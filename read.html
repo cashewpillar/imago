@@ -39,7 +39,6 @@
     --amber-text: #633806;
   }
 
-  /* Manual overrides */
   body.dark-mode {
       --bg: #1a1a18;
       --surface: #232321;
@@ -541,7 +540,6 @@
       <div class="stance-bar">
         <button class="stance-btn" id="sb-yes" onclick="setStance('yes')">yes, this</button>
         <button class="stance-btn" id="sb-complicated">
-          <!-- multi-step: show note field if complicated -->
           <span onclick="setStance('complicated')">complicated</span>
         </button>
         <button class="stance-btn" id="sb-no" onclick="setStance('no')">disagree</button>
@@ -611,7 +609,6 @@ function load() {
   initTheme();
 }
 
-// ── Theme Management ──────────────────────────────────────────
 function initTheme() {
     const t = localStorage.getItem('theme');
     if (t === 'dark') document.body.classList.add('dark-mode');
@@ -622,10 +619,7 @@ function toggleTheme() {
     const isDark = document.body.classList.contains('dark-mode');
     const isLight = document.body.classList.contains('light-mode');
     const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    
-    // Clear all
     document.body.classList.remove('dark-mode', 'light-mode');
-    
     if (isDark) {
         document.body.classList.add('light-mode');
         localStorage.setItem('theme', 'light');
@@ -633,7 +627,6 @@ function toggleTheme() {
         document.body.classList.add('dark-mode');
         localStorage.setItem('theme', 'dark');
     } else {
-        // From system default to the other
         if (systemDark) {
             document.body.classList.add('light-mode');
             localStorage.setItem('theme', 'light');
@@ -644,7 +637,6 @@ function toggleTheme() {
     }
 }
 
-// ── Per-Book Export/Import ────────────────────────────────────
 function exportBook() {
     const b = currentBook();
     if (!b) return;
@@ -665,7 +657,6 @@ function importBook(event) {
         try {
             const data = JSON.parse(e.target.result);
             if (!data.title || !Array.isArray(data.notes)) throw new Error();
-            
             if (confirm(`Import highlights for "${data.title}"? This will overwrite current lines in this book.`)) {
                 const b = currentBook();
                 b.notes = data.notes;
@@ -705,15 +696,12 @@ function renderStorage() {
   const content = document.getElementById('storage-content');
   const raw = localStorage.getItem('reader_v3') || '{}';
   const totalBytes = new TextEncoder().encode(raw).length;
-  
   let html = `<div class="card" style="cursor:default;margin-bottom:20px;">
     <div class="form-label">Total Usage</div>
     <div style="font-size:24px;margin:8px 0;font-family:-apple-system,sans-serif;">${formatBytes(totalBytes)}</div>
     <div class="muted">of ~5MB browser limit</div>
   </div>`;
-  
   html += `<div class="section-label">Breakdown by Book</div>`;
-  
   if (state.books.length === 0) {
     html += `<div class="empty">No data to analyze.</div>`;
   } else {
@@ -721,7 +709,6 @@ function renderStorage() {
       ...b,
       size: new TextEncoder().encode(JSON.stringify(b)).length
     })).sort((a, b) => b.size - a.size);
-
     booksWithSizes.forEach(b => {
       html += `<div class="card" style="cursor:default;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
         <div style="min-width:0;flex:1;margin-right:12px;">
@@ -732,7 +719,6 @@ function renderStorage() {
       </div>`;
     });
   }
-  
   content.innerHTML = html;
 }
 
@@ -777,10 +763,8 @@ function renderBook() {
   document.getElementById('book-last').textContent = notes.length ? 'last ' + relDate(notes[notes.length-1].date) : 'nothing yet';
   const idx = state.books.findIndex(x => x.id === b.id);
   document.getElementById('book-spine').style.background = SPINE_COLORS[idx % SPINE_COLORS.length];
-
   const allTags = [];
   notes.forEach(n => (n.tags||[]).forEach(t => { if(!allTags.includes(t)) allTags.push(t); }));
-
   const fa = document.getElementById('filter-area');
   const fc = document.getElementById('filter-chips');
   if(allTags.length) {
@@ -796,26 +780,21 @@ function renderBook() {
   } else {
     fa.style.display = 'none';
   }
-
   const nl = document.getElementById('note-list');
   const ne = document.getElementById('note-empty');
   nl.innerHTML = '';
-
   const filtered = currentFilter === 'all' ? notes : notes.filter(n => (n.tags||[]).includes(currentFilter));
   if(!filtered.length) { ne.style.display = 'block'; return; }
   ne.style.display = 'none';
-
   [...filtered].reverse().forEach(n => {
     const el = document.createElement('div');
     el.className = 'highlight-entry';
-
     const tags = (n.tags||[]).map(t => `<span class="tag-small">${esc(t)}</span>`).join('');
     const stance = n.stance ? `<span class="stance-display ${STANCE_CLASS[n.stance]}">${STANCE_LABEL[n.stance]}</span>` : '';
     const meta = [stance, tags ? `<span style="display:inline-flex;gap:4px;flex-wrap:wrap;">${tags}</span>` : ''].filter(Boolean).join(' ');
     const noteHtml = n.stanceNote ? `<div class="note-field">${esc(n.stanceNote)}</div>` : '';
     const locHtml = n.location ? `<div style="font-size:11px;color:var(--hint);font-family:-apple-system,sans-serif;margin-bottom:5px;">${esc(n.location)}</div>` : '';
     const dateStr = `<span style="font-size:11px;color:var(--hint);font-family:-apple-system,sans-serif;">${relDate(n.date)}</span>`;
-
     el.innerHTML = `
       ${locHtml}
       <div class="highlight-quote">${esc(n.text)}</div>
@@ -1079,23 +1058,7 @@ function doImport() {
       location: h.location || null,
       stance: null,
       stanceNote: null,
-      tags: [],
-      fromKindle: true
-    });
-  });
-  save();
-  parsedHighlights = [];
-  document.getElementById('import-preview').style.display = 'none';
-  currentFilter = 'all';
-  showScreen('s-book');
-}
-
-load();
-renderHome();
-</script>
-</body>
-</html>
-    tags: []
+      tags: []
     });
   });
   save();
