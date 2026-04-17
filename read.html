@@ -531,14 +531,14 @@
     <!-- The quote -->
     <div class="form-group" style="margin-bottom:16px;">
       <div class="form-label">the line</div>
-      <textarea id="hl-text" rows="4" placeholder="paste or type the line that hit you..."></textarea>
+      <textarea id="hl-text" rows="4" placeholder="paste or type the line that hit you..." oninput="autoExpand(this)"></textarea>
     </div>
 
     <!-- Stance -->
     <div class="form-group" style="margin-bottom:16px;">
       <div class="form-label">your take</div>
       <div class="stance-bar">
-        <button class="stance-btn" id="sb-yes" onclick="setStance('yes')">yes, this</button>
+        <button class="stance-btn" id="sb-yes" onclick="setStance('yes')">agree</button>
         <button class="stance-btn" id="sb-complicated">
           <span onclick="setStance('complicated')">complicated</span>
         </button>
@@ -592,7 +592,7 @@
 
 <script>
 const SPINE_COLORS = ['#AFA9EC','#5DCAA5','#F0997B','#ED93B1','#85B7EB','#97C459','#EF9F27'];
-const STANCE_LABEL = { yes: 'yes, this', complicated: 'complicated', no: 'disagree' };
+const STANCE_LABEL = { yes: 'agree', complicated: 'complicated', no: 'disagree' };
 const STANCE_CLASS = { yes: 'sd-yes', complicated: 'sd-complicated', no: 'sd-no' };
 
 let state = { books: [], currentBookId: null };
@@ -818,7 +818,9 @@ function editNote(id) {
   showScreen('s-highlight');
   editingNoteId = id;
   document.getElementById('hl-title').textContent = 'edit note';
-  document.getElementById('hl-text').value = n.text || '';
+  const hlText = document.getElementById('hl-text');
+  hlText.value = n.text || '';
+  autoExpand(hlText);
   document.getElementById('stance-note').value = n.stanceNote || '';
   currentStance = n.stance;
   currentTags = [...(n.tags || [])];
@@ -835,12 +837,19 @@ function deleteNote(noteId) {
   renderBook();
 }
 
+function autoExpand(el) {
+    el.style.height = 'auto';
+    el.style.height = (el.scrollHeight) + 'px';
+}
+
 function initHighlightForm() {
   editingNoteId = null;
   document.getElementById('hl-title').textContent = 'capture a line';
   currentStance = null;
   currentTags = [];
-  document.getElementById('hl-text').value = '';
+  const hlText = document.getElementById('hl-text');
+  hlText.value = '';
+  hlText.style.height = 'auto';
   document.getElementById('stance-note').value = '';
   document.getElementById('stance-note-wrap').style.display = 'none';
   document.getElementById('tag-input').value = '';
