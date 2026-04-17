@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>library</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f7f6f2;
+    --surface: #ffffff;
+    --surface2: #f0efe9;
+    --text: #1a1a18;
+    --muted: #6b6b67;
+    --hint: #a0a09b;
+    --border: rgba(0,0,0,0.09);
+    --border-med: rgba(0,0,0,0.16);
+    --radius: 12px;
+    --radius-sm: 8px;
+
+    --purple: #7F77DD;
+    --purple-bg: #EEEDFE;
+    --purple-border: #AFA9EC;
+    --purple-text: #3C3489;
+
+    --teal: #1D9E75;
+    --teal-bg: #E1F5EE;
+    --teal-border: #5DCAA5;
+    --teal-text: #085041;
+
+    --coral: #D85A30;
+    --coral-bg: #FAECE7;
+    --coral-border: #F0997B;
+    --coral-text: #712B13;
+
+    --amber-bg: #FAEEDA;
+    --amber-border: #FAC775;
+    --amber-text: #633806;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a18;
+      --surface: #232321;
+      --surface2: #2a2a28;
+      --text: #f0efe9;
+      --muted: #a0a09b;
+      --hint: #6b6b67;
+      --border: rgba(255,255,255,0.07);
+      --border-med: rgba(255,255,255,0.13);
+
+      --purple-bg: #26215C;
+      --purple-border: #534AB7;
+      --purple-text: #CECBF6;
+
+      --teal-bg: #04342C;
+      --teal-border: #0F6E56;
+      --teal-text: #9FE1CB;
+
+      --coral-bg: #4A1B0C;
+      --coral-border: #993C1D;
+      --coral-text: #F5C4B3;
+
+      --amber-bg: #412402;
+      --amber-border: #854F0B;
+      --amber-text: #FAC775;
+    }
+  }
+
+  body {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app { max-width: 480px; margin: 0 auto; padding: 1.5rem 1rem 5rem; min-height: 100vh; }
+
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  .sans { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+  h1 { font-size: 22px; font-weight: normal; color: var(--text); letter-spacing: -0.3px; }
+  h2 { font-size: 18px; font-weight: normal; color: var(--text); letter-spacing: -0.2px; }
+  h3 { font-size: 15px; font-weight: normal; color: var(--text); }
+
+  .muted { font-size: 13px; color: var(--muted); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+  .card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .card:hover { border-color: var(--border-med); }
+
+  textarea {
+    width: 100%;
+    resize: none;
+    font-size: 15px;
+    font-family: 'Georgia', 'Times New Roman', serif;
+    padding: 12px 14px;
+    border: 0.5px solid var(--border-med);
+    border-radius: var(--radius-sm);
+    background: var(--surface2);
+    color: var(--text);
+    line-height: 1.7;
+    transition: border-color 0.15s;
+  }
+  textarea:focus { outline: none; border-color: var(--border-med); box-shadow: 0 0 0 3px rgba(127,119,221,0.12); }
+  textarea::placeholder { color: var(--hint); font-style: italic; }
+
+  input[type=text] {
+    width: 100%;
+    font-size: 15px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    padding: 0 12px;
+    height: 42px;
+    border: 0.5px solid var(--border-med);
+    border-radius: var(--radius-sm);
+    background: var(--surface2);
+    color: var(--text);
+    transition: border-color 0.15s;
+  }
+  input[type=text]:focus { outline: none; border-color: var(--border-med); box-shadow: 0 0 0 3px rgba(127,119,221,0.12); }
+  input[type=text]::placeholder { color: var(--hint); }
+
+  button { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; cursor: pointer; }
+
+  .btn {
+    font-size: 14px;
+    padding: 9px 16px;
+    border-radius: var(--radius-sm);
+    border: 0.5px solid var(--border-med);
+    background: transparent;
+    color: var(--text);
+    transition: background 0.12s;
+  }
+  .btn:hover { background: var(--surface2); }
+  .btn:active { transform: scale(0.98); }
+
+  .btn-primary {
+    background: var(--text);
+    color: var(--surface);
+    border-color: var(--text);
+  }
+  .btn-primary:hover { opacity: 0.82; background: var(--text); }
+
+  .btn-ghost {
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 14px;
+    padding: 6px 4px;
+  }
+  .btn-ghost:hover { color: var(--text); background: transparent; }
+
+  .row { display: flex; align-items: center; gap: 10px; }
+  .spacer { flex: 1; }
+
+  .tag-chip {
+    font-size: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: var(--surface2);
+    color: var(--muted);
+    border: 0.5px solid var(--border);
+    cursor: pointer;
+    transition: all 0.12s;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .tag-chip:hover { border-color: var(--border-med); color: var(--text); }
+  .tag-chip.active {
+    background: var(--purple-bg);
+    color: var(--purple-text);
+    border-color: var(--purple-border);
+  }
+
+  .divider { height: 0.5px; background: var(--border); margin: 1.25rem 0; }
+
+  .highlight-entry {
+    padding: 14px 0;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .highlight-entry:last-child { border-bottom: none; }
+
+  .highlight-quote {
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--text);
+    font-style: italic;
+    margin-bottom: 10px;
+    border-left: 2px solid var(--purple);
+    padding-left: 12px;
+  }
+
+  .empty {
+    text-align: center;
+    padding: 2.5rem 1rem;
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1.7;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  .spine {
+    width: 4px;
+    border-radius: 2px;
+    flex-shrink: 0;
+    align-self: stretch;
+    min-height: 40px;
+  }
+
+  .stance-bar {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .stance-btn {
+    font-size: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    padding: 5px 12px;
+    border-radius: 20px;
+    border: 0.5px solid var(--border-med);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .stance-btn:hover { color: var(--text); border-color: var(--border-med); }
+  .stance-btn.s-yes { background: var(--teal-bg); color: var(--teal-text); border-color: var(--teal-border); }
+  .stance-btn.s-complicated { background: var(--amber-bg); color: var(--amber-text); border-color: var(--amber-border); }
+  .stance-btn.s-no { background: var(--coral-bg); color: var(--coral-text); border-color: var(--coral-border); }
+
+  .tag-display {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 8px;
+  }
+
+  .tag-small {
+    font-size: 11px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: var(--purple-bg);
+    color: var(--purple-text);
+    border: 0.5px solid var(--purple-border);
+  }
+
+  .tags-input-wrap {
+    position: relative;
+  }
+
+  .tags-input {
+    width: 100%;
+    font-size: 14px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    padding: 9px 12px;
+    height: auto;
+    border: 0.5px solid var(--border-med);
+    border-radius: var(--radius-sm);
+    background: var(--surface2);
+    color: var(--text);
+  }
+  .tags-input::placeholder { color: var(--hint); font-style: normal; }
+  .tags-input:focus { outline: none; box-shadow: 0 0 0 3px rgba(127,119,221,0.12); }
+
+  .live-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; min-height: 22px; }
+
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-label { font-size: 12px; color: var(--muted); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; text-transform: uppercase; letter-spacing: 0.04em; }
+
+  .delete-btn {
+    border: none;
+    background: transparent;
+    color: #E24B4A;
+    font-size: 13px;
+    padding: 6px 4px;
+    cursor: pointer;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  .delete-btn:hover { opacity: 0.7; }
+
+  .section-label {
+    font-size: 11px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--hint);
+    margin-bottom: 10px;
+  }
+
+  .stance-display {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    padding: 2px 8px;
+    border-radius: 20px;
+  }
+  .sd-yes { background: var(--teal-bg); color: var(--teal-text); border: 0.5px solid var(--teal-border); }
+  .sd-complicated { background: var(--amber-bg); color: var(--amber-text); border: 0.5px solid var(--amber-border); }
+  .sd-no { background: var(--coral-bg); color: var(--coral-text); border: 0.5px solid var(--coral-border); }
+
+  .note-field { font-size: 13px; color: var(--muted); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin-top: 6px; line-height: 1.6; }
+
+  .book-stat { font-size: 12px; color: var(--muted); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+  .filter-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1.25rem; }
+
+  .filter-chip {
+    font-size: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: var(--surface);
+    color: var(--muted);
+    border: 0.5px solid var(--border);
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .filter-chip:hover { color: var(--text); border-color: var(--border-med); }
+  .filter-chip.active { background: var(--text); color: var(--surface); border-color: var(--text); }
+
+  .expand-btn {
+    font-size: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: var(--hint);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    margin-top: 4px;
+  }
+  .expand-btn:hover { color: var(--muted); }
+
+  .note-extra { margin-top: 8px; padding-top: 8px; border-top: 0.5px solid var(--border); }
+
+  .import-item {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: border-color 0.12s;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .import-item:hover { border-color: var(--border-med); }
+  .import-item.selected { border-color: var(--purple); background: var(--purple-bg); }
+  .import-item.selected .import-check { background: var(--purple); border-color: var(--purple); }
+  .import-item.selected .import-check::after { opacity: 1; }
+
+  .import-check {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 1.5px solid var(--border-med);
+    flex-shrink: 0;
+    margin-top: 2px;
+    position: relative;
+    transition: all 0.12s;
+  }
+  .import-check::after {
+    content: '';
+    position: absolute;
+    left: 4px; top: 1px;
+    width: 6px; height: 10px;
+    border: 2px solid white;
+    border-top: none; border-left: none;
+    transform: rotate(45deg);
+    opacity: 0;
+    transition: opacity 0.1s;
+  }
+
+  .import-loc {
+    font-size: 11px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: var(--hint);
+    margin-bottom: 5px;
+  }
+
+  .import-text {
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--text);
+    font-style: italic;
+  }
+
+  #import-drop-area:hover { border-color: var(--purple-border); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Home -->
+  <div id="s-home" class="screen active">
+    <div class="row" style="margin-bottom:1.75rem;">
+      <h1>library</h1>
+      <div class="spacer"></div>
+      <button class="btn-ghost" style="padding: 8px; font-size: 18px;" onclick="showStorage()" title="Storage Stats">📊</button>
+      <button class="btn btn-primary sans" onclick="showScreen('s-add-book')">+ add book</button>
+    </div>
+    <div id="book-list"></div>
+    <div id="home-empty" class="empty" style="display:none;">
+      <div style="font-size:15px;margin-bottom:6px;color:var(--text);">no books yet</div>
+      Add one to start collecting.
+    </div>
+  </div>
+
+  <!-- Storage Analyzer -->
+  <div id="s-storage" class="screen">
+    <div class="row" style="margin-bottom:1.5rem;">
+      <button class="btn-ghost" onclick="showScreen('s-home')">← back</button>
+      <h2>storage stats</h2>
+    </div>
+    <div id="storage-content"></div>
+  </div>
+
+  <!-- Add Book -->
+  <div id="s-add-book" class="screen">
+    <div class="row" style="margin-bottom:1.5rem;">
+      <button class="btn-ghost" onclick="showScreen('s-home')">← back</button>
+      <h2 style="flex:1;">add a book</h2>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="form-group">
+        <div class="form-label">title</div>
+        <input type="text" id="new-title" placeholder="book title">
+      </div>
+      <div class="form-group">
+        <div class="form-label">author</div>
+        <input type="text" id="new-author" placeholder="author name">
+      </div>
+      <div style="margin-top:6px;">
+        <button class="btn btn-primary" onclick="addBook()" style="width:100%;padding:12px;">start reading</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Book Detail -->
+  <div id="s-book" class="screen">
+    <div class="row" style="margin-bottom:4px;">
+      <button class="btn-ghost" onclick="showScreen('s-home')">← library</button>
+      <div class="spacer"></div>
+      <button class="delete-btn" onclick="deleteBook()">remove</button>
+    </div>
+    <div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:1.25rem;">
+      <div class="spine" id="book-spine"></div>
+      <div>
+        <h2 id="book-title-display"></h2>
+        <div class="muted" id="book-author-display" style="margin-top:3px;"></div>
+        <div style="margin-top:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <span class="book-stat" id="book-note-count"></span>
+          <span class="book-stat" style="color:var(--hint);">·</span>
+          <span class="book-stat" id="book-last"></span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:1.5rem;">
+      <button class="btn btn-primary" style="flex:1;padding:12px;" onclick="showScreen('s-highlight')">+ capture a line</button>
+      <button class="btn" style="padding:12px 14px;white-space:nowrap;" onclick="showScreen('s-import')">import kindle</button>
+    </div>
+
+    <div class="divider" style="margin-top:0;"></div>
+
+    <div id="filter-area" style="display:none;">
+      <div class="filter-row" id="filter-chips"></div>
+    </div>
+
+    <div id="note-list"></div>
+    <div id="note-empty" class="empty" style="display:none;padding:1rem 0;">
+      Nothing yet. Capture the first line that hits you.
+    </div>
+  </div>
+
+  <!-- Highlight / Capture -->
+  <div id="s-highlight" class="screen">
+    <div class="row" style="margin-bottom:1.5rem;">
+      <button class="btn-ghost" onclick="showScreen('s-book')">← back</button>
+      <h2 id="hl-title">capture a line</h2>
+    </div>
+
+    <!-- The quote -->
+    <div class="form-group" style="margin-bottom:16px;">
+      <div class="form-label">the line</div>
+      <textarea id="hl-text" rows="4" placeholder="paste or type the line that hit you..."></textarea>
+    </div>
+
+    <!-- Stance -->
+    <div class="form-group" style="margin-bottom:16px;">
+      <div class="form-label">your take</div>
+      <div class="stance-bar">
+        <button class="stance-btn" id="sb-yes" onclick="setStance('yes')">yes, this</button>
+        <button class="stance-btn" id="sb-complicated">
+          <!-- multi-step: show note field if complicated -->
+          <span onclick="setStance('complicated')">complicated</span>
+        </button>
+        <button class="stance-btn" id="sb-no" onclick="setStance('no')">disagree</button>
+      </div>
+      <div id="stance-note-wrap" style="display:none;margin-top:10px;">
+        <textarea id="stance-note" rows="2" placeholder="what's the complication, or why do you disagree..."></textarea>
+      </div>
+    </div>
+
+    <!-- Tags -->
+    <div class="form-group" style="margin-bottom:20px;">
+      <div class="form-label">your tags</div>
+      <div class="tags-input-wrap">
+        <input class="tags-input" type="text" id="tag-input" placeholder="#lifelesson  #cringe-but-true  #dad — press space or comma">
+      </div>
+      <div class="live-tags" id="live-tags"></div>
+    </div>
+
+    <button class="btn btn-primary" onclick="saveHighlight()" style="width:100%;padding:12px;">save it</button>
+  </div>
+
+  <!-- Import Kindle -->
+  <div id="s-import" class="screen">
+    <div class="row" style="margin-bottom:1.5rem;">
+      <button class="btn-ghost" onclick="showScreen('s-book')">← back</button>
+      <h2>import kindle highlights</h2>
+    </div>
+
+    <div id="import-drop-area" style="border:1px dashed var(--border-med);border-radius:var(--radius);padding:2rem 1.5rem;text-align:center;cursor:pointer;transition:border-color 0.15s;margin-bottom:1.25rem;" onclick="document.getElementById('kindle-file-input').click()">
+      <div style="font-size:28px;margin-bottom:10px;">📄</div>
+      <div style="font-size:15px;color:var(--text);margin-bottom:4px;">drop your kindle notebook export</div>
+      <div class="muted" style="font-size:13px;">the .html file from Kindle's "Export Notebook" option</div>
+      <input type="file" id="kindle-file-input" accept=".html,.htm" style="display:none;" onchange="handleKindleFile(this)">
+    </div>
+
+    <div id="import-preview" style="display:none;">
+      <div class="row" style="margin-bottom:10px;">
+        <div style="font-size:13px;color:var(--muted);font-family:-apple-system,sans-serif;" id="import-count-label"></div>
+        <div class="spacer"></div>
+        <button class="btn-ghost" style="font-size:13px;" onclick="toggleSelectAll()">select all</button>
+      </div>
+      <div id="import-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:1.25rem;"></div>
+      <button class="btn btn-primary" onclick="doImport()" style="width:100%;padding:12px;" id="import-confirm-btn">import selected</button>
+    </div>
+
+    <div id="import-empty" style="display:none;" class="empty">No highlights found in that file.</div>
+  </div>
+
+</div>
+
+<script>
+const SPINE_COLORS = ['#AFA9EC','#5DCAA5','#F0997B','#ED93B1','#85B7EB','#97C459','#EF9F27'];
+const STANCE_LABEL = { yes: 'yes, this', complicated: 'complicated', no: 'disagree' };
+const STANCE_CLASS = { yes: 'sd-yes', complicated: 'sd-complicated', no: 'sd-no' };
+
+let state = { books: [], currentBookId: null };
+let currentStance = null;
+let currentTags = [];
+let currentFilter = 'all';
+
+function save() { try { localStorage.setItem('reader_v3', JSON.stringify(state)); } catch(e){} }
+function load() { try { const d = localStorage.getItem('reader_v3'); if(d) state = JSON.parse(d); } catch(e){} }
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if(id === 's-home') renderHome();
+  if(id === 's-book') renderBook();
+  if(id === 's-storage') renderStorage();
+  if(id === 's-highlight') initHighlightForm();
+  if(id === 's-import') {
+    parsedHighlights = [];
+    document.getElementById('import-preview').style.display = 'none';
+    document.getElementById('import-empty').style.display = 'none';
+  }
+  window.scrollTo(0, 0);
+}
+
+function showStorage() {
+  showScreen('s-storage');
+}
+
+function renderStorage() {
+  const content = document.getElementById('storage-content');
+  const raw = localStorage.getItem('reader_v3') || '{}';
+  const totalBytes = new TextEncoder().encode(raw).length;
+  
+  let html = `<div class="card" style="cursor:default;margin-bottom:20px;">
+    <div class="form-label">Total Usage</div>
+    <div style="font-size:24px;margin:8px 0;font-family:-apple-system,sans-serif;">${formatBytes(totalBytes)}</div>
+    <div class="muted">of ~5MB browser limit</div>
+  </div>`;
+  
+  html += `<div class="section-label">Breakdown by Book</div>`;
+  
+  if (state.books.length === 0) {
+    html += `<div class="empty">No data to analyze.</div>`;
+  } else {
+    // Sort books by size descending
+    const booksWithSizes = state.books.map(b => ({
+      ...b,
+      size: new TextEncoder().encode(JSON.stringify(b)).length
+    })).sort((a, b) => b.size - a.size);
+
+    booksWithSizes.forEach(b => {
+      html += `<div class="card" style="cursor:default;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div style="min-width:0;flex:1;margin-right:12px;">
+          <div style="font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(b.title)}</div>
+          <div class="muted" style="font-size:11px;">${b.notes.length} items</div>
+        </div>
+        <div style="font-family:monospace;font-size:12px;color:var(--muted);flex-shrink:0;">${formatBytes(b.size)}</div>
+      </div>`;
+    });
+  }
+  
+  content.innerHTML = html;
+}
+
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function renderHome() {
+  const list = document.getElementById('book-list');
+  const empty = document.getElementById('home-empty');
+  list.innerHTML = '';
+  if(!state.books.length) { empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  state.books.forEach((b, i) => {
+    const notes = b.notes || [];
+    const last = notes.length ? 'last: ' + relDate(notes[notes.length-1].date) : 'not started';
+    const color = SPINE_COLORS[i % SPINE_COLORS.length];
+    const el = document.createElement('div');
+    el.className = 'card';
+    el.innerHTML = `<div style="display:flex;gap:14px;align-items:center;">
+      <div class="spine" style="background:${color};min-height:36px;"></div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:15px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(b.title)}</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:2px;font-family:-apple-system,sans-serif;">${esc(b.author||'')}</div>
+      </div>
+      <div style="font-size:12px;color:var(--hint);flex-shrink:0;font-family:-apple-system,sans-serif;">${notes.length} saved</div>
+    </div>`;
+    el.onclick = () => { state.currentBookId = b.id; showScreen('s-book'); };
+    list.appendChild(el);
+  });
+}
+
+function renderBook() {
+  const b = currentBook(); if(!b) return;
+  document.getElementById('book-title-display').textContent = b.title;
+  document.getElementById('book-author-display').textContent = b.author || '';
+  const notes = b.notes || [];
+  document.getElementById('book-note-count').textContent = notes.length + ' saved';
+  document.getElementById('book-last').textContent = notes.length ? 'last ' + relDate(notes[notes.length-1].date) : 'nothing yet';
+  const idx = state.books.findIndex(x => x.id === b.id);
+  document.getElementById('book-spine').style.background = SPINE_COLORS[idx % SPINE_COLORS.length];
+
+  // Gather all tags across notes
+  const allTags = [];
+  notes.forEach(n => (n.tags||[]).forEach(t => { if(!allTags.includes(t)) allTags.push(t); }));
+
+  // Filter chips
+  const fa = document.getElementById('filter-area');
+  const fc = document.getElementById('filter-chips');
+  if(allTags.length) {
+    fa.style.display = 'block';
+    fc.innerHTML = '';
+    ['all', ...allTags].forEach(tag => {
+      const chip = document.createElement('button');
+      chip.className = 'filter-chip' + (currentFilter === tag ? ' active' : '');
+      chip.textContent = tag === 'all' ? 'all' : tag;
+      chip.onclick = () => { currentFilter = tag; renderBook(); };
+      fc.appendChild(chip);
+    });
+  } else {
+    fa.style.display = 'none';
+  }
+
+  const nl = document.getElementById('note-list');
+  const ne = document.getElementById('note-empty');
+  nl.innerHTML = '';
+
+  const filtered = currentFilter === 'all' ? notes : notes.filter(n => (n.tags||[]).includes(currentFilter));
+  if(!filtered.length) { ne.style.display = 'block'; return; }
+  ne.style.display = 'none';
+
+  [...filtered].reverse().forEach(n => {
+    const el = document.createElement('div');
+    el.className = 'highlight-entry';
+
+    const tags = (n.tags||[]).map(t => `<span class="tag-small">${esc(t)}</span>`).join('');
+    const stance = n.stance ? `<span class="stance-display ${STANCE_CLASS[n.stance]}">${STANCE_LABEL[n.stance]}</span>` : '';
+    const kindleBadge = n.fromKindle ? `<span style="font-size:11px;font-family:-apple-system,sans-serif;padding:2px 7px;border-radius:20px;background:var(--surface2);color:var(--hint);border:0.5px solid var(--border);">kindle</span>` : '';
+    const meta = [stance, kindleBadge, tags ? `<span style="display:inline-flex;gap:4px;flex-wrap:wrap;">${tags}</span>` : ''].filter(Boolean).join(' ');
+    const noteHtml = n.stanceNote ? `<div class="note-field">${esc(n.stanceNote)}</div>` : '';
+    const locHtml = n.location ? `<div style="font-size:11px;color:var(--hint);font-family:-apple-system,sans-serif;margin-bottom:5px;">${esc(n.location)}</div>` : '';
+    const dateStr = `<span style="font-size:11px;color:var(--hint);font-family:-apple-system,sans-serif;">${relDate(n.date)}</span>`;
+
+    el.innerHTML = `
+      ${locHtml}
+      <div class="highlight-quote">${esc(n.text)}</div>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;">
+        ${meta}${dateStr}
+        <button class="btn-ghost" style="font-size:11px;margin-left:auto;color:var(--purple);" onclick="editNote('${n.id}')">edit</button>
+        <button class="delete-btn" style="font-size:11px;" onclick="deleteNote('${n.id}')">delete</button>
+      </div>
+      ${noteHtml}
+    `;
+    nl.appendChild(el);
+  });
+}
+
+let editingNoteId = null;
+
+function editNote(id) {
+  const b = currentBook();
+  const n = b.notes.find(x => x.id === id);
+  if(!n) return;
+
+  showScreen('s-highlight');
+  editingNoteId = id;
+
+  document.getElementById('hl-title').textContent = 'edit note';
+  document.getElementById('hl-text').value = n.text || '';
+  document.getElementById('stance-note').value = n.stanceNote || '';
+  currentStance = n.stance;
+  currentTags = [...(n.tags || [])];
+
+  setStance(n.stance);
+  renderLiveTags();
+}
+
+function deleteNote(noteId) {
+  if(!confirm('Delete this line?')) return;
+  const b = currentBook();
+  if(!b) return;
+  b.notes = b.notes.filter(n => n.id !== noteId);
+  save();
+  renderBook();
+}
+
+function initHighlightForm() {
+  editingNoteId = null;
+  document.getElementById('hl-title').textContent = 'capture a line';
+  currentStance = null;
+  currentTags = [];
+  document.getElementById('hl-text').value = '';
+  document.getElementById('stance-note').value = '';
+  document.getElementById('stance-note-wrap').style.display = 'none';
+  document.getElementById('tag-input').value = '';
+  document.getElementById('live-tags').innerHTML = '';
+  ['yes','complicated','no'].forEach(s => {
+    document.getElementById('sb-'+s).className = 'stance-btn';
+  });
+}
+
+function setStance(s) {
+  currentStance = s;
+  ['yes','complicated','no'].forEach(x => {
+    const btn = document.getElementById('sb-'+x);
+    if (btn) btn.className = 'stance-btn' + (x === s ? ' s-'+x : '');
+  });
+  const noteWrap = document.getElementById('stance-note-wrap');
+  noteWrap.style.display = (s === 'complicated' || s === 'no') ? 'block' : 'none';
+}
+
+// Tag input
+document.addEventListener('DOMContentLoaded', () => {
+  const tagInput = document.getElementById('tag-input');
+  if (tagInput) {
+    tagInput.addEventListener('input', handleTagInput);
+    tagInput.addEventListener('keydown', e => {
+      if(e.key === 'Backspace' && tagInput.value === '' && currentTags.length) {
+        currentTags.pop();
+        renderLiveTags();
+      }
+    });
+  }
+});
+
+function handleTagInput(e) {
+  const val = e.target.value;
+  const lastChar = val[val.length-1];
+  if(lastChar === ' ' || lastChar === ',') {
+    const raw = val.slice(0, -1).trim();
+    if(raw) addTag(raw);
+    e.target.value = '';
+  }
+}
+
+function addTag(raw) {
+  const tag = raw.startsWith('#') ? raw : '#' + raw;
+  if(!currentTags.includes(tag)) {
+    currentTags.push(tag);
+    renderLiveTags();
+  }
+}
+
+function renderLiveTags() {
+  const wrap = document.getElementById('live-tags');
+  wrap.innerHTML = currentTags.map((t, i) =>
+    `<span class="tag-chip active" onclick="removeTag(${i})">${esc(t)} ×</span>`
+  ).join('');
+}
+
+function removeTag(i) {
+  currentTags.splice(i, 1);
+  renderLiveTags();
+}
+
+function saveHighlight() {
+  const b = currentBook(); if(!b) return;
+  // Flush any pending tag
+  const tagInput = document.getElementById('tag-input');
+  const pending = tagInput.value.trim();
+  if(pending) { addTag(pending); tagInput.value = ''; }
+
+  const text = document.getElementById('hl-text').value.trim();
+  if(!text) return;
+  const stanceNote = document.getElementById('stance-note').value.trim();
+
+  if (editingNoteId) {
+    const n = b.notes.find(x => x.id === editingNoteId);
+    if (n) {
+      n.text = text;
+      n.stance = currentStance;
+      n.stanceNote = stanceNote || null;
+      n.tags = [...currentTags];
+    }
+  } else {
+    const note = {
+      id: Date.now()+'',
+      date: Date.now(),
+      text,
+      stance: currentStance,
+      stanceNote: stanceNote || null,
+      tags: [...currentTags]
+    };
+    b.notes.push(note);
+  }
+  save();
+  currentFilter = 'all';
+  showScreen('s-book');
+}
+
+function addBook() {
+  const title = document.getElementById('new-title').value.trim();
+  const author = document.getElementById('new-author').value.trim();
+  if(!title) return;
+  const book = { id: Date.now()+'', title, author, notes: [] };
+  state.books.push(book);
+  state.currentBookId = book.id;
+  save();
+  document.getElementById('new-title').value = '';
+  document.getElementById('new-author').value = '';
+  showScreen('s-book');
+}
+
+function deleteBook() {
+  if(!confirm('Remove this book and all saved lines?')) return;
+  state.books = state.books.filter(b => b.id !== state.currentBookId);
+  state.currentBookId = null;
+  save();
+  showScreen('s-home');
+}
+
+function currentBook() { return state.books.find(b => b.id === state.currentBookId); }
+
+function relDate(ts) {
+  const d = Math.floor((Date.now()-ts)/86400000);
+  if(d === 0) return 'today';
+  if(d === 1) return 'yesterday';
+  if(d < 7) return d+'d ago';
+  if(d < 30) return Math.floor(d/7)+'w ago';
+  return Math.floor(d/30)+'mo ago';
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Kindle import ─────────────────────────────────────────────
+let parsedHighlights = []; // {text, location, selected}
+let allSelected = true;
+
+function handleKindleFile(input) {
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => parseKindleHTML(e.target.result);
+  reader.readAsText(file);
+  input.value = '';
+}
+
+function parseKindleHTML(html) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  const headings = doc.querySelectorAll('.noteHeading');
+  const results = [];
+
+  headings.forEach(heading => {
+    const headingText = heading.textContent || '';
+    // Skip bookmarks — only process Highlight entries
+    if(!headingText.toLowerCase().includes('highlight')) return;
+    // Extract location label (e.g. "Chapter 15 > Location 1604")
+    const locMatch = headingText.match(/[-–]\s*(.+)$/);
+    const location = locMatch ? locMatch[1].trim() : '';
+    // The noteText sibling follows the noteHeading
+    const textEl = heading.nextElementSibling;
+    if(!textEl || !textEl.classList.contains('noteText')) return;
+    const text = (textEl.textContent || '').trim();
+    if(!text) return;
+    results.push({ text, location, selected: true });
+  });
+
+  parsedHighlights = results;
+  renderImportPreview();
+}
+
+function renderImportPreview() {
+  const preview = document.getElementById('import-preview');
+  const empty = document.getElementById('import-empty');
+  const list = document.getElementById('import-list');
+  const countLabel = document.getElementById('import-count-label');
+
+  if(!parsedHighlights.length) {
+    preview.style.display = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+
+  empty.style.display = 'none';
+  preview.style.display = 'block';
+  updateImportCount();
+  list.innerHTML = '';
+
+  parsedHighlights.forEach((h, i) => {
+    const el = document.createElement('div');
+    el.className = 'import-item' + (h.selected ? ' selected' : '');
+    el.innerHTML = `
+      <div class="import-check"></div>
+      <div style="flex:1;min-width:0;">
+        ${h.location ? `<div class="import-loc">${esc(h.location)}</div>` : ''}
+        <div class="import-text">${esc(h.text)}</div>
+      </div>
+    `;
+    el.onclick = () => {
+      parsedHighlights[i].selected = !parsedHighlights[i].selected;
+      el.classList.toggle('selected', parsedHighlights[i].selected);
+      updateImportCount();
+    };
+    list.appendChild(el);
+  });
+}
+
+function updateImportCount() {
+  const sel = parsedHighlights.filter(h => h.selected).length;
+  document.getElementById('import-count-label').textContent = sel + ' of ' + parsedHighlights.length + ' selected';
+  document.getElementById('import-confirm-btn').textContent = 'import ' + sel + ' highlight' + (sel !== 1 ? 's' : '');
+}
+
+function toggleSelectAll() {
+  allSelected = !allSelected;
+  parsedHighlights.forEach(h => h.selected = allSelected);
+  renderImportPreview();
+}
+
+function doImport() {
+  const b = currentBook(); if(!b) return;
+  const toImport = parsedHighlights.filter(h => h.selected);
+  if(!toImport.length) return;
+
+  toImport.forEach(h => {
+    b.notes.push({
+      id: Date.now() + Math.random() + '',
+      date: Date.now(),
+      text: h.text,
+      location: h.location || null,
+      stance: null,
+      stanceNote: null,
+      tags: [],
+      fromKindle: true
+    });
+  });
+
+  save();
+  parsedHighlights = [];
+  document.getElementById('import-preview').style.display = 'none';
+  currentFilter = 'all';
+  showScreen('s-book');
+}
+
+// ── end import ─────────────────────────────────────────────────
+
+load();
+renderHome();
+</script>
+</body>
+</html>
