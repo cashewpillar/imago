@@ -205,6 +205,25 @@ if(state&&state.days&&state.days.length){
   days=state.days;cur=state.cur||0;
   if(state.allTags)allTags=state.allTags;
   if(state.cmap)Object.assign(CMAP,state.cmap);
+  
+  // Date check: insert missing days if today changed
+  const todayStr = fmtDate(tday);
+  if(days[0].date !== todayStr){
+    const missing = [];
+    for(let i=0; i<14; i++){
+      const d = prevDate(i);
+      const dStr = fmtDate(d);
+      if(dStr === days[0].date) break;
+      missing.push(mkDay(i));
+    }
+    if(missing.length > 0){
+      days.unshift(...missing);
+      if(days.length > 20) days.splice(20);
+      cur = 0; // jump to today
+    }
+  }
+  // Refresh labels
+  days.forEach((d,i) => d.label = dayLabel(i));
 }else{
   days=[mkDay(0),mkDay(1)];
   days[1].blocks=[{name:'work',start:9,end:12},{name:'lunch',start:12,end:13},{name:'work',start:13,end:17},{name:'exercise',start:18,end:19}];

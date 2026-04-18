@@ -320,6 +320,8 @@ function defaultBlocks(wake, bed){
   return [{name:'work',hours:e},{name:'personal',hours:e}];
 }
 
+function dayLabel(i){return i===0?'today':i===1?'yesterday':i+'d ago';}
+
 function loadState(){
   try{
     const raw=localStorage.getItem('fatd_v12')||localStorage.getItem('fatd_v11')||localStorage.getItem('fatd_v10');
@@ -357,7 +359,27 @@ function loadState(){
             return {...block,name:normalized};
           });
         });
-        return s.days;
+
+        // Date check: if today's date has changed, insert missing days
+        const loadedDays = s.days;
+        const todayStr = fmtDate(today);
+        if(loadedDays[0].date !== todayStr){
+          // Find how many days have passed
+          let missing = [];
+          for(let i=0; i<14; i++){ // max 14 days lookback
+            const d = prevDate(i);
+            const dStr = fmtDate(d);
+            if(dStr === loadedDays[0].date) break;
+            missing.push({label:'',date:dStr,blocks:defaultBlocks(6,22),wake:6,bed:22});
+          }
+          if(missing.length > 0){
+            loadedDays.unshift(...missing);
+            if(loadedDays.length > 20) loadedDays.splice(20); // keep max 20
+          }
+        }
+        // Refresh all labels
+        loadedDays.forEach((d, i) => d.label = dayLabel(i));
+        return loadedDays;
       }
     }
   }catch(e){}
@@ -438,8 +460,7 @@ document.getElementById('nav-next').onclick=()=>{
 document.getElementById('add-day-btn').onclick=()=>{
   const offset=days.length;
   const d=prevDate(offset);
-  const label=offset===1?'yesterday':`${offset}d ago`;
-  days.push({label,date:fmtDate(d),blocks:defaultBlocks(defaultWake, defaultBed),wake:defaultWake,bed:defaultBed});
+  days.push({label:dayLabel(offset),date:fmtDate(d),blocks:defaultBlocks(defaultWake, defaultBed),wake:defaultWake,bed:defaultBed});
   currentDay=days.length-1;
   saveState();
   renderAll();
