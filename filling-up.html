@@ -314,14 +314,35 @@ function renderTimeline(){
     document.addEventListener('mouseup',_mu);
   });
 
+  let pressTimer=null, creationMode=false, handlers=null, startY=0, startX=0;
   col.addEventListener('touchstart',e=>{
     let t=e.target;while(t&&t!==col){if(t.dataset.blockIdx!==undefined)return;t=t.parentElement;}
-    const {mv,mu}=begin(e.touches[0].clientY);
-    const _tm=e2=>{e2.preventDefault();mv(e2.touches[0].clientY);};
-    const _tu=e2=>{mu(e2.changedTouches[0].clientY);document.removeEventListener('touchmove',_tm);document.removeEventListener('touchend',_tu);};
-    document.addEventListener('touchmove',_tm,{passive:false});
-    document.addEventListener('touchend',_tu);
+    startX=e.touches[0].clientX; startY=e.touches[0].clientY;
+    creationMode=false;
+    pressTimer=setTimeout(()=>{
+      creationMode=true;
+      handlers=begin(startY);
+      if(window.navigator.vibrate) window.navigator.vibrate(20);
+    },400);
+  },{passive:true});
+
+  col.addEventListener('touchmove',e=>{
+    if(!creationMode){
+      const dx=e.touches[0].clientX-startX, dy=e.touches[0].clientY-startY;
+      if(Math.abs(dx)>10 || Math.abs(dy)>10) clearTimeout(pressTimer);
+      return;
+    }
+    if(e.cancelable) e.preventDefault();
+    handlers.mv(e.touches[0].clientY);
   },{passive:false});
+
+  col.addEventListener('touchend',e=>{
+    clearTimeout(pressTimer);
+    if(creationMode && handlers){
+      handlers.mu(e.changedTouches[0].clientY);
+      creationMode=false; handlers=null;
+    }
+  });
 })();
 function buildBlock(col,b,idx){
   const color=tagColor(b.name);
