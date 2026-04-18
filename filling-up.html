@@ -100,6 +100,9 @@ input{user-select:text;}
 .modal-handle{width:44px;height:5px;border-radius:999px;background:var(--color-border-tertiary);margin:0 auto 12px;}
 .modal-title{font-size:13px;font-weight:600;color:var(--color-text-primary);margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em;}
 .modal-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:12px;}
+.color-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;justify-content:center;}
+.color-opt{width:32px;height:32px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform 0.1s;}
+.color-opt.selected{border-color:var(--color-text-primary);transform:scale(1.1);}
 .modal-input{width:100%;font-size:16px;font-family:var(--font-sans);padding:12px 12px;border-radius:var(--border-radius-lg);border:0.5px solid var(--color-border-secondary);background:var(--color-background-secondary);color:var(--color-text-primary);outline:none;}
 .modal-actions{display:flex;gap:8px;}
 .modal-btn{flex:1;font-size:14px;padding:11px 12px;border-radius:var(--border-radius-lg);border:0.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-secondary);cursor:pointer;}
@@ -111,7 +114,7 @@ input{user-select:text;}
 <div class="app">
 <h2 class="sr-only">filling up — water your day</h2>
 <div class="hdr">
-  <div class="hdr-title">filling up</div>
+  <div class="hdr-title">a fraction of a day</div>
   <div class="hdr-sub" id="hdr-sub"></div>
 </div>
 <div class="day-nav">
@@ -167,6 +170,7 @@ input{user-select:text;}
     <div class="modal-grid">
       <input autocomplete="off" class="modal-input" id="edit-name-input" maxlength="24" placeholder="activity name"/>
     </div>
+    <div class="color-grid" id="edit-color-grid"></div>
     <div class="modal-actions">
       <button class="modal-btn danger" onclick="deleteEditedBlock()">delete</button>
       <button class="modal-btn" onclick="cancelBlockEdit()">cancel</button>
@@ -181,7 +185,7 @@ const PRESETS=['work','rest','exercise','commute','personal','social','reading',
 const CMAP={work:'#7F77DD',rest:'#378ADD',exercise:'#D85A30',commute:'#BA7517',personal:'#5DCAA5',social:'#D4537E',reading:'#639922'};
 const PX_H=56,SNAP=0.5,NOW_COL='#D85A30',SCROLL_H=280;
 let allTags=[...PRESETS],selTag='work';
-let editingBlockIdx=-1, editingTagName='';
+let editingBlockIdx=-1, editingTagName='', modalColor='';
 const tday=new Date();
 function fmtDate(d){return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}
 function prevDate(n){const x=new Date(tday);x.setDate(x.getDate()-n);return x;}
@@ -425,16 +429,19 @@ function renderSummary(){
 function startBlockEdit(i){
   editingBlockIdx=i;
   editingTagName=D().blocks[i]?.name||'';
+  modalColor=tagColor(editingTagName);
   renderEditor();
 }
 function startTagEdit(name){
   editingTagName=name;
   editingBlockIdx=D().blocks.findIndex(b=>b.name===name);
+  modalColor=tagColor(editingTagName);
   renderEditor();
 }
 function cancelBlockEdit(){
   editingBlockIdx=-1;
   editingTagName='';
+  modalColor='';
   renderEditor();
 }
 function renderEditor(){
@@ -445,6 +452,17 @@ function renderEditor(){
     return;
   }
   document.getElementById('edit-name-input').value=editingTagName;
+  
+  const grid=document.getElementById('edit-color-grid');
+  grid.innerHTML='';
+  PALETTE.forEach(c=>{
+    const opt=document.createElement('div');
+    opt.className='color-opt'+(c===modalColor?' selected':'');
+    opt.style.background=c;
+    opt.onclick=()=>{modalColor=c;renderEditor();};
+    grid.appendChild(opt);
+  });
+
   modal.classList.add('active');
   document.body.style.overflow='hidden';
   setTimeout(()=>document.getElementById('edit-name-input').focus(),10);
@@ -453,10 +471,10 @@ function saveBlockEdit(){
   const nextName=document.getElementById('edit-name-input').value.trim().toLowerCase();
   if(!nextName)return;
   const prevName=editingTagName;
+  
   if(prevName!==nextName){
     if(!allTags.includes(nextName)){
       allTags.push(nextName);
-      if(!CMAP[nextName])CMAP[nextName]=tagColor(prevName);
     }
     allTags=allTags.filter(t=>t!==prevName);
     if(selTag===prevName)selTag=nextName;
@@ -464,7 +482,13 @@ function saveBlockEdit(){
       day.blocks.forEach(b=>{if(b.name===prevName)b.name=nextName;});
       mergeBlocks(day);
     });
+    // Migrate color to new name if it was changed or use current
+    CMAP[nextName]=modalColor;
+    if(prevName in CMAP) delete CMAP[prevName];
+  } else {
+    CMAP[nextName]=modalColor;
   }
+  
   cancelBlockEdit();save();renderAll();
 }
 function deleteEditedBlock(){
