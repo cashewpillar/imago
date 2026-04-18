@@ -36,7 +36,7 @@
 body{background:var(--color-background-primary);min-height:100vh;display:flex;justify-content:center;}
 .app{max-width:390px;width:100%;margin:0 auto;padding:1rem 1rem 2.5rem;font-family:var(--font-sans);background:var(--color-background-primary);min-height:100vh;}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;}
-.day-nav{display:flex;align-items:center;gap:8px;margin-bottom:1.5rem;}
+.day-nav{display:flex;align-items:center;gap:8px;margin-bottom:1.25rem;}
 .day-nav-arrow{background:none;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);width:32px;height:40px;cursor:pointer;font-size:16px;color:var(--color-text-secondary);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background 0.1s;}
 .day-nav-arrow:hover{background:var(--color-background-secondary);}
 .day-nav-arrow:disabled{opacity:0.3;cursor:default;}
@@ -49,10 +49,15 @@ body{background:var(--color-background-primary);min-height:100vh;display:flex;ju
 .day-dot.active{background:var(--color-text-primary);}
 .add-day-btn{font-size:12px;padding:4px 10px;border-radius:var(--border-radius-md);border:0.5px dashed var(--color-border-secondary);background:transparent;color:var(--color-text-tertiary);cursor:pointer;white-space:nowrap;flex-shrink:0;}
 .add-day-btn:hover{color:var(--color-text-secondary);border-color:var(--color-border-primary);}
-.sleep-row{display:flex;align-items:center;gap:10px;margin-bottom:1.5rem;padding:10px 12px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary);}
-.sleep-label{font-size:13px;color:var(--color-text-secondary);flex:1;}
-.sleep-val{font-size:13px;font-weight:500;color:var(--color-text-primary);min-width:28px;text-align:center;}
-.sleep-btn{background:none;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);width:28px;height:28px;cursor:pointer;font-size:16px;color:var(--color-text-secondary);display:flex;align-items:center;justify-content:center;}
+
+.endpoints{display:flex;align-items:center;gap:8px;margin-bottom:1.25rem;}
+.ep-group{display:flex;align-items:center;gap:5px;flex:1;}
+.ep-lbl{font-size:12px;color:var(--color-text-tertiary);white-space:nowrap;}
+.ep-btn{background:none;border:0.5px solid var(--color-border-secondary);border-radius:6px;width:24px;height:24px;cursor:pointer;font-size:13px;color:var(--color-text-secondary);display:flex;align-items:center;justify-content:center;}
+.ep-btn:hover{background:var(--color-background-secondary);}
+.ep-val{font-size:12px;font-weight:500;color:var(--color-text-primary);min-width:32px;text-align:center;}
+.ep-sep{font-size:12px;color:var(--color-text-tertiary);}
+
 .main-row{display:flex;gap:6px;align-items:flex-start;}
 .bars-pair{display:flex;gap:5px;align-items:flex-start;flex-shrink:0;}
 .bar-col{display:flex;flex-direction:column;align-items:center;flex-shrink:0;}
@@ -67,15 +72,17 @@ body{background:var(--color-background-primary);min-height:100vh;display:flex;ju
 .grip-dot{width:3px;height:3px;border-radius:50%;}
 .add-btn-small{margin-top:8px;width:20px;height:20px;border:0.5px dashed var(--color-border-secondary);border-radius:4px;background:transparent;font-size:14px;color:var(--color-text-tertiary);cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;}
 .rows-col{display:flex;flex-direction:column;flex:1;min-width:0;}
-.leg-row{display:flex;align-items:center;gap:6px;flex-shrink:0;min-width:0;overflow:hidden;}
+.leg-row{display:flex;align-items:center;gap:8px;flex-shrink:0;min-width:0;overflow:hidden;}
 .leg-pct{font-size:12px;font-weight:500;min-width:30px;flex-shrink:0;}
-.leg-name{font-size:13px;color:var(--color-text-primary);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.leg-content{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;}
+.leg-name{font-size:13px;color:var(--color-text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.2;}
+.leg-time{font-size:11px;color:var(--color-text-tertiary);line-height:1.2;}
 .leg-hours{font-size:13px;color:var(--color-text-secondary);white-space:nowrap;cursor:pointer;border-bottom:0.5px dashed var(--color-border-secondary);flex-shrink:0;}
 .leg-hours:hover{color:var(--color-text-primary);}
 .leg-hours-input{font-size:13px;color:var(--color-text-primary);font-family:var(--font-sans);background:var(--color-background-secondary);border:0.5px solid var(--color-border-primary);border-radius:4px;width:44px;padding:1px 4px;outline:none;flex-shrink:0;}
-.leg-rm{background:none;border:none;cursor:pointer;font-size:11px;color:var(--color-text-tertiary);padding:0;line-height:1;flex-shrink:0;}
+.leg-rm{background:none;border:none;cursor:pointer;font-size:11px;color:var(--color-text-tertiary);padding:0;line-height:1;flex-shrink:0;margin-left:4px;}
 .divider-spacer{height:16px;flex-shrink:0;}
-.avail-note{font-size:12px;color:var(--color-text-tertiary);margin-bottom:1.5rem;}
+.avail-note{font-size:12px;color:var(--color-text-tertiary);margin-bottom:1.25rem;}
 .section-lbl{font-size:11px;color:var(--color-text-tertiary);letter-spacing:.04em;text-transform:uppercase;margin-bottom:.6rem;}
 .tags-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:1.5rem;}
 .tag{font-size:12px;padding:4px 8px;border-radius:20px;border:0.5px solid var(--color-border-secondary);cursor:pointer;color:var(--color-text-secondary);background:transparent;display:inline-flex;align-items:center;gap:5px;line-height:1;}
@@ -118,11 +125,20 @@ body{background:var(--color-background-primary);min-height:100vh;display:flex;ju
     <button class="add-day-btn" id="add-day-btn">+ day</button>
   </div>
 
-  <div class="sleep-row">
-    <span class="sleep-label">sleep</span>
-    <button class="sleep-btn" id="sleep-dn">&#8722;</button>
-    <span class="sleep-val" id="sleep-val">8h</span>
-    <button class="sleep-btn" id="sleep-up">+</button>
+  <div class="endpoints">
+    <div class="ep-group">
+      <span class="ep-lbl">wake</span>
+      <button class="ep-btn" id="wake-dn">&#8722;</button>
+      <span class="ep-val" id="wake-val"></span>
+      <button class="ep-btn" id="wake-up">+</button>
+    </div>
+    <span class="ep-sep">&#183;</span>
+    <div class="ep-group" style="justify-content:flex-end;">
+      <button class="ep-btn" id="bed-dn">&#8722;</button>
+      <span class="ep-val" id="bed-val"></span>
+      <button class="ep-btn" id="bed-up">+</button>
+      <span class="ep-lbl">sleep</span>
+    </div>
   </div>
 
   <div class="main-row">
@@ -168,37 +184,34 @@ const GUIDES=[
   {name:'Recreation',hours:'1.5h',desc:'Hobbies, reading, or creative play.',color:'#378ADD'},
 ];
 
-let defaultSleepHours=8;
+let defaultWake=6, defaultBed=22;
 let allTags=[...PRESETS_DEFAULT];
 const COLOR_MAP={};
 PRESETS_DEFAULT.forEach((p,i)=>COLOR_MAP[p]=PALETTE[i%PALETTE.length]);
 
-function getAvail(sleep){return TOTAL-sleep;}
+function getAvail(wake, bed){return bed-wake;}
 function snap(v){return Math.round(v*2)/2;}
 function fmt(h){return h%1===0?h+'h':h.toFixed(1)+'h';}
+function fmtH(h){const hh=Math.floor(h),mm=Math.round((h-hh)*60),ap=hh>=12?'pm':'am',d=hh%12||12;return mm?d+':'+(mm<10?'0':'')+mm+ap:d+ap;}
 function segColor(name){return COLOR_MAP[name]||(COLOR_MAP[name]=PALETTE[Object.keys(COLOR_MAP).length%PALETTE.length]);}
-function segPx(hours, sleep){return Math.max(8,Math.round((hours/getAvail(sleep))*BAR_H));}
+function segPx(hours, wake, bed){return Math.max(8,Math.round((hours/getAvail(wake, bed))*BAR_H));}
 
 const today=new Date();
 function fmtDate(d){return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}
 function prevDate(n){const x=new Date(today);x.setDate(x.getDate()-n);return x;}
 
-function defaultBlocks(sleep){
-  const a=getAvail(sleep);
+function defaultBlocks(wake, bed){
+  const a=getAvail(wake, bed);
   const e=a/2;
   return [{name:'work',hours:e},{name:'personal',hours:e}];
 }
 
 function loadState(){
   try{
-    const raw=localStorage.getItem('fatd_v9');
+    const raw=localStorage.getItem('fatd_v10');
     if(raw){
       const s=JSON.parse(raw);
       if(s.days&&s.days.length>=1){
-        let ds = s.sleepHours || 8;
-        s.days.forEach(d => {
-          if (d.sleepHours === undefined) d.sleepHours = ds;
-        });
         if(s.allTags)allTags=s.allTags;
         s.allTags&&s.allTags.forEach((t,i)=>{if(!COLOR_MAP[t])COLOR_MAP[t]=PALETTE[i%PALETTE.length];});
         return s.days;
@@ -206,13 +219,13 @@ function loadState(){
     }
   }catch(e){}
   return [
-    {label:'today',date:fmtDate(today),blocks:defaultBlocks(8),sleepHours:8},
-    {label:'yesterday',date:fmtDate(prevDate(1)),blocks:[{name:'work',hours:8.8},{name:'personal',hours:4},{name:'social',hours:3.2}],sleepHours:8},
+    {label:'today',date:fmtDate(today),blocks:defaultBlocks(6, 22),wake:6,bed:22},
+    {label:'yesterday',date:fmtDate(prevDate(1)),blocks:[{name:'work',hours:8.8},{name:'personal',hours:4},{name:'social',hours:3.2}],wake:6,bed:22},
   ];
 }
 
 function saveState(){
-  try{localStorage.setItem('fatd_v9',JSON.stringify({days,sleepHours:defaultSleepHours,allTags}));}catch(e){}
+  try{localStorage.setItem('fatd_v10',JSON.stringify({days,allTags}));}catch(e){}
 }
 
 let days=loadState();
@@ -230,19 +243,20 @@ function getGhostDay(){
 }
 
 function normBlocks(day){
-  const blocks=day.blocks, a=getAvail(day.sleepHours), t=blocks.reduce((s,b)=>s+b.hours,0);
+  const blocks=day.blocks, a=getAvail(day.wake, day.bed), t=blocks.reduce((s,b)=>s+b.hours,0);
   if(t<=0){const e=a/blocks.length;blocks.forEach(b=>b.hours=e);return;}
   blocks.forEach(b=>b.hours=b.hours*(a/t));
 }
 
-function renderAll(){renderDayNav();renderGhost();renderBar();renderRows();renderSleep();renderAvailNote();renderTags();renderGuides();}
+function renderAll(){renderDayNav();renderGhost();renderBar();renderRows();renderEndpoints();renderAvailNote();renderTags();renderGuides();}
 function renderAvailNote(){
   const d=getDay();
-  document.getElementById('avail-note').textContent=`${getAvail(d.sleepHours)}h to fill \u00b7 sleep ${d.sleepHours}h`;
+  document.getElementById('avail-note').textContent=`${getAvail(d.wake, d.bed)}h to fill \u00b7 sleep ${24-getAvail(d.wake, d.bed)}h`;
 }
-function renderSleep(){
+function renderEndpoints(){
   const d=getDay();
-  document.getElementById('sleep-val').textContent=d.sleepHours+'h';
+  document.getElementById('wake-val').textContent=fmtH(d.wake);
+  document.getElementById('bed-val').textContent=fmtH(d.bed);
 }
 
 function renderDayNav(){
@@ -282,7 +296,7 @@ document.getElementById('add-day-btn').onclick=()=>{
   const offset=days.length;
   const d=prevDate(offset);
   const label=offset===1?'yesterday':`${offset}d ago`;
-  days.push({label,date:fmtDate(d),blocks:defaultBlocks(defaultSleepHours),sleepHours:defaultSleepHours});
+  days.push({label,date:fmtDate(d),blocks:defaultBlocks(defaultWake, defaultBed),wake:defaultWake,bed:defaultBed});
   currentDay=days.length-1;
   saveState();
   renderAll();
@@ -295,7 +309,7 @@ function renderGhost(){
   track.innerHTML='';
   if(!day)return;
   day.blocks.forEach((b,i)=>{
-    const h=segPx(b.hours, day.sleepHours);
+    const h=segPx(b.hours, day.wake, day.bed);
     const seg=document.createElement('div');
     seg.className='ghost-seg';
     const c=segColor(b.name);
@@ -312,7 +326,7 @@ function renderBar(){
   track.innerHTML='';
   blocks.forEach((b,i)=>{
     const color=segColor(b.name);
-    const h=segPx(b.hours, day.sleepHours);
+    const h=segPx(b.hours, day.wake, day.bed);
     const only=blocks.length===1;
     const br=only?'6px':i===0?'6px 6px 0 0':i===blocks.length-1?'0 0 6px 6px':'0';
     const seg=document.createElement('div');
@@ -334,42 +348,54 @@ function renderRows(){
   const day=getDay(), blocks=day.blocks;
   const col=document.getElementById('rows-col');
   col.innerHTML='';
+  let currentPos = day.wake;
   blocks.forEach((b,i)=>{
     const color=segColor(b.name);
-    const h=segPx(b.hours, day.sleepHours);
-    const pct=Math.round(b.hours/getAvail(day.sleepHours)*100);
+    const h=segPx(b.hours, day.wake, day.bed);
+    const pct=Math.round(b.hours/getAvail(day.wake, day.bed)*100);
+    const endTime = currentPos + b.hours;
+    
     const row=document.createElement('div');
     row.className='leg-row';row.id=`leg-row-${i}`;row.style.height=h+'px';
     const pctEl=document.createElement('span');
     pctEl.className='leg-pct';pctEl.id=`leg-p-${i}`;
     pctEl.style.color=color;pctEl.textContent=pct+'%';
+    
+    const contentEl=document.createElement('div');
+    contentEl.className='leg-content';
     const nameEl=document.createElement('span');
     nameEl.className='leg-name';nameEl.textContent=b.name;
+    const timeEl=document.createElement('span');
+    timeEl.className='leg-time';timeEl.textContent=`${fmtH(currentPos)} \u2013 ${fmtH(endTime)}`;
+    contentEl.appendChild(nameEl);contentEl.appendChild(timeEl);
+    
     const hrsEl=document.createElement('span');
     hrsEl.className='leg-hours';hrsEl.id=`leg-h-${i}`;
     hrsEl.textContent=fmt(b.hours);hrsEl.title='tap to set exact';
-    hrsEl.onclick=()=>startHourEdit(i,hrsEl,nameEl);
+    hrsEl.onclick=()=>startHourEdit(i,hrsEl,contentEl);
     const rmBtn=document.createElement('button');
     rmBtn.className='leg-rm';rmBtn.textContent='\u2715';
     rmBtn.onclick=()=>removeBlock(i);
-    row.appendChild(pctEl);row.appendChild(nameEl);row.appendChild(hrsEl);row.appendChild(rmBtn);
+    
+    row.appendChild(pctEl);row.appendChild(contentEl);row.appendChild(hrsEl);row.appendChild(rmBtn);
     col.appendChild(row);
     if(i<blocks.length-1){
       const sp=document.createElement('div');sp.className='divider-spacer';col.appendChild(sp);
     }
+    currentPos = endTime;
   });
 }
 
-function startHourEdit(i,hrsEl,nameEl){
-  const day=getDay(), blocks=day.blocks, a=getAvail(day.sleepHours);
+function startHourEdit(i,hrsEl,contentEl){
+  const day=getDay(), blocks=day.blocks, a=getAvail(day.wake, day.bed);
   const inp=document.createElement('input');
   inp.className='leg-hours-input';inp.type='number';
   inp.min=MIN_H;inp.max=a;inp.step=0.5;
   inp.value=parseFloat(blocks[i].hours.toFixed(1));
-  nameEl.style.cssText='flex:0 0 0px;overflow:hidden;width:0;';
+  contentEl.style.cssText='flex:0 0 0px;overflow:hidden;width:0;';
   hrsEl.replaceWith(inp);inp.focus();inp.select();
   function commit(){
-    nameEl.style.cssText='';
+    contentEl.style.cssText='';
     let val=parseFloat(inp.value);
     if(isNaN(val)||val<MIN_H)val=MIN_H;
     val=snap(Math.min(val,a-(blocks.length-1)*MIN_H));
@@ -383,16 +409,24 @@ function startHourEdit(i,hrsEl,nameEl){
     saveState();renderBar();renderRows();renderGhost();
   }
   inp.onblur=commit;
-  inp.onkeydown=e=>{if(e.key==='Enter')inp.blur();if(e.key==='Escape'){nameEl.style.cssText='';renderRows();}};
+  inp.onkeydown=e=>{if(e.key==='Enter')inp.blur();if(e.key==='Escape'){contentEl.style.cssText='';renderRows();}};
 }
 
 function updateLive(){
-  const day=getDay(), blocks=day.blocks, a=getAvail(day.sleepHours);
+  const day=getDay(), blocks=day.blocks, a=getAvail(day.wake, day.bed);
+  let currentPos = day.wake;
   blocks.forEach((b,i)=>{
-    const seg=document.getElementById(`seg-${i}`);if(seg)seg.style.height=segPx(b.hours, day.sleepHours)+'px';
-    const row=document.getElementById(`leg-row-${i}`);if(row)row.style.height=segPx(b.hours, day.sleepHours)+'px';
+    const endTime = currentPos + b.hours;
+    const seg=document.getElementById(`seg-${i}`);if(seg)seg.style.height=segPx(b.hours, day.wake, day.bed)+'px';
+    const row=document.getElementById(`leg-row-${i}`);if(row)row.style.height=segPx(b.hours, day.wake, day.bed)+'px';
     const hEl=document.getElementById(`leg-h-${i}`);if(hEl)hEl.textContent=fmt(parseFloat(b.hours.toFixed(1)));
     const pEl=document.getElementById(`leg-p-${i}`);if(pEl)pEl.textContent=Math.round(b.hours/a*100)+'%';
+    const rowEl = document.getElementById(`leg-row-${i}`);
+    if(rowEl){
+      const timeEl = rowEl.querySelector('.leg-time');
+      if(timeEl) timeEl.textContent = `${fmtH(currentPos)} \u2013 ${fmtH(endTime)}`;
+    }
+    currentPos = endTime;
   });
 }
 
@@ -400,7 +434,7 @@ function attachDivider(grip,i){
   let startY=0,startA=0,startB=0;
   function begin(y){startY=y;startA=getBlocks()[i].hours;startB=getBlocks()[i+1].hours;}
   function move(y){
-    const day=getDay(), blocks=day.blocks, dy=y-startY, delta=(dy/BAR_H)*getAvail(day.sleepHours), pool=startA+startB;
+    const day=getDay(), blocks=day.blocks, dy=y-startY, delta=(dy/BAR_H)*getAvail(day.wake, day.bed), pool=startA+startB;
     blocks[i].hours=Math.max(MIN_H,Math.min(pool-MIN_H,startA+delta));
     blocks[i+1].hours=pool-blocks[i].hours;updateLive();
   }
@@ -501,17 +535,21 @@ function renderGuides(){
   });
 }
 
-document.getElementById('sleep-dn').onclick=()=>{
-  const d=getDay();
-  if(d.sleepHours<=1)return;d.sleepHours=snap(d.sleepHours-.5);
-  defaultSleepHours=d.sleepHours;
-  normBlocks(d);saveState();renderAll();
+document.getElementById('wake-dn').onclick=()=>{
+  const d=getDay(); if(d.wake<=0)return; d.wake=snap(d.wake-0.5);
+  defaultWake=d.wake; normBlocks(d); saveState(); renderAll();
 };
-document.getElementById('sleep-up').onclick=()=>{
-  const d=getDay();
-  if(d.sleepHours>=16)return;d.sleepHours=snap(d.sleepHours+.5);
-  defaultSleepHours=d.sleepHours;
-  normBlocks(d);saveState();renderAll();
+document.getElementById('wake-up').onclick=()=>{
+  const d=getDay(); if(d.wake>=d.bed-1)return; d.wake=snap(d.wake+0.5);
+  defaultWake=d.wake; normBlocks(d); saveState(); renderAll();
+};
+document.getElementById('bed-dn').onclick=()=>{
+  const d=getDay(); if(d.bed<=d.wake+1)return; d.bed=snap(d.bed-0.5);
+  defaultBed=d.bed; normBlocks(d); saveState(); renderAll();
+};
+document.getElementById('bed-up').onclick=()=>{
+  const d=getDay(); if(d.bed>=24)return; d.bed=snap(d.bed+0.5);
+  defaultBed=d.bed; normBlocks(d); saveState(); renderAll();
 };
 
 renderAll();
