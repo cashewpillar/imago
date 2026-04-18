@@ -24,6 +24,18 @@
   --font-b: 'DM Sans', sans-serif;
   --sh: 0 4px 24px rgba(0,0,0,0.5);
 }
+:root.light {
+  --bg: #f6f2ea;
+  --bg2: #fffdf7;
+  --bg3: #f1ebdf;
+  --bg4: #e6dece;
+  --border: rgba(52,45,30,0.09);
+  --border2: rgba(52,45,30,0.16);
+  --text: #1f1c16;
+  --muted: #6e6658;
+  --muted2: #a49a87;
+  --sh: 0 12px 36px rgba(77,65,36,0.12);
+}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 html,body{height:100%;}
 body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:14px;line-height:1.5;min-height:100vh;}
@@ -129,6 +141,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .field-row input{flex:1;background:none;border:none;color:var(--text);font-size:13px;font-family:var(--font-b);outline:none;min-width:0;}
 .field-row input::placeholder{color:var(--muted2);}
 .field-row select{background:var(--bg4);border:1px solid var(--border);border-radius:5px;color:var(--muted);font-size:11px;font-family:var(--font-b);padding:3px 6px;outline:none;cursor:pointer;}
+.field-row.wrap{flex-wrap:wrap;}
+.field-options{width:100%;padding-left:28px;}
+.field-options input{width:100%;background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:12px;}
 .field-badge{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:2px 6px;border-radius:4px;background:rgba(184,255,87,.12);color:#b8ff57;flex-shrink:0;}
 .field-del{width:22px;height:22px;border-radius:5px;border:none;background:none;color:var(--muted2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;transition:all .12s;}
 .field-del:hover{color:#ff5c5c;background:rgba(255,92,92,.12);}
@@ -146,6 +161,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .tpill-x:hover{opacity:1;}
 .tag-inp{border:none;background:none;outline:none;font-family:var(--font-b);font-size:12px;color:var(--text);flex:1;min-width:60px;}
 .tag-inp::placeholder{color:var(--muted2);}
+.tag-editor{display:flex;flex-wrap:wrap;gap:5px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:6px 8px;cursor:text;min-height:40px;align-items:center;transition:border-color .15s;}
+.tag-editor:focus-within{border-color:#b8ff57;}
 
 .cp{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px;}
 .cswatch{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .12s;}
@@ -168,6 +185,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 <div id="screen-home" class="screen active">
   <div class="topbar">
     <div class="logo" style="color:#b8ff57;">Table<span style="color:var(--text);">Vault</span></div>
+    <div class="topbar-actions">
+      <button class="btn btn-ghost btn-icon" title="Import snapshot" onclick="importSnapshot()">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1.5v6.2M4 5.4l2.5 2.5 2.5-2.5M2 10.5h9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="btn btn-ghost btn-icon" title="Toggle theme" onclick="toggleTheme()">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="2.4" stroke="currentColor" stroke-width="1.2"/><path d="M6.5 1v1.4M6.5 10.6V12M12 6.5h-1.4M2.4 6.5H1M10.4 2.6l-1 1M3.6 9.4l-1 1M10.4 10.4l-1-1M3.6 3.6l-1-1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
   </div>
   <div class="filter-bar">
     <div class="search-wrap">
@@ -188,6 +213,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
     </button>
     <div class="topbar-title" id="rec-screen-title">—</div>
     <div class="topbar-actions">
+      <button class="btn btn-ghost btn-icon" title="Toggle theme" onclick="toggleTheme()">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="2.4" stroke="currentColor" stroke-width="1.2"/><path d="M6.5 1v1.4M6.5 10.6V12M12 6.5h-1.4M2.4 6.5H1M10.4 2.6l-1 1M3.6 9.4l-1 1M10.4 10.4l-1-1M3.6 3.6l-1-1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      </button>
       <button class="btn btn-ghost btn-icon" title="Edit fields" onclick="openFieldsModal()">
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x=".5" y=".5" width="12" height="12" rx="2.5" stroke="currentColor"/><path d="M3.5 6.5h6M6.5 3.5v6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
       </button>
@@ -241,6 +269,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
         <div class="fg" style="flex:0 0 auto;"><label class="flabel">Icon</label><input class="finput" id="ts-icon" maxlength="4" style="font-size:20px;width:58px;text-align:center;"></div>
         <div class="fg" style="flex:1;"><label class="flabel">Color</label><div class="cp" id="cp2"></div></div>
       </div>
+      <div class="fg">
+        <label class="flabel">Tags</label>
+        <div class="tag-editor" onclick="document.getElementById('ts-tag-input').focus()">
+          <div id="ts-tag-pills"></div>
+          <input type="text" class="tag-inp" id="ts-tag-input" placeholder="Type tag, press Enter…" onkeydown="handleTableTag(event)">
+        </div>
+      </div>
       <div style="padding-top:12px;border-top:1px solid var(--border);">
         <button class="btn btn-danger" style="width:100%;" onclick="confirmDeleteTable()">Delete Table &amp; All Records</button>
       </div>
@@ -291,6 +326,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 
 <div id="ctx" class="ctx-menu"></div>
 <div id="toast"><div class="tdot" id="tdot"></div><span id="tmsg"></span></div>
+<input type="file" id="snapshot-file-input" accept=".json,application/json" style="display:none;" onchange="handleSnapshotFile(event)">
 
 <script>
 const db = new Dexie('TableVaultDB');
@@ -306,24 +342,32 @@ const COLORS = [
   {name:'Coral', val:'#ff6b6b',dim:'rgba(255,107,107,.13)'},
   {name:'Ice',   val:'#ddeeff',dim:'rgba(221,238,255,.10)'},
 ];
-const FTYPES = ['text','number','date','url','boolean','rating','progress','textarea'];
+const FTYPES = ['text','number','date','url','boolean','select','progress','textarea'];
+const THEME_KEY = 'tablevault-theme';
 
 let vaults=[], currentVaultId=null, allEntries=[], homeTagF=[], recTagF=[], editEntryId=null, editTags=[], selColor='Lime';
+let editTableTags=[];
 
-const gc = n => COLORS.find(c=>c.name===n)||COLORS[0];
+const gc = n => {
+  const named = COLORS.find(c=>c.name===n);
+  if(named) return named;
+  if(typeof n === 'string' && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(n)) return {name:n,val:n,dim:hexToRgba(n,0.14)};
+  return COLORS[0];
+};
 const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const om = id => document.getElementById(id).classList.add('open');
 const cm = id => document.getElementById(id).classList.remove('open');
 const bdClose = (e,id) => { if(e.target.id===id) cm(id); };
 
 async function init() {
+  initTheme();
   await loadVaults();
   renderHome();
   initCPs();
 }
 
 async function loadVaults() {
-  vaults = await db.vaults.toArray();
+  vaults = (await db.vaults.toArray()).map(normalizeVault);
   await Promise.all(vaults.map(async v => { v._count = await db.entries.where('tableId').equals(v.id).count(); }));
 }
 
@@ -386,12 +430,17 @@ function renderRecords() {
   const fields=v?.fields||[];
   const c=gc(v?.color);
   const q=document.getElementById('rec-search').value.toLowerCase();
-  const allTags=new Set(); allEntries.forEach(r=>(r.tags||[]).forEach(t=>allTags.add(t)));
+  const allTags=new Set();
+  allEntries.forEach(r=>{
+    (r.tags||[]).forEach(t=>allTags.add(t));
+    getSelectFieldTags(fields,r).forEach(t=>allTags.add(t));
+  });
   renderTagRow('rec-tags',[...allTags],recTagF,v?.color||'Lime',tag=>{
     const i=recTagF.indexOf(tag); i>=0?recTagF.splice(i,1):recTagF.push(tag); renderRecords();
   });
   const list=allEntries.filter(r=>{
-    if(recTagF.length && !recTagF.every(t=>(r.tags||[]).includes(t))) return false;
+    const recordTags = [...(r.tags||[]), ...getSelectFieldTags(fields,r)];
+    if(recTagF.length && !recTagF.every(t=>recordTags.includes(t))) return false;
     if(q){
       const txt=Object.values(r.data||{}).join(' ').toLowerCase()+' '+(r.tags||[]).join(' ').toLowerCase();
       if(!txt.includes(q)) return false;
@@ -405,16 +454,17 @@ function renderRecords() {
   }
   grid.innerHTML=list.map(r=>{
     const title=fields[0]?String(r.data?.[fields[0].key]||'—'):'—';
+    const selectTags = getSelectFieldTags(fields,r);
     const preview=fields.slice(1,4).map(f=>{
       let val=r.data?.[f.key];
       if(val===undefined||val===null||val==='') return '';
       if(f.type==='boolean') val=val?'✓ Yes':'✗ No';
-      if(f.type==='rating') val='★'.repeat(Math.min(5,parseInt(val)||0))+'☆'.repeat(Math.max(0,5-(parseInt(val)||0)));
+      if(f.type==='select') return '';
       if(f.type==='progress') return `<div class="rc-frow"><span class="rc-fkey">${esc(f.label)}</span><span class="rc-fval" style="display:flex;align-items:center;gap:5px;"><div class="prog-wrap" style="flex:1;"><div class="prog-fill" style="width:${Math.min(100,parseInt(val)||0)}%;background:${c.val};"></div></div><span style="font-size:10px;color:var(--muted);flex-shrink:0;">${val}%</span></span></div>`;
       if(f.type==='url') val='🔗 '+val;
       return `<div class="rc-frow"><span class="rc-fkey">${esc(f.label)}</span><span class="rc-fval">${esc(String(val))}</span></div>`;
     }).filter(Boolean).join('');
-    const tagsHtml=(r.tags||[]).map(t=>`<span class="rc-tag" style="background:${c.dim};color:${c.val};">${esc(t)}</span>`).join('');
+    const tagsHtml=[...(r.tags||[]), ...selectTags].map(t=>`<span class="rc-tag" style="background:${c.dim};color:${c.val};">${esc(t)}</span>`).join('');
     const date=new Date(r.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric'});
     return `<div class="rec-card" onclick="openEditRecord(${r.id})">
       <div class="rc-stripe" style="background:${c.val};"></div>
@@ -452,7 +502,7 @@ async function saveTable(){
   const name=document.getElementById('tbl-name').value.trim();
   if(!name){toast('Enter a table name','error');return;}
   const icon=document.getElementById('tbl-icon').value.trim()||'📋';
-  const id=await db.vaults.add({name,icon,color:selColor,fields:[{key:'title',label:'Title',type:'text'},{key:'notes',label:'Notes',type:'textarea'}],tags:[],createdAt:Date.now()});
+  const id=await db.vaults.add({name,icon,color:selColor,fields:[{key:'title',label:'Title',type:'text',options:[]},{key:'notes',label:'Notes',type:'textarea',options:[]}],tags:[],createdAt:Date.now()});
   cm('m-table'); await loadVaults(); renderHome(); openVault(id); toast('Table created!','success');
 }
 
@@ -461,13 +511,16 @@ function openSettingsModal(){
   const v=vaults.find(x=>x.id===currentVaultId); if(!v) return;
   document.getElementById('ts-name').value=v.name;
   document.getElementById('ts-icon').value=v.icon||'';
+  editTableTags=[...(v.tags||[])];
   selColor=v.color||'Lime'; updateCP('cp2'); om('m-settings');
+  renderTableTagPills();
 }
 async function saveSettings(){
   const name=document.getElementById('ts-name').value.trim();
   if(!name){toast('Enter a name','error');return;}
   const icon=document.getElementById('ts-icon').value.trim()||'📋';
-  await db.vaults.update(currentVaultId,{name,icon,color:selColor});
+  const tags=[...editTableTags];
+  await db.vaults.update(currentVaultId,{name,icon,color:selColor,tags});
   cm('m-settings'); await loadVaults();
   const v=vaults.find(x=>x.id===currentVaultId);
   document.getElementById('rec-screen-title').textContent=(v?.icon||'')+' '+(v?.name||'');
@@ -487,31 +540,40 @@ function openFieldsModal(){
   om('m-fields');
 }
 function renderFieldsEd(fields){
-  document.getElementById('fields-ed').innerHTML=fields.map((f,i)=>`
-    <div class="field-row${i===0?' primary':''}" data-i="${i}">
+  document.getElementById('fields-ed').innerHTML=fields.map((f,i)=>{
+    const field=normalizeField(f,i);
+    const options = (field.options||[]).join(', ');
+    return `
+    <div class="field-row${i===0?' primary':''}${field.type==='select'?' wrap':''}" data-i="${i}">
       ${i===0?'<span class="field-badge">Title</span>':'<span style="color:var(--muted2);cursor:grab;font-size:14px;">⠿</span>'}
-      <input type="text" value="${esc(f.label)}" placeholder="Field name" data-k="label">
-      <select data-k="type"${i===0?' disabled':''}>
-        ${FTYPES.map(t=>`<option value="${t}"${f.type===t?' selected':''}>${t}</option>`).join('')}
+      <input type="text" value="${esc(field.label)}" placeholder="Field name" data-k="label">
+      <select data-k="type"${i===0?' disabled':''} onchange="handleFieldTypeChange()">
+        ${FTYPES.map(t=>`<option value="${t}"${field.type===t?' selected':''}>${t}</option>`).join('')}
       </select>
       ${i===0?'<div style="width:22px;"></div>':`<button class="field-del" onclick="delField(${i})">✕</button>`}
-    </div>`).join('');
+      ${field.type==='select'?`<div class="field-options"><input type="text" value="${esc(options)}" placeholder="Options, separated by commas" data-k="options"></div>`:''}
+    </div>`;
+  }).join('');
 }
 function addField(){
   const fields=getFieldsFromEd();
-  fields.push({key:'f_'+Date.now(),label:'',type:'text'});
+  fields.push({key:'f_'+Date.now(),label:'',type:'text',options:[]});
   renderFieldsEd(fields);
 }
 function delField(i){
   const fields=getFieldsFromEd(); fields.splice(i,1); renderFieldsEd(fields);
 }
+function handleFieldTypeChange(){
+  renderFieldsEd(getFieldsFromEd());
+}
 function getFieldsFromEd(){
   const v=vaults.find(x=>x.id===currentVaultId); const ex=v?.fields||[];
-  return [...document.querySelectorAll('#fields-ed .field-row')].map((row,i)=>({
+  return [...document.querySelectorAll('#fields-ed .field-row')].map((row,i)=>normalizeField({
     key:ex[i]?.key||('f_'+Date.now()+'_'+i),
     label:row.querySelector('[data-k="label"]').value.trim()||'Field',
     type:row.querySelector('[data-k="type"]').value,
-  }));
+    options:parseSelectOptions(row.querySelector('[data-k="options"]')?.value||''),
+  },i));
 }
 async function saveFields(){
   const fields=getFieldsFromEd();
@@ -544,28 +606,29 @@ function buildRecForm(data){
   const fields=v?.fields||[{key:'title',label:'Title',type:'text'}];
   const c=gc(v?.color);
   const fhtml=fields.map(f=>{
-    const val=data[f.key]!==undefined?data[f.key]:'';
+    const field = normalizeField(f);
+    const val=data[field.key]!==undefined?data[field.key]:'';
     let inp='';
-    if(f.type==='textarea'){
-      inp=`<textarea class="ftextarea" data-k="${f.key}">${esc(String(val))}</textarea>`;
-    } else if(f.type==='boolean'){
-      inp=`<div style="display:flex;gap:16px;margin-top:2px;">${['true','false'].map(bv=>`<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;"><input type="radio" name="b_${f.key}" data-k="${f.key}" value="${bv}"${String(val)===bv||(bv==='false'&&val==='')?'checked':''} style="accent-color:${c.val};">${bv==='true'?'Yes':'No'}</label>`).join('')}</div>`;
-    } else if(f.type==='rating'){
-      const rv=parseInt(val)||0;
-      inp=`<div style="display:flex;gap:8px;align-items:center;margin-top:2px;" id="stars_${f.key}">${[1,2,3,4,5].map(n=>`<span onclick="setRating('${f.key}',${n})" style="font-size:24px;cursor:pointer;" data-n="${n}">${rv>=n?'★':'☆'}</span>`).join('')}<input type="hidden" data-k="${f.key}" id="rv_${f.key}" value="${rv}"></div>`;
-    } else if(f.type==='progress'){
+    if(field.type==='textarea'){
+      inp=`<textarea class="ftextarea" data-k="${field.key}">${esc(String(val))}</textarea>`;
+    } else if(field.type==='boolean'){
+      inp=`<div style="display:flex;gap:16px;margin-top:2px;">${['true','false'].map(bv=>`<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;"><input type="radio" name="b_${field.key}" data-k="${field.key}" value="${bv}"${String(val)===bv||(bv==='false'&&val==='')?'checked':''} style="accent-color:${c.val};">${bv==='true'?'Yes':'No'}</label>`).join('')}</div>`;
+    } else if(field.type==='progress'){
       const pv=parseInt(val)||0;
-      inp=`<div style="margin-top:4px;"><div style="display:flex;align-items:center;gap:10px;"><input type="range" min="0" max="100" step="1" value="${pv}" data-k="${f.key}" style="flex:1;accent-color:${c.val};" oninput="document.getElementById('po_${f.key}').textContent=this.value+'%';document.getElementById('pb_${f.key}').style.width=this.value+'%'"><span id="po_${f.key}" style="font-size:13px;font-weight:600;color:${c.val};min-width:38px;">${pv}%</span></div><div class="prog-wrap" style="margin-top:6px;"><div class="prog-fill" id="pb_${f.key}" style="width:${pv}%;background:${c.val};"></div></div></div>`;
-    } else if(f.type==='number'){
-      inp=`<input class="finput" type="number" data-k="${f.key}" value="${esc(String(val))}">`;
-    } else if(f.type==='date'){
-      inp=`<input class="finput" type="date" data-k="${f.key}" value="${esc(String(val))}">`;
-    } else if(f.type==='url'){
-      inp=`<input class="finput" type="url" data-k="${f.key}" value="${esc(String(val))}" placeholder="https://…">`;
+      inp=`<div style="margin-top:4px;"><div style="display:flex;align-items:center;gap:10px;"><input type="range" min="0" max="100" step="1" value="${pv}" data-k="${field.key}" style="flex:1;accent-color:${c.val};" oninput="document.getElementById('po_${field.key}').textContent=this.value+'%';document.getElementById('pb_${field.key}').style.width=this.value+'%'"><span id="po_${field.key}" style="font-size:13px;font-weight:600;color:${c.val};min-width:38px;">${pv}%</span></div><div class="prog-wrap" style="margin-top:6px;"><div class="prog-fill" id="pb_${field.key}" style="width:${pv}%;background:${c.val};"></div></div></div>`;
+    } else if(field.type==='select'){
+      const opts=(field.options||[]).map(opt=>`<option value="${esc(opt)}"${String(val)===opt?' selected':''}>${esc(opt)}</option>`).join('');
+      inp=`<select class="fselect" data-k="${field.key}"><option value="">Select…</option>${opts}</select>`;
+    } else if(field.type==='number'){
+      inp=`<input class="finput" type="number" data-k="${field.key}" value="${esc(String(val))}">`;
+    } else if(field.type==='date'){
+      inp=`<input class="finput" type="date" data-k="${field.key}" value="${esc(String(val))}">`;
+    } else if(field.type==='url'){
+      inp=`<input class="finput" type="url" data-k="${field.key}" value="${esc(String(val))}" placeholder="https://…">`;
     } else {
-      inp=`<input class="finput" type="text" data-k="${f.key}" value="${esc(String(val))}">`;
+      inp=`<input class="finput" type="text" data-k="${field.key}" value="${esc(String(val))}">`;
     }
-    return `<div class="rfrow"><div class="rflabel">${esc(f.label)}<span class="type-badge">${f.type}</span></div>${inp}</div>`;
+    return `<div class="rfrow"><div class="rflabel">${esc(field.label)}<span class="type-badge">${field.type}</span></div>${inp}</div>`;
   }).join('');
 
   const tagSec=`<div class="rfrow"><div class="rflabel">Tags</div>
@@ -577,16 +640,33 @@ function buildRecForm(data){
 
   document.getElementById('rec-form').innerHTML=fhtml+tagSec;
 }
-function setRating(key,n){
-  document.getElementById('rv_'+key).value=n;
-  document.querySelectorAll(`#stars_${key} [data-n]`).forEach(s=>s.textContent=parseInt(s.dataset.n)<=n?'★':'☆');
-}
 function renderTpills(c){
   return editTags.map((t,i)=>`<span class="tpill" style="background:${c.dim};color:${c.val};">${esc(t)}<span class="tpill-x" onclick="rmTag(${i})">×</span></span>`).join('');
 }
 function rmTag(i){
   const v=vaults.find(x=>x.id===currentVaultId); const c=gc(v?.color);
   editTags.splice(i,1); document.getElementById('tpills').innerHTML=renderTpills(c);
+}
+function renderTableTagPills(){
+  const v=vaults.find(x=>x.id===currentVaultId); const c=gc(v?.color);
+  const el=document.getElementById('ts-tag-pills');
+  if(!el) return;
+  el.innerHTML=editTableTags.map((t,i)=>`<span class="tpill" style="background:${c.dim};color:${c.val};">${esc(t)}<span class="tpill-x" onclick="rmTableTag(${i})">×</span></span>`).join('');
+}
+function rmTableTag(i){
+  editTableTags.splice(i,1);
+  renderTableTagPills();
+}
+function handleTableTag(e){
+  if(e.key==='Enter'||e.key===','){
+    e.preventDefault();
+    const val=e.target.value.trim().replace(/,/g,'');
+    if(val&&!editTableTags.includes(val)){editTableTags.push(val);renderTableTagPills();}
+    e.target.value='';
+  } else if(e.key==='Backspace'&&!e.target.value&&editTableTags.length){
+    editTableTags.pop();
+    renderTableTagPills();
+  }
 }
 function handleTag(e,cv,cd){
   if(e.key==='Enter'||e.key===','){
@@ -603,7 +683,6 @@ async function saveRecord(){
   const data={};
   fields.forEach(f=>{
     if(f.type==='boolean'){const el=document.querySelector(`input[name="b_${f.key}"]:checked`);data[f.key]=el?el.value==='true':false;}
-    else if(f.type==='rating'){data[f.key]=parseInt(document.getElementById('rv_'+f.key)?.value||0);}
     else{const el=document.querySelector(`[data-k="${f.key}"]`);data[f.key]=el?el.value:'';}
   });
   const tags=[...editTags];
@@ -677,6 +756,186 @@ function updateCP(pid){
     s.style.borderColor=s.dataset.c===selColor?c.val:'transparent';
     s.style.transform=s.dataset.c===selColor?'scale(1.2)':'scale(1)';
   });
+}
+
+/* ── THEME ── */
+function initTheme(){
+  const saved = localStorage.getItem(THEME_KEY);
+  const theme = saved || 'light';
+  applyTheme(theme);
+}
+function applyTheme(theme){
+  document.documentElement.classList.toggle('light', theme === 'light');
+  localStorage.setItem(THEME_KEY, theme);
+}
+function toggleTheme(){
+  applyTheme(document.documentElement.classList.contains('light') ? 'dark' : 'light');
+}
+
+/* ── IMPORT ── */
+async function importSnapshot(){
+  const input = document.getElementById('snapshot-file-input');
+  if(input) input.value = '';
+  input?.click();
+}
+async function handleSnapshotFile(event){
+  const file = event.target.files?.[0];
+  if(!file) return;
+  if(!confirm('Replace current TableVault data with supported content from the selected snapshot? Unsupported organize data and linked-table fields will be skipped.')) return;
+  try{
+    const snapshot = JSON.parse(await file.text());
+    const payload = buildImportPayload(snapshot);
+    await db.transaction('rw', db.vaults, db.entries, async()=>{
+      await db.entries.clear();
+      await db.vaults.clear();
+      for(const vault of payload.vaults){
+        const {_sourceTrackerId, ...vaultRecord} = vault;
+        const id = await db.vaults.add(vaultRecord);
+        const entries = (payload.entriesByTracker.get(vault._sourceTrackerId)||[]).map(entry=>({...entry,tableId:id}));
+        if(entries.length) await db.entries.bulkAdd(entries);
+      }
+    });
+    currentVaultId = null;
+    allEntries = [];
+    homeTagF = [];
+    recTagF = [];
+    await loadVaults();
+    renderHome();
+    goHome();
+    toast(`Imported ${payload.vaults.length} tables and ${payload.entryCount} records`,'success');
+  } catch(err){
+    console.error(err);
+    toast('Snapshot import failed','error');
+  } finally {
+    event.target.value = '';
+  }
+}
+function buildImportPayload(snapshot){
+  const tables = Array.isArray(snapshot?.tables) ? snapshot.tables : [];
+  const columns = Array.isArray(snapshot?.tracker_columns) ? snapshot.tracker_columns : [];
+  const rows = Array.isArray(snapshot?.rows) ? snapshot.rows : [];
+  const colsByTracker = new Map();
+  const rowsByTracker = new Map();
+  columns.forEach(col=>{
+    const list = colsByTracker.get(col.tracker_id) || [];
+    list.push(col);
+    colsByTracker.set(col.tracker_id,list);
+  });
+  rows.forEach(row=>{
+    const list = rowsByTracker.get(row.tracker_id) || [];
+    list.push(row);
+    rowsByTracker.set(row.tracker_id,list);
+  });
+
+  let entryCount = 0;
+  const vaults = tables.map(table=>{
+    const meta = safeJson(table.table_meta_json,{});
+    const fields = (colsByTracker.get(table.id)||[])
+      .slice()
+      .sort((a,b)=>(a.sort_order||0)-(b.sort_order||0))
+      .map((col,idx)=>mapSnapshotColumn(col,idx))
+      .filter(Boolean);
+    const safeFields = fields.length ? fields : [{key:'title',label:'Title',type:'text',options:[]}];
+    const entries = (rowsByTracker.get(table.id)||[]).map(row=>{
+      const values = safeJson(row.values_json,{});
+      const data = {};
+      safeFields.forEach(field=>{
+        const raw = values[field.key];
+        if(field.type === 'boolean') data[field.key] = raw === true || raw === 'true';
+        else if(field.type === 'number' || field.type === 'progress') data[field.key] = raw ?? '';
+        else data[field.key] = raw ?? '';
+      });
+      return {
+        data,
+        tags: [],
+        createdAt: parseSnapshotTime(row.created_at, row.updated_at),
+      };
+    });
+    entryCount += entries.length;
+    rowsByTracker.set(table.id, entries);
+    return {
+      _sourceTrackerId: table.id,
+      name: table.name || 'Untitled',
+      icon: meta.icon || '📋',
+      color: meta.color || 'Lime',
+      fields: safeFields,
+      tags: table.tag ? [table.tag] : [],
+      createdAt: parseSnapshotTime(table.created_at),
+    };
+  });
+
+  return {vaults, entriesByTracker: rowsByTracker, entryCount};
+}
+function mapSnapshotColumn(col, idx){
+  if(col.linked_tracker_id) return null;
+  const mappedType = mapSnapshotFieldType(col.field_type);
+  if(!mappedType) return null;
+  return normalizeField({
+    key: col.field_key || `f_${Date.now()}_${idx}`,
+    label: col.label || 'Field',
+    type: mappedType,
+    options: mappedType === 'select' ? safeJson(col.options_json,[]) : [],
+  }, idx);
+}
+function mapSnapshotFieldType(type){
+  if(type === 'status') return 'select';
+  if(['text','number','date','url','boolean','select','progress','textarea'].includes(type)) return type;
+  return null;
+}
+function parseSnapshotTime(...values){
+  for(const value of values){
+    if(!value) continue;
+    const time = new Date(value).getTime();
+    if(Number.isFinite(time)) return time;
+  }
+  return Date.now();
+}
+
+/* ── HELPERS ── */
+function getSelectFieldTags(fields, record){
+  return fields
+    .filter(f=>f.type==='select')
+    .map(f=>record?.data?.[f.key])
+    .filter(v=>v!==undefined && v!==null && v!=='')
+    .map(v=>String(v));
+}
+function normalizeVault(v){
+  return {
+    ...v,
+    fields:(v.fields||[]).map((field,idx)=>normalizeField(field,idx)),
+    tags:Array.isArray(v.tags)?v.tags.filter(Boolean):[],
+  };
+}
+function normalizeField(field, idx=0){
+  const incomingType = field?.type === 'status' ? 'select' : field?.type;
+  const safeType = incomingType === 'rating' ? 'number' : (incomingType || 'text');
+  const next = {
+    ...field,
+    key:field?.key || (idx===0 ? 'title' : `f_${Date.now()}_${idx}`),
+    label:field?.label || (idx===0 ? 'Title' : 'Field'),
+    type:safeType,
+    options:Array.isArray(field?.options) ? parseSelectOptions(field.options.join(',')) : parseSelectOptions(field?.options || ''),
+  };
+  if(next.type !== 'select') next.options = [];
+  return next;
+}
+function parseSelectOptions(value){
+  const list = Array.isArray(value) ? value : String(value || '').split(',');
+  return [...new Set(list.map(v=>String(v).trim()).filter(Boolean))];
+}
+function safeJson(value, fallback){
+  if(typeof value !== 'string') return fallback;
+  try{return JSON.parse(value);}catch{return fallback;}
+}
+function hexToRgba(hex, alpha){
+  let raw = hex.replace('#','');
+  if(raw.length === 3) raw = raw.split('').map(ch=>ch+ch).join('');
+  if(raw.length !== 6) return `rgba(184,255,87,${alpha})`;
+  const num = parseInt(raw,16);
+  const r = (num >> 16) & 255;
+  const g = (num >> 8) & 255;
+  const b = num & 255;
+  return `rgba(${r},${g},${b},${alpha})`;
 }
 
 /* ── TOAST ── */
