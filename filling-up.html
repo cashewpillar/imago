@@ -253,10 +253,16 @@ document.getElementById('nav-prev').onclick=()=>{if(cur>0){cur--;save();renderAl
 document.getElementById('nav-next').onclick=()=>{if(cur<days.length-1){cur++;save();renderAll();scrollToNow();}};
 document.getElementById('add-day-btn').onclick=()=>{days.push(mkDay(days.length));cur=days.length-1;save();renderAll();scrollToNow();};
 function renderEndpoints(){
-  document.getElementById('wake-val').textContent=fmtH(D().wake);
-  document.getElementById('bed-val').textContent=fmtH(D().bed);
-  const aw=D().bed-D().wake;
-  document.getElementById('hdr-sub').textContent=`${aw}h to fill \u00b7 sleep ${24-aw}h`;
+  const d=D();
+  document.getElementById('wake-val').textContent=fmtH(d.wake);
+  document.getElementById('bed-val').textContent=fmtH(d.bed);
+  const aw=d.bed-d.wake;
+  let sl = 24-aw;
+  if(cur+1<days.length){
+    const p=days[cur+1];
+    sl = (24-p.bed)+d.wake;
+  }
+  document.getElementById('hdr-sub').textContent=`${aw}h to fill \u00b7 sleep ${sl}h`;
 }
 ['wake-dn','wake-up','bed-dn','bed-up'].forEach(id=>{
   document.getElementById(id).onclick=()=>{
