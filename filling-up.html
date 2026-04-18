@@ -28,8 +28,8 @@
   --color-border-secondary:rgba(255,255,255,0.3);
   --color-border-tertiary:rgba(255,255,255,0.15);
 }}
-body{background:var(--color-background-primary);max-height:100vh;display:flex;justify-content:center;font-family:var(--font-sans);user-select:none;}
-input{user-select:text;}
+body{background:var(--color-background-primary);max-height:100vh;display:flex;justify-content:center;font-family:var(--font-sans);-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;}
+input{-webkit-user-select:text;-moz-user-select:text;-ms-user-select:text;user-select:text;}
 .app{max-width:400px;width:100%;background:var(--color-background-primary);min-height:100vh;padding:1.25rem 1rem 3rem;}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);}
 .hdr{margin-bottom:1rem;}
@@ -183,7 +183,7 @@ input{user-select:text;}
 const PALETTE=['#7F77DD','#1D9E75','#D85A30','#378ADD','#BA7517','#D4537E','#639922','#5DCAA5','#ED93B1'];
 const PRESETS=['work','rest','exercise','commute','personal','social','reading','rest'];
 const CMAP={work:'#7F77DD',rest:'#378ADD',exercise:'#D85A30',commute:'#BA7517',personal:'#5DCAA5',social:'#D4537E',reading:'#639922'};
-const PX_H=56,SNAP=0.5,NOW_COL='#D85A30',SCROLL_H=280;
+const PX_H=56,SNAP=0.25,NOW_COL='#D85A30',SCROLL_H=280;
 let allTags=[...PRESETS],selTag='work';
 let editingBlockIdx=-1, editingTagName='', modalColor='';
 const tday=new Date();
@@ -267,10 +267,10 @@ function renderEndpoints(){
 ['wake-dn','wake-up','bed-dn','bed-up'].forEach(id=>{
   document.getElementById(id).onclick=()=>{
     const d=D();
-    if(id==='wake-dn'&&d.wake>0)d.wake=snapH(d.wake-.5);
-    else if(id==='wake-up'&&d.wake<d.bed-1)d.wake=snapH(d.wake+.5);
-    else if(id==='bed-dn'&&d.bed>d.wake+1)d.bed=snapH(d.bed-.5);
-    else if(id==='bed-up'&&d.bed<24)d.bed=snapH(d.bed+.5);
+    if(id==='wake-dn'&&d.wake>0)d.wake=snapH(d.wake-0.25);
+    else if(id==='wake-up'&&d.wake<d.bed-1)d.wake=snapH(d.wake+0.25);
+    else if(id==='bed-dn'&&d.bed>d.wake+1)d.bed=snapH(d.bed-0.25);
+    else if(id==='bed-up'&&d.bed<24)d.bed=snapH(d.bed+0.25);
     d.blocks.forEach(b=>{b.start=Math.max(d.wake,b.start);b.end=Math.min(d.bed,b.end);if(b.end-b.start<SNAP)b.end=b.start+SNAP;});
     mergeBlocks(d);save();renderAll();
   };
