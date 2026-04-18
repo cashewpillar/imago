@@ -254,14 +254,18 @@ const COLOR_MAP={};
 [...PRESETS_MAINTAIN,...PRESETS_BUILD,...PRESETS_BREAK].forEach((p,i)=>COLOR_MAP[p]=PALETTE[i%PALETTE.length]);
 
 function getAvail(wake, bed){return bed-wake;}
-function snap(v){return Math.round(v*2)/2;}
-function fmt(h){return h%1===0?h+'h':h.toFixed(1)+'h';}
+function snap(v){return Math.round(v*10)/10;}
+function fmt(h){
+  const rounded=snap(h);
+  return Number.isInteger(rounded)?rounded+'h':rounded.toFixed(1)+'h';
+}
 function fmtH(h){const hh=Math.floor(h),mm=Math.round((h-hh)*60),ap=hh>=12?'pm':'am',d=hh%12||12;return mm?d+':'+(mm<10?'0':'')+mm+ap:d+ap;}
-function segColor(name){return COLOR_MAP[name]||(COLOR_MAP[name]=PALETTE[Object.keys(COLOR_MAP).length%PALETTE.length]);}
+function segColor(name){return !name?'var(--color-background-tertiary)':(COLOR_MAP[name]||(COLOR_MAP[name]=PALETTE[Object.keys(COLOR_MAP).length%PALETTE.length]));}
+function blockLabel(name){return name||'empty';}
 function segPx(hours, wake, bed){
   const avail = getAvail(wake, bed);
-  const h = Math.round((hours/avail)*BAR_H);
-  const minH = Math.round((1.5/avail)*BAR_H);
+  const h = (hours/avail)*BAR_H;
+  const minH = (1.5/avail)*BAR_H;
   return Math.max(minH, h);
 }
 
@@ -513,10 +517,10 @@ function renderRows(){
     const contentEl=document.createElement('div');
     contentEl.className='leg-content';
     const nameEl=document.createElement('span');
-    nameEl.className='leg-name';nameEl.textContent=b.name;
+    nameEl.className='leg-name';nameEl.textContent=blockLabel(b.name);
     const timeEl=document.createElement('span');
-    const categoryLabel=getCategory(b.name);
-    timeEl.className='leg-time';timeEl.textContent=`${fmtH(currentPos)} \u2013 ${fmtH(endTime)} \u00b7 ${categoryLabel}`;
+    const categoryLabel=b.name?` \u00b7 ${getCategory(b.name)}`:'';
+    timeEl.className='leg-time';timeEl.textContent=`${fmtH(currentPos)} \u2013 ${fmtH(endTime)}${categoryLabel}`;
     contentEl.appendChild(nameEl);contentEl.appendChild(timeEl);
     
     const hrsEl=document.createElement('span');
@@ -604,8 +608,8 @@ function startHourEdit(i,hrsEl,contentEl){
   const day=getDay(), blocks=day.blocks, a=getAvail(day.wake, day.bed);
   const inp=document.createElement('input');
   inp.className='leg-hours-input';inp.type='number';
-  inp.min=MIN_H;inp.max=a;inp.step=0.5;
-  inp.value=parseFloat(blocks[i].hours.toFixed(1));
+  inp.min=MIN_H;inp.max=a;inp.step='any';
+  inp.value=snap(blocks[i].hours);
   contentEl.style.cssText='flex:0 0 0px;overflow:hidden;width:0;';
   hrsEl.replaceWith(inp);inp.focus();inp.select();
   function commit(){
@@ -619,7 +623,7 @@ function startHourEdit(i,hrsEl,contentEl){
     const ot=others.reduce((s,b)=>s+b.hours,0);
     if(ot>0&&rem>0)others.forEach(b=>b.hours=Math.max(MIN_H,snap(b.hours*(rem/ot))));
     const diff=snap(a-blocks.reduce((s,b)=>s+b.hours,0));
-    if(Math.abs(diff)>=MIN_H){const adj=blocks[blocks.length-1===i?Math.max(0,i-1):blocks.length-1];adj.hours=Math.max(MIN_H,snap(adj.hours+diff));}
+    if(Math.abs(diff)>0.001){const adj=blocks[blocks.length-1===i?Math.max(0,i-1):blocks.length-1];adj.hours=Math.max(MIN_H,snap(adj.hours+diff));}
     saveState();renderBar();renderRows();renderGhost();
   }
   inp.onblur=commit;
@@ -633,12 +637,12 @@ function updateLive(){
     const endTime = currentPos + b.hours;
     const seg=document.getElementById(`seg-${i}`);if(seg)seg.style.height=segPx(b.hours, day.wake, day.bed)+'px';
     const row=document.getElementById(`leg-row-${i}`);if(row)row.style.height=segPx(b.hours, day.wake, day.bed)+'px';
-    const hEl=document.getElementById(`leg-h-${i}`);if(hEl)hEl.textContent=fmt(parseFloat(b.hours.toFixed(1)));
+    const hEl=document.getElementById(`leg-h-${i}`);if(hEl)hEl.textContent=fmt(b.hours);
     const pEl=document.getElementById(`leg-p-${i}`);if(pEl)pEl.textContent=Math.round(b.hours/a*100)+'%';
     const rowEl = document.getElementById(`leg-row-${i}`);
     if(rowEl){
       const timeEl = rowEl.querySelector('.leg-time');
-      if(timeEl) timeEl.textContent = `${fmtH(currentPos)} \u2013 ${fmtH(endTime)} \u00b7 ${getCategory(b.name)}`;
+      if(timeEl) timeEl.textContent = `${fmtH(currentPos)} \u2013 ${fmtH(endTime)}${b.name?` \u00b7 ${getCategory(b.name)}`:''}`;
     }
     currentPos = endTime;
   });
@@ -672,10 +676,25 @@ function attachDivider(grip,i){
   },{passive:false});
 }
 
+function mergeConsecutiveEmptyBlocks(blocks){
+  for(let i=blocks.length-1;i>0;i--){
+    if(!blocks[i].name && !blocks[i-1].name){
+      blocks[i-1].hours=snap(blocks[i-1].hours+blocks[i].hours);
+      blocks.splice(i,1);
+    }
+  }
+}
+
+function replaceBlockWithEmpty(blocks, i){
+  if(!blocks[i]||!blocks[i].name)return false;
+  blocks[i]={name:'',hours:blocks[i].hours};
+  mergeConsecutiveEmptyBlocks(blocks);
+  return true;
+}
+
 function removeBlock(i){
-  const blocks=getBlocks();if(blocks.length<=1)return;
-  const freed=blocks[i].hours;blocks.splice(i,1);
-  blocks[blocks.length-1].hours=snap(blocks[blocks.length-1].hours+freed);
+  const blocks=getBlocks();
+  if(!replaceBlockWithEmpty(blocks,i))return;
   if(editingBlockIdx===i)cancelBlockEdit();
   else if(editingBlockIdx>i)editingBlockIdx--;
   saveState();renderBar();renderRows();renderTags();
@@ -686,6 +705,12 @@ function addBlockByName(name){
   if(!normalized)return;
   const blocks=getBlocks();
   if(blocks.some(b=>b.name===normalized))return;
+  const emptyIdx=blocks.findIndex(b=>!b.name);
+  if(emptyIdx!==-1){
+    blocks[emptyIdx].name=normalized;
+    saveState();renderBar();renderRows();renderTags();
+    return;
+  }
   const last=blocks[blocks.length-1];
   const steal=snap(Math.max(MIN_H,last.hours/2));
   last.hours=Math.max(MIN_H,snap(last.hours-steal));
@@ -828,10 +853,7 @@ function deleteEditedBlock(){
     days.forEach(day=>{
       const targetIdx=day.blocks.findIndex(block=>block.name===name);
       if(targetIdx===-1)return;
-      if(day.blocks.length===1)return;
-      const freed=day.blocks[targetIdx].hours;
-      day.blocks.splice(targetIdx,1);
-      day.blocks[day.blocks.length-1].hours=snap(day.blocks[day.blocks.length-1].hours+freed);
+      replaceBlockWithEmpty(day.blocks,targetIdx);
     });
   }else{
     removeTagFromGroups(name);
