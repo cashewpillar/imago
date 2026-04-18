@@ -33,8 +33,9 @@
     --color-border-tertiary:rgba(255,255,255,0.15);
   }
 }
-body{background:var(--color-background-primary);min-height:100vh;display:flex;justify-content:center;}
-.app{max-width:390px;width:100%;margin:0 auto;padding:1rem 1rem 2.5rem;font-family:var(--font-sans);background:var(--color-background-primary);min-height:100vh;}
+body{background:var(--color-background-primary);min-height:100vh;display:flex;justify-content:center;font-family:var(--font-sans);color:var(--color-text-primary);}
+button,input,select{font:inherit;}
+.app{max-width:390px;width:100%;margin:0 auto;padding:1rem 1rem 2.5rem;background:var(--color-background-primary);min-height:100vh;}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;}
 .day-nav{display:flex;align-items:center;gap:8px;margin-bottom:1.25rem;}
 .day-nav-arrow{background:none;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);width:32px;height:40px;cursor:pointer;font-size:16px;color:var(--color-text-secondary);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background 0.1s;}
@@ -81,7 +82,8 @@ body{background:var(--color-background-primary);min-height:100vh;display:flex;ju
 .leg-hours{font-size:13px;color:var(--color-text-secondary);white-space:nowrap;cursor:pointer;border-bottom:0.5px dashed var(--color-border-secondary);flex-shrink:0;}
 .leg-hours:hover{color:var(--color-text-primary);}
 .leg-hours-input{font-size:13px;color:var(--color-text-primary);font-family:var(--font-sans);background:var(--color-background-secondary);border:0.5px solid var(--color-border-primary);border-radius:4px;width:44px;padding:1px 4px;outline:none;flex-shrink:0;}
-.leg-rm, .leg-reorder{background:none;border:none;cursor:pointer;font-size:11px;color:var(--color-text-tertiary);padding:0;line-height:1;flex-shrink:0;margin-left:4px;width:18px;height:18px;display:flex;align-items:center;justify-content:center;}
+.leg-actions{display:flex;align-items:center;gap:6px;flex-shrink:0;margin-left:4px;}
+.leg-rm, .leg-reorder{background:none;border:none;cursor:pointer;font-size:11px;color:var(--color-text-tertiary);padding:0;line-height:1;flex-shrink:0;width:18px;height:18px;display:flex;align-items:center;justify-content:center;}
 .leg-reorder{cursor:ns-resize;font-size:14px;}
 .reorder-toggle{font-size:11px;color:var(--color-text-tertiary);background:none;border:0.5px solid var(--color-border-tertiary);border-radius:4px;padding:2px 6px;cursor:pointer;margin-left:auto;}
 .reorder-toggle.active{color:var(--color-text-primary);border-color:var(--color-text-primary);background:var(--color-background-secondary);}
@@ -93,13 +95,26 @@ body{background:var(--color-background-primary);min-height:100vh;display:flex;ju
 .tag{font-size:12px;padding:4px 8px;border-radius:20px;border:0.5px solid var(--color-border-secondary);cursor:pointer;color:var(--color-text-secondary);background:transparent;display:inline-flex;align-items:center;gap:6px;line-height:1;}
 .tag.active{background:var(--color-background-secondary);color:var(--color-text-primary);border-color:var(--color-border-primary);}
 .tag-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
-.tag-x{font-size:10px;color:var(--color-text-tertiary);line-height:1;cursor:pointer;}
-.tag-x:hover{color:var(--color-text-primary);}
+.tag-edit{font-size:12px;color:var(--color-text-tertiary);line-height:1;display:inline-flex;align-items:center;justify-content:center;min-width:12px;}
 .custom-tag-form{display:flex;gap:6px;margin-bottom:1.5rem;}
 .custom-tag-input{flex:1;font-size:13px;font-family:var(--font-sans);padding:5px 8px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-primary);outline:none;}
 .custom-tag-input:focus{border-color:var(--color-border-primary);}
+.custom-tag-select{font-size:13px;font-family:var(--font-sans);padding:5px 8px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-primary);outline:none;}
 .custom-add-btn{font-size:12px;padding:5px 12px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-secondary);cursor:pointer;white-space:nowrap;}
 .custom-add-btn:hover{background:var(--color-background-secondary);}
+.tag-group{margin-bottom:1rem;}
+.tag-group:last-of-type{margin-bottom:1.5rem;}
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:none;align-items:flex-end;justify-content:center;padding:16px;z-index:1000;color:var(--color-text-primary);}
+.modal-backdrop.active{display:flex;}
+.modal-card{width:min(100%,420px);background:var(--color-background-primary);border-radius:20px 20px 14px 14px;border:0.5px solid var(--color-border-secondary);padding:14px 14px calc(14px + env(safe-area-inset-bottom));box-shadow:0 20px 40px rgba(0,0,0,0.18);font-family:var(--font-sans);}
+.modal-handle{width:44px;height:5px;border-radius:999px;background:var(--color-border-tertiary);margin:0 auto 12px;}
+.modal-title{font-size:13px;font-weight:600;color:var(--color-text-primary);margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em;}
+.modal-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:12px;}
+.modal-input,.modal-select{width:100%;font-size:16px;font-family:var(--font-sans);padding:12px 12px;border-radius:var(--border-radius-lg);border:0.5px solid var(--color-border-secondary);background:var(--color-background-secondary);color:var(--color-text-primary);outline:none;}
+.modal-actions{display:flex;gap:8px;}
+.modal-btn{flex:1;font-size:14px;padding:11px 12px;border-radius:var(--border-radius-lg);border:0.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-secondary);cursor:pointer;}
+.modal-btn.primary{background:var(--color-text-primary);color:var(--color-background-primary);border-color:var(--color-text-primary);}
+.modal-btn.danger{border-color:#c55a5a;color:#c55a5a;}
 .divider-line{height:0.5px;background:var(--color-border-tertiary);margin:1.5rem 0;}
 .guide-row{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--color-border-tertiary);}
 .guide-row:last-child{border-bottom:none;}
@@ -165,12 +180,28 @@ body{background:var(--color-background-primary);min-height:100vh;display:flex;ju
 
   <div class="divider-line"></div>
   <div class="section-hdr">
-    <div class="section-lbl" style="margin-bottom:0;">blocks</div>
-    <button class="reorder-toggle" id="reorder-btn" onclick="toggleReorderMode()">reorder</button>
+  <div class="section-lbl" style="margin-bottom:0;">blocks</div>
+  <button class="reorder-toggle" id="reorder-btn" onclick="toggleReorderMode()">reorder</button>
   </div>
-  <div class="tags-row" id="tags-row"></div>
+  <div class="tag-group">
+    <div class="section-lbl">maintain blocks</div>
+    <div class="tags-row" id="tags-row-maintain"></div>
+  </div>
+  <div class="tag-group">
+    <div class="section-lbl">build blocks</div>
+    <div class="tags-row" id="tags-row-build"></div>
+  </div>
+  <div class="tag-group">
+    <div class="section-lbl">break blocks</div>
+    <div class="tags-row" id="tags-row-break"></div>
+  </div>
   <div class="custom-tag-form">
     <input class="custom-tag-input" id="custom-input" placeholder="custom block name" maxlength="20"/>
+    <select class="custom-tag-select" id="custom-category">
+      <option value="maintain">maintain</option>
+      <option value="build">build</option>
+      <option value="break">break</option>
+    </select>
     <button class="custom-add-btn" onclick="addCustomTag()">+ add</button>
   </div>
 
@@ -178,9 +209,30 @@ body{background:var(--color-background-primary);min-height:100vh;display:flex;ju
   <div class="section-lbl">daily guidelines</div>
   <div id="guide-list"></div>
 </div>
+<div class="modal-backdrop" id="block-editor-modal" onclick="handleModalBackdrop(event)">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modal-title">edit block</div>
+    <div class="modal-grid">
+      <input class="modal-input" id="edit-name-input" maxlength="20" placeholder="block name"/>
+      <select class="modal-select" id="edit-category-select">
+        <option value="maintain">maintain</option>
+        <option value="build">build</option>
+        <option value="break">break</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn danger" onclick="deleteEditedBlock()">delete</button>
+      <button class="modal-btn" onclick="cancelBlockEdit()">cancel</button>
+      <button class="modal-btn primary" onclick="saveBlockEdit()">save</button>
+    </div>
+  </div>
+</div>
 
 <script>
-const PRESETS_DEFAULT=['work','personal','social','family','health','learning','rest','creative'];
+const PRESETS_MAINTAIN=['work','personal','social','family','health'];
+const PRESETS_BUILD=['reading','learning','creative'];
+const PRESETS_BREAK=['rest'];
 const PALETTE=['#7F77DD','#1D9E75','#D85A30','#378ADD','#BA7517','#D4537E','#639922','#5DCAA5','#888780','#ED93B1'];
 const TOTAL=24;
 const BAR_H=280;
@@ -194,10 +246,12 @@ const GUIDES=[
 ];
 
 let defaultWake=6, defaultBed=22;
-let allTags=[...PRESETS_DEFAULT];
+let tagGroups={maintain:[...PRESETS_MAINTAIN],build:[...PRESETS_BUILD],break:[...PRESETS_BREAK]};
 let reorderIdx=-1, reorderMode=false;
+let editingBlockIdx=-1;
+let editingTagName='';
 const COLOR_MAP={};
-PRESETS_DEFAULT.forEach((p,i)=>COLOR_MAP[p]=PALETTE[i%PALETTE.length]);
+[...PRESETS_MAINTAIN,...PRESETS_BUILD,...PRESETS_BREAK].forEach((p,i)=>COLOR_MAP[p]=PALETTE[i%PALETTE.length]);
 
 function getAvail(wake, bed){return bed-wake;}
 function snap(v){return Math.round(v*2)/2;}
@@ -214,6 +268,47 @@ function segPx(hours, wake, bed){
 const today=new Date();
 function fmtDate(d){return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}
 function prevDate(n){const x=new Date(today);x.setDate(x.getDate()-n);return x;}
+function getAllTags(){return [...tagGroups.maintain,...tagGroups.build,...tagGroups.break];}
+function getCategory(name){
+  if(tagGroups.build.includes(name))return 'build';
+  if(tagGroups.break.includes(name))return 'break';
+  return 'maintain';
+}
+function ensureTagColor(name){
+  if(!COLOR_MAP[name])COLOR_MAP[name]=PALETTE[Object.keys(COLOR_MAP).length%PALETTE.length];
+}
+function ensureTag(name, category='maintain'){
+  const normalized=String(name||'').trim().toLowerCase();
+  if(!normalized)return '';
+  const current=getCategory(normalized);
+  const inMaintain=tagGroups.maintain.includes(normalized);
+  const inBuild=tagGroups.build.includes(normalized);
+  const inBreak=tagGroups.break.includes(normalized);
+  if(inMaintain||inBuild||inBreak){
+    if(current!==category){
+      tagGroups.maintain=tagGroups.maintain.filter(t=>t!==normalized);
+      tagGroups.build=tagGroups.build.filter(t=>t!==normalized);
+      tagGroups.break=tagGroups.break.filter(t=>t!==normalized);
+      tagGroups[category].push(normalized);
+    }
+  }else{
+    tagGroups[category].push(normalized);
+  }
+  ensureTagColor(normalized);
+  return normalized;
+}
+function removeTagFromGroups(name){
+  tagGroups.maintain=tagGroups.maintain.filter(t=>t!==name);
+  tagGroups.build=tagGroups.build.filter(t=>t!==name);
+  tagGroups.break=tagGroups.break.filter(t=>t!==name);
+}
+function renameTagEverywhere(oldName, newName){
+  days.forEach(day=>{
+    day.blocks.forEach(block=>{
+      if(block.name===oldName)block.name=newName;
+    });
+  });
+}
 
 function defaultBlocks(wake, bed){
   const a=getAvail(wake, bed);
@@ -223,12 +318,41 @@ function defaultBlocks(wake, bed){
 
 function loadState(){
   try{
-    const raw=localStorage.getItem('fatd_v10');
+    const raw=localStorage.getItem('fatd_v12')||localStorage.getItem('fatd_v11')||localStorage.getItem('fatd_v10');
     if(raw){
       const s=JSON.parse(raw);
       if(s.days&&s.days.length>=1){
-        if(s.allTags)allTags=s.allTags;
-        s.allTags&&s.allTags.forEach((t,i)=>{if(!COLOR_MAP[t])COLOR_MAP[t]=PALETTE[i%PALETTE.length];});
+        if(s.tagGroups){
+          if('maintain' in s.tagGroups || 'build' in s.tagGroups || 'break' in s.tagGroups){
+            tagGroups={
+              maintain:Array.isArray(s.tagGroups.maintain)?s.tagGroups.maintain:[],
+              build:Array.isArray(s.tagGroups.build)?s.tagGroups.build:[],
+              break:Array.isArray(s.tagGroups.break)?s.tagGroups.break:[],
+            };
+          }else{
+            tagGroups={
+              maintain:Array.isArray(s.tagGroups.default)?s.tagGroups.default:[],
+              build:Array.isArray(s.tagGroups.goal)?s.tagGroups.goal:[],
+              break:[],
+            };
+          }
+        }else if(s.allTags){
+          tagGroups={maintain:[...s.allTags],build:[],break:[]};
+        }
+        getAllTags().forEach(t=>ensureTagColor(t));
+        s.days.forEach(day=>{
+          day.blocks=day.blocks.map(block=>{
+            const oldCategory=String(block.category||'').toLowerCase();
+            const desiredCategory=
+              oldCategory==='default'?'maintain':
+              oldCategory==='goal'?'build':
+              oldCategory==='maintain'||oldCategory==='build'||oldCategory==='break'
+                ?oldCategory
+                :getCategory(String(block.name||'').trim().toLowerCase());
+            const normalized=ensureTag(block.name, desiredCategory);
+            return {...block,name:normalized};
+          });
+        });
         return s.days;
       }
     }
@@ -240,7 +364,7 @@ function loadState(){
 }
 
 function saveState(){
-  try{localStorage.setItem('fatd_v10',JSON.stringify({days,allTags}));}catch(e){}
+  try{localStorage.setItem('fatd_v12',JSON.stringify({days,tagGroups}));}catch(e){}
 }
 
 let days=loadState();
@@ -365,6 +489,7 @@ function toggleReorderMode(){
   const btn = document.getElementById('reorder-btn');
   btn.classList.toggle('active', reorderMode);
   btn.textContent = reorderMode ? 'done' : 'reorder';
+  if(reorderMode)cancelBlockEdit();
   renderRows();
 }
 
@@ -390,7 +515,8 @@ function renderRows(){
     const nameEl=document.createElement('span');
     nameEl.className='leg-name';nameEl.textContent=b.name;
     const timeEl=document.createElement('span');
-    timeEl.className='leg-time';timeEl.textContent=`${fmtH(currentPos)} \u2013 ${fmtH(endTime)}`;
+    const categoryLabel=getCategory(b.name);
+    timeEl.className='leg-time';timeEl.textContent=`${fmtH(currentPos)} \u2013 ${fmtH(endTime)} \u00b7 ${categoryLabel}`;
     contentEl.appendChild(nameEl);contentEl.appendChild(timeEl);
     
     const hrsEl=document.createElement('span');
@@ -404,10 +530,13 @@ function renderRows(){
       attachReorder(drBtn, i);
       row.appendChild(pctEl);row.appendChild(contentEl);row.appendChild(hrsEl);row.appendChild(drBtn);
     } else {
+      const actionsEl=document.createElement('div');
+      actionsEl.className='leg-actions';
       const rmBtn=document.createElement('button');
       rmBtn.className='leg-rm';rmBtn.textContent='\u2715';
       rmBtn.onclick=()=>removeBlock(i);
-      row.appendChild(pctEl);row.appendChild(contentEl);row.appendChild(hrsEl);row.appendChild(rmBtn);
+      actionsEl.appendChild(rmBtn);
+      row.appendChild(pctEl);row.appendChild(contentEl);row.appendChild(hrsEl);row.appendChild(actionsEl);
     }
     
     col.appendChild(row);
@@ -509,7 +638,7 @@ function updateLive(){
     const rowEl = document.getElementById(`leg-row-${i}`);
     if(rowEl){
       const timeEl = rowEl.querySelector('.leg-time');
-      if(timeEl) timeEl.textContent = `${fmtH(currentPos)} \u2013 ${fmtH(endTime)}`;
+      if(timeEl) timeEl.textContent = `${fmtH(currentPos)} \u2013 ${fmtH(endTime)} \u00b7 ${getCategory(b.name)}`;
     }
     currentPos = endTime;
   });
@@ -547,70 +676,194 @@ function removeBlock(i){
   const blocks=getBlocks();if(blocks.length<=1)return;
   const freed=blocks[i].hours;blocks.splice(i,1);
   blocks[blocks.length-1].hours=snap(blocks[blocks.length-1].hours+freed);
+  if(editingBlockIdx===i)cancelBlockEdit();
+  else if(editingBlockIdx>i)editingBlockIdx--;
   saveState();renderBar();renderRows();renderTags();
 }
 
 function addBlockByName(name){
-  if(!COLOR_MAP[name])COLOR_MAP[name]=PALETTE[Object.keys(COLOR_MAP).length%PALETTE.length];
+  const normalized=ensureTag(name,getCategory(name));
+  if(!normalized)return;
   const blocks=getBlocks();
+  if(blocks.some(b=>b.name===normalized))return;
   const last=blocks[blocks.length-1];
   const steal=snap(Math.max(MIN_H,last.hours/2));
   last.hours=Math.max(MIN_H,snap(last.hours-steal));
-  blocks.push({name,hours:steal});
+  blocks.push({name:normalized,hours:steal});
   saveState();renderBar();renderRows();renderTags();
 }
 
 function addBlockFromBtn(){
   const active=new Set(getBlocks().map(b=>b.name));
-  const next=allTags.find(t=>!active.has(t));
+  const next=getAllTags().find(t=>!active.has(t));
   if(next)addBlockByName(next);
 }
 
 function renderTags(){
   const blocks=getBlocks();
   const active=new Set(blocks.map(b=>b.name));
-  const row=document.getElementById('tags-row');
+  renderTagGroup('maintain', blocks, active);
+  renderTagGroup('build', blocks, active);
+  renderTagGroup('break', blocks, active);
+  renderEditor();
+}
+
+function renderTagGroup(category, blocks, active){
+  const row=document.getElementById(`tags-row-${category}`);
   row.innerHTML='';
-  allTags.forEach(p=>{
-    const on=active.has(p);
+  tagGroups[category].forEach(name=>{
+    const on=active.has(name);
     const tag=document.createElement('span');
     tag.className='tag'+(on?' active':'');
-    if(on)tag.style.borderColor=segColor(p);
+    if(on)tag.style.borderColor=segColor(name);
     const dot=document.createElement('span');
-    dot.className='tag-dot';dot.style.background=segColor(p);
+    dot.className='tag-dot';dot.style.background=segColor(name);
     const label=document.createElement('span');
-    label.textContent=p;label.style.cursor='pointer';
-    label.onclick=()=>{
-      if(on){const idx=blocks.findIndex(b=>b.name===p);if(idx!==-1)removeBlock(idx);}
-      else addBlockByName(p);
+    label.textContent=name;label.style.cursor='pointer';
+    tag.onclick=()=>{
+      if(on){
+        const idx=blocks.findIndex(b=>b.name===name);
+        if(idx!==-1)startBlockEdit(idx);
+      }else{
+        addBlockByName(name);
+      }
     };
-    const x=document.createElement('span');
-    x.className='tag-x';x.textContent='\u2715';x.title='remove tag';
-    x.onclick=(e)=>{
+    tag.appendChild(dot);tag.appendChild(label);
+    const edit=document.createElement('span');
+    edit.className='tag-edit';
+    edit.textContent='\u270e';
+    edit.title='edit block';
+    edit.onclick=(e)=>{
       e.stopPropagation();
-      if(on){const idx=blocks.findIndex(b=>b.name===p);if(idx!==-1)removeBlock(idx);}
-      allTags=allTags.filter(t=>t!==p);
-      saveState();renderTags();
+      startTagEdit(name);
     };
-    tag.appendChild(dot);tag.appendChild(label);tag.appendChild(x);
+    tag.appendChild(edit);
     row.appendChild(tag);
   });
+}
+
+function startBlockEdit(i){
+  editingBlockIdx=i;
+  editingTagName=getBlocks()[i]?.name||'';
+  renderEditor();
+}
+
+function startTagEdit(name){
+  editingTagName=name;
+  const idx=getBlocks().findIndex(block=>block.name===name);
+  editingBlockIdx=idx;
+  renderEditor();
+}
+
+function cancelBlockEdit(){
+  editingBlockIdx=-1;
+  editingTagName='';
+  renderEditor();
+}
+
+function renderEditor(){
+  const card=document.getElementById('block-editor-modal');
+  if(reorderMode||!editingTagName){
+    card.classList.remove('active');
+    document.body.style.overflow='';
+    return;
+  }
+  document.getElementById('edit-name-input').value=editingTagName;
+  document.getElementById('edit-category-select').value=getCategory(editingTagName);
+  card.classList.add('active');
+  document.body.style.overflow='hidden';
+  requestAnimationFrame(()=>{
+    const input=document.getElementById('edit-name-input');
+    input.focus();
+    input.select();
+  });
+}
+
+function saveBlockEdit(){
+  const nameInput=document.getElementById('edit-name-input');
+  const categoryInput=document.getElementById('edit-category-select');
+  const nextName=ensureTag(nameInput.value,categoryInput.value);
+  if(!nextName)return;
+  const previousName=editingTagName;
+  const blocks=getBlocks();
+  if(previousName!==nextName){
+    removeTagFromGroups(previousName);
+    if(days.some(day=>day.blocks.some(block=>block.name===nextName))){
+      days.forEach(day=>{
+        const matching=day.blocks.filter(block=>block.name===previousName);
+        if(!matching.length)return;
+        const target=day.blocks.find(block=>block.name===nextName);
+        if(target){
+          matching.forEach(block=>{target.hours=snap(target.hours+block.hours);});
+          day.blocks=day.blocks.filter(block=>block.name!==previousName);
+        }else{
+          day.blocks.forEach(block=>{if(block.name===previousName)block.name=nextName;});
+        }
+      });
+    }else{
+      renameTagEverywhere(previousName,nextName);
+    }
+  }
+  if(editingBlockIdx>=0){
+    const updatedIdx=getBlocks().findIndex(block=>block.name===nextName);
+    editingBlockIdx=updatedIdx;
+  }
+  if(getCategory(nextName)!==categoryInput.value)ensureTag(nextName,categoryInput.value);
+  editingTagName=nextName;
+  saveState();
+  cancelBlockEdit();
+  renderAll();
+}
+
+function deleteEditedBlock(){
+  if(!editingTagName)return;
+  const name=editingTagName;
+  const hasPlotted=days.some(day=>day.blocks.some(block=>block.name===name));
+  if(hasPlotted){
+    const idx=getBlocks().findIndex(block=>block.name===name);
+    if(idx!==-1){
+      removeBlock(idx);
+      return;
+    }
+    days.forEach(day=>{
+      const targetIdx=day.blocks.findIndex(block=>block.name===name);
+      if(targetIdx===-1)return;
+      if(day.blocks.length===1)return;
+      const freed=day.blocks[targetIdx].hours;
+      day.blocks.splice(targetIdx,1);
+      day.blocks[day.blocks.length-1].hours=snap(day.blocks[day.blocks.length-1].hours+freed);
+    });
+  }else{
+    removeTagFromGroups(name);
+    saveState();
+    cancelBlockEdit();
+    renderTags();
+  }
+}
+
+function handleModalBackdrop(event){
+  if(event.target===event.currentTarget)cancelBlockEdit();
 }
 
 function addCustomTag(){
   const inp=document.getElementById('custom-input');
   const val=inp.value.trim().toLowerCase();
+  const category=document.getElementById('custom-category').value;
   if(!val)return;
-  if(!allTags.includes(val)){
-    allTags.push(val);
-    if(!COLOR_MAP[val])COLOR_MAP[val]=PALETTE[Object.keys(COLOR_MAP).length%PALETTE.length];
-  }
+  ensureTag(val,category);
   addBlockByName(val);
   inp.value='';
   saveState();
 }
 
 document.getElementById('custom-input').onkeydown=e=>{if(e.key==='Enter')addCustomTag();};
+document.getElementById('edit-name-input').onkeydown=e=>{
+  if(e.key==='Enter')saveBlockEdit();
+  if(e.key==='Escape')cancelBlockEdit();
+};
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&editingBlockIdx!==-1)cancelBlockEdit();
+});
 
 function renderGuides(){
   const el=document.getElementById('guide-list');
