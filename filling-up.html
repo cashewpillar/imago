@@ -16,6 +16,7 @@
   --color-border-secondary:rgba(0,0,0,0.3);
   --color-border-tertiary:rgba(0,0,0,0.15);
   --font-sans:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --border-radius-lg:12px;
 }
 @media(prefers-color-scheme:dark){:root{
   --color-background-primary:#1c1c1a;
@@ -74,22 +75,35 @@ body{background:var(--color-background-primary);min-height:100vh;display:flex;ju
 .block-dur{font-size:10px;line-height:1.3;opacity:0.75;}
 .block.small .block-inner{flex-direction:row;justify-content:flex-start;align-items:center;gap:6px;}
 .block.small .block-dur::before{content:'(';}.block.small .block-dur::after{content:')';}
-.block-rm{position:absolute;right:3px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:11px;cursor:pointer;padding:3px;line-height:1;z-index:6;opacity:0.6;}
-.block-rm:hover{opacity:1;}
+.block-edit{position:absolute;right:3px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:12px;cursor:pointer;padding:3px;line-height:1;z-index:6;opacity:0.6;}
+.block-edit:hover{opacity:1;}
 .divider-line{height:0.5px;background:var(--color-border-tertiary);margin:1rem 0;}
 .section-lbl{font-size:11px;color:var(--color-text-tertiary);letter-spacing:.04em;text-transform:uppercase;margin-bottom:.5rem;}
 .tags-row{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:.9rem;}
-.tag{font-size:12px;padding:4px 8px;border-radius:20px;border:0.5px solid var(--color-border-secondary);cursor:default;color:var(--color-text-secondary);background:transparent;display:inline-flex;align-items:center;gap:4px;line-height:1;user-select:none;}
+.tag{font-size:12px;padding:4px 8px;border-radius:20px;border:0.5px solid var(--color-border-secondary);cursor:pointer;color:var(--color-text-secondary);background:transparent;display:inline-flex;align-items:center;gap:4px;line-height:1;user-select:none;}
 .tag.sel{background:var(--color-background-secondary);color:var(--color-text-primary);}
 .tag-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
 .tag-lbl{cursor:pointer;}
-.tag-x{font-size:9px;color:var(--color-text-tertiary);cursor:pointer;padding:1px 2px;line-height:1;}
-.tag-x:hover{color:var(--color-text-primary);}
+.tag-edit-btn{font-size:11px;color:var(--color-text-tertiary);cursor:pointer;padding:1px 2px;line-height:1;display:inline-flex;align-items:center;justify-content:center;min-width:12px;}
+.tag-edit-btn:hover{color:var(--color-text-primary);}
 .custom-row{display:flex;gap:6px;}
 .custom-input{flex:1;font-size:13px;font-family:var(--font-sans);padding:5px 8px;border-radius:8px;border:0.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-primary);outline:none;}
 .custom-input:focus{border-color:var(--color-border-primary);}
 .custom-add{font-size:12px;padding:5px 11px;border-radius:8px;border:0.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-secondary);cursor:pointer;white-space:nowrap;}
 .custom-add:hover{background:var(--color-background-secondary);}
+
+/* Modal Styles */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:none;align-items:flex-end;justify-content:center;padding:16px;z-index:1000;color:var(--color-text-primary);}
+.modal-backdrop.active{display:flex;}
+.modal-card{width:min(100%,420px);background:var(--color-background-primary);border-radius:20px 20px 14px 14px;border:0.5px solid var(--color-border-secondary);padding:14px 14px calc(14px + env(safe-area-inset-bottom));box-shadow:0 20px 40px rgba(0,0,0,0.18);font-family:var(--font-sans);}
+.modal-handle{width:44px;height:5px;border-radius:999px;background:var(--color-border-tertiary);margin:0 auto 12px;}
+.modal-title{font-size:13px;font-weight:600;color:var(--color-text-primary);margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em;}
+.modal-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:12px;}
+.modal-input{width:100%;font-size:16px;font-family:var(--font-sans);padding:12px 12px;border-radius:var(--border-radius-lg);border:0.5px solid var(--color-border-secondary);background:var(--color-background-secondary);color:var(--color-text-primary);outline:none;}
+.modal-actions{display:flex;gap:8px;}
+.modal-btn{flex:1;font-size:14px;padding:11px 12px;border-radius:var(--border-radius-lg);border:0.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-secondary);cursor:pointer;}
+.modal-btn.primary{background:var(--color-text-primary);color:var(--color-background-primary);border-color:var(--color-text-primary);}
+.modal-btn.danger{border-color:#c55a5a;color:#c55a5a;}
 </style>
 </head>
 <body>
@@ -144,12 +158,29 @@ body{background:var(--color-background-primary);min-height:100vh;display:flex;ju
   </div>
 </div>
 </div>
+
+<div class="modal-backdrop" id="block-editor-modal" onclick="handleModalBackdrop(event)">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modal-title">edit block</div>
+    <div class="modal-grid">
+      <input class="modal-input" id="edit-name-input" maxlength="24" placeholder="activity name"/>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn danger" onclick="deleteEditedBlock()">delete</button>
+      <button class="modal-btn" onclick="cancelBlockEdit()">cancel</button>
+      <button class="modal-btn primary" onclick="saveBlockEdit()">save</button>
+    </div>
+  </div>
+</div>
+
 <script>
-const PALETTE=['#7F77DD','#1D9E75','#D85A30','#378ADD','#BA7517','#D4537E','#639922','#5DCAA5','#888780','#ED93B1'];
-const PRESETS=['work','focus','exercise','commute','personal','social','reading','rest'];
-const CMAP={work:'#7F77DD',focus:'#378ADD',exercise:'#D85A30',commute:'#BA7517',personal:'#5DCAA5',social:'#D4537E',reading:'#639922',rest:'#888780'};
+const PALETTE=['#7F77DD','#1D9E75','#D85A30','#378ADD','#BA7517','#D4537E','#639922','#5DCAA5','#ED93B1'];
+const PRESETS=['work','rest','exercise','commute','personal','social','reading','rest'];
+const CMAP={work:'#7F77DD',rest:'#378ADD',exercise:'#D85A30',commute:'#BA7517',personal:'#5DCAA5',social:'#D4537E',reading:'#639922'};
 const PX_H=56,SNAP=0.5,NOW_COL='#D85A30',SCROLL_H=280;
 let allTags=[...PRESETS],selTag='work';
+let editingBlockIdx=-1, editingTagName='';
 const tday=new Date();
 function fmtDate(d){return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}
 function prevDate(n){const x=new Date(tday);x.setDate(x.getDate()-n);return x;}
@@ -289,7 +320,7 @@ function renderTimeline(){
 
   col.addEventListener('mousedown',e=>{
     if(e.button!==0)return;
-    let t=e.target;while(t&&t!==col){if(t.classList.contains('block-rm'))return;t=t.parentElement;}
+    let t=e.target;while(t&&t!==col){if(t.classList.contains('block-edit'))return;t=t.parentElement;}
     const {mv,mu}=begin(e.clientY);
     const _mv=e2=>mv(e2.clientY);
     const _mu=e2=>{mu(e2.clientY);document.removeEventListener('mousemove',_mv);document.removeEventListener('mouseup',_mu);};
@@ -299,7 +330,7 @@ function renderTimeline(){
 
   let pressTimer=null, creationMode=false, handlers=null, startY=0, startX=0;
   col.addEventListener('touchstart',e=>{
-    let t=e.target;while(t&&t!==col){if(t.classList.contains('block-rm'))return;t=t.parentElement;}
+    let t=e.target;while(t&&t!==col){if(t.classList.contains('block-edit'))return;t=t.parentElement;}
     startX=e.touches[0].clientX; startY=e.touches[0].clientY;
     creationMode=false;
     pressTimer=setTimeout(()=>{
@@ -340,9 +371,9 @@ function buildBlock(col,b,idx){
   const nm=document.createElement('div');nm.className='block-name';nm.style.color=color;nm.textContent=b.name;
   const dur=document.createElement('div');dur.className='block-dur';dur.style.color=color;dur.textContent=fmtDur(durH);
   inner.appendChild(nm);inner.appendChild(dur);
-  const rm=document.createElement('button');rm.className='block-rm';rm.textContent='\u2715';rm.style.color=color;
-  rm.onclick=e=>{e.stopPropagation();D().blocks.splice(idx,1);save();renderAll();};
-  el.appendChild(inner);el.appendChild(rm);
+  const edit=document.createElement('button');edit.className='block-edit';edit.textContent='\u270e';edit.style.color=color;
+  edit.onclick=e=>{e.stopPropagation();startBlockEdit(idx);};
+  el.appendChild(inner);el.appendChild(edit);
   col.appendChild(el);
 }
 function renderTags(){
@@ -353,9 +384,9 @@ function renderTags(){
     const dot=document.createElement('span');dot.className='tag-dot';dot.style.background=tagColor(p);
     const lbl=document.createElement('span');lbl.className='tag-lbl';lbl.textContent=p;
     lbl.onclick=()=>{selTag=p;renderTags();};
-    const x=document.createElement('span');x.className='tag-x';x.textContent='\u2715';
-    x.onclick=e=>{e.stopPropagation();allTags=allTags.filter(t=>t!==p);if(selTag===p)selTag=allTags[0]||'';save();renderTags();};
-    tag.appendChild(dot);tag.appendChild(lbl);tag.appendChild(x);row.appendChild(tag);
+    const edit=document.createElement('span');edit.className='tag-edit-btn';edit.textContent='\u270e';
+    edit.onclick=e=>{e.stopPropagation();startTagEdit(p);};
+    tag.appendChild(dot);tag.appendChild(lbl);tag.appendChild(edit);row.appendChild(tag);
   });
 }
 function addCustomTag(){
@@ -383,7 +414,70 @@ function renderSummary(){
     bar.appendChild(seg);
   });
 }
-function renderAll(){renderNav();renderEndpoints();renderAxis();renderTimeline();renderSummary();renderTags();}
+
+function startBlockEdit(i){
+  editingBlockIdx=i;
+  editingTagName=D().blocks[i]?.name||'';
+  renderEditor();
+}
+function startTagEdit(name){
+  editingTagName=name;
+  editingBlockIdx=D().blocks.findIndex(b=>b.name===name);
+  renderEditor();
+}
+function cancelBlockEdit(){
+  editingBlockIdx=-1;
+  editingTagName='';
+  renderEditor();
+}
+function renderEditor(){
+  const modal=document.getElementById('block-editor-modal');
+  if(!editingTagName){
+    modal.classList.remove('active');
+    document.body.style.overflow='';
+    return;
+  }
+  document.getElementById('edit-name-input').value=editingTagName;
+  modal.classList.add('active');
+  document.body.style.overflow='hidden';
+  setTimeout(()=>document.getElementById('edit-name-input').focus(),10);
+}
+function saveBlockEdit(){
+  const nextName=document.getElementById('edit-name-input').value.trim().toLowerCase();
+  if(!nextName)return;
+  const prevName=editingTagName;
+  if(prevName!==nextName){
+    if(!allTags.includes(nextName)){
+      allTags.push(nextName);
+      if(!CMAP[nextName])CMAP[nextName]=tagColor(prevName);
+    }
+    allTags=allTags.filter(t=>t!==prevName);
+    if(selTag===prevName)selTag=nextName;
+    days.forEach(day=>{
+      day.blocks.forEach(b=>{if(b.name===prevName)b.name=nextName;});
+      mergeBlocks(day);
+    });
+  }
+  cancelBlockEdit();save();renderAll();
+}
+function deleteEditedBlock(){
+  if(!editingTagName)return;
+  const name=editingTagName;
+  if(editingBlockIdx!==-1){
+    D().blocks.splice(editingBlockIdx,1);
+  }else{
+    allTags=allTags.filter(t=>t!==name);
+    if(selTag===name)selTag=allTags[0]||'';
+  }
+  cancelBlockEdit();save();renderAll();
+}
+function handleModalBackdrop(e){if(e.target===e.currentTarget)cancelBlockEdit();}
+document.getElementById('edit-name-input').onkeydown=e=>{
+  if(e.key==='Enter')saveBlockEdit();
+  if(e.key==='Escape')cancelBlockEdit();
+};
+
+function renderAll(){renderNav();renderEndpoints();renderAxis();renderTimeline();renderSummary();renderTags();renderEditor();}
 renderAll();
 setTimeout(scrollToNow,80);
 </script>
