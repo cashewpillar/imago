@@ -142,7 +142,7 @@ body{background:var(--color-background-secondary);min-height:100vh;display:flex;
   </div>
 </div>
 <div class="divider-line"></div>
-<div class="section-lbl">select then tap timeline to place</div>
+<div class="section-lbl">select then click and drag on timeline to place</div>
 <div class="tags-row" id="tags-row"></div>
 <div class="custom-row">
   <input class="custom-input" id="custom-input" placeholder="new activity" maxlength="24"/>
@@ -271,17 +271,58 @@ function renderTimeline(){
   }
   D().blocks.forEach((b,i)=>buildBlock(col,b,i));
 }
-document.getElementById('tl-col').onclick=e=>{
-  if(isDragging)return;
+(function(){
   const col=document.getElementById('tl-col');
-  let t=e.target;while(t&&t!==col){if(t.dataset.blockIdx!==undefined)return;t=t.parentElement;}
-  const rect=col.getBoundingClientRect();
-  const y=e.clientY-rect.top;
-  const slot=findFreeSlot(D(),snapH(hFor(y,D())),1);
-  if(!slot)return;
-  D().blocks.push({name:selTag,start:slot.start,end:slot.end});
-  save();renderAll();
-};
+  function begin(y){
+    const rect=col.getBoundingClientRect();
+    const startH=snapH(hFor(y-rect.top,D()));
+    let preview=document.createElement('div');
+    preview.className='block';
+    const color=tagColor(selTag);
+    preview.style.cssText=`background:${color}25;border:1.5px dashed ${color}99;z-index:100;pointer-events:none;display:none;`;
+    col.appendChild(preview);
+
+    function mv(y2){
+      const curH=snapH(hFor(y2-rect.top,D()));
+      const s=Math.min(startH,curH),e=Math.max(startH,curH);
+      if(e-s<SNAP){ preview.style.display='none'; }
+      else {
+        preview.style.display='block';
+        preview.style.top=yFor(s,D())+'px';
+        preview.style.height=(e-s)*PX_H+'px';
+      }
+    }
+    function mu(y2){
+      const curH=snapH(hFor(y2-rect.top,D()));
+      const s=Math.min(startH,curH),e=Math.max(startH,curH);
+      preview.remove();
+      if(e-s>=SNAP && !overlaps(D().blocks,s,e,-1)){
+        D().blocks.push({name:selTag,start:s,end:e});
+        save();renderAll();
+      }
+    }
+    return {mv,mu};
+  }
+
+  col.addEventListener('mousedown',e=>{
+    if(e.button!==0)return;
+    let t=e.target;while(t&&t!==col){if(t.dataset.blockIdx!==undefined)return;t=t.parentElement;}
+    const {mv,mu}=begin(e.clientY);
+    const _mv=e2=>mv(e2.clientY);
+    const _mu=e2=>{mu(e2.clientY);document.removeEventListener('mousemove',_mv);document.removeEventListener('mouseup',_mu);};
+    document.addEventListener('mousemove',_mv);
+    document.addEventListener('mouseup',_mu);
+  });
+
+  col.addEventListener('touchstart',e=>{
+    let t=e.target;while(t&&t!==col){if(t.dataset.blockIdx!==undefined)return;t=t.parentElement;}
+    const {mv,mu}=begin(e.touches[0].clientY);
+    const _tm=e2=>{e2.preventDefault();mv(e2.touches[0].clientY);};
+    const _tu=e2=>{mu(e2.changedTouches[0].clientY);document.removeEventListener('touchmove',_tm);document.removeEventListener('touchend',_tu);};
+    document.addEventListener('touchmove',_tm,{passive:false});
+    document.addEventListener('touchend',_tu);
+  },{passive:false});
+})();
 function buildBlock(col,b,idx){
   const color=tagColor(b.name);
   const top=yFor(b.start,D());
