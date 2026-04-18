@@ -28,7 +28,8 @@
   --color-border-secondary:rgba(255,255,255,0.3);
   --color-border-tertiary:rgba(255,255,255,0.15);
 }}
-body{background:var(--color-background-primary);min-height:100vh;display:flex;justify-content:center;font-family:var(--font-sans);}
+body{background:var(--color-background-primary);min-height:100vh;display:flex;justify-content:center;font-family:var(--font-sans);user-select:none;}
+input{user-select:text;}
 .app{max-width:400px;width:100%;background:var(--color-background-primary);min-height:100vh;padding:1.25rem 1rem 3rem;}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);}
 .hdr{margin-bottom:1rem;}
@@ -75,8 +76,8 @@ body{background:var(--color-background-primary);min-height:100vh;display:flex;ju
 .block-dur{font-size:10px;line-height:1.3;opacity:0.75;}
 .block.small .block-inner{flex-direction:row;justify-content:flex-start;align-items:center;gap:6px;}
 .block.small .block-dur::before{content:'(';}.block.small .block-dur::after{content:')';}
-.block-edit{position:absolute;right:3px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:12px;cursor:pointer;padding:3px;line-height:1;z-index:6;opacity:0.6;}
-.block-edit:hover{opacity:1;}
+.block-rm{position:absolute;right:3px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:11px;cursor:pointer;padding:3px;line-height:1;z-index:6;opacity:0.6;}
+.block-rm:hover{opacity:1;}
 .divider-line{height:0.5px;background:var(--color-border-tertiary);margin:1rem 0;}
 .section-lbl{font-size:11px;color:var(--color-text-tertiary);letter-spacing:.04em;text-transform:uppercase;margin-bottom:.5rem;}
 .tags-row{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:.9rem;}
@@ -144,7 +145,7 @@ body{background:var(--color-background-primary);min-height:100vh;display:flex;ju
 <div class="section-lbl">select then click and drag on timeline to place</div>
 <div class="tags-row" id="tags-row"></div>
 <div class="custom-row">
-  <input class="custom-input" id="custom-input" placeholder="new activity" maxlength="24"/>
+  <input autocomplete="off" class="custom-input" id="custom-input" placeholder="new activity" maxlength="24"/>
   <button class="custom-add" onclick="addCustomTag()">+ add</button>
 </div>
 <div class="divider-line"></div>
@@ -164,7 +165,7 @@ body{background:var(--color-background-primary);min-height:100vh;display:flex;ju
     <div class="modal-handle"></div>
     <div class="modal-title" id="modal-title">edit block</div>
     <div class="modal-grid">
-      <input class="modal-input" id="edit-name-input" maxlength="24" placeholder="activity name"/>
+      <input autocomplete="off" class="modal-input" id="edit-name-input" maxlength="24" placeholder="activity name"/>
     </div>
     <div class="modal-actions">
       <button class="modal-btn danger" onclick="deleteEditedBlock()">delete</button>
@@ -320,7 +321,7 @@ function renderTimeline(){
 
   col.addEventListener('mousedown',e=>{
     if(e.button!==0)return;
-    let t=e.target;while(t&&t!==col){if(t.classList.contains('block-edit'))return;t=t.parentElement;}
+    let t=e.target;while(t&&t!==col){if(t.classList.contains('block-rm'))return;t=t.parentElement;}
     const {mv,mu}=begin(e.clientY);
     const _mv=e2=>mv(e2.clientY);
     const _mu=e2=>{mu(e2.clientY);document.removeEventListener('mousemove',_mv);document.removeEventListener('mouseup',_mu);};
@@ -330,7 +331,7 @@ function renderTimeline(){
 
   let pressTimer=null, creationMode=false, handlers=null, startY=0, startX=0;
   col.addEventListener('touchstart',e=>{
-    let t=e.target;while(t&&t!==col){if(t.classList.contains('block-edit'))return;t=t.parentElement;}
+    let t=e.target;while(t&&t!==col){if(t.classList.contains('block-rm'))return;t=t.parentElement;}
     startX=e.touches[0].clientX; startY=e.touches[0].clientY;
     creationMode=false;
     pressTimer=setTimeout(()=>{
@@ -371,9 +372,9 @@ function buildBlock(col,b,idx){
   const nm=document.createElement('div');nm.className='block-name';nm.style.color=color;nm.textContent=b.name;
   const dur=document.createElement('div');dur.className='block-dur';dur.style.color=color;dur.textContent=fmtDur(durH);
   inner.appendChild(nm);inner.appendChild(dur);
-  const edit=document.createElement('button');edit.className='block-edit';edit.textContent='\u270e';edit.style.color=color;
-  edit.onclick=e=>{e.stopPropagation();startBlockEdit(idx);};
-  el.appendChild(inner);el.appendChild(edit);
+  const rm=document.createElement('button');rm.className='block-rm';rm.textContent='\u2715';rm.style.color=color;
+  rm.onclick=e=>{e.stopPropagation();D().blocks.splice(idx,1);save();renderAll();};
+  el.appendChild(inner);el.appendChild(rm);
   col.appendChild(el);
 }
 function renderTags(){
