@@ -65,7 +65,8 @@ body{background:var(--color-background-primary);min-height:100vh;display:flex;ju
 .bar-track{width:20px;border-radius:6px;display:flex;flex-direction:column;position:relative;touch-action:none;user-select:none;}
 .ghost-track{width:20px;border-radius:6px;overflow:hidden;display:flex;flex-direction:column;flex-shrink:0;}
 .ghost-seg{width:100%;flex-shrink:0;}
-.seg{width:20px;position:relative;flex-shrink:0;}
+.seg{width:20px;position:relative;flex-shrink:0;cursor:ns-resize;}
+.seg.dragging, .leg-row.dragging{opacity:0.5;pointer-events:none;}
 .seg-fill{width:100%;height:100%;}
 .divider-grip{width:20px;height:16px;display:flex;align-items:center;justify-content:center;cursor:ns-resize;flex-shrink:0;z-index:3;}
 .grip-dots{display:flex;flex-direction:column;gap:2px;align-items:center;}
@@ -80,13 +81,18 @@ body{background:var(--color-background-primary);min-height:100vh;display:flex;ju
 .leg-hours{font-size:13px;color:var(--color-text-secondary);white-space:nowrap;cursor:pointer;border-bottom:0.5px dashed var(--color-border-secondary);flex-shrink:0;}
 .leg-hours:hover{color:var(--color-text-primary);}
 .leg-hours-input{font-size:13px;color:var(--color-text-primary);font-family:var(--font-sans);background:var(--color-background-secondary);border:0.5px solid var(--color-border-primary);border-radius:4px;width:44px;padding:1px 4px;outline:none;flex-shrink:0;}
-.leg-rm{background:none;border:none;cursor:pointer;font-size:11px;color:var(--color-text-tertiary);padding:0;line-height:1;flex-shrink:0;margin-left:4px;}
+.leg-rm, .leg-reorder{background:none;border:none;cursor:pointer;font-size:11px;color:var(--color-text-tertiary);padding:0;line-height:1;flex-shrink:0;margin-left:4px;width:18px;height:18px;display:flex;align-items:center;justify-content:center;}
+.leg-reorder{cursor:ns-resize;font-size:14px;}
+.reorder-toggle{font-size:11px;color:var(--color-text-tertiary);background:none;border:0.5px solid var(--color-border-tertiary);border-radius:4px;padding:2px 6px;cursor:pointer;margin-left:auto;}
+.reorder-toggle.active{color:var(--color-text-primary);border-color:var(--color-text-primary);background:var(--color-background-secondary);}
+.section-hdr{display:flex;align-items:center;margin-bottom:.6rem;}
 .divider-spacer{height:16px;flex-shrink:0;}
 .avail-note{font-size:12px;color:var(--color-text-tertiary);margin-bottom:1.25rem;}
 .section-lbl{font-size:11px;color:var(--color-text-tertiary);letter-spacing:.04em;text-transform:uppercase;margin-bottom:.6rem;}
 .tags-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:1.5rem;}
-.tag{font-size:12px;padding:4px 8px;border-radius:20px;border:0.5px solid var(--color-border-secondary);cursor:pointer;color:var(--color-text-secondary);background:transparent;display:inline-flex;align-items:center;gap:5px;line-height:1;}
+.tag{font-size:12px;padding:4px 8px;border-radius:20px;border:0.5px solid var(--color-border-secondary);cursor:pointer;color:var(--color-text-secondary);background:transparent;display:inline-flex;align-items:center;gap:6px;line-height:1;}
 .tag.active{background:var(--color-background-secondary);color:var(--color-text-primary);border-color:var(--color-border-primary);}
+.tag-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
 .tag-x{font-size:10px;color:var(--color-text-tertiary);line-height:1;cursor:pointer;}
 .tag-x:hover{color:var(--color-text-primary);}
 .custom-tag-form{display:flex;gap:6px;margin-bottom:1.5rem;}
@@ -158,7 +164,10 @@ body{background:var(--color-background-primary);min-height:100vh;display:flex;ju
   </div>
 
   <div class="divider-line"></div>
-  <div class="section-lbl">blocks</div>
+  <div class="section-hdr">
+    <div class="section-lbl" style="margin-bottom:0;">blocks</div>
+    <button class="reorder-toggle" id="reorder-btn" onclick="toggleReorderMode()">reorder</button>
+  </div>
   <div class="tags-row" id="tags-row"></div>
   <div class="custom-tag-form">
     <input class="custom-tag-input" id="custom-input" placeholder="custom block name" maxlength="20"/>
@@ -186,6 +195,7 @@ const GUIDES=[
 
 let defaultWake=6, defaultBed=22;
 let allTags=[...PRESETS_DEFAULT];
+let reorderIdx=-1, reorderMode=false;
 const COLOR_MAP={};
 PRESETS_DEFAULT.forEach((p,i)=>COLOR_MAP[p]=PALETTE[i%PALETTE.length]);
 
@@ -330,7 +340,8 @@ function renderBar(){
     const only=blocks.length===1;
     const br=only?'6px':i===0?'6px 6px 0 0':i===blocks.length-1?'0 0 6px 6px':'0';
     const seg=document.createElement('div');
-    seg.className='seg';seg.id=`seg-${i}`;seg.style.height=h+'px';
+    seg.className='seg'+(i===reorderIdx?' dragging':'');
+    seg.id=`seg-${i}`;seg.style.height=h+'px';
     const fill=document.createElement('div');
     fill.className='seg-fill';fill.style.cssText=`background:${color};border-radius:${br};`;
     seg.appendChild(fill);track.appendChild(seg);
@@ -342,6 +353,14 @@ function renderBar(){
       attachDivider(grip,i);
     }
   });
+}
+
+function toggleReorderMode(){
+  reorderMode = !reorderMode;
+  const btn = document.getElementById('reorder-btn');
+  btn.classList.toggle('active', reorderMode);
+  btn.textContent = reorderMode ? 'done' : 'reorder';
+  renderRows();
 }
 
 function renderRows(){
@@ -356,7 +375,7 @@ function renderRows(){
     const endTime = currentPos + b.hours;
     
     const row=document.createElement('div');
-    row.className='leg-row';row.id=`leg-row-${i}`;row.style.height=h+'px';
+    row.className='leg-row'+(i===reorderIdx?' dragging':'');row.id=`leg-row-${i}`;row.style.height=h+'px';
     const pctEl=document.createElement('span');
     pctEl.className='leg-pct';pctEl.id=`leg-p-${i}`;
     pctEl.style.color=color;pctEl.textContent=pct+'%';
@@ -373,17 +392,78 @@ function renderRows(){
     hrsEl.className='leg-hours';hrsEl.id=`leg-h-${i}`;
     hrsEl.textContent=fmt(b.hours);hrsEl.title='tap to set exact';
     hrsEl.onclick=()=>startHourEdit(i,hrsEl,contentEl);
-    const rmBtn=document.createElement('button');
-    rmBtn.className='leg-rm';rmBtn.textContent='\u2715';
-    rmBtn.onclick=()=>removeBlock(i);
+
+    if(reorderMode){
+      const drBtn=document.createElement('button');
+      drBtn.className='leg-reorder';drBtn.textContent='\u2630'; // ☰ handle
+      attachReorder(drBtn, i);
+      row.appendChild(pctEl);row.appendChild(contentEl);row.appendChild(hrsEl);row.appendChild(drBtn);
+    } else {
+      const rmBtn=document.createElement('button');
+      rmBtn.className='leg-rm';rmBtn.textContent='\u2715';
+      rmBtn.onclick=()=>removeBlock(i);
+      row.appendChild(pctEl);row.appendChild(contentEl);row.appendChild(hrsEl);row.appendChild(rmBtn);
+    }
     
-    row.appendChild(pctEl);row.appendChild(contentEl);row.appendChild(hrsEl);row.appendChild(rmBtn);
     col.appendChild(row);
     if(i<blocks.length-1){
       const sp=document.createElement('div');sp.className='divider-spacer';col.appendChild(sp);
     }
     currentPos = endTime;
   });
+}
+
+function attachReorder(el, i){
+  const startDrag=()=>{
+    reorderIdx=i; renderRows();
+    if(window.navigator.vibrate) window.navigator.vibrate(20);
+  };
+  const move=(clientX, clientY)=>{
+    if(reorderIdx===-1) return;
+    const overEl = document.elementFromPoint(clientX, clientY);
+    if(!overEl) return;
+    const row = overEl.closest('.leg-row');
+    if(!row || row.id === `leg-row-${reorderIdx}`) return;
+    
+    const newIdx = parseInt(row.id.split('-')[2]);
+    if(isNaN(newIdx)) return;
+
+    // Smoothness check: only swap if we've moved past the midpoint of the target row
+    const rect = row.getBoundingClientRect();
+    const midpoint = rect.top + rect.height / 2;
+    const isMovingDown = newIdx > reorderIdx;
+    
+    if((isMovingDown && clientY > midpoint) || (!isMovingDown && clientY < midpoint)){
+      const blocks = getBlocks();
+      const b = blocks[reorderIdx];
+      blocks.splice(reorderIdx, 1);
+      blocks.splice(newIdx, 0, b);
+      reorderIdx = newIdx;
+      renderRows(); renderBar();
+    }
+  };
+  const endDrag=()=>{
+    if(reorderIdx!==-1){ reorderIdx=-1; saveState(); renderAll(); }
+  };
+
+  el.onmousedown=e=>{
+    if(e.button!==0) return;
+    startDrag();
+    const mm=e2=>move(e2.clientX, e2.clientY);
+    const mu=()=>{ window.removeEventListener('mousemove', mm); window.removeEventListener('mouseup', mu); endDrag(); };
+    window.addEventListener('mousemove', mm); window.addEventListener('mouseup', mu);
+  };
+  el.ontouchstart=e=>{
+    startDrag();
+    const tm=e2=>{ 
+      if(reorderIdx!==-1){
+        if(e2.cancelable) e2.preventDefault();
+        move(e2.touches[0].clientX, e2.touches[0].clientY);
+      }
+    };
+    const tu=()=>{ window.removeEventListener('touchmove', tm); window.removeEventListener('touchend', tu); endDrag(); };
+    window.addEventListener('touchmove', tm, {passive:false}); window.addEventListener('touchend', tu);
+  };
 }
 
 function startHourEdit(i,hrsEl,contentEl){
@@ -490,6 +570,9 @@ function renderTags(){
     const on=active.has(p);
     const tag=document.createElement('span');
     tag.className='tag'+(on?' active':'');
+    if(on)tag.style.borderColor=segColor(p);
+    const dot=document.createElement('span');
+    dot.className='tag-dot';dot.style.background=segColor(p);
     const label=document.createElement('span');
     label.textContent=p;label.style.cursor='pointer';
     label.onclick=()=>{
@@ -504,7 +587,7 @@ function renderTags(){
       allTags=allTags.filter(t=>t!==p);
       saveState();renderTags();
     };
-    tag.appendChild(label);tag.appendChild(x);
+    tag.appendChild(dot);tag.appendChild(label);tag.appendChild(x);
     row.appendChild(tag);
   });
 }
