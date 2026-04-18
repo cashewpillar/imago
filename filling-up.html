@@ -75,6 +75,8 @@ body{background:var(--color-background-secondary);min-height:100vh;display:flex;
 .block-inner:active{cursor:grabbing;}
 .block-name{font-size:11px;font-weight:500;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .block-dur{font-size:10px;line-height:1.3;opacity:0.75;}
+.block.small .block-inner{flex-direction:row;justify-content:flex-start;align-items:center;gap:6px;}
+.block.small .block-dur::before{content:'(';}.block.small .block-dur::after{content:')';}
 .block-rm{position:absolute;right:3px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:11px;cursor:pointer;padding:3px;line-height:1;z-index:6;}
 .rh{position:absolute;left:0;right:0;height:12px;cursor:ns-resize;z-index:7;}
 .rh.top{top:0;}.rh.bot{bottom:0;}
@@ -347,13 +349,15 @@ function renderTimeline(){
 function buildBlock(col,b,idx){
   const color=tagColor(b.name);
   const top=yFor(b.start,D());
-  const height=Math.max(18,(b.end-b.start)*PX_H);
+  const durH=b.end-b.start;
+  const height=Math.max(18,durH*PX_H);
   const el=document.createElement('div');
   el.className='block';el.dataset.blockIdx=idx;
+  if(durH<=0.5) el.classList.add('small');
   el.style.cssText='top:'+top+'px;height:'+height+'px;background:'+color+'25;border:1.5px solid '+color+'99;';
   const inner=document.createElement('div');inner.className='block-inner';inner.dataset.blockIdx=idx;
   const nm=document.createElement('div');nm.className='block-name';nm.style.color=color;nm.textContent=b.name;nm.dataset.blockIdx=idx;
-  const dur=document.createElement('div');dur.className='block-dur';dur.style.color=color;dur.textContent=fmtDur(b.end-b.start);dur.dataset.blockIdx=idx;
+  const dur=document.createElement('div');dur.className='block-dur';dur.style.color=color;dur.textContent=fmtDur(durH);dur.dataset.blockIdx=idx;
   inner.appendChild(nm);inner.appendChild(dur);
   const rm=document.createElement('button');rm.className='block-rm';rm.textContent='\u2715';rm.style.color=color;
   rm.onclick=e=>{e.stopPropagation();D().blocks.splice(idx,1);save();renderAll();};
