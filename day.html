@@ -166,26 +166,26 @@ const GUIDES=[
   {name:'Movement',hours:'1h',desc:'Physical activity — walking, gym, stretching.',color:'#1D9E75'},
   {name:'Connection',hours:'1.5h',desc:'Meaningful time with family, friends, or community.',color:'#D85A30'},
   {name:'Recreation',hours:'1.5h',desc:'Hobbies, reading, or creative play.',color:'#378ADD'},
-  {name:'Reflection',hours:'20–30 mins',desc:'Meditation, journaling, or quiet planning.',color:'#BA7517'},
 ];
 
-let sleepHours=8;
+let defaultSleepHours=8;
 let allTags=[...PRESETS_DEFAULT];
 const COLOR_MAP={};
 PRESETS_DEFAULT.forEach((p,i)=>COLOR_MAP[p]=PALETTE[i%PALETTE.length]);
 
-function avail(){return TOTAL-sleepHours;}
+function getAvail(sleep){return TOTAL-sleep;}
 function snap(v){return Math.round(v*2)/2;}
 function fmt(h){return h%1===0?h+'h':h.toFixed(1)+'h';}
 function segColor(name){return COLOR_MAP[name]||(COLOR_MAP[name]=PALETTE[Object.keys(COLOR_MAP).length%PALETTE.length]);}
-function segPx(hours){return Math.max(8,Math.round((hours/avail())*BAR_H));}
+function segPx(hours, sleep){return Math.max(8,Math.round((hours/getAvail(sleep))*BAR_H));}
 
 const today=new Date();
 function fmtDate(d){return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}
 function prevDate(n){const x=new Date(today);x.setDate(x.getDate()-n);return x;}
 
-function defaultBlocks(){
-  const e=avail()/2;
+function defaultBlocks(sleep){
+  const a=getAvail(sleep);
+  const e=a/2;
   return [{name:'work',hours:e},{name:'personal',hours:e}];
 }
 
@@ -194,8 +194,11 @@ function loadState(){
     const raw=localStorage.getItem('fatd_v9');
     if(raw){
       const s=JSON.parse(raw);
-      if(s.days&&s.days.length>=2){
-        if(s.sleepHours)sleepHours=s.sleepHours;
+      if(s.days&&s.days.length>=1){
+        let ds = s.sleepHours || 8;
+        s.days.forEach(d => {
+          if (d.sleepHours === undefined) d.sleepHours = ds;
+        });
         if(s.allTags)allTags=s.allTags;
         s.allTags&&s.allTags.forEach((t,i)=>{if(!COLOR_MAP[t])COLOR_MAP[t]=PALETTE[i%PALETTE.length];});
         return s.days;
@@ -203,37 +206,44 @@ function loadState(){
     }
   }catch(e){}
   return [
-    {label:'today',date:fmtDate(today),blocks:defaultBlocks()},
-    {label:'yesterday',date:fmtDate(prevDate(1)),blocks:[{name:'work',hours:avail()*0.55},{name:'personal',hours:avail()*0.25},{name:'social',hours:avail()*0.2}]},
+    {label:'today',date:fmtDate(today),blocks:defaultBlocks(8),sleepHours:8},
+    {label:'yesterday',date:fmtDate(prevDate(1)),blocks:[{name:'work',hours:8.8},{name:'personal',hours:4},{name:'social',hours:3.2}],sleepHours:8},
   ];
 }
 
 function saveState(){
-  try{localStorage.setItem('fatd_v9',JSON.stringify({days,sleepHours,allTags}));}catch(e){}
+  try{localStorage.setItem('fatd_v9',JSON.stringify({days,sleepHours:defaultSleepHours,allTags}));}catch(e){}
 }
 
 let days=loadState();
 let currentDay=0;
+function getDay(){return days[currentDay];}
 function getBlocks(){return days[currentDay].blocks;}
 function getGhostIdx(){
   if(days.length===1)return -1;
   if(currentDay===0)return 1;
   return 0;
 }
-function getGhostBlocks(){
+function getGhostDay(){
   const gi=getGhostIdx();
-  return gi>=0?days[gi].blocks:[];
+  return gi>=0?days[gi]:null;
 }
 
-function normBlocks(blocks){
-  const a=avail(),t=blocks.reduce((s,b)=>s+b.hours,0);
+function normBlocks(day){
+  const blocks=day.blocks, a=getAvail(day.sleepHours), t=blocks.reduce((s,b)=>s+b.hours,0);
   if(t<=0){const e=a/blocks.length;blocks.forEach(b=>b.hours=e);return;}
   blocks.forEach(b=>b.hours=b.hours*(a/t));
 }
 
 function renderAll(){renderDayNav();renderGhost();renderBar();renderRows();renderSleep();renderAvailNote();renderTags();renderGuides();}
-function renderAvailNote(){document.getElementById('avail-note').textContent=`${avail()}h to fill \u00b7 sleep ${sleepHours}h`;}
-function renderSleep(){document.getElementById('sleep-val').textContent=sleepHours+'h';}
+function renderAvailNote(){
+  const d=getDay();
+  document.getElementById('avail-note').textContent=`${getAvail(d.sleepHours)}h to fill \u00b7 sleep ${d.sleepHours}h`;
+}
+function renderSleep(){
+  const d=getDay();
+  document.getElementById('sleep-val').textContent=d.sleepHours+'h';
+}
 
 function renderDayNav(){
   const d=days[currentDay];
@@ -272,36 +282,37 @@ document.getElementById('add-day-btn').onclick=()=>{
   const offset=days.length;
   const d=prevDate(offset);
   const label=offset===1?'yesterday':`${offset}d ago`;
-  days.push({label,date:fmtDate(d),blocks:defaultBlocks()});
+  days.push({label,date:fmtDate(d),blocks:defaultBlocks(defaultSleepHours),sleepHours:defaultSleepHours});
   currentDay=days.length-1;
   saveState();
   renderAll();
 };
 
 function renderGhost(){
-  const blocks=getGhostBlocks();
+  const day=getGhostDay();
   const track=document.getElementById('ghost-track');
   track.style.height=BAR_H+'px';
   track.innerHTML='';
-  blocks.forEach((b,i)=>{
-    const h=segPx(b.hours);
+  if(!day)return;
+  day.blocks.forEach((b,i)=>{
+    const h=segPx(b.hours, day.sleepHours);
     const seg=document.createElement('div');
     seg.className='ghost-seg';
     const c=segColor(b.name);
     seg.style.cssText=`height:${h}px;background:${c};opacity:0.28;`;
-    if(i===0)seg.style.borderRadius=blocks.length===1?'4px':'4px 4px 0 0';
-    else if(i===blocks.length-1)seg.style.borderRadius='0 0 4px 4px';
+    if(i===0)seg.style.borderRadius=day.blocks.length===1?'4px':'4px 4px 0 0';
+    else if(i===day.blocks.length-1)seg.style.borderRadius='0 0 4px 4px';
     track.appendChild(seg);
   });
 }
 
 function renderBar(){
-  const blocks=getBlocks();
+  const day=getDay(), blocks=day.blocks;
   const track=document.getElementById('bar-track');
   track.innerHTML='';
   blocks.forEach((b,i)=>{
     const color=segColor(b.name);
-    const h=segPx(b.hours);
+    const h=segPx(b.hours, day.sleepHours);
     const only=blocks.length===1;
     const br=only?'6px':i===0?'6px 6px 0 0':i===blocks.length-1?'0 0 6px 6px':'0';
     const seg=document.createElement('div');
@@ -320,13 +331,13 @@ function renderBar(){
 }
 
 function renderRows(){
-  const blocks=getBlocks();
+  const day=getDay(), blocks=day.blocks;
   const col=document.getElementById('rows-col');
   col.innerHTML='';
   blocks.forEach((b,i)=>{
     const color=segColor(b.name);
-    const h=segPx(b.hours);
-    const pct=Math.round(b.hours/avail()*100);
+    const h=segPx(b.hours, day.sleepHours);
+    const pct=Math.round(b.hours/getAvail(day.sleepHours)*100);
     const row=document.createElement('div');
     row.className='leg-row';row.id=`leg-row-${i}`;row.style.height=h+'px';
     const pctEl=document.createElement('span');
@@ -350,10 +361,10 @@ function renderRows(){
 }
 
 function startHourEdit(i,hrsEl,nameEl){
-  const blocks=getBlocks();
+  const day=getDay(), blocks=day.blocks, a=getAvail(day.sleepHours);
   const inp=document.createElement('input');
   inp.className='leg-hours-input';inp.type='number';
-  inp.min=MIN_H;inp.max=avail();inp.step=0.5;
+  inp.min=MIN_H;inp.max=a;inp.step=0.5;
   inp.value=parseFloat(blocks[i].hours.toFixed(1));
   nameEl.style.cssText='flex:0 0 0px;overflow:hidden;width:0;';
   hrsEl.replaceWith(inp);inp.focus();inp.select();
@@ -361,13 +372,13 @@ function startHourEdit(i,hrsEl,nameEl){
     nameEl.style.cssText='';
     let val=parseFloat(inp.value);
     if(isNaN(val)||val<MIN_H)val=MIN_H;
-    val=snap(Math.min(val,avail()-(blocks.length-1)*MIN_H));
+    val=snap(Math.min(val,a-(blocks.length-1)*MIN_H));
     blocks[i].hours=val;
     const others=blocks.filter((_,j)=>j!==i);
-    const rem=avail()-val;
+    const rem=a-val;
     const ot=others.reduce((s,b)=>s+b.hours,0);
     if(ot>0&&rem>0)others.forEach(b=>b.hours=Math.max(MIN_H,snap(b.hours*(rem/ot))));
-    const diff=snap(avail()-blocks.reduce((s,b)=>s+b.hours,0));
+    const diff=snap(a-blocks.reduce((s,b)=>s+b.hours,0));
     if(Math.abs(diff)>=MIN_H){const adj=blocks[blocks.length-1===i?Math.max(0,i-1):blocks.length-1];adj.hours=Math.max(MIN_H,snap(adj.hours+diff));}
     saveState();renderBar();renderRows();renderGhost();
   }
@@ -376,12 +387,12 @@ function startHourEdit(i,hrsEl,nameEl){
 }
 
 function updateLive(){
-  const blocks=getBlocks();
+  const day=getDay(), blocks=day.blocks, a=getAvail(day.sleepHours);
   blocks.forEach((b,i)=>{
-    const seg=document.getElementById(`seg-${i}`);if(seg)seg.style.height=segPx(b.hours)+'px';
-    const row=document.getElementById(`leg-row-${i}`);if(row)row.style.height=segPx(b.hours)+'px';
+    const seg=document.getElementById(`seg-${i}`);if(seg)seg.style.height=segPx(b.hours, day.sleepHours)+'px';
+    const row=document.getElementById(`leg-row-${i}`);if(row)row.style.height=segPx(b.hours, day.sleepHours)+'px';
     const hEl=document.getElementById(`leg-h-${i}`);if(hEl)hEl.textContent=fmt(parseFloat(b.hours.toFixed(1)));
-    const pEl=document.getElementById(`leg-p-${i}`);if(pEl)pEl.textContent=Math.round(b.hours/avail()*100)+'%';
+    const pEl=document.getElementById(`leg-p-${i}`);if(pEl)pEl.textContent=Math.round(b.hours/a*100)+'%';
   });
 }
 
@@ -389,7 +400,7 @@ function attachDivider(grip,i){
   let startY=0,startA=0,startB=0;
   function begin(y){startY=y;startA=getBlocks()[i].hours;startB=getBlocks()[i+1].hours;}
   function move(y){
-    const blocks=getBlocks(),dy=y-startY,delta=(dy/BAR_H)*avail(),pool=startA+startB;
+    const day=getDay(), blocks=day.blocks, dy=y-startY, delta=(dy/BAR_H)*getAvail(day.sleepHours), pool=startA+startB;
     blocks[i].hours=Math.max(MIN_H,Math.min(pool-MIN_H,startA+delta));
     blocks[i+1].hours=pool-blocks[i].hours;updateLive();
   }
@@ -491,12 +502,16 @@ function renderGuides(){
 }
 
 document.getElementById('sleep-dn').onclick=()=>{
-  if(sleepHours<=1)return;sleepHours=snap(sleepHours-.5);
-  days.forEach(d=>normBlocks(d.blocks));saveState();renderAll();
+  const d=getDay();
+  if(d.sleepHours<=1)return;d.sleepHours=snap(d.sleepHours-.5);
+  defaultSleepHours=d.sleepHours;
+  normBlocks(d);saveState();renderAll();
 };
 document.getElementById('sleep-up').onclick=()=>{
-  if(sleepHours>=16)return;sleepHours=snap(sleepHours+.5);
-  days.forEach(d=>normBlocks(d.blocks));saveState();renderAll();
+  const d=getDay();
+  if(d.sleepHours>=16)return;d.sleepHours=snap(d.sleepHours+.5);
+  defaultSleepHours=d.sleepHours;
+  normBlocks(d);saveState();renderAll();
 };
 
 renderAll();
