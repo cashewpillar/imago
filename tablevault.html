@@ -52,13 +52,22 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .topbar-actions{display:flex;gap:6px;margin-left:auto;flex-shrink:0;}
 
 .filter-bar{padding:10px 14px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0;}
+.filter-controls{display:flex;gap:8px;align-items:center;}
+.grouping-select{flex:0 0 148px;max-width:45%;}
 .search-wrap{position:relative;}
 .search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;}
 .search-input{width:100%;padding:8px 10px 8px 32px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:13px;font-family:var(--font-b);outline:none;transition:border-color .15s;}
 .search-input:focus{border-color:var(--border2);}
 .search-input::placeholder{color:var(--muted2);}
-.tag-row{display:flex;gap:5px;flex-wrap:wrap;}
+.topbar-search{display:flex;align-items:center;justify-content:flex-end;overflow:hidden;max-width:0;opacity:0;transition:max-width .18s ease, opacity .12s ease;}
+.topbar-search.open{max-width:220px;opacity:1;}
+.topbar-search .search-wrap{width:200px;}
+.topbar-search .search-input{height:32px;padding:6px 10px 6px 32px;font-size:12px;}
+.tag-row{display:flex;flex-direction:column;gap:6px;}
 .tag-row:empty{display:none;}
+.tag-group{display:flex;gap:6px;align-items:flex-start;min-width:0;}
+.tag-group-label{flex:0 0 auto;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted2);padding-top:5px;min-width:32px;}
+.tag-group-chips{display:flex;gap:5px;flex-wrap:wrap;min-width:0;}
 .tag-chip{padding:4px 11px;border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--border2);background:var(--bg3);color:var(--muted);transition:all .12s;white-space:nowrap;user-select:none;}
 .tag-chip:hover{color:var(--text);}
 .tag-chip.active{border-color:transparent;color:#0e0e10;font-weight:600;}
@@ -94,7 +103,18 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .rc-fval{color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .rc-tags{display:flex;flex-wrap:wrap;gap:4px;}
 .rc-tag{font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;}
+.rc-meta{display:flex;flex-direction:column;gap:5px;}
+.rc-meta-group{display:flex;gap:6px;align-items:flex-start;min-width:0;}
+.rc-meta-label{flex:0 0 auto;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted2);padding-top:3px;min-width:32px;}
+.rc-meta-tags{display:flex;flex-wrap:wrap;gap:4px;min-width:0;}
 .rc-date{font-size:10px;color:var(--muted2);margin-top:auto;padding-top:6px;border-top:1px solid var(--border);}
+.group-list{display:flex;flex-direction:column;gap:12px;grid-column:1/-1;}
+.group-block{display:flex;flex-direction:column;gap:8px;}
+.group-head{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg2);cursor:pointer;}
+.group-toggle{width:18px;color:var(--muted);font-size:12px;text-align:center;flex-shrink:0;}
+.group-title{font-size:12px;font-weight:700;color:var(--text);}
+.group-count{margin-left:auto;font-size:10px;font-weight:700;color:var(--muted);padding:2px 7px;border-radius:999px;background:var(--bg3);border:1px solid var(--border);}
+.group-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
 
 .prog-wrap{width:100%;height:5px;background:var(--bg4);border-radius:3px;overflow:hidden;margin-top:3px;}
 .prog-fill{height:100%;border-radius:3px;transition:width .3s;}
@@ -185,7 +205,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 <div id="screen-home" class="screen active">
   <div class="topbar">
     <div class="logo" style="color:#b8ff57;">Table<span style="color:var(--text);">Vault</span></div>
+    <div class="topbar-search" id="home-top-search">
+      <div class="search-wrap">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"/><path d="M9 9l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <input class="search-input" id="home-search" placeholder="Search tables…" oninput="renderHome()">
+      </div>
+    </div>
     <div class="topbar-actions">
+      <button class="btn btn-ghost btn-icon" title="Search tables" onclick="toggleTopSearch('home')">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"/><path d="M9 9l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+      </button>
       <button class="btn btn-ghost btn-icon" title="Import snapshot" onclick="importSnapshot()">
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1.5v6.2M4 5.4l2.5 2.5 2.5-2.5M2 10.5h9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
@@ -195,10 +224,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
     </div>
   </div>
   <div class="filter-bar">
-    <div class="search-wrap">
-      <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"/><path d="M9 9l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-      <input class="search-input" id="home-search" placeholder="Search tables…" oninput="renderHome()">
-    </div>
     <div class="tag-row" id="home-tags"></div>
   </div>
   <div class="mosaic" id="home-grid"></div>
@@ -212,7 +237,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
       <svg width="14" height="12" viewBox="0 0 14 12" fill="none"><path d="M6 1L1 6l5 5M1 6h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
     <div class="topbar-title" id="rec-screen-title">—</div>
+    <div class="topbar-search" id="rec-top-search">
+      <div class="search-wrap">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"/><path d="M9 9l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <input class="search-input" id="rec-search" placeholder="Search records…" oninput="renderRecords()">
+      </div>
+    </div>
     <div class="topbar-actions">
+      <button class="btn btn-ghost btn-icon" title="Search records" onclick="toggleTopSearch('rec')">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"/><path d="M9 9l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+      </button>
       <button class="btn btn-ghost btn-icon" title="Toggle theme" onclick="toggleTheme()">
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="2.4" stroke="currentColor" stroke-width="1.2"/><path d="M6.5 1v1.4M6.5 10.6V12M12 6.5h-1.4M2.4 6.5H1M10.4 2.6l-1 1M3.6 9.4l-1 1M10.4 10.4l-1-1M3.6 3.6l-1-1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
       </button>
@@ -225,9 +259,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
     </div>
   </div>
   <div class="filter-bar">
-    <div class="search-wrap">
-      <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"/><path d="M9 9l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-      <input class="search-input" id="rec-search" placeholder="Search records…" oninput="renderRecords()">
+    <div class="filter-controls">
+      <select class="fselect grouping-select" id="rec-group-by" onchange="handleGroupingChange()"></select>
     </div>
     <div class="tag-row" id="rec-tags"></div>
   </div>
@@ -345,8 +378,10 @@ const COLORS = [
 const FTYPES = ['text','number','date','url','boolean','select','progress','textarea'];
 const THEME_KEY = 'tablevault-theme';
 
-let vaults=[], currentVaultId=null, allEntries=[], homeTagF=[], recTagF=[], editEntryId=null, editTags=[], selColor='Lime';
+let vaults=[], currentVaultId=null, allEntries=[], homeTagF=[], recTagF=[], editEntryId=null, selColor='Lime';
 let editTableTags=[];
+let recGroupField='', collapsedGroups={};
+let activeTopSearch='';
 
 const gc = n => {
   const named = COLORS.find(c=>c.name===n);
@@ -409,6 +444,7 @@ function goHome() {
   document.getElementById('screen-home').classList.add('active');
   document.getElementById('rec-search').value='';
   recTagF=[];
+  closeTopSearch('rec');
   loadVaults().then(renderHome);
 }
 
@@ -420,8 +456,11 @@ async function openVault(id) {
   const v=vaults.find(x=>x.id===id);
   document.getElementById('rec-screen-title').textContent=(v?.icon||'')+' '+(v?.name||'');
   recTagF=[]; document.getElementById('rec-search').value='';
+  recGroupField='';
+  collapsedGroups={};
   document.getElementById('screen-home').classList.remove('active');
   document.getElementById('screen-records').classList.add('active');
+  renderGroupingSelect(v?.fields||[]);
   renderRecords();
 }
 
@@ -430,19 +469,22 @@ function renderRecords() {
   const fields=v?.fields||[];
   const c=gc(v?.color);
   const q=document.getElementById('rec-search').value.toLowerCase();
-  const allTags=new Set();
+  const tagGroups = new Map();
   allEntries.forEach(r=>{
-    (r.tags||[]).forEach(t=>allTags.add(t));
-    getSelectFieldTags(fields,r).forEach(t=>allTags.add(t));
+    getRecordMetaGroups(fields,r).forEach(group=>{
+      const list = tagGroups.get(group.key) || {label:group.label, chips:new Set()};
+      group.values.forEach(value=>list.chips.add(value));
+      tagGroups.set(group.key,list);
+    });
   });
-  renderTagRow('rec-tags',[...allTags],recTagF,v?.color||'Lime',tag=>{
+  renderTagRow('rec-tags',[...tagGroups.entries()].map(([key, group])=>({key,label:group.label,tags:[...group.chips]})),recTagF,v?.color||'Lime',tag=>{
     const i=recTagF.indexOf(tag); i>=0?recTagF.splice(i,1):recTagF.push(tag); renderRecords();
   });
   const list=allEntries.filter(r=>{
-    const recordTags = [...(r.tags||[]), ...getSelectFieldTags(fields,r)];
+    const recordTags = getRecordMetaGroups(fields,r).flatMap(group=>group.values);
     if(recTagF.length && !recTagF.every(t=>recordTags.includes(t))) return false;
     if(q){
-      const txt=Object.values(r.data||{}).join(' ').toLowerCase()+' '+(r.tags||[]).join(' ').toLowerCase();
+      const txt=Object.values(r.data||{}).join(' ').toLowerCase();
       if(!txt.includes(q)) return false;
     }
     return true;
@@ -452,9 +494,36 @@ function renderRecords() {
     grid.innerHTML=`<div class="empty-state"><div class="empty-icon">${v?.icon||'🗂️'}</div><h3>${allEntries.length?'No results':'No records yet'}</h3><p>${allEntries.length?'Try different filters.':'Tap + to add your first record.'}</p></div>`;
     return;
   }
-  grid.innerHTML=list.map(r=>{
+  if(recGroupField){
+    const grouped = new Map();
+    list.forEach(r=>{
+      const value = getGroupValue(fields, r, recGroupField);
+      const key = value || 'Ungrouped';
+      const rows = grouped.get(key) || [];
+      rows.push(r);
+      grouped.set(key, rows);
+    });
+    const sortedGroups = [...grouped.entries()].sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
+    grid.innerHTML = `<div class="group-list">${sortedGroups.map(([groupName, rows])=>{
+      const collapsed = !!collapsedGroups[groupName];
+      const encodedName = encodeURIComponent(groupName);
+      return `<div class="group-block">
+        <div class="group-head" onclick="toggleGroup('${encodedName}')">
+          <span class="group-toggle">${collapsed?'▸':'▾'}</span>
+          <span class="group-title">${esc(groupName)}</span>
+          <span class="group-count">${rows.length}</span>
+          </div>
+        ${collapsed ? '' : `<div class="group-cards">${rows.map(r=>renderRecordCard(r, fields, c)).join('')}</div>`}
+      </div>`;
+    }).join('')}</div>`;
+    return;
+  }
+  grid.innerHTML=list.map(r=>renderRecordCard(r, fields, c)).join('');
+}
+
+function renderRecordCard(r, fields, c){
     const title=fields[0]?String(r.data?.[fields[0].key]||'—'):'—';
-    const selectTags = getSelectFieldTags(fields,r);
+    const metaGroups = getRecordMetaGroups(fields,r);
     const preview=fields.slice(1,4).map(f=>{
       let val=r.data?.[f.key];
       if(val===undefined||val===null||val==='') return '';
@@ -464,27 +533,76 @@ function renderRecords() {
       if(f.type==='url') val='🔗 '+val;
       return `<div class="rc-frow"><span class="rc-fkey">${esc(f.label)}</span><span class="rc-fval">${esc(String(val))}</span></div>`;
     }).filter(Boolean).join('');
-    const tagsHtml=[...(r.tags||[]), ...selectTags].map(t=>`<span class="rc-tag" style="background:${c.dim};color:${c.val};">${esc(t)}</span>`).join('');
+    const tagsHtml=metaGroups.length ? `<div class="rc-meta">${metaGroups.map(group=>`
+      <div class="rc-meta-group">
+        <div class="rc-meta-label">${esc(group.label)}</div>
+        <div class="rc-meta-tags">${group.values.map(t=>`<span class="rc-tag" style="background:${c.dim};color:${c.val};">${esc(t)}</span>`).join('')}</div>
+      </div>`).join('')}</div>` : '';
     const date=new Date(r.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric'});
     return `<div class="rec-card" onclick="openEditRecord(${r.id})">
       <div class="rc-stripe" style="background:${c.val};"></div>
       <div class="rc-header"><div class="rc-title">${esc(title)}</div>
         <button class="rc-menu" onclick="event.stopPropagation();showEntryCtx(event,${r.id})">⋮</button></div>
       ${preview?`<div class="rc-fields">${preview}</div>`:''}
-      ${tagsHtml?`<div class="rc-tags">${tagsHtml}</div>`:''}
+      ${tagsHtml}
       <div class="rc-date">${date}</div>
     </div>`;
-  }).join('');
 }
 
 function renderTagRow(elId,tags,active,colorName,fn) {
   const c=gc(colorName);
   const el=document.getElementById(elId);
   if(!tags.length){el.innerHTML='';return;}
-  el.innerHTML=tags.map(tag=>{
-    const on=active.includes(tag);
-    return `<div class="tag-chip${on?' active':''}" style="${on?`background:${c.val};border-color:${c.val};`:''}" onclick='(${fn.toString()})("${CSS.escape(tag)}")'>${esc(tag)}</div>`;
+  const normalizedGroups = tags.map(group=>{
+    if(typeof group === 'string') return {label:'Tags', tags:[group]};
+    return {label:group.label||'Tags', tags:Array.isArray(group.tags)?group.tags:[]};
+  });
+  el.innerHTML=normalizedGroups.map(group=>{
+    return `<div class="tag-group">
+      <div class="tag-group-label">${esc(group.label)}</div>
+      <div class="tag-group-chips">${group.tags.map(tag=>{
+        const on=active.includes(tag);
+        return `<div class="tag-chip${on?' active':''}" style="${on?`background:${c.val};border-color:${c.val};`:''}" onclick='(${fn.toString()})("${CSS.escape(tag)}")'>${esc(tag)}</div>`;
+      }).join('')}</div>
+    </div>`;
   }).join('');
+}
+function renderGroupingSelect(fields){
+  const el=document.getElementById('rec-group-by');
+  if(!el) return;
+  const options = [{key:'', label:'No grouping'}].concat(
+    fields.filter(f=>f.type==='select').map(f=>({key:f.key,label:`Group: ${f.label}`}))
+  );
+  el.innerHTML = options.map(opt=>`<option value="${esc(opt.key)}"${opt.key===recGroupField?' selected':''}>${esc(opt.label)}</option>`).join('');
+}
+function handleGroupingChange(){
+  recGroupField=document.getElementById('rec-group-by')?.value||'';
+  collapsedGroups={};
+  renderRecords();
+}
+function toggleTopSearch(scope){
+  const targetId = scope === 'home' ? 'home-top-search' : 'rec-top-search';
+  const inputId = scope === 'home' ? 'home-search' : 'rec-search';
+  const target = document.getElementById(targetId);
+  if(!target) return;
+  const willOpen = !target.classList.contains('open');
+  ['home','rec'].forEach(name=>{
+    if(name !== scope) closeTopSearch(name);
+  });
+  target.classList.toggle('open', willOpen);
+  activeTopSearch = willOpen ? scope : '';
+  if(willOpen) setTimeout(()=>document.getElementById(inputId)?.focus(), 120);
+}
+function closeTopSearch(scope){
+  const targetId = scope === 'home' ? 'home-top-search' : 'rec-top-search';
+  const target = document.getElementById(targetId);
+  target?.classList.remove('open');
+  if(activeTopSearch === scope) activeTopSearch = '';
+}
+function toggleGroup(encodedName){
+  const name = decodeURIComponent(encodedName);
+  collapsedGroups[name]=!collapsedGroups[name];
+  renderRecords();
 }
 
 /* ── NEW TABLE ── */
@@ -586,7 +704,7 @@ async function saveFields(){
 
 /* ── RECORD MODAL ── */
 function openAddRecordModal(){
-  editEntryId=null; editTags=[];
+  editEntryId=null;
   document.getElementById('m-rec-ttl').textContent='Add Record';
   document.getElementById('rec-save-btn').textContent='Add';
   buildRecForm({});
@@ -595,7 +713,6 @@ function openAddRecordModal(){
 async function openEditRecord(id){
   editEntryId=id;
   const r=await db.entries.get(id); if(!r) return;
-  editTags=[...(r.tags||[])];
   document.getElementById('m-rec-ttl').textContent='Edit Record';
   document.getElementById('rec-save-btn').textContent='Save';
   buildRecForm(r.data||{});
@@ -630,22 +747,7 @@ function buildRecForm(data){
     }
     return `<div class="rfrow"><div class="rflabel">${esc(field.label)}<span class="type-badge">${field.type}</span></div>${inp}</div>`;
   }).join('');
-
-  const tagSec=`<div class="rfrow"><div class="rflabel">Tags</div>
-    <div class="tag-wrap" id="tw" onclick="document.getElementById('tinp').focus()">
-      <div id="tpills">${renderTpills(c)}</div>
-      <input type="text" class="tag-inp" id="tinp" placeholder="Type tag, press Enter…"
-        onkeydown="handleTag(event,'${c.val}','${c.dim}')">
-    </div></div>`;
-
-  document.getElementById('rec-form').innerHTML=fhtml+tagSec;
-}
-function renderTpills(c){
-  return editTags.map((t,i)=>`<span class="tpill" style="background:${c.dim};color:${c.val};">${esc(t)}<span class="tpill-x" onclick="rmTag(${i})">×</span></span>`).join('');
-}
-function rmTag(i){
-  const v=vaults.find(x=>x.id===currentVaultId); const c=gc(v?.color);
-  editTags.splice(i,1); document.getElementById('tpills').innerHTML=renderTpills(c);
+  document.getElementById('rec-form').innerHTML=fhtml;
 }
 function renderTableTagPills(){
   const v=vaults.find(x=>x.id===currentVaultId); const c=gc(v?.color);
@@ -668,16 +770,6 @@ function handleTableTag(e){
     renderTableTagPills();
   }
 }
-function handleTag(e,cv,cd){
-  if(e.key==='Enter'||e.key===','){
-    e.preventDefault();
-    const val=e.target.value.trim().replace(/,/g,'');
-    if(val&&!editTags.includes(val)){editTags.push(val);document.getElementById('tpills').innerHTML=renderTpills({val:cv,dim:cd});}
-    e.target.value='';
-  } else if(e.key==='Backspace'&&!e.target.value&&editTags.length){
-    editTags.pop(); document.getElementById('tpills').innerHTML=renderTpills({val:cv,dim:cd});
-  }
-}
 async function saveRecord(){
   const v=vaults.find(x=>x.id===currentVaultId); const fields=v?.fields||[];
   const data={};
@@ -685,9 +777,8 @@ async function saveRecord(){
     if(f.type==='boolean'){const el=document.querySelector(`input[name="b_${f.key}"]:checked`);data[f.key]=el?el.value==='true':false;}
     else{const el=document.querySelector(`[data-k="${f.key}"]`);data[f.key]=el?el.value:'';}
   });
-  const tags=[...editTags];
-  if(editEntryId){await db.entries.update(editEntryId,{data,tags});toast('Updated!','success');}
-  else{await db.entries.add({tableId:currentVaultId,data,tags,createdAt:Date.now()});toast('Record added!','success');}
+  if(editEntryId){await db.entries.update(editEntryId,{data});toast('Updated!','success');}
+  else{await db.entries.add({tableId:currentVaultId,data,createdAt:Date.now()});toast('Record added!','success');}
   cm('m-record');
   allEntries=await db.entries.where('tableId').equals(currentVaultId).toArray();
   allEntries.sort((a,b)=>b.createdAt-a.createdAt);
@@ -847,7 +938,6 @@ function buildImportPayload(snapshot){
       });
       return {
         data,
-        tags: [],
         createdAt: parseSnapshotTime(row.created_at, row.updated_at),
       };
     });
@@ -892,12 +982,19 @@ function parseSnapshotTime(...values){
 }
 
 /* ── HELPERS ── */
-function getSelectFieldTags(fields, record){
-  return fields
-    .filter(f=>f.type==='select')
-    .map(f=>record?.data?.[f.key])
-    .filter(v=>v!==undefined && v!==null && v!=='')
-    .map(v=>String(v));
+function getRecordMetaGroups(fields, record){
+  const groups = [];
+  fields.filter(f=>f.type==='select').forEach(f=>{
+    const value = record?.data?.[f.key];
+    if(value!==undefined && value!==null && value!=='') groups.push({key:f.key, label:f.label, values:[String(value)]});
+  });
+  return groups;
+}
+function getGroupValue(fields, record, groupKey){
+  const field = fields.find(f=>f.key===groupKey && f.type==='select');
+  if(!field) return '';
+  const value = record?.data?.[field.key];
+  return value!==undefined && value!==null && value!=='' ? String(value) : 'Ungrouped';
 }
 function normalizeVault(v){
   return {
