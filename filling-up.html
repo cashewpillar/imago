@@ -208,13 +208,6 @@ if(state&&state.days&&state.days.length){
 }
 function D(){return days[cur];}
 function save(){try{localStorage.setItem('daytl_v4',JSON.stringify({days,cur,allTags,cmap:CMAP}));}catch(e){}}
-function overlaps(blocks,start,end,skipName){
-  for(let i=0;i<blocks.length;i++){
-    if(blocks[i].name===skipName)continue;
-    if(start<blocks[i].end-0.01&&end>blocks[i].start+0.01)return blocks[i];
-  }
-  return null;
-}
 function mergeBlocks(d){
   d.blocks.sort((a,b)=>a.start-b.start);
   for(let i=0;i<d.blocks.length-1;i++){
@@ -311,10 +304,23 @@ function renderTimeline(){
       const curH=snapH(hFor(y2-rect.top,D()));
       const s=Math.min(startH,curH),e=Math.max(startH,curH);
       preview.remove();
-      if(e-s>=SNAP && !overlaps(D().blocks,s,e,selTag)){
-        D().blocks.push({name:selTag,start:s,end:e});
-        mergeBlocks(D());save();renderAll();
+      if(e-s<SNAP) return;
+
+      const d=D();
+      let isEraser=false;
+      for(const b of d.blocks){
+        if(b.name===selTag && s<b.end-0.01 && e>b.start+0.01){ isEraser=true; break; }
       }
+
+      const nb=[];
+      for(const b of d.blocks){
+        if(b.end<=s+0.01 || b.start>=e-0.01){ nb.push(b); continue; }
+        if(b.start<s-0.01) nb.push({name:b.name,start:b.start,end:s});
+        if(b.end>e+0.01) nb.push({name:b.name,start:e,end:b.end});
+      }
+      if(!isEraser) nb.push({name:selTag,start:s,end:e});
+      d.blocks=nb;
+      mergeBlocks(d);save();renderAll();
     }
     return {mv,mu};
   }
