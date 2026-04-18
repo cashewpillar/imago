@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>TableVault</title>
+<script src="https://unpkg.com/dexie@3.2.4/dist/dexie.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+
+:root {
+  --bg: #0e0e10;
+  --bg2: #17171b;
+  --bg3: #1f1f25;
+  --bg4: #28282f;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.13);
+  --text: #efefee;
+  --muted: #7a7a88;
+  --muted2: #45454f;
+  --r: 14px;
+  --r-sm: 8px;
+  --font-h: 'Syne', sans-serif;
+  --font-b: 'DM Sans', sans-serif;
+  --sh: 0 4px 24px rgba(0,0,0,0.5);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:14px;line-height:1.5;min-height:100vh;}
+::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px;}
+
+.screen{display:none;flex-direction:column;min-height:100vh;}
+.screen.active{display:flex;}
+
+.topbar{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--border);padding:0 14px;height:52px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.logo{font-family:var(--font-h);font-size:17px;font-weight:800;letter-spacing:-0.5px;}
+.back-btn{width:32px;height:32px;border-radius:var(--r-sm);border:1px solid var(--border2);background:var(--bg3);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .15s;}
+.back-btn:hover{color:var(--text);background:var(--bg4);}
+.topbar-title{font-family:var(--font-h);font-size:15px;font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.topbar-actions{display:flex;gap:6px;margin-left:auto;flex-shrink:0;}
+
+.filter-bar{padding:10px 14px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0;}
+.search-wrap{position:relative;}
+.search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;}
+.search-input{width:100%;padding:8px 10px 8px 32px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:13px;font-family:var(--font-b);outline:none;transition:border-color .15s;}
+.search-input:focus{border-color:var(--border2);}
+.search-input::placeholder{color:var(--muted2);}
+.tag-row{display:flex;gap:5px;flex-wrap:wrap;}
+.tag-row:empty{display:none;}
+.tag-chip{padding:4px 11px;border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--border2);background:var(--bg3);color:var(--muted);transition:all .12s;white-space:nowrap;user-select:none;}
+.tag-chip:hover{color:var(--text);}
+.tag-chip.active{border-color:transparent;color:#0e0e10;font-weight:600;}
+
+.mosaic{padding:12px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;flex:1;align-content:start;}
+
+/* table cards */
+.table-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px 13px 12px;cursor:pointer;transition:border-color .15s,transform .12s;display:flex;flex-direction:column;gap:10px;position:relative;overflow:hidden;}
+.table-card:hover{border-color:var(--border2);transform:translateY(-1px);}
+.table-card:active{transform:scale(.98);}
+.tc-stripe{position:absolute;top:0;left:0;right:0;height:3px;}
+.tc-icon{font-size:28px;line-height:1;}
+.tc-name{font-family:var(--font-h);font-size:14px;font-weight:700;line-height:1.2;word-break:break-word;}
+.tc-footer{display:flex;align-items:center;justify-content:space-between;margin-top:auto;}
+.tc-count{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:600;}
+.tc-menu{width:24px;height:24px;border-radius:6px;border:none;background:none;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;line-height:1;transition:all .12s;}
+.tc-menu:hover{background:var(--bg4);color:var(--text);}
+.tc-tags{display:flex;flex-wrap:wrap;gap:4px;}
+.tc-tag{font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;}
+
+/* record cards */
+.rec-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:12px;cursor:pointer;transition:border-color .15s,transform .12s;display:flex;flex-direction:column;gap:8px;position:relative;overflow:hidden;}
+.rec-card:hover{border-color:var(--border2);transform:translateY(-1px);}
+.rec-card:active{transform:scale(.98);}
+.rc-stripe{position:absolute;top:0;left:0;right:0;height:2px;opacity:.7;}
+.rc-header{display:flex;align-items:flex-start;justify-content:space-between;gap:6px;}
+.rc-title{font-size:13px;font-weight:600;line-height:1.3;word-break:break-word;}
+.rc-menu{width:22px;height:22px;border-radius:5px;border:none;background:none;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;line-height:1;flex-shrink:0;transition:all .12s;}
+.rc-menu:hover{background:var(--bg4);color:var(--text);}
+.rc-fields{display:flex;flex-direction:column;gap:4px;}
+.rc-frow{display:flex;gap:6px;font-size:11px;}
+.rc-fkey{color:var(--muted);flex-shrink:0;max-width:45%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rc-fval{color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rc-tags{display:flex;flex-wrap:wrap;gap:4px;}
+.rc-tag{font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;}
+.rc-date{font-size:10px;color:var(--muted2);margin-top:auto;padding-top:6px;border-top:1px solid var(--border);}
+
+.prog-wrap{width:100%;height:5px;background:var(--bg4);border-radius:3px;overflow:hidden;margin-top:3px;}
+.prog-fill{height:100%;border-radius:3px;transition:width .3s;}
+
+.empty-state{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;padding:60px 20px;gap:10px;text-align:center;}
+.empty-icon{font-size:40px;margin-bottom:4px;}
+.empty-state h3{font-family:var(--font-h);font-size:16px;font-weight:700;}
+.empty-state p{font-size:13px;color:var(--muted);max-width:220px;line-height:1.6;}
+
+.btn{padding:7px 14px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:var(--font-b);cursor:pointer;border:none;transition:all .15s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}
+.btn-primary{background:#b8ff57;color:#0e0e10;}
+.btn-primary:hover{background:#c9ff6e;}
+.btn-ghost{background:var(--bg3);color:var(--text);border:1px solid var(--border2);}
+.btn-ghost:hover{background:var(--bg4);}
+.btn-danger{background:rgba(255,92,92,.12);color:#ff5c5c;border:1px solid rgba(255,92,92,.2);}
+.btn-danger:hover{background:rgba(255,92,92,.22);}
+.btn-icon{padding:7px 9px;}
+
+.fab{position:fixed;bottom:22px;right:18px;z-index:30;width:52px;height:52px;border-radius:50%;background:#b8ff57;color:#0e0e10;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:300;box-shadow:0 4px 20px rgba(184,255,87,.35);transition:transform .15s,box-shadow .15s;}
+.fab:hover{transform:scale(1.08);box-shadow:0 6px 28px rgba(184,255,87,.45);}
+.fab:active{transform:scale(.95);}
+
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:flex-end;justify-content:center;z-index:100;}
+.modal-backdrop.open{display:flex;animation:fadeIn .15s ease;}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r) var(--r) 0 0;width:100%;max-width:520px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;animation:slideUp .22s cubic-bezier(.16,1,.3,1);}
+@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-header{padding:15px 16px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.modal-title{font-family:var(--font-h);font-size:16px;font-weight:700;}
+.modal-close{width:28px;height:28px;border-radius:var(--r-sm);border:none;background:var(--bg3);color:var(--muted);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;transition:all .12s;}
+.modal-close:hover{color:var(--text);background:var(--bg4);}
+.modal-body{padding:16px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:14px;}
+.modal-footer{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;}
+
+.fg{display:flex;flex-direction:column;gap:5px;}
+.flabel{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);}
+.finput,.fselect,.ftextarea{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);font-family:var(--font-b);font-size:13px;padding:8px 10px;outline:none;transition:border-color .15s;width:100%;}
+.finput:focus,.fselect:focus,.ftextarea:focus{border-color:#b8ff57;}
+.ftextarea{resize:vertical;min-height:70px;}
+.fselect option{background:var(--bg3);}
+
+.field-row{display:flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);padding:8px 10px;}
+.field-row.primary{border-left:3px solid #b8ff57;}
+.field-row input{flex:1;background:none;border:none;color:var(--text);font-size:13px;font-family:var(--font-b);outline:none;min-width:0;}
+.field-row input::placeholder{color:var(--muted2);}
+.field-row select{background:var(--bg4);border:1px solid var(--border);border-radius:5px;color:var(--muted);font-size:11px;font-family:var(--font-b);padding:3px 6px;outline:none;cursor:pointer;}
+.field-badge{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:2px 6px;border-radius:4px;background:rgba(184,255,87,.12);color:#b8ff57;flex-shrink:0;}
+.field-del{width:22px;height:22px;border-radius:5px;border:none;background:none;color:var(--muted2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;transition:all .12s;}
+.field-del:hover{color:#ff5c5c;background:rgba(255,92,92,.12);}
+.btn-add-field{display:flex;align-items:center;gap:6px;padding:8px 10px;border:1px dashed var(--border2);border-radius:var(--r-sm);background:none;color:var(--muted);font-size:12px;font-family:var(--font-b);cursor:pointer;width:100%;transition:all .12s;}
+.btn-add-field:hover{border-color:#b8ff57;color:#b8ff57;}
+
+.rfrow{display:flex;flex-direction:column;gap:5px;}
+.rflabel{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:6px;}
+.type-badge{font-size:9px;font-weight:600;padding:1px 5px;border-radius:4px;background:var(--bg4);color:var(--muted2);text-transform:lowercase;letter-spacing:0;}
+
+.tag-wrap{display:flex;flex-wrap:wrap;gap:5px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:6px 8px;cursor:text;min-height:40px;align-items:center;transition:border-color .15s;}
+.tag-wrap:focus-within{border-color:#b8ff57;}
+.tpill{display:flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;}
+.tpill-x{cursor:pointer;opacity:.7;font-size:13px;line-height:1;}
+.tpill-x:hover{opacity:1;}
+.tag-inp{border:none;background:none;outline:none;font-family:var(--font-b);font-size:12px;color:var(--text);flex:1;min-width:60px;}
+.tag-inp::placeholder{color:var(--muted2);}
+
+.cp{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px;}
+.cswatch{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .12s;}
+
+.ctx-menu{position:fixed;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);box-shadow:var(--sh);z-index:200;overflow:hidden;min-width:160px;display:none;}
+.ctx-item{display:flex;align-items:center;gap:8px;padding:9px 13px;font-size:13px;cursor:pointer;transition:background .1s;color:var(--text);}
+.ctx-item:hover{background:var(--bg4);}
+.ctx-item.danger{color:#ff5c5c;}
+.ctx-item.danger:hover{background:rgba(255,92,92,.12);}
+.ctx-sep{height:1px;background:var(--border);margin:3px 0;}
+
+#toast{position:fixed;bottom:84px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:9px 16px;font-size:13px;color:var(--text);z-index:999;opacity:0;transition:all .25s cubic-bezier(.16,1,.3,1);box-shadow:var(--sh);white-space:nowrap;display:flex;align-items:center;gap:8px;pointer-events:none;}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.tdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+</style>
+</head>
+<body>
+
+<!-- ══ HOME: tables mosaic ════════════════════════════════════════════ -->
+<div id="screen-home" class="screen active">
+  <div class="topbar">
+    <div class="logo" style="color:#b8ff57;">Table<span style="color:var(--text);">Vault</span></div>
+  </div>
+  <div class="filter-bar">
+    <div class="search-wrap">
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"/><path d="M9 9l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+      <input class="search-input" id="home-search" placeholder="Search tables…" oninput="renderHome()">
+    </div>
+    <div class="tag-row" id="home-tags"></div>
+  </div>
+  <div class="mosaic" id="home-grid"></div>
+  <button class="fab" onclick="openNewTableModal()">+</button>
+</div>
+
+<!-- ══ RECORDS: records mosaic ════════════════════════════════════════ -->
+<div id="screen-records" class="screen">
+  <div class="topbar">
+    <button class="back-btn" onclick="goHome()">
+      <svg width="14" height="12" viewBox="0 0 14 12" fill="none"><path d="M6 1L1 6l5 5M1 6h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="topbar-title" id="rec-screen-title">—</div>
+    <div class="topbar-actions">
+      <button class="btn btn-ghost btn-icon" title="Edit fields" onclick="openFieldsModal()">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x=".5" y=".5" width="12" height="12" rx="2.5" stroke="currentColor"/><path d="M3.5 6.5h6M6.5 3.5v6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      </button>
+      <button class="btn btn-ghost btn-icon" title="Table settings" onclick="openSettingsModal()">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="2" stroke="currentColor" stroke-width="1.2"/><path d="M6.5 1v1.2M6.5 10.8V12M12 6.5h-1.2M2.2 6.5H1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="filter-bar">
+    <div class="search-wrap">
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"/><path d="M9 9l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+      <input class="search-input" id="rec-search" placeholder="Search records…" oninput="renderRecords()">
+    </div>
+    <div class="tag-row" id="rec-tags"></div>
+  </div>
+  <div class="mosaic" id="rec-grid"></div>
+  <button class="fab" onclick="openAddRecordModal()">+</button>
+</div>
+
+<!-- modal: new/edit table -->
+<div id="m-table" class="modal-backdrop" onclick="bdClose(event,'m-table')">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="m-table-ttl">New Table</div>
+      <button class="modal-close" onclick="cm('m-table')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg"><label class="flabel">Name</label><input class="finput" id="tbl-name" placeholder="e.g. Fitness Goals, Book List…" maxlength="40"></div>
+      <div style="display:flex;gap:12px;">
+        <div class="fg" style="flex:0 0 auto;"><label class="flabel">Icon</label><input class="finput" id="tbl-icon" placeholder="📋" maxlength="4" style="font-size:20px;width:58px;text-align:center;"></div>
+        <div class="fg" style="flex:1;"><label class="flabel">Color</label><div class="cp" id="cp1"></div></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="cm('m-table')">Cancel</button>
+      <button class="btn btn-primary" id="tbl-save-btn" onclick="saveTable()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- modal: table settings -->
+<div id="m-settings" class="modal-backdrop" onclick="bdClose(event,'m-settings')">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Table Settings</div>
+      <button class="modal-close" onclick="cm('m-settings')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg"><label class="flabel">Name</label><input class="finput" id="ts-name" maxlength="40"></div>
+      <div style="display:flex;gap:12px;">
+        <div class="fg" style="flex:0 0 auto;"><label class="flabel">Icon</label><input class="finput" id="ts-icon" maxlength="4" style="font-size:20px;width:58px;text-align:center;"></div>
+        <div class="fg" style="flex:1;"><label class="flabel">Color</label><div class="cp" id="cp2"></div></div>
+      </div>
+      <div style="padding-top:12px;border-top:1px solid var(--border);">
+        <button class="btn btn-danger" style="width:100%;" onclick="confirmDeleteTable()">Delete Table &amp; All Records</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="cm('m-settings')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- modal: fields editor -->
+<div id="m-fields" class="modal-backdrop" onclick="bdClose(event,'m-fields')">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Edit Fields</div>
+      <button class="modal-close" onclick="cm('m-fields')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:var(--muted);line-height:1.7;">Define the columns for records. The first field is the card title.</p>
+      <div id="fields-ed" style="display:flex;flex-direction:column;gap:7px;"></div>
+      <button class="btn-add-field" onclick="addField()">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Add Field
+      </button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="cm('m-fields')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveFields()">Save Fields</button>
+    </div>
+  </div>
+</div>
+
+<!-- modal: add/edit record -->
+<div id="m-record" class="modal-backdrop" onclick="bdClose(event,'m-record')">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="m-rec-ttl">Add Record</div>
+      <button class="modal-close" onclick="cm('m-record')">✕</button>
+    </div>
+    <div class="modal-body" id="rec-form"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="cm('m-record')">Cancel</button>
+      <button class="btn btn-primary" id="rec-save-btn" onclick="saveRecord()">Add</button>
+    </div>
+  </div>
+</div>
+
+<div id="ctx" class="ctx-menu"></div>
+<div id="toast"><div class="tdot" id="tdot"></div><span id="tmsg"></span></div>
+
+<script>
+const db = new Dexie('TableVaultDB');
+db.version(1).stores({ vaults:'++id,name', entries:'++id,tableId,createdAt' });
+
+const COLORS = [
+  {name:'Lime',  val:'#b8ff57',dim:'rgba(184,255,87,.13)'},
+  {name:'Sky',   val:'#57c4ff',dim:'rgba(87,196,255,.13)'},
+  {name:'Pink',  val:'#ff7eb3',dim:'rgba(255,126,179,.13)'},
+  {name:'Amber', val:'#ffb84d',dim:'rgba(255,184,77,.13)'},
+  {name:'Violet',val:'#b57bff',dim:'rgba(181,123,255,.13)'},
+  {name:'Teal',  val:'#3fe0c5',dim:'rgba(63,224,197,.13)'},
+  {name:'Coral', val:'#ff6b6b',dim:'rgba(255,107,107,.13)'},
+  {name:'Ice',   val:'#ddeeff',dim:'rgba(221,238,255,.10)'},
+];
+const FTYPES = ['text','number','date','url','boolean','rating','progress','textarea'];
+
+let vaults=[], currentVaultId=null, allEntries=[], homeTagF=[], recTagF=[], editEntryId=null, editTags=[], selColor='Lime';
+
+const gc = n => COLORS.find(c=>c.name===n)||COLORS[0];
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const om = id => document.getElementById(id).classList.add('open');
+const cm = id => document.getElementById(id).classList.remove('open');
+const bdClose = (e,id) => { if(e.target.id===id) cm(id); };
+
+async function init() {
+  await loadVaults();
+  renderHome();
+  initCPs();
+}
+
+async function loadVaults() {
+  vaults = await db.vaults.toArray();
+  await Promise.all(vaults.map(async v => { v._count = await db.entries.where('tableId').equals(v.id).count(); }));
+}
+
+/* ── HOME ── */
+async function renderHome() {
+  const q = document.getElementById('home-search').value.toLowerCase();
+  const allTags = new Set(); vaults.forEach(v=>(v.tags||[]).forEach(t=>allTags.add(t)));
+  renderTagRow('home-tags',[...allTags],homeTagF,'Lime',tag=>{
+    const i=homeTagF.indexOf(tag); i>=0?homeTagF.splice(i,1):homeTagF.push(tag); renderHome();
+  });
+  const list = vaults.filter(v=>{
+    if(homeTagF.length && !homeTagF.every(t=>(v.tags||[]).includes(t))) return false;
+    if(q && !v.name.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const grid = document.getElementById('home-grid');
+  if(!list.length){
+    grid.innerHTML=`<div class="empty-state"><div class="empty-icon">🗂️</div><h3>${vaults.length?'No results':'No tables yet'}</h3><p>${vaults.length?'Try different filters.':'Tap + to create your first table.'}</p></div>`;
+    return;
+  }
+  grid.innerHTML = list.map(v=>{
+    const c=gc(v.color);
+    const tagsHtml=(v.tags||[]).map(t=>`<span class="tc-tag" style="background:${c.dim};color:${c.val};">${esc(t)}</span>`).join('');
+    return `<div class="table-card" onclick="openVault(${v.id})">
+      <div class="tc-stripe" style="background:${c.val};"></div>
+      <div class="tc-icon">${v.icon||'📋'}</div>
+      <div class="tc-name">${esc(v.name)}</div>
+      ${tagsHtml?`<div class="tc-tags">${tagsHtml}</div>`:''}
+      <div class="tc-footer">
+        <span class="tc-count" style="background:${c.dim};color:${c.val};">${v._count} record${v._count!==1?'s':''}</span>
+        <button class="tc-menu" onclick="event.stopPropagation();showVaultCtx(event,${v.id})">⋮</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function goHome() {
+  document.getElementById('screen-records').classList.remove('active');
+  document.getElementById('screen-home').classList.add('active');
+  document.getElementById('rec-search').value='';
+  recTagF=[];
+  loadVaults().then(renderHome);
+}
+
+/* ── RECORDS ── */
+async function openVault(id) {
+  currentVaultId=id;
+  allEntries = await db.entries.where('tableId').equals(id).toArray();
+  allEntries.sort((a,b)=>b.createdAt-a.createdAt);
+  const v=vaults.find(x=>x.id===id);
+  document.getElementById('rec-screen-title').textContent=(v?.icon||'')+' '+(v?.name||'');
+  recTagF=[]; document.getElementById('rec-search').value='';
+  document.getElementById('screen-home').classList.remove('active');
+  document.getElementById('screen-records').classList.add('active');
+  renderRecords();
+}
+
+function renderRecords() {
+  const v=vaults.find(x=>x.id===currentVaultId);
+  const fields=v?.fields||[];
+  const c=gc(v?.color);
+  const q=document.getElementById('rec-search').value.toLowerCase();
+  const allTags=new Set(); allEntries.forEach(r=>(r.tags||[]).forEach(t=>allTags.add(t)));
+  renderTagRow('rec-tags',[...allTags],recTagF,v?.color||'Lime',tag=>{
+    const i=recTagF.indexOf(tag); i>=0?recTagF.splice(i,1):recTagF.push(tag); renderRecords();
+  });
+  const list=allEntries.filter(r=>{
+    if(recTagF.length && !recTagF.every(t=>(r.tags||[]).includes(t))) return false;
+    if(q){
+      const txt=Object.values(r.data||{}).join(' ').toLowerCase()+' '+(r.tags||[]).join(' ').toLowerCase();
+      if(!txt.includes(q)) return false;
+    }
+    return true;
+  });
+  const grid=document.getElementById('rec-grid');
+  if(!list.length){
+    grid.innerHTML=`<div class="empty-state"><div class="empty-icon">${v?.icon||'🗂️'}</div><h3>${allEntries.length?'No results':'No records yet'}</h3><p>${allEntries.length?'Try different filters.':'Tap + to add your first record.'}</p></div>`;
+    return;
+  }
+  grid.innerHTML=list.map(r=>{
+    const title=fields[0]?String(r.data?.[fields[0].key]||'—'):'—';
+    const preview=fields.slice(1,4).map(f=>{
+      let val=r.data?.[f.key];
+      if(val===undefined||val===null||val==='') return '';
+      if(f.type==='boolean') val=val?'✓ Yes':'✗ No';
+      if(f.type==='rating') val='★'.repeat(Math.min(5,parseInt(val)||0))+'☆'.repeat(Math.max(0,5-(parseInt(val)||0)));
+      if(f.type==='progress') return `<div class="rc-frow"><span class="rc-fkey">${esc(f.label)}</span><span class="rc-fval" style="display:flex;align-items:center;gap:5px;"><div class="prog-wrap" style="flex:1;"><div class="prog-fill" style="width:${Math.min(100,parseInt(val)||0)}%;background:${c.val};"></div></div><span style="font-size:10px;color:var(--muted);flex-shrink:0;">${val}%</span></span></div>`;
+      if(f.type==='url') val='🔗 '+val;
+      return `<div class="rc-frow"><span class="rc-fkey">${esc(f.label)}</span><span class="rc-fval">${esc(String(val))}</span></div>`;
+    }).filter(Boolean).join('');
+    const tagsHtml=(r.tags||[]).map(t=>`<span class="rc-tag" style="background:${c.dim};color:${c.val};">${esc(t)}</span>`).join('');
+    const date=new Date(r.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    return `<div class="rec-card" onclick="openEditRecord(${r.id})">
+      <div class="rc-stripe" style="background:${c.val};"></div>
+      <div class="rc-header"><div class="rc-title">${esc(title)}</div>
+        <button class="rc-menu" onclick="event.stopPropagation();showEntryCtx(event,${r.id})">⋮</button></div>
+      ${preview?`<div class="rc-fields">${preview}</div>`:''}
+      ${tagsHtml?`<div class="rc-tags">${tagsHtml}</div>`:''}
+      <div class="rc-date">${date}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderTagRow(elId,tags,active,colorName,fn) {
+  const c=gc(colorName);
+  const el=document.getElementById(elId);
+  if(!tags.length){el.innerHTML='';return;}
+  el.innerHTML=tags.map(tag=>{
+    const on=active.includes(tag);
+    return `<div class="tag-chip${on?' active':''}" style="${on?`background:${c.val};border-color:${c.val};`:''}" onclick='(${fn.toString()})("${CSS.escape(tag)}")'>${esc(tag)}</div>`;
+  }).join('');
+}
+
+/* ── NEW TABLE ── */
+let editVaultId=null;
+function openNewTableModal(){
+  editVaultId=null; selColor='Lime';
+  document.getElementById('m-table-ttl').textContent='New Table';
+  document.getElementById('tbl-save-btn').textContent='Create';
+  document.getElementById('tbl-name').value='';
+  document.getElementById('tbl-icon').value='';
+  updateCP('cp1'); om('m-table');
+  setTimeout(()=>document.getElementById('tbl-name').focus(),120);
+}
+async function saveTable(){
+  const name=document.getElementById('tbl-name').value.trim();
+  if(!name){toast('Enter a table name','error');return;}
+  const icon=document.getElementById('tbl-icon').value.trim()||'📋';
+  const id=await db.vaults.add({name,icon,color:selColor,fields:[{key:'title',label:'Title',type:'text'},{key:'notes',label:'Notes',type:'textarea'}],tags:[],createdAt:Date.now()});
+  cm('m-table'); await loadVaults(); renderHome(); openVault(id); toast('Table created!','success');
+}
+
+/* ── SETTINGS ── */
+function openSettingsModal(){
+  const v=vaults.find(x=>x.id===currentVaultId); if(!v) return;
+  document.getElementById('ts-name').value=v.name;
+  document.getElementById('ts-icon').value=v.icon||'';
+  selColor=v.color||'Lime'; updateCP('cp2'); om('m-settings');
+}
+async function saveSettings(){
+  const name=document.getElementById('ts-name').value.trim();
+  if(!name){toast('Enter a name','error');return;}
+  const icon=document.getElementById('ts-icon').value.trim()||'📋';
+  await db.vaults.update(currentVaultId,{name,icon,color:selColor});
+  cm('m-settings'); await loadVaults();
+  const v=vaults.find(x=>x.id===currentVaultId);
+  document.getElementById('rec-screen-title').textContent=(v?.icon||'')+' '+(v?.name||'');
+  renderRecords(); toast('Saved!','success');
+}
+async function confirmDeleteTable(){
+  if(!confirm('Delete this table and all its records?')) return;
+  await db.entries.where('tableId').equals(currentVaultId).delete();
+  await db.vaults.delete(currentVaultId);
+  cm('m-settings'); await loadVaults(); goHome(); toast('Table deleted','error');
+}
+
+/* ── FIELDS ── */
+function openFieldsModal(){
+  const v=vaults.find(x=>x.id===currentVaultId);
+  renderFieldsEd(v?.fields||[]);
+  om('m-fields');
+}
+function renderFieldsEd(fields){
+  document.getElementById('fields-ed').innerHTML=fields.map((f,i)=>`
+    <div class="field-row${i===0?' primary':''}" data-i="${i}">
+      ${i===0?'<span class="field-badge">Title</span>':'<span style="color:var(--muted2);cursor:grab;font-size:14px;">⠿</span>'}
+      <input type="text" value="${esc(f.label)}" placeholder="Field name" data-k="label">
+      <select data-k="type"${i===0?' disabled':''}>
+        ${FTYPES.map(t=>`<option value="${t}"${f.type===t?' selected':''}>${t}</option>`).join('')}
+      </select>
+      ${i===0?'<div style="width:22px;"></div>':`<button class="field-del" onclick="delField(${i})">✕</button>`}
+    </div>`).join('');
+}
+function addField(){
+  const fields=getFieldsFromEd();
+  fields.push({key:'f_'+Date.now(),label:'',type:'text'});
+  renderFieldsEd(fields);
+}
+function delField(i){
+  const fields=getFieldsFromEd(); fields.splice(i,1); renderFieldsEd(fields);
+}
+function getFieldsFromEd(){
+  const v=vaults.find(x=>x.id===currentVaultId); const ex=v?.fields||[];
+  return [...document.querySelectorAll('#fields-ed .field-row')].map((row,i)=>({
+    key:ex[i]?.key||('f_'+Date.now()+'_'+i),
+    label:row.querySelector('[data-k="label"]').value.trim()||'Field',
+    type:row.querySelector('[data-k="type"]').value,
+  }));
+}
+async function saveFields(){
+  const fields=getFieldsFromEd();
+  if(!fields[0]?.label){toast('Title field needs a name','error');return;}
+  await db.vaults.update(currentVaultId,{fields});
+  const i=vaults.findIndex(x=>x.id===currentVaultId);
+  if(i>=0) vaults[i].fields=fields;
+  cm('m-fields'); renderRecords(); toast('Fields updated!','success');
+}
+
+/* ── RECORD MODAL ── */
+function openAddRecordModal(){
+  editEntryId=null; editTags=[];
+  document.getElementById('m-rec-ttl').textContent='Add Record';
+  document.getElementById('rec-save-btn').textContent='Add';
+  buildRecForm({});
+  om('m-record');
+}
+async function openEditRecord(id){
+  editEntryId=id;
+  const r=await db.entries.get(id); if(!r) return;
+  editTags=[...(r.tags||[])];
+  document.getElementById('m-rec-ttl').textContent='Edit Record';
+  document.getElementById('rec-save-btn').textContent='Save';
+  buildRecForm(r.data||{});
+  om('m-record');
+}
+function buildRecForm(data){
+  const v=vaults.find(x=>x.id===currentVaultId);
+  const fields=v?.fields||[{key:'title',label:'Title',type:'text'}];
+  const c=gc(v?.color);
+  const fhtml=fields.map(f=>{
+    const val=data[f.key]!==undefined?data[f.key]:'';
+    let inp='';
+    if(f.type==='textarea'){
+      inp=`<textarea class="ftextarea" data-k="${f.key}">${esc(String(val))}</textarea>`;
+    } else if(f.type==='boolean'){
+      inp=`<div style="display:flex;gap:16px;margin-top:2px;">${['true','false'].map(bv=>`<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;"><input type="radio" name="b_${f.key}" data-k="${f.key}" value="${bv}"${String(val)===bv||(bv==='false'&&val==='')?'checked':''} style="accent-color:${c.val};">${bv==='true'?'Yes':'No'}</label>`).join('')}</div>`;
+    } else if(f.type==='rating'){
+      const rv=parseInt(val)||0;
+      inp=`<div style="display:flex;gap:8px;align-items:center;margin-top:2px;" id="stars_${f.key}">${[1,2,3,4,5].map(n=>`<span onclick="setRating('${f.key}',${n})" style="font-size:24px;cursor:pointer;" data-n="${n}">${rv>=n?'★':'☆'}</span>`).join('')}<input type="hidden" data-k="${f.key}" id="rv_${f.key}" value="${rv}"></div>`;
+    } else if(f.type==='progress'){
+      const pv=parseInt(val)||0;
+      inp=`<div style="margin-top:4px;"><div style="display:flex;align-items:center;gap:10px;"><input type="range" min="0" max="100" step="1" value="${pv}" data-k="${f.key}" style="flex:1;accent-color:${c.val};" oninput="document.getElementById('po_${f.key}').textContent=this.value+'%';document.getElementById('pb_${f.key}').style.width=this.value+'%'"><span id="po_${f.key}" style="font-size:13px;font-weight:600;color:${c.val};min-width:38px;">${pv}%</span></div><div class="prog-wrap" style="margin-top:6px;"><div class="prog-fill" id="pb_${f.key}" style="width:${pv}%;background:${c.val};"></div></div></div>`;
+    } else if(f.type==='number'){
+      inp=`<input class="finput" type="number" data-k="${f.key}" value="${esc(String(val))}">`;
+    } else if(f.type==='date'){
+      inp=`<input class="finput" type="date" data-k="${f.key}" value="${esc(String(val))}">`;
+    } else if(f.type==='url'){
+      inp=`<input class="finput" type="url" data-k="${f.key}" value="${esc(String(val))}" placeholder="https://…">`;
+    } else {
+      inp=`<input class="finput" type="text" data-k="${f.key}" value="${esc(String(val))}">`;
+    }
+    return `<div class="rfrow"><div class="rflabel">${esc(f.label)}<span class="type-badge">${f.type}</span></div>${inp}</div>`;
+  }).join('');
+
+  const tagSec=`<div class="rfrow"><div class="rflabel">Tags</div>
+    <div class="tag-wrap" id="tw" onclick="document.getElementById('tinp').focus()">
+      <div id="tpills">${renderTpills(c)}</div>
+      <input type="text" class="tag-inp" id="tinp" placeholder="Type tag, press Enter…"
+        onkeydown="handleTag(event,'${c.val}','${c.dim}')">
+    </div></div>`;
+
+  document.getElementById('rec-form').innerHTML=fhtml+tagSec;
+}
+function setRating(key,n){
+  document.getElementById('rv_'+key).value=n;
+  document.querySelectorAll(`#stars_${key} [data-n]`).forEach(s=>s.textContent=parseInt(s.dataset.n)<=n?'★':'☆');
+}
+function renderTpills(c){
+  return editTags.map((t,i)=>`<span class="tpill" style="background:${c.dim};color:${c.val};">${esc(t)}<span class="tpill-x" onclick="rmTag(${i})">×</span></span>`).join('');
+}
+function rmTag(i){
+  const v=vaults.find(x=>x.id===currentVaultId); const c=gc(v?.color);
+  editTags.splice(i,1); document.getElementById('tpills').innerHTML=renderTpills(c);
+}
+function handleTag(e,cv,cd){
+  if(e.key==='Enter'||e.key===','){
+    e.preventDefault();
+    const val=e.target.value.trim().replace(/,/g,'');
+    if(val&&!editTags.includes(val)){editTags.push(val);document.getElementById('tpills').innerHTML=renderTpills({val:cv,dim:cd});}
+    e.target.value='';
+  } else if(e.key==='Backspace'&&!e.target.value&&editTags.length){
+    editTags.pop(); document.getElementById('tpills').innerHTML=renderTpills({val:cv,dim:cd});
+  }
+}
+async function saveRecord(){
+  const v=vaults.find(x=>x.id===currentVaultId); const fields=v?.fields||[];
+  const data={};
+  fields.forEach(f=>{
+    if(f.type==='boolean'){const el=document.querySelector(`input[name="b_${f.key}"]:checked`);data[f.key]=el?el.value==='true':false;}
+    else if(f.type==='rating'){data[f.key]=parseInt(document.getElementById('rv_'+f.key)?.value||0);}
+    else{const el=document.querySelector(`[data-k="${f.key}"]`);data[f.key]=el?el.value:'';}
+  });
+  const tags=[...editTags];
+  if(editEntryId){await db.entries.update(editEntryId,{data,tags});toast('Updated!','success');}
+  else{await db.entries.add({tableId:currentVaultId,data,tags,createdAt:Date.now()});toast('Record added!','success');}
+  cm('m-record');
+  allEntries=await db.entries.where('tableId').equals(currentVaultId).toArray();
+  allEntries.sort((a,b)=>b.createdAt-a.createdAt);
+  const vi=vaults.findIndex(x=>x.id===currentVaultId); if(vi>=0) vaults[vi]._count=allEntries.length;
+  renderRecords();
+}
+
+/* ── CTX ── */
+let ctxFns=[];
+function showVaultCtx(e,id){
+  showCtx(e.clientX,e.clientY,[
+    {l:'⚙️  Settings',f:()=>{currentVaultId=id;openSettingsModal();}},
+    {sep:true},
+    {l:'🗑  Delete',f:()=>deleteVaultDirect(id),d:true},
+  ]);
+}
+function showEntryCtx(e,id){
+  showCtx(e.clientX,e.clientY,[
+    {l:'✏️  Edit',f:()=>openEditRecord(id)},
+    {sep:true},
+    {l:'🗑  Delete',f:()=>deleteEntry(id),d:true},
+  ]);
+}
+async function deleteVaultDirect(id){
+  if(!confirm('Delete this table and all its records?')) return;
+  await db.entries.where('tableId').equals(id).delete();
+  await db.vaults.delete(id);
+  await loadVaults(); renderHome(); toast('Deleted','error');
+}
+async function deleteEntry(id){
+  if(!confirm('Delete this record?')) return;
+  await db.entries.delete(id);
+  allEntries=allEntries.filter(r=>r.id!==id);
+  const vi=vaults.findIndex(x=>x.id===currentVaultId); if(vi>=0) vaults[vi]._count=allEntries.length;
+  renderRecords(); toast('Deleted','error');
+}
+function showCtx(x,y,items){
+  ctxFns=items;
+  const m=document.getElementById('ctx');
+  m.innerHTML=items.map((item,i)=>item.sep?'<div class="ctx-sep"></div>':`<div class="ctx-item${item.d?' danger':''}" onclick="fireCtx(${i})">${item.l}</div>`).join('');
+  m.style.display='block';
+  const vw=window.innerWidth,vh=window.innerHeight,mw=m.offsetWidth,mh=m.offsetHeight;
+  m.style.left=Math.min(x,vw-mw-10)+'px';
+  m.style.top=Math.min(y,vh-mh-10)+'px';
+}
+function fireCtx(i){ctxFns[i]?.f?.();document.getElementById('ctx').style.display='none';}
+document.addEventListener('click',()=>document.getElementById('ctx').style.display='none');
+
+/* ── COLOR PICKERS ── */
+function initCPs(){
+  ['cp1','cp2'].forEach(id=>{
+    const el=document.getElementById(id);
+    COLORS.forEach(c=>{
+      const s=document.createElement('div');
+      s.className='cswatch'; s.dataset.c=c.name; s.dataset.p=id;
+      s.style.background=c.val; s.title=c.name;
+      s.onclick=()=>{selColor=c.name;updateCP(id);};
+      el.appendChild(s);
+    });
+    updateCP(id);
+  });
+}
+function updateCP(pid){
+  document.querySelectorAll(`#${pid} .cswatch`).forEach(s=>{
+    const c=COLORS.find(x=>x.name===s.dataset.c);
+    s.style.borderColor=s.dataset.c===selColor?c.val:'transparent';
+    s.style.transform=s.dataset.c===selColor?'scale(1.2)':'scale(1)';
+  });
+}
+
+/* ── TOAST ── */
+let tT;
+function toast(msg,type='success'){
+  document.getElementById('tmsg').textContent=msg;
+  document.getElementById('tdot').style.background=type==='success'?'#57e5a0':'#ff5c5c';
+  const el=document.getElementById('toast');
+  el.classList.add('show'); clearTimeout(tT);
+  tT=setTimeout(()=>el.classList.remove('show'),2400);
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape')['m-table','m-settings','m-fields','m-record'].forEach(cm);
+});
+
+init();
+</script>
+</body>
+</html>
