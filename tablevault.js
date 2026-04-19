@@ -3,14 +3,14 @@ db.version(1).stores({ vaults:'++id,name', entries:'++id,tableId,createdAt' });
 db.version(2).stores({ vaults:'++id,name,sourceTrackerId', entries:'++id,tableId,createdAt,sourceRowUid,sourceTrackerId' });
 
 const COLORS = [
-  {name:'Lime',  val:'#b8ff57',dim:'rgba(184,255,87,.13)'},
-  {name:'Sky',   val:'#57c4ff',dim:'rgba(87,196,255,.13)'},
-  {name:'Pink',  val:'#ff7eb3',dim:'rgba(255,126,179,.13)'},
-  {name:'Amber', val:'#ffb84d',dim:'rgba(255,184,77,.13)'},
-  {name:'Violet',val:'#b57bff',dim:'rgba(181,123,255,.13)'},
-  {name:'Teal',  val:'#3fe0c5',dim:'rgba(63,224,197,.13)'},
-  {name:'Coral', val:'#ff6b6b',dim:'rgba(255,107,107,.13)'},
-  {name:'Ice',   val:'#ddeeff',dim:'rgba(221,238,255,.10)'},
+  {name:'Lime',  val:'#b8ff57', lightVal:'#61a300', dim:'rgba(184,255,87,.13)'},
+  {name:'Sky',   val:'#57c4ff', lightVal:'#0077b6', dim:'rgba(87,196,255,.13)'},
+  {name:'Pink',  val:'#ff7eb3', lightVal:'#c9184a', dim:'rgba(255,126,179,.13)'},
+  {name:'Amber', val:'#ffb84d', lightVal:'#b5651d', dim:'rgba(255,184,77,.13)'},
+  {name:'Violet',val:'#b57bff', lightVal:'#6a0dad', dim:'rgba(181,123,255,.13)'},
+  {name:'Teal',  val:'#3fe0c5', lightVal:'#008080', dim:'rgba(63,224,197,.13)'},
+  {name:'Coral', val:'#ff6b6b', lightVal:'#d00000', dim:'rgba(255,107,107,.13)'},
+  {name:'Ice',   val:'#ddeeff', lightVal:'#4682b4', dim:'rgba(221,238,255,.10)'},
 ];
 const FTYPES = ['text','number','date','url','boolean','select','progress','textarea'];
 const THEME_KEY = 'tablevault-theme';
@@ -22,9 +22,15 @@ let activeTopSearch='';
 
 const gc = n => {
   const named = COLORS.find(c=>c.name===n);
-  if(named) return named;
+  const isLight = document.documentElement.classList.contains('light');
+  if(named) {
+    const val = isLight ? named.lightVal : named.val;
+    return { ...named, val, dim: hexToRgba(val, isLight ? 0.12 : 0.13) };
+  }
   if(typeof n === 'string' && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(n)) return {name:n,val:n,dim:hexToRgba(n,0.14)};
-  return COLORS[0];
+  const def = COLORS[0];
+  const val = isLight ? def.lightVal : def.val;
+  return { ...def, val, dim: hexToRgba(val, isLight ? 0.12 : 0.13) };
 };
 const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const om = id => document.getElementById(id).classList.add('open');
@@ -493,11 +499,17 @@ function initTheme(){
   applyTheme(theme);
 }
 function applyTheme(theme){
-  document.documentElement.classList.toggle('light', theme === 'light');
+  const isLight = theme === 'light';
+  document.documentElement.classList.toggle('light', isLight);
   localStorage.setItem(THEME_KEY, theme);
+  const logo = document.querySelector('.logo');
+  if(logo) logo.style.color = isLight ? '#61a300' : '#b8ff57';
 }
 function toggleTheme(){
   applyTheme(document.documentElement.classList.contains('light') ? 'dark' : 'light');
+  if(document.getElementById('screen-home').classList.contains('active')) renderHome();
+  else if(document.getElementById('screen-records').classList.contains('active')) renderRecords();
+  initCPs();
 }
 
 /* ── EXPORT/IMPORT ── */
@@ -813,7 +825,10 @@ function safeJson(value, fallback){
 function hexToRgba(hex, alpha){
   let raw = hex.replace('#','');
   if(raw.length === 3) raw = raw.split('').map(ch=>ch+ch).join('');
-  if(raw.length !== 6) return `rgba(184,255,87,${alpha})`;
+  if(raw.length !== 6) {
+    const isLight = document.documentElement.classList.contains('light');
+    return isLight ? `rgba(97,163,0,${alpha})` : `rgba(184,255,87,${alpha})`;
+  }
   const num = parseInt(raw,16);
   const r = (num >> 16) & 255;
   const g = (num >> 8) & 255;
