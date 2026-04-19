@@ -550,12 +550,24 @@ function renderAll(){renderNav();renderEndpoints();renderAxis();renderTimeline()
 renderAll();
 setTimeout(scrollToNow,80);
 
+// Robust Refresh Strategy
+const refresh = () => {
+  renderAll();
+  scrollToNow();
+};
+
+window.addEventListener('focus', refresh);
+window.addEventListener('pageshow', refresh);
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') {
-    renderAll();
-    scrollToNow();
-  }
+  if (document.visibilityState === 'visible') refresh();
 });
+
+// Keep it live while active (every 30s)
+setInterval(() => {
+  if (document.visibilityState === 'visible') {
+    renderTimeline(); // Just update the lines/blocks
+  }
+}, 30000);
 </script>
 </body>
 </html>
