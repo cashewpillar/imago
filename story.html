@@ -556,6 +556,12 @@
       </div>
     </div>
 
+    <!-- Meaning -->
+    <div class="form-group" style="margin-bottom:16px;">
+      <div class="form-label">your meaning</div>
+      <textarea id="hl-meaning" rows="2" placeholder="what meaning do you ascribe to it? (optional)" oninput="autoExpand(this)"></textarea>
+    </div>
+
     <!-- Tags -->
     <div class="form-group" style="margin-bottom:20px;">
       <div class="form-label">your tags</div>
@@ -800,6 +806,7 @@ function renderBook() {
     const stance = n.stance ? `<span class="stance-display ${STANCE_CLASS[n.stance]}">${STANCE_LABEL[n.stance]}</span>` : '';
     const meta = [stance, tags ? `<span style="display:inline-flex;gap:4px;flex-wrap:wrap;">${tags}</span>` : ''].filter(Boolean).join(' ');
     const noteHtml = n.stanceNote ? `<div class="note-field">${esc(n.stanceNote)}</div>` : '';
+    const meaningHtml = n.meaning ? `<div class="note-field" style="color:var(--text);font-weight:500;"><span style="color:var(--hint);font-weight:normal;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:2px;">meaning</span>${esc(n.meaning)}</div>` : '';
     const locHtml = n.location ? `<div style="font-size:11px;color:var(--hint);font-family:-apple-system,sans-serif;margin-bottom:5px;">${esc(n.location)}</div>` : '';
     const dateStr = `<span style="font-size:11px;color:var(--hint);font-family:-apple-system,sans-serif;">${relDate(n.date)}</span>`;
     el.innerHTML = `
@@ -810,6 +817,7 @@ function renderBook() {
         <button class="btn-ghost" style="font-size:11px;margin-left:auto;color:var(--purple);" onclick="editNote('${n.id}')">edit</button>
         <button class="delete-btn" style="font-size:11px;" onclick="deleteNote('${n.id}')">delete</button>
       </div>
+      ${meaningHtml}
       ${noteHtml}
     `;
     nl.appendChild(el);
@@ -829,6 +837,9 @@ function editNote(id) {
   hlText.value = n.text || '';
   autoExpand(hlText);
   document.getElementById('stance-note').value = n.stanceNote || '';
+  const hlMeaning = document.getElementById('hl-meaning');
+  hlMeaning.value = n.meaning || '';
+  autoExpand(hlMeaning);
   currentStance = n.stance;
   currentTags = [...(n.tags || [])];
   setStance(n.stance);
@@ -859,6 +870,9 @@ function initHighlightForm() {
   hlText.style.height = 'auto';
   document.getElementById('stance-note').value = '';
   document.getElementById('stance-note-wrap').style.display = 'none';
+  const hlMeaning = document.getElementById('hl-meaning');
+  hlMeaning.value = '';
+  hlMeaning.style.height = 'auto';
   document.getElementById('tag-input').value = '';
   document.getElementById('live-tags').innerHTML = '';
   ['yes','complicated','no'].forEach(s => {
@@ -927,12 +941,14 @@ function saveHighlight() {
   const text = document.getElementById('hl-text').value.trim();
   if(!text) return;
   const stanceNote = document.getElementById('stance-note').value.trim();
+  const meaning = document.getElementById('hl-meaning').value.trim();
   if (editingNoteId) {
     const n = b.notes.find(x => x.id === editingNoteId);
     if (n) {
       n.text = text;
       n.stance = currentStance;
       n.stanceNote = stanceNote || null;
+      n.meaning = meaning || null;
       n.tags = [...currentTags];
     }
   } else {
@@ -942,6 +958,7 @@ function saveHighlight() {
       text,
       stance: currentStance,
       stanceNote: stanceNote || null,
+      meaning: meaning || null,
       tags: [...currentTags]
     });
   }

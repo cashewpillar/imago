@@ -549,6 +549,13 @@ document.getElementById('edit-name-input').onkeydown=e=>{
 function renderAll(){renderNav();renderEndpoints();renderAxis();renderTimeline();renderSummary();renderTags();renderEditor();}
 renderAll();
 setTimeout(scrollToNow,80);
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    renderAll();
+    scrollToNow();
+  }
+});
 </script>
 </body>
 </html>
