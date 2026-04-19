@@ -515,10 +515,15 @@ async function exportAllData(){
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
+    a.style.display = 'none';
     a.href = url;
     a.download = `tablevault-full-backup-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => {
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    }, 100);
     toast('Backup exported!','success');
   } catch(err) {
     console.error(err);
@@ -530,20 +535,29 @@ async function importAllData(){
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = '.json';
+  input.style.display = 'none';
   input.onchange = async e => {
     const file = e.target.files[0];
-    if(!file) return;
-    if(!confirm('Replace ALL existing tables and records with the data from this backup? This cannot be undone.')) return;
+    if(!file) {
+      document.body.removeChild(input);
+      return;
+    }
+    if(!confirm('Replace ALL existing tables and records with the data from this backup? This cannot be undone.')) {
+      document.body.removeChild(input);
+      return;
+    }
     try {
       const backup = JSON.parse(await file.text());
       if(backup.type !== 'imago-tablevault-backup' && !backup.tables) {
         // Fallback for old snapshot format
         await handleSnapshotFile({target:{files:[file]}});
+        document.body.removeChild(input);
         return;
       }
       
       await db.transaction('rw', db.vaults, db.entries, async () => {
         await db.vaults.clear();
+        await db.vaults.clear(); // Safety clear for some edge cases
         await db.entries.clear();
         if(backup.vaults) await db.vaults.bulkAdd(backup.vaults);
         if(backup.entries) await db.entries.bulkAdd(backup.entries);
@@ -555,8 +569,11 @@ async function importAllData(){
     } catch(err) {
       console.error(err);
       toast('Import failed','error');
+    } finally {
+      if (input.parentNode) document.body.removeChild(input);
     }
   };
+  document.body.appendChild(input);
   input.click();
 }
 
@@ -575,10 +592,15 @@ async function exportTableData(id){
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
+    a.style.display = 'none';
     a.href = url;
     a.download = `table-${v.name.toLowerCase().replace(/\s+/g,'-')}-backup.json`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => {
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    }, 100);
     toast('Table exported!','success');
   } catch(err) {
     console.error(err);
@@ -590,13 +612,18 @@ async function importTableData(){
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = '.json';
+  input.style.display = 'none';
   input.onchange = async e => {
     const file = e.target.files[0];
-    if(!file) return;
+    if(!file) {
+      document.body.removeChild(input);
+      return;
+    }
     try {
       const backup = JSON.parse(await file.text());
       if(backup.type !== 'imago-tablevault-table-backup' || !backup.vault) {
         toast('Invalid table backup file','error');
+        document.body.removeChild(input);
         return;
       }
       
@@ -614,8 +641,11 @@ async function importTableData(){
     } catch(err) {
       console.error(err);
       toast('Import failed','error');
+    } finally {
+      if (input.parentNode) document.body.removeChild(input);
     }
   };
+  document.body.appendChild(input);
   input.click();
 }
 
