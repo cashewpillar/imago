@@ -108,14 +108,27 @@ input{-webkit-user-select:text;-moz-user-select:text;-ms-user-select:text;user-s
 .modal-btn{flex:1;font-size:14px;padding:11px 12px;border-radius:var(--border-radius-lg);border:0.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-secondary);cursor:pointer;}
 .modal-btn.primary{background:var(--color-text-primary);color:var(--color-background-primary);border-color:var(--color-text-primary);}
 .modal-btn.danger{border-color:#c55a5a;color:#c55a5a;}
+.settings-row{display:none;align-items:center;gap:12px;margin-bottom:1rem;font-size:11px;color:var(--color-text-tertiary);}
+.settings-row.open{display:flex;}
+.settings-btn{background:none;border:none;cursor:pointer;font-size:11px;color:var(--color-text-tertiary);text-decoration:underline;}
+.settings-btn:hover{color:var(--color-text-primary);}
 </style>
+<script src="imago-export.js"></script>
 </head>
 <body>
 <div class="app">
 <h2 class="sr-only">filling up — water your day</h2>
-<div class="hdr">
-  <div class="hdr-title">a fraction of a day</div>
-  <div class="hdr-sub" id="hdr-sub"></div>
+<div class="hdr" style="display:flex;justify-content:space-between;align-items:flex-start;">
+  <div>
+    <div class="hdr-title">a fraction of a day</div>
+    <div class="hdr-sub" id="hdr-sub"></div>
+  </div>
+  <button class="settings-btn" style="text-decoration:none;font-size:14px;" onclick="document.getElementById('settings-row').classList.toggle('open')">⚙️</button>
+</div>
+<div class="settings-row" id="settings-row">
+  <span>Data:</span>
+  <button class="settings-btn" onclick="ImagoExport.exportJSON('daytl_v4', 'filling-up-backup.json')">Export</button>
+  <button class="settings-btn" onclick="ImagoExport.importJSON('daytl_v4')">Import</button>
 </div>
 <div class="day-nav">
   <button class="nav-arrow" id="nav-prev">&#8592;</button>

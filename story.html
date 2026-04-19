@@ -430,7 +430,10 @@
   }
 
   #import-drop-area:hover { border-color: var(--purple-border); }
+  .backup-actions { display: flex; gap: 8px; margin-top: 20px; }
+  .backup-actions .btn { flex: 1; text-align: center; }
 </style>
+<script src="imago-export.js"></script>
 </head>
 <body>
 <div class="app">
@@ -458,6 +461,10 @@
       <h2>storage stats</h2>
     </div>
     <div id="storage-content"></div>
+    <div class="backup-actions">
+      <button class="btn" onclick="ImagoExport.exportJSON('reader_v3', 'story-backup.json')">export all data</button>
+      <button class="btn" onclick="ImagoExport.importJSON('reader_v3')">import backup</button>
+    </div>
   </div>
 
   <!-- Add Book -->
@@ -553,7 +560,7 @@
     <div class="form-group" style="margin-bottom:20px;">
       <div class="form-label">your tags</div>
       <div class="tags-input-wrap">
-        <input class="tags-input" type="text" id="tag-input" placeholder="#lifelesson  #cringe-but-true  #dad — press space or comma">
+        <input class="tags-input" type="text" id="tag-input" placeholder="#life  #connection  #friendship — press space or comma">
       </div>
       <div class="live-tags" id="live-tags"></div>
     </div>
