@@ -397,7 +397,7 @@ function rmTableTag(i){
   renderTableTagPills();
 }
 function handleTableTag(e){
-  if(e.key==='Enter'||e.key===','){
+  if(e.key==='Enter'||e.key===','||e.key===' '){
     e.preventDefault();
     const val=e.target.value.trim().replace(/,/g,'');
     if(val&&!editTableTags.includes(val)){editTableTags.push(val);renderTableTagPills();}
