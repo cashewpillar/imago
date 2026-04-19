@@ -427,7 +427,17 @@ function buildBlock(col,b,idx){
 }
 function renderTags(){
   const row=document.getElementById('tags-row');row.innerHTML='';
-  allTags.forEach(p=>{
+  const d=D();
+  const totals={};
+  d.blocks.forEach(b=>{ totals[b.name]=(totals[b.name]||0)+(b.end-b.start); });
+
+  const sortedTags = [...allTags].sort((a,b)=>{
+    const ta = totals[a]||0, tb = totals[b]||0;
+    if(tb !== ta) return tb - ta;
+    return allTags.indexOf(a) - allTags.indexOf(b);
+  });
+
+  sortedTags.forEach(p=>{
     const tag=document.createElement('span');tag.className='tag'+(p===selTag?' sel':'');
     if(p===selTag)tag.style.borderColor=tagColor(p);
     const dot=document.createElement('span');dot.className='tag-dot';dot.style.background=tagColor(p);
@@ -454,14 +464,17 @@ function renderSummary(){
   });
   const tAwake=d.bed-d.wake;
   bar.innerHTML='';
-  Object.keys(totals).forEach(name=>{
-    const seg=document.createElement('div');
-    seg.className='summary-seg';
-    seg.style.width=(totals[name]/tAwake*100)+'%';
-    seg.style.background=tagColor(name);
-    seg.title=`${name}: ${fmtDur(totals[name])}`;
-    bar.appendChild(seg);
-  });
+  
+  Object.keys(totals)
+    .sort((a,b)=>totals[b]-totals[a])
+    .forEach(name=>{
+      const seg=document.createElement('div');
+      seg.className='summary-seg';
+      seg.style.width=(totals[name]/tAwake*100)+'%';
+      seg.style.background=tagColor(name);
+      seg.title=`${name}: ${fmtDur(totals[name])}`;
+      bar.appendChild(seg);
+    });
 }
 
 function startBlockEdit(i){
