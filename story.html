@@ -783,10 +783,13 @@ function renderBook() {
   if(allTags.length) {
     fa.style.display = 'block';
     fc.innerHTML = '';
-    ['all', ...allTags].forEach(tag => {
+    const hasUntagged = notes.some(n => !(n.tags || []).length);
+    const filterOptions = ['all', ...(hasUntagged ? ['untagged'] : []), ...allTags];
+    
+    filterOptions.forEach(tag => {
       const chip = document.createElement('button');
       chip.className = 'filter-chip' + (currentFilter === tag ? ' active' : '');
-      chip.textContent = tag === 'all' ? 'all' : tag;
+      chip.textContent = tag;
       chip.onclick = () => { currentFilter = tag; renderBook(); };
       fc.appendChild(chip);
     });
@@ -796,7 +799,10 @@ function renderBook() {
   const nl = document.getElementById('note-list');
   const ne = document.getElementById('note-empty');
   nl.innerHTML = '';
-  const filtered = currentFilter === 'all' ? notes : notes.filter(n => (n.tags||[]).includes(currentFilter));
+  
+  const filtered = currentFilter === 'all' ? notes : 
+                   currentFilter === 'untagged' ? notes.filter(n => !(n.tags || []).length) :
+                   notes.filter(n => (n.tags||[]).includes(currentFilter));
   if(!filtered.length) { ne.style.display = 'block'; return; }
   ne.style.display = 'none';
   [...filtered].reverse().forEach(n => {
