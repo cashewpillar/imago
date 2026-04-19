@@ -215,8 +215,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
       <button class="btn btn-ghost btn-icon" title="Search tables" onclick="toggleTopSearch('home')">
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"/><path d="M9 9l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
       </button>
-      <button class="btn btn-ghost btn-icon" title="Import snapshot" onclick="importSnapshot()">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1.5v6.2M4 5.4l2.5 2.5 2.5-2.5M2 10.5h9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <button class="btn btn-ghost btn-icon" title="Import table" onclick="importTableData()">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1.5v6.2M4 5.4l2.5 2.5 2.5-2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 10.5h9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      </button>
+      <button class="btn btn-ghost btn-icon" title="Backup all data" onclick="exportAllData()">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2.5 4.5l4 4 4-4M6.5 8.5V1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M1 11.5h11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      </button>
+      <button class="btn btn-ghost btn-icon" title="Restore all data" onclick="importAllData()">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 8.5V1.5M2.5 5.5l4-4 4 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M1 11.5h11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
       </button>
       <button class="btn btn-ghost btn-icon" title="Toggle theme" onclick="toggleTheme()">
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="2.4" stroke="currentColor" stroke-width="1.2"/><path d="M6.5 1v1.4M6.5 10.6V12M12 6.5h-1.4M2.4 6.5H1M10.4 2.6l-1 1M3.6 9.4l-1 1M10.4 10.4l-1-1M3.6 3.6l-1-1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
@@ -309,8 +315,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
           <input type="text" class="tag-inp" id="ts-tag-input" placeholder="Type tag, press Enter…" onkeydown="handleTableTag(event)">
         </div>
       </div>
-      <div style="padding-top:12px;border-top:1px solid var(--border);">
-        <button class="btn btn-danger" style="width:100%;" onclick="confirmDeleteTable()">Delete Table &amp; All Records</button>
+      <div style="padding-top:12px;border-top:1px solid var(--border);display:flex;gap:8px;">
+        <button class="btn btn-ghost" style="flex:1;" onclick="exportTableData()">Export Table</button>
+        <button class="btn btn-danger" style="flex:1;" onclick="confirmDeleteTable()">Delete Table</button>
       </div>
     </div>
     <div class="modal-footer">

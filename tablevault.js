@@ -500,6 +500,125 @@ function toggleTheme(){
   applyTheme(document.documentElement.classList.contains('light') ? 'dark' : 'light');
 }
 
+/* ── EXPORT/IMPORT ── */
+async function exportAllData(){
+  try {
+    const allVaults = await db.vaults.toArray();
+    const allEntries = await db.entries.toArray();
+    const payload = {
+      type: 'imago-tablevault-backup',
+      version: 1,
+      timestamp: Date.now(),
+      vaults: allVaults,
+      entries: allEntries
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tablevault-full-backup-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Backup exported!','success');
+  } catch(err) {
+    console.error(err);
+    toast('Export failed','error');
+  }
+}
+
+async function importAllData(){
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = async e => {
+    const file = e.target.files[0];
+    if(!file) return;
+    if(!confirm('Replace ALL existing tables and records with the data from this backup? This cannot be undone.')) return;
+    try {
+      const backup = JSON.parse(await file.text());
+      if(backup.type !== 'imago-tablevault-backup' && !backup.tables) {
+        // Fallback for old snapshot format
+        await handleSnapshotFile({target:{files:[file]}});
+        return;
+      }
+      
+      await db.transaction('rw', db.vaults, db.entries, async () => {
+        await db.vaults.clear();
+        await db.entries.clear();
+        if(backup.vaults) await db.vaults.bulkAdd(backup.vaults);
+        if(backup.entries) await db.entries.bulkAdd(backup.entries);
+      });
+      
+      await loadVaults();
+      renderHome();
+      toast('Import successful!','success');
+    } catch(err) {
+      console.error(err);
+      toast('Import failed','error');
+    }
+  };
+  input.click();
+}
+
+async function exportTableData(id){
+  try {
+    const v = vaults.find(x=>x.id===(id||currentVaultId));
+    if(!v) return;
+    const entries = await db.entries.where('tableId').equals(v.id).toArray();
+    const payload = {
+      type: 'imago-tablevault-table-backup',
+      version: 1,
+      timestamp: Date.now(),
+      vault: v,
+      entries: entries
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `table-${v.name.toLowerCase().replace(/\s+/g,'-')}-backup.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Table exported!','success');
+  } catch(err) {
+    console.error(err);
+    toast('Export failed','error');
+  }
+}
+
+async function importTableData(){
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = async e => {
+    const file = e.target.files[0];
+    if(!file) return;
+    try {
+      const backup = JSON.parse(await file.text());
+      if(backup.type !== 'imago-tablevault-table-backup' || !backup.vault) {
+        toast('Invalid table backup file','error');
+        return;
+      }
+      
+      const {id, ...vaultRecord} = backup.vault;
+      const newId = await db.vaults.add(vaultRecord);
+      const entries = backup.entries.map(e => {
+        const {id, ...entryData} = e;
+        return {...entryData, tableId: newId};
+      });
+      if(entries.length) await db.entries.bulkAdd(entries);
+      
+      await loadVaults();
+      renderHome();
+      toast(`Imported table "${backup.vault.name}"`,'success');
+    } catch(err) {
+      console.error(err);
+      toast('Import failed','error');
+    }
+  };
+  input.click();
+}
+
 /* ── IMPORT ── */
 async function importSnapshot(){
   const input = document.getElementById('snapshot-file-input');
