@@ -8,6 +8,12 @@
 		"ghcr.io/devcontainer-config/features/dot-config:4": {}
 	},
 
+	// This maps node_modules to a Docker Volume instead of your host disk.
+    // It prevents malicious scripts from writing persistent files to your computer.
+    "mounts": [
+        "source=${localWorkspaceFolderBasename}-node_modules,target=${containerWorkspaceFolder}/node_modules,type=volume"
+    ],
+
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
 
