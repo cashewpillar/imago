@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>story graph</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <style>
@@ -166,9 +166,23 @@
     flex: 1;
     position: relative;
     overflow: hidden;
+    margin: 10px;
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: 16px;
+    box-shadow: inset 0 0 0 1px rgba(127,119,221,0.04);
+    touch-action: none;
   }
 
-  #graph-svg { width: 100%; height: 100%; display: block; }
+  #graph-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    background:
+      radial-gradient(circle at center, rgba(127,119,221,0.05), transparent 55%),
+      linear-gradient(var(--surface), var(--surface));
+    touch-action: none;
+  }
 
   .graph-info {
     font-size: 12px;
@@ -243,35 +257,105 @@
     width: 100%;
   }
 
-  .tooltip {
-    position: absolute;
-    background: var(--surface);
-    border: 0.5px solid var(--border-med);
-    border-radius: var(--radius-sm);
-    padding: 10px 13px;
-    max-width: 260px;
+  .sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.28);
     opacity: 0;
-    transition: opacity 0.15s;
-    z-index: 20;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
-    left: 10px;
-    bottom: 10px;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+    z-index: 30;
   }
-  .tooltip.visible { opacity: 1; }
-  .tooltip-text {
-    font-size: 13px;
-    line-height: 1.6;
-    color: var(--text);
-    font-style: italic;
-    margin-bottom: 6px;
+
+  .sheet-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
   }
-  .tooltip-meta, .tooltip-note {
+
+  .detail-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--surface);
+    border-top-left-radius: 18px;
+    border-top-right-radius: 18px;
+    border-top: 0.5px solid var(--border-med);
+    box-shadow: 0 -10px 30px rgba(0,0,0,0.12);
+    transform: translateY(100%);
+    transition: transform 0.22s ease;
+    z-index: 31;
+    max-height: min(70vh, 520px);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .detail-sheet.open {
+    transform: translateY(0);
+  }
+
+  .sheet-handle {
+    width: 38px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--border-med);
+    margin: 10px auto 8px;
+    flex-shrink: 0;
+  }
+
+  .sheet-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 0 14px 10px;
+    border-bottom: 0.5px solid var(--border);
+  }
+
+  .sheet-head-copy {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .sheet-meta {
     font-size: 11px;
     color: var(--hint);
     line-height: 1.5;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
-  .tooltip-note { margin-top: 6px; }
+
+  .sheet-close {
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 20px;
+    line-height: 1;
+    padding: 2px 4px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .sheet-body {
+    overflow: auto;
+    padding: 14px;
+  }
+
+  .sheet-text {
+    font-size: 16px;
+    line-height: 1.75;
+    color: var(--text);
+    font-style: italic;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .sheet-note {
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.65;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    white-space: pre-wrap;
+  }
 
   .empty {
     text-align: center;
@@ -308,12 +392,21 @@
     </div>
     <div class="graph-wrap" id="graph-wrap">
       <svg id="graph-svg"></svg>
-      <div class="tooltip" id="tooltip">
-        <div class="tooltip-text" id="tt-text"></div>
-        <div class="tooltip-meta" id="tt-meta"></div>
-        <div class="tooltip-note" id="tt-note"></div>
-      </div>
     </div>
+  </div>
+</div>
+<div class="sheet-backdrop" id="sheet-backdrop" onclick="closeDetailSheet()"></div>
+<div class="detail-sheet" id="detail-sheet" aria-hidden="true">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head">
+    <div class="sheet-head-copy">
+      <div class="sheet-meta" id="sheet-meta"></div>
+    </div>
+    <button class="sheet-close" onclick="closeDetailSheet()" aria-label="Close">×</button>
+  </div>
+  <div class="sheet-body">
+    <div class="sheet-text" id="sheet-text"></div>
+    <div class="sheet-note" id="sheet-note" style="display:none;"></div>
   </div>
 </div>
 
@@ -580,24 +673,11 @@ function renderGraph() {
     .attr('font-family', "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif")
     .text(d => truncate(d.label, 18));
 
-  const tooltip = document.getElementById('tooltip');
-  const syncActiveTooltip = () => {
-    if (!activeNoteId) return;
-    const activeNode = noteNodes.find(node => node.id === activeNoteId);
-    if (!activeNode) {
-      hideTooltip();
-      return;
-    }
-    showTooltipForNote(activeNode.note, tooltip);
-  };
   nodeSel.filter(d => d.type === 'note')
-    .on('pointerenter', (event, d) => {
+    .on('click', (event, d) => {
+      event.stopPropagation();
       activeNoteId = d.id;
-      showTooltipForNote(d.note, tooltip);
-    })
-    .on('pointerleave', () => {
-      activeNoteId = null;
-      hideTooltip();
+      openDetailSheet(d.note);
     });
 
   nodeSel.filter(d => d.type === 'tag')
@@ -633,7 +713,6 @@ function renderGraph() {
       .attr('x2', d => d.target.x)
       .attr('y2', d => d.target.y);
     nodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
-    syncActiveTooltip();
   });
 
   renderGraphTags(notes);
@@ -665,14 +744,14 @@ function setGraphFilter(tag) {
   const isAll = tag === 'all';
   graphFilter = isAll ? null : tag;
   if (isAll) graphBookFilter = null;
-  hideTooltip();
+  closeDetailSheet();
   toggleTagSidebar(false);
   renderGraph();
 }
 
 function setBookFilter(bookId) {
   graphBookFilter = graphBookFilter === bookId ? null : bookId;
-  hideTooltip();
+  closeDetailSheet();
   renderGraph();
 }
 
@@ -707,16 +786,25 @@ function noteNodeId(note) {
   return 'n_' + note.bookId + '_' + note.id;
 }
 
-function showTooltipForNote(note, tooltip) {
-  document.getElementById('tt-text').textContent = note.text.slice(0, 160) + (note.text.length > 160 ? '…' : '');
-  document.getElementById('tt-meta').textContent = [note.bookTitle, note.location, note.stance ? STANCE_LABEL[note.stance] : null, relDate(note.date)].filter(Boolean).join(' · ');
-  document.getElementById('tt-note').textContent = note.meaning || note.stanceNote || '';
-  tooltip.classList.add('visible');
+function openDetailSheet(note) {
+  document.getElementById('sheet-text').textContent = note.text || '';
+  document.getElementById('sheet-meta').textContent = [note.bookTitle, note.location, note.stance ? STANCE_LABEL[note.stance] : null, relDate(note.date)].filter(Boolean).join(' · ');
+  const noteEl = document.getElementById('sheet-note');
+  const extra = note.meaning || note.stanceNote || '';
+  noteEl.textContent = extra;
+  noteEl.style.display = extra ? 'block' : 'none';
+  document.getElementById('sheet-backdrop').classList.add('open');
+  const sheet = document.getElementById('detail-sheet');
+  sheet.classList.add('open');
+  sheet.setAttribute('aria-hidden', 'false');
 }
 
-function hideTooltip() {
-  const tooltip = document.getElementById('tooltip');
-  if (tooltip) tooltip.classList.remove('visible');
+function closeDetailSheet() {
+  activeNoteId = null;
+  document.getElementById('sheet-backdrop').classList.remove('open');
+  const sheet = document.getElementById('detail-sheet');
+  sheet.classList.remove('open');
+  sheet.setAttribute('aria-hidden', 'true');
 }
 
 function seedNodePositions(nodes, centerX, centerY, radius, angleOffset = 0) {
@@ -735,7 +823,6 @@ document.addEventListener('click', event => {
   if (sidebar.contains(event.target) || toggle.contains(event.target)) return;
   toggleTagSidebar(false);
 });
-
 </script>
 </body>
 </html>
