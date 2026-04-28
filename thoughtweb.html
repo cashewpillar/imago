@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>thoughtweb</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/3.2.4/dexie.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f7f6f2;
+  --surface: #ffffff;
+  --surface2: #f0efe9;
+  --text: #1a1a18;
+  --muted: #6b6b67;
+  --hint: #a0a09b;
+  --border: rgba(0,0,0,0.09);
+  --border-med: rgba(0,0,0,0.16);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --purple: #7F77DD;
+  --purple-bg: #EEEDFE;
+  --purple-border: #AFA9EC;
+  --purple-text: #3C3489;
+  --teal: #1D9E75;
+  --teal-bg: #E1F5EE;
+  --teal-border: #5DCAA5;
+  --teal-text: #085041;
+  --coral: #D85A30;
+  --coral-bg: #FAECE7;
+  --coral-border: #F0997B;
+  --coral-text: #712B13;
+}
+
+@media (prefers-color-scheme: dark) {
+  body:not(.light-mode) {
+    --bg: #1a1a18; --surface: #232321; --surface2: #2a2a28;
+    --text: #f0efe9; --muted: #a0a09b; --hint: #6b6b67;
+    --border: rgba(255,255,255,0.07); --border-med: rgba(255,255,255,0.13);
+    --purple-bg: #26215C; --purple-border: #534AB7; --purple-text: #CECBF6;
+    --teal-bg: #04342C; --teal-border: #0F6E56; --teal-text: #9FE1CB;
+    --coral-bg: #4A1B0C; --coral-border: #993C1D; --coral-text: #F5C4B3;
+  }
+}
+body.dark-mode {
+  --bg: #1a1a18; --surface: #232321; --surface2: #2a2a28;
+  --text: #f0efe9; --muted: #a0a09b; --hint: #6b6b67;
+  --border: rgba(255,255,255,0.07); --border-med: rgba(255,255,255,0.13);
+  --purple-bg: #26215C; --purple-border: #534AB7; --purple-text: #CECBF6;
+  --teal-bg: #04342C; --teal-border: #0F6E56; --teal-text: #9FE1CB;
+  --coral-bg: #4A1B0C; --coral-border: #993C1D; --coral-text: #F5C4B3;
+}
+
+body {
+  font-family: 'Georgia', 'Times New Roman', serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  transition: background 0.2s, color 0.2s;
+  overflow-x: hidden;
+}
+
+.app { max-width: 480px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
+
+/* NAV */
+.nav {
+  display: flex;
+  align-items: center;
+  padding: 0.9rem 1rem 0;
+  gap: 8px;
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 10;
+  border-bottom: 0.5px solid var(--border);
+  padding-bottom: 0.75rem;
+}
+.nav-title { font-size: 17px; letter-spacing: -0.3px; flex: 1; }
+.nav-tabs { display: flex; gap: 4px; background: var(--surface2); border-radius: 8px; padding: 3px; }
+.nav-tab {
+  font-size: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.nav-tab.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+
+.btn-ghost {
+  border: none; background: transparent; color: var(--muted);
+  font-size: 14px; padding: 6px 4px; cursor: pointer;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.btn-ghost:hover { color: var(--text); }
+
+/* SCREENS */
+.screen { display: none; flex: 1; }
+.screen.active { display: flex; flex-direction: column; }
+
+/* ── NOTES SCREEN ── */
+#s-notes { padding: 1.25rem 1rem 5rem; }
+
+.entry-form {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem 0.9rem;
+  margin-bottom: 1.25rem;
+}
+
+.form-label {
+  font-size: 11px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--hint);
+  margin-bottom: 6px;
+}
+
+textarea {
+  width: 100%; resize: none;
+  font-size: 15px;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  padding: 10px 12px;
+  border: 0.5px solid var(--border-med);
+  border-radius: var(--radius-sm);
+  background: var(--surface2);
+  color: var(--text);
+  line-height: 1.7;
+  transition: border-color 0.15s;
+  min-height: 90px;
+}
+textarea:focus { outline: none; box-shadow: 0 0 0 3px rgba(127,119,221,0.12); }
+textarea::placeholder { color: var(--hint); font-style: italic; }
+
+input[type=text], input[type=datetime-local] {
+  font-size: 14px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  padding: 0 12px;
+  height: 40px;
+  border: 0.5px solid var(--border-med);
+  border-radius: var(--radius-sm);
+  background: var(--surface2);
+  color: var(--text);
+  transition: border-color 0.15s;
+  width: 100%;
+}
+input[type=datetime-local] { height: 38px; font-size: 13px; }
+input:focus { outline: none; box-shadow: 0 0 0 3px rgba(127,119,221,0.12); }
+input::placeholder { color: var(--hint); }
+
+.form-row { margin-bottom: 12px; }
+
+.tags-input-wrap { position: relative; }
+.tags-input {
+  width: 100%; font-size: 14px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  padding: 9px 12px; height: auto;
+  border: 0.5px solid var(--border-med);
+  border-radius: var(--radius-sm);
+  background: var(--surface2); color: var(--text);
+}
+.tags-input::placeholder { color: var(--hint); font-style: normal; }
+.tags-input:focus { outline: none; box-shadow: 0 0 0 3px rgba(127,119,221,0.12); }
+
+.live-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; min-height: 20px; }
+
+.tag-chip {
+  font-size: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: var(--purple-bg);
+  color: var(--purple-text);
+  border: 0.5px solid var(--purple-border);
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 4px;
+  transition: opacity 0.1s;
+}
+.tag-chip:hover { opacity: 0.75; }
+.tag-chip.filter {
+  background: var(--surface2); color: var(--muted);
+  border-color: var(--border);
+}
+.tag-chip.filter.active { background: var(--text); color: var(--surface); border-color: var(--text); }
+.tag-chip.filter:hover { border-color: var(--border-med); color: var(--text); }
+
+.btn-save {
+  width: 100%; padding: 11px;
+  background: var(--text); color: var(--surface);
+  border: none; border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  cursor: pointer; transition: opacity 0.12s;
+  margin-top: 4px;
+}
+.btn-save:hover { opacity: 0.82; }
+.btn-save:active { transform: scale(0.99); }
+
+.divider { height: 0.5px; background: var(--border); margin: 1rem 0; }
+
+.filter-row { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 1rem; }
+
+.entry-item {
+  padding: 13px 0;
+  border-bottom: 0.5px solid var(--border);
+}
+.entry-item:last-child { border-bottom: none; }
+
+.entry-body {
+  font-size: 15px; line-height: 1.7;
+  color: var(--text); font-style: italic;
+  border-left: 2px solid var(--purple);
+  padding-left: 12px; margin-bottom: 9px;
+}
+
+.entry-meta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 5px;
+  font-size: 11px; color: var(--hint);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.entry-tag {
+  font-size: 11px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  padding: 2px 7px; border-radius: 20px;
+  background: var(--purple-bg); color: var(--purple-text);
+  border: 0.5px solid var(--purple-border);
+}
+.entry-actions { margin-left: auto; display: flex; gap: 8px; }
+.act-btn {
+  border: none; background: transparent; cursor: pointer; padding: 3px;
+  font-size: 12px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: var(--purple); transition: opacity 0.12s;
+}
+.act-btn.del { color: #E24B4A; }
+.act-btn:hover { opacity: 0.65; }
+
+.empty { text-align: center; padding: 2.5rem 1rem; color: var(--muted); font-size: 15px; line-height: 1.7; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+/* ── GRAPH SCREEN ── */
+#s-graph { flex-direction: column; overflow: hidden; }
+
+.graph-canvas-wrap { flex: 1; position: relative; overflow: hidden; }
+
+#graph-svg { width: 100%; height: 100%; display: block; }
+
+.graph-bottom {
+  background: var(--bg);
+  border-top: 0.5px solid var(--border);
+  padding: 0.75rem 1rem;
+}
+.graph-tag-row { display: flex; gap: 5px; flex-wrap: wrap; }
+.graph-info {
+  font-size: 12px; color: var(--muted);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  margin-bottom: 8px;
+  min-height: 18px;
+}
+
+/* Node tooltip */
+.tooltip {
+  position: absolute;
+  background: var(--surface);
+  border: 0.5px solid var(--border-med);
+  border-radius: var(--radius-sm);
+  padding: 10px 13px;
+  max-width: 240px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 20;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+}
+.tooltip.visible { opacity: 1; }
+.tooltip-text {
+  font-size: 13px; line-height: 1.6; color: var(--text);
+  font-style: italic; margin-bottom: 6px;
+}
+.tooltip-date {
+  font-size: 11px; color: var(--hint);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Edit modal */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.35); z-index: 50;
+  align-items: flex-end; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--bg);
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: 1.25rem 1rem 2rem;
+  width: 100%; max-width: 480px;
+  max-height: 90vh; overflow-y: auto;
+}
+.modal-title {
+  font-size: 15px; margin-bottom: 1.1rem; color: var(--text);
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+/* section label */
+.section-label {
+  font-size: 11px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  text-transform: uppercase; letter-spacing: 0.06em; color: var(--hint); margin-bottom: 10px;
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- NAV -->
+  <div class="nav">
+    <span class="nav-title">thoughtweb</span>
+    <div class="nav-tabs">
+      <button class="nav-tab active" id="tab-notes" onclick="switchTab('notes')">notes</button>
+      <button class="nav-tab" id="tab-graph" onclick="switchTab('graph')">graph</button>
+    </div>
+    <button class="btn-ghost" onclick="toggleTheme()" title="toggle theme">◐</button>
+    <button class="btn-ghost" style="font-size:12px;" onclick="showExportImport()" title="export / import">⇅</button>
+  </div>
+
+  <!-- NOTES SCREEN -->
+  <div id="s-notes" class="screen active">
+
+    <!-- Capture form -->
+    <div class="entry-form">
+      <div class="form-row">
+        <div class="form-label">thought</div>
+        <textarea id="capture-text" placeholder="what's bugging you…" oninput="autoExpand(this)"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-label">when</div>
+        <input type="datetime-local" id="capture-dt">
+      </div>
+      <div class="form-row" style="margin-bottom:4px;">
+        <div class="form-label">tags — space or comma to add</div>
+        <input class="tags-input" type="text" id="tag-input" placeholder="#identity  #fear  #work">
+        <div class="live-tags" id="live-tags"></div>
+      </div>
+      <button class="btn-save" onclick="saveEntry()">save</button>
+    </div>
+
+    <!-- Filter + list -->
+    <div id="filter-wrap" style="display:none;">
+      <div class="filter-row" id="filter-chips"></div>
+      <div class="divider" style="margin-top:0;"></div>
+    </div>
+    <div id="entry-list"></div>
+    <div id="entry-empty" class="empty" style="display:none;">
+      No entries yet.<br>Write the first thought.
+    </div>
+  </div>
+
+  <!-- GRAPH SCREEN -->
+  <div id="s-graph" class="screen">
+    <div class="graph-canvas-wrap" id="graph-wrap">
+      <svg id="graph-svg"></svg>
+      <div class="tooltip" id="tooltip">
+        <div class="tooltip-text" id="tt-text"></div>
+        <div class="tooltip-date" id="tt-date"></div>
+      </div>
+    </div>
+    <div class="graph-bottom">
+      <div class="graph-info" id="graph-info">tap a tag to filter · tap a node to peek</div>
+      <div class="graph-tag-row" id="graph-tags"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <div class="modal-title">
+      <span>edit entry</span>
+      <button class="btn-ghost" onclick="closeModal()">✕</button>
+    </div>
+    <div class="form-row">
+      <div class="form-label">thought</div>
+      <textarea id="edit-text" rows="4" oninput="autoExpand(this)"></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-label">when</div>
+      <input type="datetime-local" id="edit-dt">
+    </div>
+    <div class="form-row" style="margin-bottom:8px;">
+      <div class="form-label">tags</div>
+      <input class="tags-input" type="text" id="edit-tag-input" placeholder="#add tags">
+      <div class="live-tags" id="edit-live-tags"></div>
+    </div>
+    <button class="btn-save" onclick="saveEdit()">save changes</button>
+  </div>
+</div>
+
+<!-- EXPORT/IMPORT MODAL -->
+<div class="modal-overlay" id="ei-modal">
+  <div class="modal">
+    <div class="modal-title">
+      <span>data</span>
+      <button class="btn-ghost" onclick="document.getElementById('ei-modal').classList.remove('open')">✕</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <button class="btn-save" onclick="doExport()">export all entries (.json)</button>
+      <button class="btn-save" style="background:var(--surface2);color:var(--text);border:0.5px solid var(--border-med);" onclick="document.getElementById('import-file').click()">import from backup</button>
+      <input type="file" id="import-file" accept=".json" style="display:none;" onchange="doImport(event)">
+      <div style="font-size:12px;color:var(--hint);font-family:-apple-system,sans-serif;text-align:center;">import merges — it won't overwrite existing entries</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── DB ──────────────────────────────────────────────────────────────────────
+const db = new Dexie('thoughtweb');
+db.version(1).stores({ entries: '++id, dt, *tags' });
+
+// ── STATE ───────────────────────────────────────────────────────────────────
+let allEntries = [];
+let currentFilter = 'all';
+let editingId = null;
+let editTags = [];
+let captureTags = [];
+let graphFilter = null;
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  initTheme();
+  setDefaultDt('capture-dt');
+  initTagInput('tag-input', () => captureTags, v => { captureTags = v; renderLiveTags('live-tags', captureTags, () => renderLiveTags('live-tags', captureTags)); });
+  await loadEntries();
+});
+
+async function loadEntries() {
+  allEntries = await db.entries.orderBy('dt').reverse().toArray();
+  renderEntries();
+  if (document.getElementById('s-graph').classList.contains('active')) renderGraph();
+}
+
+// ── THEME ────────────────────────────────────────────────────────────────────
+function initTheme() {
+  const t = localStorage.getItem('tw-theme');
+  if (t === 'dark') document.body.classList.add('dark-mode');
+  else if (t === 'light') document.body.classList.add('light-mode');
+}
+function toggleTheme() {
+  const isDark = document.body.classList.contains('dark-mode');
+  document.body.classList.toggle('dark-mode', !isDark);
+  document.body.classList.toggle('light-mode', isDark);
+  localStorage.setItem('tw-theme', isDark ? 'light' : 'dark');
+  if (document.getElementById('s-graph').classList.contains('active')) renderGraph();
+}
+
+// ── TABS ─────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('s-' + tab).classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+  if (tab === 'graph') renderGraph();
+}
+
+// ── CAPTURE ───────────────────────────────────────────────────────────────────
+function setDefaultDt(id) {
+  const now = new Date();
+  now.setSeconds(0, 0);
+  document.getElementById(id).value = now.toISOString().slice(0, 16);
+}
+
+function autoExpand(el) {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+
+async function saveEntry() {
+  const text = document.getElementById('capture-text').value.trim();
+  if (!text) return;
+  const dtVal = document.getElementById('capture-dt').value;
+  const dt = dtVal ? new Date(dtVal).getTime() : Date.now();
+  const pending = document.getElementById('tag-input').value.trim();
+  if (pending) { addTagTo(captureTags, pending); document.getElementById('tag-input').value = ''; }
+  await db.entries.add({ text, dt, tags: [...captureTags] });
+  // reset
+  document.getElementById('capture-text').value = '';
+  document.getElementById('capture-text').style.height = 'auto';
+  setDefaultDt('capture-dt');
+  captureTags = [];
+  renderLiveTags('live-tags', captureTags);
+  await loadEntries();
+}
+
+// ── TAG INPUT ─────────────────────────────────────────────────────────────────
+function initTagInput(inputId, getArr, setArr) {
+  const el = document.getElementById(inputId);
+  el.addEventListener('input', e => {
+    const val = e.target.value;
+    const last = val[val.length - 1];
+    if (last === ' ' || last === ',') {
+      const raw = val.slice(0, -1).trim();
+      if (raw) {
+        const arr = getArr();
+        addTagTo(arr, raw);
+        setArr(arr);
+      }
+      e.target.value = '';
+    }
+  });
+  el.addEventListener('keydown', e => {
+    if (e.key === 'Backspace' && e.target.value === '') {
+      const arr = getArr();
+      arr.pop();
+      setArr(arr);
+    }
+  });
+}
+
+function addTagTo(arr, raw) {
+  const tag = raw.startsWith('#') ? raw.toLowerCase() : ('#' + raw.toLowerCase());
+  if (!arr.includes(tag)) arr.push(tag);
+}
+
+function renderLiveTags(containerId, tags, onChange) {
+  const wrap = document.getElementById(containerId);
+  if (!wrap) return;
+  wrap.innerHTML = tags.map((t, i) =>
+    `<span class="tag-chip" onclick="removeTag('${containerId}',${i})">${esc(t)} ×</span>`
+  ).join('');
+}
+
+function removeTag(containerId, i) {
+  if (containerId === 'live-tags') {
+    captureTags.splice(i, 1);
+    renderLiveTags('live-tags', captureTags);
+  } else {
+    editTags.splice(i, 1);
+    renderLiveTags('edit-live-tags', editTags);
+  }
+}
+
+// ── ENTRIES LIST ───────────────────────────────────────────────────────────────
+function renderEntries() {
+  const allTags = getAllTags();
+  const fw = document.getElementById('filter-wrap');
+  const fc = document.getElementById('filter-chips');
+  if (allTags.length) {
+    fw.style.display = 'block';
+    const opts = ['all', ...allTags];
+    fc.innerHTML = opts.map(t =>
+      `<button class="tag-chip filter ${currentFilter === t ? 'active' : ''}" onclick="setFilter('${esc(t)}')">${esc(t)}</button>`
+    ).join('');
+  } else {
+    fw.style.display = 'none';
+  }
+
+  const filtered = currentFilter === 'all'
+    ? allEntries
+    : allEntries.filter(e => (e.tags || []).includes(currentFilter));
+
+  const list = document.getElementById('entry-list');
+  const empty = document.getElementById('entry-empty');
+
+  if (!filtered.length) { empty.style.display = 'block'; list.innerHTML = ''; return; }
+  empty.style.display = 'none';
+
+  list.innerHTML = filtered.map(e => {
+    const tags = (e.tags || []).map(t => `<span class="entry-tag">${esc(t)}</span>`).join('');
+    return `<div class="entry-item">
+      <div class="entry-body">${esc(e.text)}</div>
+      <div class="entry-meta">
+        ${tags}
+        <span>${fmtDt(e.dt)}</span>
+        <span class="entry-actions">
+          <button class="act-btn" onclick="openEdit(${e.id})">edit</button>
+          <button class="act-btn del" onclick="deleteEntry(${e.id})">delete</button>
+        </span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function getAllTags() {
+  const set = new Set();
+  allEntries.forEach(e => (e.tags || []).forEach(t => set.add(t)));
+  return [...set].sort();
+}
+
+function setFilter(tag) {
+  currentFilter = tag;
+  renderEntries();
+}
+
+async function deleteEntry(id) {
+  if (!confirm('Delete this entry?')) return;
+  await db.entries.delete(id);
+  await loadEntries();
+}
+
+// ── EDIT MODAL ────────────────────────────────────────────────────────────────
+function openEdit(id) {
+  const e = allEntries.find(x => x.id === id);
+  if (!e) return;
+  editingId = id;
+  editTags = [...(e.tags || [])];
+  document.getElementById('edit-text').value = e.text;
+  autoExpand(document.getElementById('edit-text'));
+  const d = new Date(e.dt);
+  d.setSeconds(0, 0);
+  document.getElementById('edit-dt').value = d.toISOString().slice(0, 16);
+  document.getElementById('edit-tag-input').value = '';
+  renderLiveTags('edit-live-tags', editTags);
+  // init tag input for edit
+  const el = document.getElementById('edit-tag-input');
+  el.oninput = ev => {
+    const val = ev.target.value;
+    const last = val[val.length - 1];
+    if (last === ' ' || last === ',') {
+      const raw = val.slice(0, -1).trim();
+      if (raw) { addTagTo(editTags, raw); renderLiveTags('edit-live-tags', editTags); }
+      ev.target.value = '';
+    }
+  };
+  el.onkeydown = ev => {
+    if (ev.key === 'Backspace' && ev.target.value === '') {
+      editTags.pop();
+      renderLiveTags('edit-live-tags', editTags);
+    }
+  };
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('edit-modal').classList.remove('open');
+  editingId = null;
+}
+
+async function saveEdit() {
+  const text = document.getElementById('edit-text').value.trim();
+  if (!text) return;
+  const pending = document.getElementById('edit-tag-input').value.trim();
+  if (pending) { addTagTo(editTags, pending); }
+  const dtVal = document.getElementById('edit-dt').value;
+  const dt = dtVal ? new Date(dtVal).getTime() : Date.now();
+  await db.entries.update(editingId, { text, dt, tags: [...editTags] });
+  closeModal();
+  await loadEntries();
+}
+
+// ── EXPORT / IMPORT ───────────────────────────────────────────────────────────
+function showExportImport() {
+  document.getElementById('ei-modal').classList.add('open');
+}
+
+async function doExport() {
+  const data = await db.entries.toArray();
+  const blob = new Blob([JSON.stringify({ version: 1, entries: data }, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `thoughtweb-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function doImport(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      const entries = data.entries || data; // handle both formats
+      if (!Array.isArray(entries)) throw new Error();
+      let added = 0;
+      for (const entry of entries) {
+        const { id, ...rest } = entry; // strip id so Dexie auto-assigns
+        await db.entries.add(rest);
+        added++;
+      }
+      document.getElementById('ei-modal').classList.remove('open');
+      await loadEntries();
+      alert(`Imported ${added} entries.`);
+    } catch {
+      alert('Could not read that file. Make sure it\'s a thoughtweb backup.');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ── GRAPH ─────────────────────────────────────────────────────────────────────
+function renderGraph() {
+  const wrap = document.getElementById('graph-wrap');
+  const svg = document.getElementById('graph-svg');
+  svg.innerHTML = '';
+
+  const W = wrap.clientWidth || 360;
+  const H = wrap.clientHeight || 500;
+
+  // compute --purple from computed style
+  const cs = getComputedStyle(document.body);
+  const purpleCol = cs.getPropertyValue('--purple').trim() || '#7F77DD';
+  const textCol = cs.getPropertyValue('--text').trim() || '#1a1a18';
+  const mutedCol = cs.getPropertyValue('--muted').trim() || '#6b6b67';
+  const surfaceCol = cs.getPropertyValue('--surface').trim() || '#fff';
+  const borderMed = cs.getPropertyValue('--border-med').trim() || 'rgba(0,0,0,0.16)';
+
+  const TAG_COLORS = ['#AFA9EC','#5DCAA5','#F0997B','#ED93B1','#85B7EB','#97C459','#EF9F27','#7F77DD','#1D9E75','#D85A30'];
+
+  const entriesToShow = graphFilter
+    ? allEntries.filter(e => (e.tags || []).includes(graphFilter))
+    : allEntries;
+
+  if (!entriesToShow.length) {
+    // empty state
+    const s = d3.select(svg).attr('viewBox', `0 0 ${W} ${H}`);
+    s.append('text').attr('x', W/2).attr('y', H/2)
+      .attr('text-anchor','middle').attr('fill', mutedCol)
+      .attr('font-size', 14).attr('font-family', '-apple-system, sans-serif')
+      .text('no entries yet');
+    renderGraphTags(TAG_COLORS);
+    return;
+  }
+
+  const allTags = getAllTags();
+  const tagColorMap = {};
+  allTags.forEach((t, i) => tagColorMap[t] = TAG_COLORS[i % TAG_COLORS.length]);
+
+  // Build nodes: each entry is a node; each tag is a node
+  const entryNodes = entriesToShow.map(e => ({
+    id: 'e_' + e.id, type: 'entry', entry: e,
+    r: 7 + Math.min((e.tags||[]).length * 2, 8)
+  }));
+
+  const tagSet = new Set();
+  entriesToShow.forEach(e => (e.tags||[]).forEach(t => tagSet.add(t)));
+  const tagNodes = [...tagSet].map(t => ({
+    id: 't_' + t, type: 'tag', tag: t,
+    r: 14 + allEntries.filter(e => (e.tags||[]).includes(t)).length * 1.5,
+    color: tagColorMap[t]
+  }));
+
+  const nodes = [...tagNodes, ...entryNodes];
+
+  // links: entry → its tags
+  const links = [];
+  entriesToShow.forEach(e => {
+    (e.tags||[]).forEach(t => {
+      if (tagSet.has(t)) links.push({ source: 'e_' + e.id, target: 't_' + t });
+    });
+  });
+
+  // D3 simulation
+  const sim = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links).id(d => d.id).distance(60).strength(0.6))
+    .force('charge', d3.forceManyBody().strength(-120))
+    .force('center', d3.forceCenter(W/2, H/2))
+    .force('collision', d3.forceCollide().radius(d => d.r + 5));
+
+  const s = d3.select(svg).attr('viewBox', `0 0 ${W} ${H}`);
+
+  const linkSel = s.append('g').selectAll('line').data(links).join('line')
+    .attr('stroke', borderMed).attr('stroke-width', 1).attr('opacity', 0.5);
+
+  const nodeSel = s.append('g').selectAll('g').data(nodes).join('g')
+    .style('cursor', 'pointer')
+    .call(d3.drag()
+      .on('start', (event, d) => { if (!event.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
+      .on('end', (event, d) => { if (!event.active) sim.alphaTarget(0); d.fx = null; d.fy = null; })
+    );
+
+  // circles
+  nodeSel.append('circle')
+    .attr('r', d => d.r)
+    .attr('fill', d => {
+      if (d.type === 'tag') return d.color;
+      const tags = d.entry.tags || [];
+      return tags.length ? tagColorMap[tags[0]] + '55' : purpleCol + '44';
+    })
+    .attr('stroke', d => d.type === 'tag' ? d.color : borderMed)
+    .attr('stroke-width', d => d.type === 'tag' ? 2 : 1);
+
+  // tag labels
+  nodeSel.filter(d => d.type === 'tag').append('text')
+    .attr('text-anchor', 'middle').attr('dy', '0.35em')
+    .attr('font-size', 10).attr('font-family', '-apple-system, sans-serif')
+    .attr('fill', surfaceCol).attr('font-weight', '500')
+    .text(d => d.tag.replace('#',''));
+
+  // tooltip
+  const tooltip = document.getElementById('tooltip');
+  nodeSel.filter(d => d.type === 'entry')
+    .on('pointerenter', (event, d) => {
+      const rect = wrap.getBoundingClientRect();
+      document.getElementById('tt-text').textContent = d.entry.text.slice(0, 120) + (d.entry.text.length > 120 ? '…' : '');
+      document.getElementById('tt-date').textContent = fmtDt(d.entry.dt);
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      tooltip.style.left = Math.min(x + 12, W - 260) + 'px';
+      tooltip.style.top = Math.max(y - 60, 4) + 'px';
+      tooltip.classList.add('visible');
+    })
+    .on('pointerleave', () => tooltip.classList.remove('visible'));
+
+  nodeSel.filter(d => d.type === 'tag')
+    .on('pointerenter', (event, d) => {
+      const count = allEntries.filter(e => (e.tags||[]).includes(d.tag)).length;
+      document.getElementById('graph-info').textContent = `${d.tag} — ${count} entr${count === 1 ? 'y' : 'ies'}`;
+    })
+    .on('pointerleave', () => {
+      document.getElementById('graph-info').textContent = 'tap a tag to filter · tap a node to peek';
+    });
+
+  sim.on('tick', () => {
+    linkSel
+      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    nodeSel.attr('transform', d => `translate(${clamp(d.x, d.r, W-d.r)},${clamp(d.y, d.r, H-d.r)})`);
+  });
+
+  renderGraphTags(TAG_COLORS);
+}
+
+function renderGraphTags(TAG_COLORS) {
+  const allTags = getAllTags();
+  const wrap = document.getElementById('graph-tags');
+  if (!allTags.length) { wrap.innerHTML = '<span style="font-size:12px;color:var(--hint);font-family:-apple-system,sans-serif;">tags will appear here</span>'; return; }
+  wrap.innerHTML = ['all', ...allTags].map(t =>
+    `<button class="tag-chip filter ${graphFilter === t || (t === 'all' && !graphFilter) ? 'active' : ''}" onclick="setGraphFilter('${esc(t)}')">${esc(t)}</button>`
+  ).join('');
+}
+
+function setGraphFilter(tag) {
+  graphFilter = tag === 'all' ? null : tag;
+  document.getElementById('graph-info').textContent = graphFilter ? `showing #${graphFilter}` : 'tap a tag to filter · tap a node to peek';
+  renderGraph();
+}
+
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+function fmtDt(ts) {
+  const d = new Date(ts);
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+</script>
+</body>
+</html>
