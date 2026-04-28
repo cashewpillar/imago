@@ -1,943 +1,582 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<meta name="mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<title>Reader</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.4.21/vue.global.prod.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>story graph</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-:root {
-  --bg: #0f0d0b;
-  --surface: #1a1714;
-  --surface2: #231f1b;
-  --border: #2e2822;
-  --amber: #d4903f;
-  --amber-dim: #8a5a20;
-  --amber-pale: #2a1f0f;
-  --text: #e8e0d4;
-  --text-2: #9a8e82;
-  --text-3: #5a5048;
-  --yes: #4e8c62;
-  --no: #8c4e4e;
-  --complicated: #5e5e8c;
-  --safe-top: env(safe-area-inset-top, 0px);
-  --safe-bot: env(safe-area-inset-bottom, 0px);
-  --nav-h: 60px;
-}
+  :root {
+    --bg: #f7f6f2;
+    --surface: #ffffff;
+    --surface2: #f0efe9;
+    --text: #1a1a18;
+    --muted: #6b6b67;
+    --hint: #a0a09b;
+    --border: rgba(0,0,0,0.09);
+    --border-med: rgba(0,0,0,0.16);
+    --radius: 12px;
+    --radius-sm: 8px;
+    --purple: #7F77DD;
+    --purple-bg: #EEEDFE;
+    --purple-border: #AFA9EC;
+    --purple-text: #3C3489;
+    --teal-bg: #E1F5EE;
+    --teal-border: #5DCAA5;
+    --teal-text: #085041;
+    --coral-bg: #FAECE7;
+    --coral-border: #F0997B;
+    --coral-text: #712B13;
+    --amber-bg: #FAEEDA;
+    --amber-border: #FAC775;
+    --amber-text: #633806;
+  }
 
-html, body { height: 100%; background: var(--bg); overflow: hidden; }
+  body.dark-mode {
+    --bg: #1a1a18;
+    --surface: #232321;
+    --surface2: #2a2a28;
+    --text: #f0efe9;
+    --muted: #a0a09b;
+    --hint: #6b6b67;
+    --border: rgba(255,255,255,0.07);
+    --border-med: rgba(255,255,255,0.13);
+    --purple-bg: #26215C;
+    --purple-border: #534AB7;
+    --purple-text: #CECBF6;
+    --teal-bg: #04342C;
+    --teal-border: #0F6E56;
+    --teal-text: #9FE1CB;
+    --coral-bg: #4A1B0C;
+    --coral-border: #993C1D;
+    --coral-text: #F5C4B3;
+    --amber-bg: #412402;
+    --amber-border: #854F0B;
+    --amber-text: #FAC775;
+  }
 
-body {
-  font-family: 'DM Sans', sans-serif;
-  color: var(--text);
-  overscroll-behavior: none;
-}
+  @media (prefers-color-scheme: dark) {
+    body:not(.light-mode) {
+      --bg: #1a1a18;
+      --surface: #232321;
+      --surface2: #2a2a28;
+      --text: #f0efe9;
+      --muted: #a0a09b;
+      --hint: #6b6b67;
+      --border: rgba(255,255,255,0.07);
+      --border-med: rgba(255,255,255,0.13);
+      --purple-bg: #26215C;
+      --purple-border: #534AB7;
+      --purple-text: #CECBF6;
+      --teal-bg: #04342C;
+      --teal-border: #0F6E56;
+      --teal-text: #9FE1CB;
+      --coral-bg: #4A1B0C;
+      --coral-border: #993C1D;
+      --coral-text: #F5C4B3;
+      --amber-bg: #412402;
+      --amber-border: #854F0B;
+      --amber-text: #FAC775;
+    }
+  }
 
-#app {
-  height: 100vh;
-  height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  overflow: hidden;
-}
+  body {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    transition: background 0.2s, color 0.2s;
+    overflow: hidden;
+  }
 
-/* ── SCREENS ── */
-.screen {
-  position: absolute;
-  inset: 0;
-  bottom: calc(var(--nav-h) + var(--safe-bot));
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--bg);
-  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.3s;
-  will-change: transform;
-}
+  .app {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
 
-.screen.gone { transform: translateX(100%); opacity: 0; pointer-events: none; }
-.screen.back  { transform: translateX(-28%); opacity: 0.5; pointer-events: none; }
+  .nav {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0.9rem 1rem 0.75rem;
+    border-bottom: 0.5px solid var(--border);
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
 
-/* ── TOPBAR ── */
-.topbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: calc(var(--safe-top) + 10px) 14px 10px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-  min-height: 52px;
-}
+  .nav-title { flex: 1; min-width: 0; }
+  .nav-title h1 {
+    font-size: 18px;
+    font-weight: normal;
+    letter-spacing: -0.3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .nav-sub {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    margin-top: 2px;
+  }
 
-.topbar-back {
-  width: 36px; height: 36px;
-  display: flex; align-items: center; justify-content: center;
-  border: none; background: transparent;
-  color: var(--amber); font-size: 22px; line-height: 1;
-  cursor: pointer; flex-shrink: 0; border-radius: 50%;
-}
-.topbar-back:active { background: var(--surface2); }
+  .btn-ghost {
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 14px;
+    padding: 6px 4px;
+    cursor: pointer;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  .btn-ghost:hover { color: var(--text); }
 
-.topbar-title { flex: 1; min-width: 0; }
-.topbar-title h1 {
-  font-family: 'Lora', serif;
-  font-size: 16px; font-weight: 600;
-  color: var(--text);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.topbar-title .sub {
-  font-size: 12px; color: var(--text-3); font-style: italic;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
+  .graph-screen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
 
-.topbar-icon-btn {
-  width: 36px; height: 36px;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 50%; border: 1px solid var(--border);
-  background: transparent; color: var(--text-2);
-  font-size: 18px; cursor: pointer; flex-shrink: 0;
-}
-.topbar-icon-btn:active { background: var(--surface2); }
+  .graph-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
 
-/* ── LIBRARY ── */
-.lib-header {
-  padding: calc(var(--safe-top) + 18px) 20px 14px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-.wordmark {
-  font-family: 'Lora', serif;
-  font-size: 26px; font-weight: 600; color: var(--amber);
-}
-.tagline {
-  font-size: 11px; color: var(--text-3);
-  letter-spacing: 0.1em; text-transform: uppercase;
-  font-family: 'JetBrains Mono', monospace;
-  margin-top: 2px;
-}
+  #graph-svg { width: 100%; height: 100%; display: block; }
 
-.lib-scroll {
-  flex: 1; overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  padding: 12px 16px 80px;
-}
+  .graph-bottom {
+    background: var(--bg);
+    border-top: 0.5px solid var(--border);
+    padding: 0.75rem 1rem 1rem;
+  }
 
-.book-card {
-  display: flex; align-items: center; gap: 12px;
-  padding: 14px 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  margin-bottom: 10px;
-  cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
-}
-.book-card:active { background: var(--surface2); border-color: var(--amber-dim); }
-.book-card.current .book-card-title { color: var(--amber); }
+  .graph-info {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    margin-bottom: 8px;
+    min-height: 18px;
+  }
 
-.book-spine {
-  width: 4px; height: 44px; border-radius: 2px;
-  background: var(--amber-dim); flex-shrink: 0;
-  transition: background 0.2s;
-}
-.book-card.current .book-spine { background: var(--amber); }
+  .graph-tag-row {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
 
-.book-info { flex: 1; min-width: 0; }
-.book-card-title {
-  font-family: 'Lora', serif;
-  font-size: 15px; font-weight: 600; color: var(--text);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.book-card-author {
-  font-size: 12px; color: var(--text-3); font-style: italic; margin-top: 1px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.book-card-count {
-  font-size: 11px; color: var(--text-3);
-  font-family: 'JetBrains Mono', monospace; margin-top: 4px;
-}
-.book-chevron { color: var(--text-3); font-size: 18px; flex-shrink: 0; }
+  .tag-chip {
+    font-size: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 0.5px solid var(--border);
+    background: var(--surface2);
+    color: var(--muted);
+    cursor: pointer;
+  }
 
-.lib-empty {
-  flex: 1; display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  padding: 40px 28px; text-align: center; gap: 10px;
-}
-.e-icon { font-size: 48px; opacity: 0.25; }
-.lib-empty h3 { font-family: 'Lora', serif; font-size: 18px; color: var(--text-2); font-weight: 400; }
-.lib-empty p { font-size: 13px; color: var(--text-3); line-height: 1.7; }
+  .tooltip {
+    position: absolute;
+    background: var(--surface);
+    border: 0.5px solid var(--border-med);
+    border-radius: var(--radius-sm);
+    padding: 10px 13px;
+    max-width: 260px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 20;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  }
+  .tooltip.visible { opacity: 1; }
+  .tooltip-text {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text);
+    font-style: italic;
+    margin-bottom: 6px;
+  }
+  .tooltip-meta, .tooltip-note {
+    font-size: 11px;
+    color: var(--hint);
+    line-height: 1.5;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  .tooltip-note { margin-top: 6px; }
 
-/* ── NOTES ── */
-.search-wrap {
-  padding: 10px 14px 0;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-  padding-bottom: 10px;
-}
-.search-field {
-  display: flex; align-items: center; gap: 8px;
-  background: var(--bg); border: 1px solid var(--border);
-  border-radius: 10px; padding: 8px 12px;
-}
-.search-field input {
-  flex: 1; border: none; background: transparent;
-  font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--text); outline: none;
-}
-.search-field input::placeholder { color: var(--text-3); }
-.search-icon { color: var(--text-3); font-size: 14px; }
-
-.tag-row {
-  display: flex; gap: 6px;
-  overflow-x: auto; -webkit-overflow-scrolling: touch;
-  margin-top: 8px; scrollbar-width: none;
-}
-.tag-row::-webkit-scrollbar { display: none; }
-.tag-pill {
-  flex-shrink: 0; padding: 4px 12px; border-radius: 20px;
-  font-size: 12px; font-family: 'JetBrains Mono', monospace;
-  background: var(--surface2); border: 1px solid var(--border);
-  color: var(--text-2); cursor: pointer; transition: all 0.15s;
-}
-.tag-pill.on { background: var(--amber); border-color: var(--amber); color: #1a0f00; }
-
-.notes-scroll {
-  flex: 1; overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  padding: 14px 14px 80px;
-}
-
-.notes-empty { padding: 60px 20px; text-align: center; color: var(--text-3); }
-.notes-empty .e-icon { margin-bottom: 8px; }
-.notes-empty p { font-size: 14px; font-style: italic; line-height: 1.7; }
-
-.note-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 12px; margin-bottom: 12px; overflow: hidden;
-}
-.note-inner { padding: 14px; cursor: pointer; }
-.note-card:active .note-inner { background: var(--surface2); }
-
-.stance-row { display: flex; align-items: center; gap: 7px; margin-bottom: 9px; }
-.s-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.s-dot.yes { background: var(--yes); }
-.s-dot.no  { background: var(--no); }
-.s-dot.complicated { background: var(--complicated); }
-.s-chip {
-  font-size: 10px; font-family: 'JetBrains Mono', monospace;
-  padding: 1px 7px; border-radius: 3px;
-  text-transform: uppercase; letter-spacing: 0.05em;
-}
-.s-chip.yes { background: rgba(78,140,98,.15); color: #6fc88a; }
-.s-chip.no  { background: rgba(140,78,78,.15); color: #c87070; }
-.s-chip.complicated { background: rgba(94,94,140,.15); color: #9090c8; }
-.s-note { font-size: 12px; color: var(--text-3); flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-
-.note-quote {
-  font-family: 'Lora', serif; font-style: italic;
-  font-size: 15px; color: var(--text); line-height: 1.65;
-  margin-bottom: 10px;
-}
-.note-quote::before { content: '\201C'; color: var(--amber); }
-.note-quote::after  { content: '\201D'; color: var(--amber); }
-
-.note-meaning {
-  font-size: 12px; color: var(--text-3); line-height: 1.5;
-  padding-left: 10px; border-left: 2px solid var(--border);
-  margin-bottom: 8px;
-}
-
-.note-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
-.n-tag {
-  font-size: 11px; font-family: 'JetBrains Mono', monospace;
-  color: var(--amber); background: var(--amber-pale);
-  padding: 2px 8px; border-radius: 4px;
-}
-
-.note-foot {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 8px 14px; border-top: 1px solid var(--border);
-  background: var(--surface2);
-}
-.note-date { font-size: 11px; font-family: 'JetBrains Mono', monospace; color: var(--text-3); }
-.del-btn {
-  padding: 4px 10px; border: none; background: transparent;
-  font-size: 12px; color: #8c4e4e; cursor: pointer;
-  font-family: 'DM Sans', sans-serif; border-radius: 6px;
-}
-.del-btn:active { background: rgba(140,78,78,.15); }
-
-/* ── GRAPH ── */
-.graph-screen { background: #090806; }
-.graph-svg { width: 100%; height: 100%; }
-.graph-hint {
-  position: absolute;
-  bottom: calc(var(--nav-h) + var(--safe-bot) + 14px);
-  left: 50%; transform: translateX(-50%);
-  background: rgba(15,13,11,.88); border: 1px solid var(--border);
-  border-radius: 20px; padding: 5px 14px;
-  font-size: 11px; font-family: 'JetBrains Mono', monospace;
-  color: var(--text-3); white-space: nowrap; pointer-events: none;
-}
-
-/* ── FAB ── */
-.fab {
-  position: absolute;
-  bottom: calc(var(--nav-h) + var(--safe-bot) + 16px);
-  right: 18px;
-  width: 52px; height: 52px; border-radius: 50%;
-  background: var(--amber); border: none; color: #1a0f00;
-  font-size: 28px; cursor: pointer;
-  box-shadow: 0 4px 18px rgba(212,144,63,.45);
-  display: flex; align-items: center; justify-content: center;
-  transition: transform 0.15s, box-shadow 0.15s;
-  z-index: 10; line-height: 1;
-}
-.fab:active { transform: scale(0.92); box-shadow: 0 2px 8px rgba(212,144,63,.3); }
-
-/* ── BOTTOM NAV ── */
-.bottom-nav {
-  height: calc(var(--nav-h) + var(--safe-bot));
-  padding-bottom: var(--safe-bot);
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-  display: flex; align-items: stretch;
-  flex-shrink: 0; z-index: 20;
-}
-.nav-tab {
-  flex: 1; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 3px;
-  border: none; background: transparent; color: var(--text-3);
-  cursor: pointer; transition: color 0.15s;
-  font-family: 'DM Sans', sans-serif; padding-top: 2px;
-}
-.nav-tab.on { color: var(--amber); }
-.nav-icon { font-size: 20px; line-height: 1; }
-.nav-label { font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; }
-
-/* ── SHEETS ── */
-.backdrop {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,.72);
-  z-index: 50; backdrop-filter: blur(2px);
-}
-.sheet {
-  position: fixed; left: 0; right: 0; bottom: 0;
-  background: var(--surface);
-  border-radius: 20px 20px 0 0;
-  z-index: 51; max-height: 92dvh;
-  display: flex; flex-direction: column; overflow: hidden;
-  padding-bottom: var(--safe-bot);
-}
-.sh-handle {
-  width: 36px; height: 4px; background: var(--border);
-  border-radius: 2px; margin: 10px auto 0; flex-shrink: 0;
-}
-.sh-header {
-  padding: 14px 20px 12px;
-  border-bottom: 1px solid var(--border); flex-shrink: 0;
-}
-.sh-title { font-family: 'Lora', serif; font-size: 18px; font-weight: 600; color: var(--text); }
-.sh-body { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 20px; flex: 1; }
-.sh-actions {
-  padding: 10px 20px 4px;
-  display: flex; gap: 10px;
-  border-top: 1px solid var(--border); flex-shrink: 0;
-}
-
-.fg { margin-bottom: 16px; }
-.fl {
-  display: block; font-size: 11px;
-  letter-spacing: 0.1em; text-transform: uppercase;
-  color: var(--text-3); margin-bottom: 6px;
-  font-family: 'JetBrains Mono', monospace;
-}
-.fi, .fta {
-  width: 100%; padding: 12px 14px;
-  border: 1px solid var(--border); border-radius: 10px;
-  background: var(--bg); font-family: 'DM Sans', sans-serif;
-  font-size: 15px; color: var(--text); outline: none;
-  transition: border-color 0.15s; -webkit-appearance: none;
-}
-.fi:focus, .fta:focus { border-color: var(--amber); }
-.fi::placeholder, .fta::placeholder { color: var(--text-3); }
-.fta { resize: none; min-height: 96px; line-height: 1.6; }
-
-.stance-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 7px; }
-.st-btn {
-  padding: 10px 4px; border-radius: 8px;
-  border: 1px solid var(--border); background: var(--bg);
-  color: var(--text-2); font-size: 12px;
-  font-family: 'JetBrains Mono', monospace;
-  cursor: pointer; text-align: center;
-  transition: all 0.15s; text-transform: uppercase; letter-spacing: 0.04em;
-}
-.st-btn.on.yes { background: rgba(78,140,98,.2); border-color: var(--yes); color: #6fc88a; }
-.st-btn.on.no  { background: rgba(140,78,78,.2); border-color: var(--no); color: #c87070; }
-.st-btn.on.complicated { background: rgba(94,94,140,.2); border-color: var(--complicated); color: #9090c8; }
-.st-btn.on.none-s { background: var(--surface2); border-color: var(--text-3); color: var(--text-2); }
-
-.tags-row { display: flex; gap: 8px; }
-.tags-row .fi { flex: 1; }
-.add-tag-btn {
-  padding: 12px 16px; border-radius: 10px;
-  border: 1px solid var(--border); background: var(--bg);
-  color: var(--amber); font-size: 20px; cursor: pointer; flex-shrink: 0;
-}
-.add-tag-btn:active { background: var(--surface2); }
-
-.tag-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.tag-ce {
-  display: inline-flex; align-items: center; gap: 4px;
-  background: var(--amber-pale); border: 1px solid var(--amber-dim);
-  padding: 3px 9px; border-radius: 6px;
-  font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--amber);
-}
-.tag-rm { font-size: 16px; cursor: pointer; color: var(--amber-dim); line-height: 1; }
-.tag-rm:active { color: var(--no); }
-
-.btn-full {
-  flex: 1; padding: 14px; border-radius: 12px;
-  font-size: 15px; font-weight: 500;
-  font-family: 'DM Sans', sans-serif;
-  border: none; cursor: pointer; transition: opacity 0.15s;
-}
-.btn-full:active { opacity: 0.72; }
-.btn-cancel { background: var(--surface2); color: var(--text-2); }
-.btn-save   { background: var(--amber); color: #1a0f00; }
-
-.ctx-item {
-  display: flex; align-items: center; gap: 14px;
-  padding: 16px 4px; cursor: pointer;
-  border-radius: 10px; font-size: 15px; color: var(--text);
-  transition: background 0.12s;
-}
-.ctx-item:active { background: var(--surface2); }
-.ctx-item.danger { color: #c87070; }
-.ctx-icon { font-size: 20px; width: 28px; text-align: center; }
-
-/* ── TRANSITIONS ── */
-.sheet-enter-active { transition: transform 0.3s cubic-bezier(0.32,0.72,0,1); }
-.sheet-leave-active { transition: transform 0.24s cubic-bezier(0.32,0.72,0,1); }
-.sheet-enter-from, .sheet-leave-to { transform: translateY(100%); }
-
-.fade-enter-active { transition: opacity 0.2s; }
-.fade-leave-active { transition: opacity 0.15s; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
-
-.list-enter-active, .list-leave-active { transition: all 0.2s; }
-.list-enter-from { opacity: 0; transform: translateY(8px); }
-.list-leave-to   { opacity: 0; transform: translateX(-8px); }
-
-* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
-
-/* Desktop enhancement */
-@media (min-width: 600px) {
-  #app { max-width: 480px; margin: 0 auto; box-shadow: 0 0 80px rgba(0,0,0,.8); }
-}
+  .empty {
+    text-align: center;
+    padding: 2.5rem 1rem;
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1.7;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
 </style>
 </head>
 <body>
-<div id="app">
-
-  <!-- ── LIBRARY SCREEN ── -->
-  <div class="screen" :class="sc('library')">
-    <div class="lib-header">
-      <div class="wordmark">Reader</div>
+<div class="app">
+  <div class="nav">
+    <button class="btn-ghost" onclick="goBack()">← back</button>
+    <div class="nav-title">
+      <h1 id="book-title">story graph</h1>
+      <div class="nav-sub" id="book-meta">loading…</div>
     </div>
-    <div v-if="!state.books.length" class="lib-empty">
-      <div class="e-icon">📚</div>
-      <h3>Library is empty</h3>
-      <p>Tap the + button to add your first book and start collecting notes.</p>
-    </div>
-    <div v-else class="lib-scroll">
-      <transition-group name="list" tag="div">
-        <div
-          v-for="book in state.books" :key="book.id"
-          class="book-card"
-          :class="{ current: state.currentBookId === book.id }"
-          @click="openBook(book.id)"
-        >
-          <div class="book-spine"></div>
-          <div class="book-info">
-            <div class="book-card-title">{{ book.title }}</div>
-            <div class="book-card-author">{{ book.author || 'Unknown author' }}</div>
-            <div class="book-card-count">{{ book.notes.length }} note{{ book.notes.length !== 1 ? 's' : '' }}</div>
-          </div>
-          <div class="book-chevron">›</div>
-        </div>
-      </transition-group>
-    </div>
+    <button class="btn-ghost" onclick="toggleTheme()" title="Toggle theme">◐</button>
   </div>
 
-  <!-- ── NOTES SCREEN ── -->
-  <div class="screen" :class="sc('notes')">
-    <div class="topbar">
-      <button class="topbar-back" @click="goBack">‹</button>
-      <div class="topbar-title">
-        <h1>{{ curBook?.title || '' }}</h1>
-        <div class="sub" v-if="curBook?.author">{{ curBook.author }}</div>
-      </div>
-      <button class="topbar-icon-btn" @click="ctxOpen = true">⋯</button>
-    </div>
-    <div class="search-wrap">
-      <div class="search-field">
-        <span class="search-icon">⌕</span>
-        <input v-model="searchQ" placeholder="Search notes…" type="search" />
-      </div>
-      <div v-if="bookTags.length" class="tag-row">
-        <span
-          v-for="tag in bookTags" :key="tag"
-          class="tag-pill" :class="{ on: tagFilter === tag }"
-          @click="toggleTag(tag)"
-        >{{ tag }}</span>
+  <div class="graph-screen">
+    <div class="graph-wrap" id="graph-wrap">
+      <svg id="graph-svg"></svg>
+      <div class="tooltip" id="tooltip">
+        <div class="tooltip-text" id="tt-text"></div>
+        <div class="tooltip-meta" id="tt-meta"></div>
+        <div class="tooltip-note" id="tt-note"></div>
       </div>
     </div>
-    <div class="notes-scroll">
-      <div v-if="!filteredNotes.length" class="notes-empty">
-        <div class="e-icon">✍️</div>
-        <p>No notes yet.<br>Tap + to add your first quote.</p>
-      </div>
-      <transition-group name="list" tag="div">
-        <div v-for="note in filteredNotes" :key="note.id" class="note-card">
-          <div class="note-inner" @click="editNote(note)">
-            <div v-if="note.stance" class="stance-row">
-              <div class="s-dot" :class="note.stance"></div>
-              <span class="s-chip" :class="note.stance">{{ note.stance }}</span>
-              <span v-if="note.stanceNote" class="s-note">{{ note.stanceNote }}</span>
-            </div>
-            <div class="note-quote">{{ note.text }}</div>
-            <div v-if="note.meaning" class="note-meaning">{{ note.meaning }}</div>
-            <div v-if="note.tags?.length" class="note-tags">
-              <span v-for="t in note.tags" :key="t" class="n-tag">{{ t }}</span>
-            </div>
-          </div>
-          <div class="note-foot">
-            <span class="note-date">{{ fmt(note.date) }}</span>
-            <button class="del-btn" @click.stop="delNote(note.id)">Delete</button>
-          </div>
-        </div>
-      </transition-group>
+    <div class="graph-bottom">
+      <div class="graph-info" id="graph-info">tap a tag to filter · tap a node to peek</div>
+      <div class="graph-tag-row" id="graph-tags"></div>
     </div>
   </div>
-
-  <!-- ── GRAPH SCREEN ── -->
-  <div class="screen graph-screen" :class="sc('graph')">
-    <svg ref="gsvg" class="graph-svg" @click="graphClick"></svg>
-    <div class="graph-hint">tap a book node to open it</div>
-  </div>
-
-  <!-- FABs -->
-  <button v-if="screen === 'library'" class="fab" @click="addBookOpen = true">+</button>
-  <button v-if="screen === 'notes'"   class="fab" @click="openAddNote">+</button>
-
-  <!-- ── BOTTOM NAV ── -->
-  <nav class="bottom-nav">
-    <button class="nav-tab" :class="{ on: tab === 'library' }" @click="switchTab('library')">
-      <span class="nav-icon">📚</span>
-      <span class="nav-label">Library</span>
-    </button>
-    <button class="nav-tab" :class="{ on: tab === 'graph' }" @click="switchTab('graph')">
-      <span class="nav-icon">✦</span>
-      <span class="nav-label">Graph</span>
-    </button>
-  </nav>
-
-  <!-- ── SHEET: ADD BOOK ── -->
-  <transition name="fade"><div v-if="addBookOpen" class="backdrop" @click="addBookOpen = false"></div></transition>
-  <transition name="sheet">
-    <div v-if="addBookOpen" class="sheet">
-      <div class="sh-handle"></div>
-      <div class="sh-header"><div class="sh-title">Add Book</div></div>
-      <div class="sh-body">
-        <div class="fg"><label class="fl">Title *</label><input v-model="bForm.title" class="fi" placeholder="Book title" /></div>
-        <div class="fg"><label class="fl">Author</label><input v-model="bForm.author" class="fi" placeholder="Author name" /></div>
-      </div>
-      <div class="sh-actions">
-        <button class="btn-full btn-cancel" @click="addBookOpen = false">Cancel</button>
-        <button class="btn-full btn-save" @click="saveBook(false)">Add</button>
-      </div>
-    </div>
-  </transition>
-
-  <!-- ── SHEET: EDIT BOOK ── -->
-  <transition name="fade"><div v-if="editBookOpen" class="backdrop" @click="editBookOpen = false"></div></transition>
-  <transition name="sheet">
-    <div v-if="editBookOpen" class="sheet">
-      <div class="sh-handle"></div>
-      <div class="sh-header"><div class="sh-title">Edit Book</div></div>
-      <div class="sh-body">
-        <div class="fg"><label class="fl">Title *</label><input v-model="bForm.title" class="fi" placeholder="Book title" /></div>
-        <div class="fg"><label class="fl">Author</label><input v-model="bForm.author" class="fi" placeholder="Author name" /></div>
-      </div>
-      <div class="sh-actions">
-        <button class="btn-full btn-cancel" @click="editBookOpen = false">Cancel</button>
-        <button class="btn-full btn-save" @click="saveBook(true)">Save</button>
-      </div>
-    </div>
-  </transition>
-
-  <!-- ── SHEET: NOTE FORM ── -->
-  <transition name="fade"><div v-if="noteSheet.open" class="backdrop" @click="noteSheet.open = false"></div></transition>
-  <transition name="sheet">
-    <div v-if="noteSheet.open" class="sheet">
-      <div class="sh-handle"></div>
-      <div class="sh-header"><div class="sh-title">{{ noteSheet.isEdit ? 'Edit Note' : 'New Note' }}</div></div>
-      <div class="sh-body">
-        <div class="fg">
-          <label class="fl">Quote / Note *</label>
-          <textarea v-model="noteSheet.text" class="fta" placeholder="Type or paste the quote…" rows="4"></textarea>
-        </div>
-        <div class="fg">
-          <label class="fl">Stance</label>
-          <div class="stance-grid">
-            <button v-for="s in [null,'yes','no','complicated']" :key="String(s)"
-              class="st-btn"
-              :class="[{ on: noteSheet.stance === s }, s === null ? 'none-s' : s]"
-              @click="noteSheet.stance = s"
-            >{{ s === null ? '—' : s }}</button>
-          </div>
-        </div>
-        <div v-if="noteSheet.stance" class="fg">
-          <label class="fl">Why this stance?</label>
-          <input v-model="noteSheet.stanceNote" class="fi" placeholder="Optional…" />
-        </div>
-        <div class="fg">
-          <label class="fl">Personal meaning</label>
-          <input v-model="noteSheet.meaning" class="fi" placeholder="What does this mean to you?" />
-        </div>
-        <div class="fg">
-          <label class="fl">Tags</label>
-          <div class="tags-row">
-            <input v-model="noteSheet.tagInput" class="fi" placeholder="#hope, #society…" @keydown.enter.prevent="addTag" />
-            <button class="add-tag-btn" @click="addTag">+</button>
-          </div>
-          <div v-if="noteSheet.tags.length" class="tag-chips">
-            <span v-for="t in noteSheet.tags" :key="t" class="tag-ce">
-              {{ t }}<span class="tag-rm" @click="rmTag(t)">×</span>
-            </span>
-          </div>
-        </div>
-      </div>
-      <div class="sh-actions">
-        <button class="btn-full btn-cancel" @click="noteSheet.open = false">Cancel</button>
-        <button class="btn-full btn-save" @click="saveNote">{{ noteSheet.isEdit ? 'Save' : 'Add' }}</button>
-      </div>
-    </div>
-  </transition>
-
-  <!-- ── SHEET: BOOK CONTEXT ── -->
-  <transition name="fade"><div v-if="ctxOpen" class="backdrop" @click="ctxOpen = false"></div></transition>
-  <transition name="sheet">
-    <div v-if="ctxOpen" class="sheet">
-      <div class="sh-handle"></div>
-      <div class="sh-body">
-        <div class="ctx-item" @click="ctxOpen = false; openEditBook()">
-          <span class="ctx-icon">✎</span> Edit book details
-        </div>
-        <div class="ctx-item danger" @click="ctxOpen = false; delBook()">
-          <span class="ctx-icon">🗑</span> Remove book &amp; all notes
-        </div>
-      </div>
-    </div>
-  </transition>
-
 </div>
 
 <script>
-const { createApp, ref, computed, reactive, watch, nextTick } = Vue;
-const KEY = 'reader_v3';
+const TAG_COLORS = ['#AFA9EC','#5DCAA5','#F0997B','#ED93B1','#85B7EB','#97C459','#EF9F27','#7F77DD','#1D9E75','#D85A30'];
+const STANCE_LABEL = { yes: 'agree', complicated: 'complicated', no: 'disagree' };
 
-function load() {
+let state = { books: [], currentBookId: null };
+let graphFilter = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  initTheme();
+  loadState();
+  renderHeader();
+  renderGraph();
+  window.addEventListener('resize', renderGraph);
+});
+
+function loadState() {
   try {
-    const r = localStorage.getItem(KEY);
-    if (!r) return { books: [], currentBookId: null };
-    const s = JSON.parse(r);
-    (s.books || []).forEach(b => { if (!b.notes) b.notes = []; });
-    return { books: s.books || [], currentBookId: s.currentBookId || null };
-  } catch { return { books: [], currentBookId: null }; }
+    const raw = localStorage.getItem('reader_v3');
+    if (raw) state = JSON.parse(raw);
+  } catch (e) {}
+  const params = new URLSearchParams(window.location.search);
+  const bookId = params.get('book');
+  if (bookId) state.currentBookId = bookId;
 }
 
-function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
-function fmt(ts) {
-  if (!ts) return '';
-  return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+function currentBook() {
+  return state.books.find(b => b.id === state.currentBookId) || state.books[0] || null;
 }
 
-createApp({
-  setup() {
-    const state = reactive(load());
-    const screen = ref('library');
-    const tab    = ref('library');
-    const searchQ   = ref('');
-    const tagFilter = ref(null);
-    const gsvg = ref(null);
-    const ctxOpen = ref(false);
-    const addBookOpen  = ref(false);
-    const editBookOpen = ref(false);
-    const gnodes = ref([]); // graph book nodes for hit-testing
+function initTheme() {
+  const t = localStorage.getItem('theme');
+  if (t === 'dark') document.body.classList.add('dark-mode');
+  else if (t === 'light') document.body.classList.add('light-mode');
+}
 
-    // persist
-    watch(() => JSON.stringify({ books: state.books, currentBookId: state.currentBookId }),
-      () => localStorage.setItem(KEY, JSON.stringify({ books: state.books, currentBookId: state.currentBookId })),
-      { deep: true }
-    );
-
-    const curBook = computed(() => state.books.find(b => b.id === state.currentBookId) || null);
-
-    const bookTags = computed(() => {
-      if (!curBook.value) return [];
-      const s = new Set();
-      curBook.value.notes.forEach(n => (n.tags || []).forEach(t => s.add(t)));
-      return [...s].sort();
-    });
-
-    const filteredNotes = computed(() => {
-      if (!curBook.value) return [];
-      let ns = [...curBook.value.notes].reverse();
-      const q = searchQ.value.trim().toLowerCase();
-      if (q) ns = ns.filter(n =>
-        n.text.toLowerCase().includes(q) ||
-        (n.meaning || '').toLowerCase().includes(q) ||
-        (n.stanceNote || '').toLowerCase().includes(q) ||
-        (n.tags || []).some(t => t.toLowerCase().includes(q))
-      );
-      if (tagFilter.value) ns = ns.filter(n => (n.tags || []).includes(tagFilter.value));
-      return ns;
-    });
-
-    // Screen class logic
-    function sc(name) {
-      if (name === screen.value) return '';
-      // notes sits "forward" of library; graph is separate layer
-      const fwd = ['library', 'notes'];
-      const ci = fwd.indexOf(screen.value);
-      const ni = fwd.indexOf(name);
-      if (ni >= 0 && ci >= 0) return ni < ci ? 'back' : 'gone';
-      return 'gone';
-    }
-
-    function openBook(id) {
-      state.currentBookId = id;
-      searchQ.value = ''; tagFilter.value = null;
-      screen.value = 'notes';
-    }
-
-    function goBack() {
-      screen.value = tab.value === 'graph' ? 'graph' : 'library';
-    }
-
-    function switchTab(t) {
-      tab.value = t;
-      if (t === 'graph') { screen.value = 'graph'; nextTick(renderGraph); }
-      else { screen.value = 'library'; }
-    }
-
-    function toggleTag(t) { tagFilter.value = tagFilter.value === t ? null : t; }
-
-    // Book form
-    const bForm = reactive({ title: '', author: '' });
-
-    function openEditBook() {
-      if (!curBook.value) return;
-      bForm.title = curBook.value.title; bForm.author = curBook.value.author || '';
-      editBookOpen.value = true;
-    }
-
-    function saveBook(isEdit) {
-      if (!bForm.title.trim()) return;
-      if (isEdit && curBook.value) {
-        curBook.value.title = bForm.title.trim(); curBook.value.author = bForm.author.trim();
-        editBookOpen.value = false;
-      } else {
-        const b = { id: uid(), title: bForm.title.trim(), author: bForm.author.trim(), notes: [] };
-        state.books.push(b); state.currentBookId = b.id;
-        bForm.title = ''; bForm.author = '';
-        addBookOpen.value = false;
-      }
-    }
-
-    function delBook() {
-      if (!curBook.value) return;
-      if (!confirm(`Remove "${curBook.value.title}" and all its notes?`)) return;
-      const i = state.books.findIndex(b => b.id === state.currentBookId);
-      state.books.splice(i, 1);
-      state.currentBookId = state.books[0]?.id || null;
-      screen.value = 'library';
-    }
-
-    // Note form
-    const noteSheet = reactive({
-      open: false, isEdit: false, editId: null,
-      text: '', stance: null, stanceNote: '', meaning: '', tags: [], tagInput: ''
-    });
-
-    function openAddNote() {
-      Object.assign(noteSheet, { open: true, isEdit: false, editId: null,
-        text: '', stance: null, stanceNote: '', meaning: '', tags: [], tagInput: '' });
-    }
-    function editNote(note) {
-      Object.assign(noteSheet, { open: true, isEdit: true, editId: note.id,
-        text: note.text, stance: note.stance || null,
-        stanceNote: note.stanceNote || '', meaning: note.meaning || '',
-        tags: [...(note.tags || [])], tagInput: '' });
-    }
-    function addTag() {
-      let v = noteSheet.tagInput.trim().replace(/\s+/g, '');
-      if (!v) return;
-      if (!v.startsWith('#')) v = '#' + v;
-      if (!noteSheet.tags.includes(v)) noteSheet.tags.push(v);
-      noteSheet.tagInput = '';
-    }
-    function rmTag(t) { noteSheet.tags = noteSheet.tags.filter(x => x !== t); }
-    function saveNote() {
-      if (!noteSheet.text.trim() || !curBook.value) return;
-      if (noteSheet.tagInput.trim()) addTag();
-      if (noteSheet.isEdit) {
-        const n = curBook.value.notes.find(x => x.id === noteSheet.editId);
-        if (n) { n.text = noteSheet.text.trim(); n.stance = noteSheet.stance;
-          n.stanceNote = noteSheet.stanceNote.trim(); n.meaning = noteSheet.meaning.trim();
-          n.tags = [...noteSheet.tags]; }
-      } else {
-        curBook.value.notes.push({ id: uid(), date: Date.now(),
-          text: noteSheet.text.trim(), stance: noteSheet.stance,
-          stanceNote: noteSheet.stanceNote.trim(), meaning: noteSheet.meaning.trim(),
-          tags: [...noteSheet.tags] });
-      }
-      noteSheet.open = false;
-    }
-    function delNote(id) {
-      if (!confirm('Delete this note?')) return;
-      curBook.value.notes = curBook.value.notes.filter(n => n.id !== id);
-    }
-
-    // Graph
-    function renderGraph() {
-      const svg = gsvg.value;
-      if (!svg) return;
-      svg.innerHTML = ''; gnodes.value = [];
-      const W = svg.clientWidth || 360, H = svg.clientHeight || 580;
-      const cx = W / 2, cy = H / 2;
-      const ns = 'http://www.w3.org/2000/svg';
-
-      const tagMap = new Map();
-      state.books.forEach(b => b.notes.forEach(n =>
-        (n.tags || []).forEach(t => { if (!tagMap.has(t)) tagMap.set(t, new Set()); tagMap.get(t).add(b.id); })
-      ));
-
-      const bookN = state.books.map(b => ({ id: 'b:' + b.id, bid: b.id, label: b.title, type: 'book', c: b.notes.length }));
-      const tagN  = [...tagMap.keys()].map(t => ({ id: 't:' + t, label: t, type: 'tag', c: tagMap.get(t).size }));
-      const nodes = [...bookN, ...tagN];
-      const edges = [];
-      tagMap.forEach((bids, tag) => bids.forEach(bid => edges.push([`b:${bid}`, `t:${tag}`])));
-
-      if (!nodes.length) {
-        const t = document.createElementNS(ns, 'text');
-        t.setAttribute('x', cx); t.setAttribute('y', cy);
-        t.setAttribute('text-anchor', 'middle');
-        t.setAttribute('fill', '#3a3028'); t.setAttribute('font-size', '14');
-        t.setAttribute('font-family', 'Lora, serif'); t.setAttribute('font-style', 'italic');
-        t.textContent = 'Add books and notes to see the graph.';
-        svg.appendChild(t); return;
-      }
-
-      const pos = new Map();
-      const bR = Math.min(W, H) * 0.22, tR = Math.min(W, H) * 0.36;
-      bookN.forEach((n, i) => { const a = (2 * Math.PI * i / Math.max(bookN.length, 1)) - Math.PI / 2; pos.set(n.id, { x: cx + bR * Math.cos(a), y: cy + bR * Math.sin(a) }); });
-      tagN.forEach((n, i)  => { const a = (2 * Math.PI * i / Math.max(tagN.length, 1)) - Math.PI / 2 + 0.35; pos.set(n.id, { x: cx + tR * Math.cos(a), y: cy + tR * Math.sin(a) }); });
-
-      // Defs
-      const defs = document.createElementNS(ns, 'defs');
-      const filter = document.createElementNS(ns, 'filter');
-      filter.setAttribute('id', 'gl');
-      const fe = document.createElementNS(ns, 'feGaussianBlur');
-      fe.setAttribute('stdDeviation', '2.5'); fe.setAttribute('result', 'b');
-      const fm = document.createElementNS(ns, 'feMerge');
-      ['b', 'SourceGraphic'].forEach(v => { const mn = document.createElementNS(ns, 'feMergeNode'); mn.setAttribute('in', v); fm.appendChild(mn); });
-      filter.appendChild(fe); filter.appendChild(fm); defs.appendChild(filter); svg.appendChild(defs);
-
-      // Edges
-      const eg = document.createElementNS(ns, 'g');
-      edges.forEach(([s, t]) => {
-        const sp = pos.get(s), tp = pos.get(t);
-        if (!sp || !tp) return;
-        const l = document.createElementNS(ns, 'line');
-        l.setAttribute('x1', sp.x); l.setAttribute('y1', sp.y);
-        l.setAttribute('x2', tp.x); l.setAttribute('y2', tp.y);
-        l.setAttribute('stroke', '#2a2420'); l.setAttribute('stroke-width', '1.5');
-        eg.appendChild(l);
-      });
-      svg.appendChild(eg);
-
-      // Nodes
-      const nd = [];
-      nodes.forEach(n => {
-        const p = pos.get(n.id); if (!p) return;
-        const isBook = n.type === 'book';
-        const r = isBook ? 15 + Math.min(n.c * 2, 12) : 9 + Math.min(n.c * 3, 8);
-        const color = isBook ? '#d4903f' : '#6a8899';
-        const g = document.createElementNS(ns, 'g');
-        g.setAttribute('transform', `translate(${p.x},${p.y})`);
-        const circle = document.createElementNS(ns, 'circle');
-        circle.setAttribute('r', r); circle.setAttribute('fill', color + '28');
-        circle.setAttribute('stroke', color); circle.setAttribute('stroke-width', '1.5');
-        circle.setAttribute('filter', 'url(#gl)');
-        g.appendChild(circle);
-        const lbl = document.createElementNS(ns, 'text');
-        lbl.setAttribute('text-anchor', 'middle'); lbl.setAttribute('y', r + 12);
-        lbl.setAttribute('fill', isBook ? '#e8c87a' : '#8ab0ba');
-        lbl.setAttribute('font-size', isBook ? '11' : '10');
-        lbl.setAttribute('font-family', isBook ? 'Lora, serif' : 'JetBrains Mono, monospace');
-        const ml = 18; lbl.textContent = n.label.length > ml ? n.label.slice(0, ml) + '…' : n.label;
-        g.appendChild(lbl); svg.appendChild(g);
-        if (isBook) nd.push({ x: p.x, y: p.y, r, bid: n.bid });
-      });
-      gnodes.value = nd;
-    }
-
-    function graphClick(e) {
-      const svg = gsvg.value; if (!svg) return;
-      const rect = svg.getBoundingClientRect();
-      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-      for (const n of gnodes.value) {
-        if (Math.hypot(mx - n.x, my - n.y) <= n.r + 14) {
-          tab.value = 'library';
-          openBook(n.bid); return;
-        }
-      }
-    }
-
-    return {
-      state, screen, tab, searchQ, tagFilter, gsvg, ctxOpen,
-      addBookOpen, editBookOpen, bForm, noteSheet,
-      curBook, bookTags, filteredNotes,
-      sc, openBook, goBack, switchTab, toggleTag,
-      openEditBook, saveBook, delBook,
-      openAddNote, editNote, addTag, rmTag, saveNote, delNote,
-      renderGraph, graphClick, fmt
-    };
+function toggleTheme() {
+  const isDark = document.body.classList.contains('dark-mode');
+  const isLight = document.body.classList.contains('light-mode');
+  const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  document.body.classList.remove('dark-mode', 'light-mode');
+  if (isDark) {
+    document.body.classList.add('light-mode');
+    localStorage.setItem('theme', 'light');
+  } else if (isLight) {
+    document.body.classList.add('dark-mode');
+    localStorage.setItem('theme', 'dark');
+  } else {
+    document.body.classList.add(systemDark ? 'light-mode' : 'dark-mode');
+    localStorage.setItem('theme', systemDark ? 'light' : 'dark');
   }
-}).mount('#app');
-</script>
-<script>
-  window.onerror = function(msg, url, line) {
-    alert("Error: " + msg + "\nLine: " + line);
-  };
-  document.addEventListener('DOMContentLoaded', () => {
-    if (typeof Vue === 'undefined') {
-      alert("Vue failed to load. Check your internet connection or CDN URL.");
-    } else {
-      console.log("Vue loaded, mounting app...");
-    }
+  renderGraph();
+}
+
+function goBack() {
+  const b = currentBook();
+  if (b) localStorage.setItem('reader_v3', JSON.stringify({ ...state, currentBookId: b.id }));
+  window.location.href = 'story.html';
+}
+
+function renderHeader() {
+  const title = document.getElementById('book-title');
+  const meta = document.getElementById('book-meta');
+  const books = state.books || [];
+  const graphNotes = getGraphNotes();
+  if (!books.length) {
+    title.textContent = 'story graph';
+    meta.textContent = 'no books yet';
+    return;
+  }
+  title.textContent = 'story graph';
+  meta.textContent = `${books.length} book${books.length === 1 ? '' : 's'} · ${graphNotes.length} tagged line${graphNotes.length === 1 ? '' : 's'}`;
+}
+
+function getGraphNotes() {
+  const items = [];
+  (state.books || []).forEach(book => {
+    (book.notes || []).forEach(note => {
+      const tags = (note.tags || []).filter(Boolean);
+      if (!tags.length) return;
+      items.push({
+        ...note,
+        tags,
+        bookId: book.id,
+        bookTitle: book.title || 'untitled book',
+        bookAuthor: book.author || ''
+      });
+    });
   });
+  return items;
+}
+
+function getAllTags(notes) {
+  const set = new Set();
+  notes.forEach(n => (n.tags || []).forEach(t => set.add(t)));
+  return [...set].sort();
+}
+
+function renderGraph() {
+  const wrap = document.getElementById('graph-wrap');
+  const svg = document.getElementById('graph-svg');
+  const notes = getGraphNotes();
+  svg.innerHTML = '';
+
+  const W = wrap.clientWidth || 360;
+  const H = wrap.clientHeight || 540;
+  const cs = getComputedStyle(document.body);
+  const purpleCol = cs.getPropertyValue('--purple').trim() || '#7F77DD';
+  const textCol = cs.getPropertyValue('--text').trim() || '#1a1a18';
+  const mutedCol = cs.getPropertyValue('--muted').trim() || '#6b6b67';
+  const borderMed = cs.getPropertyValue('--border-med').trim() || 'rgba(0,0,0,0.16)';
+  const surfaceCol = cs.getPropertyValue('--surface').trim() || '#ffffff';
+
+  const shownNotes = graphFilter
+    ? notes.filter(n => (n.tags || []).includes(graphFilter))
+    : notes;
+
+  if (!shownNotes.length) {
+    const s = d3.select(svg).attr('viewBox', `0 0 ${W} ${H}`);
+    s.append('text')
+      .attr('x', W / 2)
+      .attr('y', H / 2)
+      .attr('text-anchor', 'middle')
+      .attr('fill', mutedCol)
+      .attr('font-size', 14)
+      .attr('font-family', '-apple-system, sans-serif')
+      .text(notes.length ? 'no tagged lines match this filter' : 'no tagged lines yet');
+    renderGraphTags(notes);
+    return;
+  }
+
+  const allTags = getAllTags(notes);
+  const tagColorMap = {};
+  allTags.forEach((t, i) => { tagColorMap[t] = TAG_COLORS[i % TAG_COLORS.length]; });
+
+  const books = state.books.filter(book =>
+    shownNotes.some(note => note.bookId === book.id)
+  );
+
+  const bookNodes = books.map((book, index) => ({
+    id: 'b_' + book.id,
+    type: 'book',
+    book,
+    label: book.title || 'untitled book',
+    color: TAG_COLORS[index % TAG_COLORS.length],
+    r: 10 + shownNotes.filter(note => note.bookId === book.id).length * 0.6
+  }));
+
+  const noteNodes = shownNotes.map(n => ({
+    id: noteNodeId(n),
+    type: 'note',
+    note: n,
+    r: 4 + Math.min((n.tags || []).length, 4)
+  }));
+
+  const tagSet = new Set();
+  shownNotes.forEach(n => (n.tags || []).forEach(t => tagSet.add(t)));
+  const tagNodes = [...tagSet].map(t => ({
+    id: 't_' + t,
+    type: 'tag',
+    tag: t,
+    r: 7 + notes.filter(n => (n.tags || []).includes(t)).length * 0.9,
+    color: tagColorMap[t]
+  }));
+
+  const nodes = [...bookNodes, ...tagNodes, ...noteNodes];
+  const links = [];
+  shownNotes.forEach(n => {
+    links.push({ source: noteNodeId(n), target: 'b_' + n.bookId, kind: 'book' });
+    (n.tags || []).forEach(t => {
+      if (tagSet.has(t)) links.push({ source: noteNodeId(n), target: 't_' + t, kind: 'tag' });
+    });
+  });
+
+  const sim = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links).id(d => d.id).distance(d => d.kind === 'book' ? 74 : 60).strength(d => d.kind === 'book' ? 0.42 : 0.68))
+    .force('charge', d3.forceManyBody().strength(-140))
+    .force('center', d3.forceCenter(W / 2, H / 2))
+    .force('collision', d3.forceCollide().radius(d => d.r + 5));
+
+  const s = d3.select(svg).attr('viewBox', `0 0 ${W} ${H}`);
+  const linkSel = s.append('g').selectAll('line').data(links).join('line')
+    .attr('stroke', borderMed)
+    .attr('stroke-width', d => d.kind === 'book' ? 1.2 : 1)
+    .attr('opacity', d => d.kind === 'book' ? 0.32 : 0.5);
+
+  const nodeSel = s.append('g').selectAll('g').data(nodes).join('g')
+    .style('cursor', 'pointer')
+    .call(d3.drag()
+      .on('start', (event, d) => {
+        if (!event.active) sim.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+      })
+      .on('drag', (event, d) => {
+        d.fx = event.x;
+        d.fy = event.y;
+      })
+      .on('end', (event, d) => {
+        if (!event.active) sim.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+      }));
+
+  nodeSel.append('circle')
+    .attr('r', d => d.r)
+    .attr('fill', d => {
+      if (d.type === 'tag') return d.color;
+      if (d.type === 'book') return surfaceCol;
+      const tags = d.note.tags || [];
+      return tags.length ? tagColorMap[tags[0]] + '55' : purpleCol + '44';
+    })
+    .attr('stroke', d => d.type === 'tag' ? d.color : d.type === 'book' ? textCol : borderMed)
+    .attr('stroke-width', d => d.type === 'tag' ? 1.5 : d.type === 'book' ? 1.4 : 1);
+
+  nodeSel.filter(d => d.type === 'book')
+    .append('text')
+    .attr('y', d => d.r + 12)
+    .attr('text-anchor', 'middle')
+    .attr('fill', textCol)
+    .attr('font-size', 10)
+    .attr('font-family', "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif")
+    .text(d => truncate(d.label, 18));
+
+  const tooltip = document.getElementById('tooltip');
+  nodeSel.filter(d => d.type === 'note')
+    .on('pointerenter', (event, d) => {
+      const rect = wrap.getBoundingClientRect();
+      const note = d.note;
+      document.getElementById('tt-text').textContent = note.text.slice(0, 160) + (note.text.length > 160 ? '…' : '');
+      document.getElementById('tt-meta').textContent = [note.bookTitle, note.location, note.stance ? STANCE_LABEL[note.stance] : null, relDate(note.date)].filter(Boolean).join(' · ');
+      document.getElementById('tt-note').textContent = note.meaning || note.stanceNote || '';
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      tooltip.style.left = Math.min(x + 12, W - 272) + 'px';
+      tooltip.style.top = Math.max(y - 72, 4) + 'px';
+      tooltip.classList.add('visible');
+    })
+    .on('pointerleave', () => tooltip.classList.remove('visible'));
+
+  nodeSel.filter(d => d.type === 'tag')
+    .on('pointerenter', (event, d) => {
+      const count = notes.filter(n => (n.tags || []).includes(d.tag)).length;
+      document.getElementById('graph-info').textContent = `${d.tag} — ${count} line${count === 1 ? '' : 's'}`;
+    })
+    .on('pointerleave', () => {
+      document.getElementById('graph-info').textContent = graphFilter ? `showing ${graphFilter}` : 'tap a tag to filter · tap a node to peek';
+    });
+
+  nodeSel.filter(d => d.type === 'book')
+    .on('pointerenter', (event, d) => {
+      const count = shownNotes.filter(note => note.bookId === d.book.id).length;
+      document.getElementById('graph-info').textContent = `${d.book.title} — ${count} tagged line${count === 1 ? '' : 's'}`;
+    })
+    .on('pointerleave', () => {
+      document.getElementById('graph-info').textContent = graphFilter ? `showing ${graphFilter}` : 'tap a tag to filter · tap a node to peek';
+    });
+
+  sim.on('tick', () => {
+    linkSel
+      .attr('x1', d => d.source.x)
+      .attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x)
+      .attr('y2', d => d.target.y);
+    nodeSel.attr('transform', d => `translate(${clamp(d.x, d.r, W - d.r)},${clamp(d.y, d.r, H - d.r)})`);
+  });
+
+  renderGraphTags(notes);
+}
+
+function renderGraphTags(notes) {
+  const allTags = getAllTags(notes);
+  const wrap = document.getElementById('graph-tags');
+  if (!allTags.length) {
+    wrap.innerHTML = '<span class="empty" style="padding:0;font-size:12px;">tags will appear here once you add some</span>';
+    return;
+  }
+
+  const tagColorMap = {};
+  allTags.forEach((t, i) => { tagColorMap[t] = TAG_COLORS[i % TAG_COLORS.length]; });
+
+  wrap.innerHTML = ['all', ...allTags].map(t => {
+    const isAll = t === 'all';
+    const isActive = graphFilter === t || (isAll && !graphFilter);
+    const color = isAll ? 'var(--muted)' : tagColorMap[t];
+    const style = !isAll ? `background:${color}22;color:${color};border-color:${color}44;` : '';
+    const activeStyle = `background:${color};color:#fff;border-color:${color};`;
+    return `<button class="tag-chip" style="${isActive ? activeStyle : style}" onclick="setGraphFilter('${esc(t)}')">${esc(t)}</button>`;
+  }).join('');
+}
+
+function setGraphFilter(tag) {
+  graphFilter = tag === 'all' ? null : tag;
+  document.getElementById('graph-info').textContent = graphFilter ? `showing ${graphFilter}` : 'tap a tag to filter · tap a node to peek';
+  renderGraph();
+}
+
+function relDate(ts) {
+  const d = Math.floor((Date.now() - ts) / 86400000);
+  if (d === 0) return 'today';
+  if (d === 1) return 'yesterday';
+  if (d < 7) return d + 'd ago';
+  if (d < 30) return Math.floor(d / 7) + 'w ago';
+  return Math.floor(d / 30) + 'mo ago';
+}
+
+function clamp(v, min, max) {
+  return Math.max(min, Math.min(max, v));
+}
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function truncate(s, max) {
+  const text = String(s || '');
+  return text.length > max ? text.slice(0, max - 1) + '…' : text;
+}
+
+function noteNodeId(note) {
+  return 'n_' + note.bookId + '_' + note.id;
+}
 </script>
 </body>
 </html>

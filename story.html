@@ -513,6 +513,7 @@
 
     <div style="display:flex;gap:8px;margin-bottom:1.5rem;">
       <button class="btn btn-primary" style="flex:1;padding:12px;" onclick="showScreen('s-highlight')">+ capture a line</button>
+      <button class="btn" style="padding:12px 14px;white-space:nowrap;" onclick="openGraphView()">graph view</button>
       <button class="btn" style="padding:12px 14px;white-space:nowrap;" onclick="showScreen('s-import')">import kindle</button>
     </div>
 
@@ -828,6 +829,12 @@ function renderBook() {
     `;
     nl.appendChild(el);
   });
+}
+
+function openGraphView() {
+  const b = currentBook();
+  if (!b) return;
+  window.location.href = `storygraph.html?book=${encodeURIComponent(b.id)}`;
 }
 
 let editingNoteId = null;
