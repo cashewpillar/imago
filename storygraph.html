@@ -90,6 +90,8 @@
     -webkit-font-smoothing: antialiased;
     transition: background 0.2s, color 0.2s;
     overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
   }
 
   .app {
@@ -148,12 +150,17 @@
 
   .graph-top {
     position: sticky;
-    top: 58px;
+    top: 0;
     z-index: 9;
     background: var(--bg);
     border-bottom: 0.5px solid var(--border);
     padding: 0.7rem 1rem 0.75rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
   }
+
+  .graph-top-copy { flex: 1; min-width: 0; }
 
   .graph-wrap {
     flex: 1;
@@ -167,14 +174,60 @@
     font-size: 12px;
     color: var(--muted);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    margin-bottom: 8px;
     min-height: 18px;
   }
 
-  .graph-tag-row {
+  .tag-sidebar-wrap {
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .tag-toggle {
+    border: 0.5px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    cursor: pointer;
+  }
+
+  .tag-toggle:hover {
+    background: var(--surface2);
+  }
+
+  .tag-sidebar {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: min(240px, 68vw);
+    max-height: 52vh;
+    overflow: auto;
+    background: var(--surface);
+    border: 0.5px solid var(--border-med);
+    border-radius: var(--radius);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+    padding: 10px;
+    display: none;
+  }
+
+  .tag-sidebar.open {
+    display: block;
+  }
+
+  .tag-sidebar-empty {
+    font-size: 12px;
+    color: var(--hint);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    line-height: 1.5;
+    padding: 6px 4px;
+  }
+
+  .graph-tag-list {
     display: flex;
-    gap: 5px;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 6px;
   }
 
   .tag-chip {
@@ -186,6 +239,8 @@
     background: var(--surface2);
     color: var(--muted);
     cursor: pointer;
+    text-align: left;
+    width: 100%;
   }
 
   .tooltip {
@@ -195,11 +250,12 @@
     border-radius: var(--radius-sm);
     padding: 10px 13px;
     max-width: 260px;
-    pointer-events: none;
     opacity: 0;
     transition: opacity 0.15s;
     z-index: 20;
     box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    left: 10px;
+    bottom: 10px;
   }
   .tooltip.visible { opacity: 1; }
   .tooltip-text {
@@ -240,8 +296,15 @@
 
   <div class="graph-screen">
     <div class="graph-top">
-      <div class="graph-info" id="graph-info">tap a tag to filter · drag to move · pinch or scroll to zoom</div>
-      <div class="graph-tag-row" id="graph-tags"></div>
+      <div class="graph-top-copy">
+        <div class="graph-info" id="graph-info">tap a tag to filter · drag to move · pinch or scroll to zoom</div>
+      </div>
+      <div class="tag-sidebar-wrap">
+        <button class="tag-toggle" id="tag-toggle" onclick="toggleTagSidebar()">tags</button>
+        <div class="tag-sidebar" id="tag-sidebar">
+          <div class="graph-tag-list" id="graph-tags"></div>
+        </div>
+      </div>
     </div>
     <div class="graph-wrap" id="graph-wrap">
       <svg id="graph-svg"></svg>
@@ -257,9 +320,13 @@
 <script>
 const TAG_COLORS = ['#AFA9EC','#5DCAA5','#F0997B','#ED93B1','#85B7EB','#97C459','#EF9F27','#7F77DD','#1D9E75','#D85A30'];
 const STANCE_LABEL = { yes: 'agree', complicated: 'complicated', no: 'disagree' };
+const BASE_NODE_RADIUS = 2.6;
 
 let state = { books: [], currentBookId: null };
 let graphFilter = null;
+let tagSidebarOpen = false;
+let graphBookFilter = null;
+let activeNoteId = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   initTheme();
@@ -305,6 +372,19 @@ function toggleTheme() {
     localStorage.setItem('theme', systemDark ? 'light' : 'dark');
   }
   renderGraph();
+}
+
+function defaultGraphInfo() {
+  if (graphFilter && graphBookFilter) return `showing ${graphBookFilter} + ${graphFilter}`;
+  if (graphBookFilter) return `showing ${graphBookFilter}`;
+  if (graphFilter) return `showing ${graphFilter}`;
+  return '';
+}
+
+function toggleTagSidebar(force) {
+  tagSidebarOpen = typeof force === 'boolean' ? force : !tagSidebarOpen;
+  const sidebar = document.getElementById('tag-sidebar');
+  if (sidebar) sidebar.classList.toggle('open', tagSidebarOpen);
 }
 
 function goBack() {
@@ -369,9 +449,11 @@ function renderGraph() {
   const borderMed = cs.getPropertyValue('--border-med').trim() || 'rgba(0,0,0,0.16)';
   const surfaceCol = cs.getPropertyValue('--surface').trim() || '#ffffff';
 
-  const shownNotes = graphFilter
-    ? notes.filter(n => (n.tags || []).includes(graphFilter))
-    : notes;
+  const shownNotes = notes.filter(n => {
+    if (graphFilter && !(n.tags || []).includes(graphFilter)) return false;
+    if (graphBookFilter && n.bookId !== graphBookFilter) return false;
+    return true;
+  });
 
   if (!shownNotes.length) {
     const s = d3.select(svg).attr('viewBox', `0 0 ${W} ${H}`);
@@ -401,14 +483,14 @@ function renderGraph() {
     book,
     label: book.title || 'untitled book',
     color: TAG_COLORS[index % TAG_COLORS.length],
-    r: 6 + Math.min(8, shownNotes.filter(note => note.bookId === book.id).length * 0.28)
+    r: BASE_NODE_RADIUS + Math.min(15, Math.sqrt(shownNotes.filter(note => note.bookId === book.id).length - 1) * 2.2)
   }));
 
   const noteNodes = shownNotes.map(n => ({
     id: noteNodeId(n),
     type: 'note',
     note: n,
-    r: 2.2 + Math.min((n.tags || []).length * 0.7, 2.8)
+    r: BASE_NODE_RADIUS
   }));
 
   const tagSet = new Set();
@@ -417,7 +499,7 @@ function renderGraph() {
     id: 't_' + t,
     type: 'tag',
     tag: t,
-    r: 4.4 + Math.min(7, notes.filter(n => (n.tags || []).includes(t)).length * 0.18),
+    r: BASE_NODE_RADIUS + Math.min(17, Math.sqrt(notes.filter(n => (n.tags || []).includes(t)).length - 1) * 2.1),
     color: tagColorMap[t]
   }));
 
@@ -499,20 +581,24 @@ function renderGraph() {
     .text(d => truncate(d.label, 18));
 
   const tooltip = document.getElementById('tooltip');
+  const syncActiveTooltip = () => {
+    if (!activeNoteId) return;
+    const activeNode = noteNodes.find(node => node.id === activeNoteId);
+    if (!activeNode) {
+      hideTooltip();
+      return;
+    }
+    showTooltipForNote(activeNode.note, tooltip);
+  };
   nodeSel.filter(d => d.type === 'note')
     .on('pointerenter', (event, d) => {
-      const rect = wrap.getBoundingClientRect();
-      const note = d.note;
-      document.getElementById('tt-text').textContent = note.text.slice(0, 160) + (note.text.length > 160 ? '…' : '');
-      document.getElementById('tt-meta').textContent = [note.bookTitle, note.location, note.stance ? STANCE_LABEL[note.stance] : null, relDate(note.date)].filter(Boolean).join(' · ');
-      document.getElementById('tt-note').textContent = note.meaning || note.stanceNote || '';
-      const x = event.clientX - rect.left;
-      const y = event.clientY - rect.top;
-      tooltip.style.left = Math.min(x + 12, W - 272) + 'px';
-      tooltip.style.top = Math.max(y - 72, 4) + 'px';
-      tooltip.classList.add('visible');
+      activeNoteId = d.id;
+      showTooltipForNote(d.note, tooltip);
     })
-    .on('pointerleave', () => tooltip.classList.remove('visible'));
+    .on('pointerleave', () => {
+      activeNoteId = null;
+      hideTooltip();
+    });
 
   nodeSel.filter(d => d.type === 'tag')
     .on('pointerenter', (event, d) => {
@@ -520,7 +606,11 @@ function renderGraph() {
       document.getElementById('graph-info').textContent = `${d.tag} — ${count} line${count === 1 ? '' : 's'}`;
     })
     .on('pointerleave', () => {
-      document.getElementById('graph-info').textContent = graphFilter ? `showing ${graphFilter}` : 'tap a tag to filter · tap a node to peek';
+      document.getElementById('graph-info').textContent = defaultGraphInfo();
+    })
+    .on('click', (event, d) => {
+      event.stopPropagation();
+      setGraphFilter(d.tag);
     });
 
   nodeSel.filter(d => d.type === 'book')
@@ -529,7 +619,11 @@ function renderGraph() {
       document.getElementById('graph-info').textContent = `${d.book.title} — ${count} tagged line${count === 1 ? '' : 's'}`;
     })
     .on('pointerleave', () => {
-      document.getElementById('graph-info').textContent = graphFilter ? `showing ${graphFilter}` : 'tap a tag to filter · tap a node to peek';
+      document.getElementById('graph-info').textContent = defaultGraphInfo();
+    })
+    .on('click', (event, d) => {
+      event.stopPropagation();
+      setBookFilter(d.book.id);
     });
 
   sim.on('tick', () => {
@@ -539,16 +633,18 @@ function renderGraph() {
       .attr('x2', d => d.target.x)
       .attr('y2', d => d.target.y);
     nodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
+    syncActiveTooltip();
   });
 
   renderGraphTags(notes);
+  document.getElementById('graph-info').textContent = defaultGraphInfo();
 }
 
 function renderGraphTags(notes) {
   const allTags = getAllTags(notes);
   const wrap = document.getElementById('graph-tags');
   if (!allTags.length) {
-    wrap.innerHTML = '<span class="empty" style="padding:0;font-size:12px;">tags will appear here once you add some</span>';
+    wrap.innerHTML = '<div class="tag-sidebar-empty">tags will appear here once you add some</div>';
     return;
   }
 
@@ -566,8 +662,17 @@ function renderGraphTags(notes) {
 }
 
 function setGraphFilter(tag) {
-  graphFilter = tag === 'all' ? null : tag;
-  document.getElementById('graph-info').textContent = graphFilter ? `showing ${graphFilter}` : 'tap a tag to filter · tap a node to peek';
+  const isAll = tag === 'all';
+  graphFilter = isAll ? null : tag;
+  if (isAll) graphBookFilter = null;
+  hideTooltip();
+  toggleTagSidebar(false);
+  renderGraph();
+}
+
+function setBookFilter(bookId) {
+  graphBookFilter = graphBookFilter === bookId ? null : bookId;
+  hideTooltip();
   renderGraph();
 }
 
@@ -602,6 +707,18 @@ function noteNodeId(note) {
   return 'n_' + note.bookId + '_' + note.id;
 }
 
+function showTooltipForNote(note, tooltip) {
+  document.getElementById('tt-text').textContent = note.text.slice(0, 160) + (note.text.length > 160 ? '…' : '');
+  document.getElementById('tt-meta').textContent = [note.bookTitle, note.location, note.stance ? STANCE_LABEL[note.stance] : null, relDate(note.date)].filter(Boolean).join(' · ');
+  document.getElementById('tt-note').textContent = note.meaning || note.stanceNote || '';
+  tooltip.classList.add('visible');
+}
+
+function hideTooltip() {
+  const tooltip = document.getElementById('tooltip');
+  if (tooltip) tooltip.classList.remove('visible');
+}
+
 function seedNodePositions(nodes, centerX, centerY, radius, angleOffset = 0) {
   if (!nodes.length) return;
   nodes.forEach((node, index) => {
@@ -610,6 +727,15 @@ function seedNodePositions(nodes, centerX, centerY, radius, angleOffset = 0) {
     node.y = centerY + Math.sin(angle) * radius;
   });
 }
+
+document.addEventListener('click', event => {
+  const sidebar = document.getElementById('tag-sidebar');
+  const toggle = document.getElementById('tag-toggle');
+  if (!sidebar || !toggle || !tagSidebarOpen) return;
+  if (sidebar.contains(event.target) || toggle.contains(event.target)) return;
+  toggleTagSidebar(false);
+});
+
 </script>
 </body>
 </html>
