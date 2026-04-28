@@ -146,6 +146,15 @@
     overflow: hidden;
   }
 
+  .graph-top {
+    position: sticky;
+    top: 58px;
+    z-index: 9;
+    background: var(--bg);
+    border-bottom: 0.5px solid var(--border);
+    padding: 0.7rem 1rem 0.75rem;
+  }
+
   .graph-wrap {
     flex: 1;
     position: relative;
@@ -153,12 +162,6 @@
   }
 
   #graph-svg { width: 100%; height: 100%; display: block; }
-
-  .graph-bottom {
-    background: var(--bg);
-    border-top: 0.5px solid var(--border);
-    padding: 0.75rem 1rem 1rem;
-  }
 
   .graph-info {
     font-size: 12px;
@@ -236,6 +239,10 @@
   </div>
 
   <div class="graph-screen">
+    <div class="graph-top">
+      <div class="graph-info" id="graph-info">tap a tag to filter · drag to move · pinch or scroll to zoom</div>
+      <div class="graph-tag-row" id="graph-tags"></div>
+    </div>
     <div class="graph-wrap" id="graph-wrap">
       <svg id="graph-svg"></svg>
       <div class="tooltip" id="tooltip">
@@ -243,10 +250,6 @@
         <div class="tooltip-meta" id="tt-meta"></div>
         <div class="tooltip-note" id="tt-note"></div>
       </div>
-    </div>
-    <div class="graph-bottom">
-      <div class="graph-info" id="graph-info">tap a tag to filter · tap a node to peek</div>
-      <div class="graph-tag-row" id="graph-tags"></div>
     </div>
   </div>
 </div>
@@ -356,6 +359,9 @@ function renderGraph() {
 
   const W = wrap.clientWidth || 360;
   const H = wrap.clientHeight || 540;
+  const centerX = W / 2;
+  const centerY = H / 2;
+  const minDim = Math.min(W, H);
   const cs = getComputedStyle(document.body);
   const purpleCol = cs.getPropertyValue('--purple').trim() || '#7F77DD';
   const textCol = cs.getPropertyValue('--text').trim() || '#1a1a18';
@@ -395,14 +401,14 @@ function renderGraph() {
     book,
     label: book.title || 'untitled book',
     color: TAG_COLORS[index % TAG_COLORS.length],
-    r: 10 + shownNotes.filter(note => note.bookId === book.id).length * 0.6
+    r: 6 + Math.min(8, shownNotes.filter(note => note.bookId === book.id).length * 0.28)
   }));
 
   const noteNodes = shownNotes.map(n => ({
     id: noteNodeId(n),
     type: 'note',
     note: n,
-    r: 4 + Math.min((n.tags || []).length, 4)
+    r: 2.2 + Math.min((n.tags || []).length * 0.7, 2.8)
   }));
 
   const tagSet = new Set();
@@ -411,11 +417,14 @@ function renderGraph() {
     id: 't_' + t,
     type: 'tag',
     tag: t,
-    r: 7 + notes.filter(n => (n.tags || []).includes(t)).length * 0.9,
+    r: 4.4 + Math.min(7, notes.filter(n => (n.tags || []).includes(t)).length * 0.18),
     color: tagColorMap[t]
   }));
 
   const nodes = [...bookNodes, ...tagNodes, ...noteNodes];
+  seedNodePositions(bookNodes, centerX, centerY, minDim * 0.16);
+  seedNodePositions(tagNodes, centerX, centerY, minDim * 0.28, Math.PI / 7);
+  seedNodePositions(noteNodes, centerX, centerY, minDim * 0.08);
   const links = [];
   shownNotes.forEach(n => {
     links.push({ source: noteNodeId(n), target: 'b_' + n.bookId, kind: 'book' });
@@ -425,18 +434,33 @@ function renderGraph() {
   });
 
   const sim = d3.forceSimulation(nodes)
-    .force('link', d3.forceLink(links).id(d => d.id).distance(d => d.kind === 'book' ? 74 : 60).strength(d => d.kind === 'book' ? 0.42 : 0.68))
-    .force('charge', d3.forceManyBody().strength(-140))
-    .force('center', d3.forceCenter(W / 2, H / 2))
-    .force('collision', d3.forceCollide().radius(d => d.r + 5));
+    .force('link', d3.forceLink(links).id(d => d.id).distance(d => d.kind === 'book' ? 54 : 42).strength(d => d.kind === 'book' ? 0.3 : 0.5))
+    .force('charge', d3.forceManyBody().strength(d => d.type === 'note' ? -28 : -85))
+    .force('x', d3.forceX(centerX).strength(d => d.type === 'note' ? 0.018 : 0.04))
+    .force('y', d3.forceY(centerY).strength(d => d.type === 'note' ? 0.018 : 0.04))
+    .force('radial', d3.forceRadial(d => {
+      if (d.type === 'book') return minDim * 0.16;
+      if (d.type === 'tag') return minDim * 0.28;
+      return minDim * 0.08;
+    }, centerX, centerY).strength(d => d.type === 'note' ? 0.03 : 0.08))
+    .force('collision', d3.forceCollide().radius(d => d.r + (d.type === 'note' ? 2.5 : 5)));
 
   const s = d3.select(svg).attr('viewBox', `0 0 ${W} ${H}`);
-  const linkSel = s.append('g').selectAll('line').data(links).join('line')
+  const zoomLayer = s.append('g');
+  s.call(
+    d3.zoom()
+      .scaleExtent([0.45, 2.5])
+      .on('zoom', event => {
+        zoomLayer.attr('transform', event.transform);
+      })
+  );
+
+  const linkSel = zoomLayer.append('g').selectAll('line').data(links).join('line')
     .attr('stroke', borderMed)
-    .attr('stroke-width', d => d.kind === 'book' ? 1.2 : 1)
+    .attr('stroke-width', d => d.kind === 'book' ? 1 : 0.8)
     .attr('opacity', d => d.kind === 'book' ? 0.32 : 0.5);
 
-  const nodeSel = s.append('g').selectAll('g').data(nodes).join('g')
+  const nodeSel = zoomLayer.append('g').selectAll('g').data(nodes).join('g')
     .style('cursor', 'pointer')
     .call(d3.drag()
       .on('start', (event, d) => {
@@ -467,10 +491,10 @@ function renderGraph() {
 
   nodeSel.filter(d => d.type === 'book')
     .append('text')
-    .attr('y', d => d.r + 12)
+    .attr('y', d => d.r + 10)
     .attr('text-anchor', 'middle')
     .attr('fill', textCol)
-    .attr('font-size', 10)
+    .attr('font-size', 9)
     .attr('font-family', "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif")
     .text(d => truncate(d.label, 18));
 
@@ -514,7 +538,7 @@ function renderGraph() {
       .attr('y1', d => d.source.y)
       .attr('x2', d => d.target.x)
       .attr('y2', d => d.target.y);
-    nodeSel.attr('transform', d => `translate(${clamp(d.x, d.r, W - d.r)},${clamp(d.y, d.r, H - d.r)})`);
+    nodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
   });
 
   renderGraphTags(notes);
@@ -576,6 +600,15 @@ function truncate(s, max) {
 
 function noteNodeId(note) {
   return 'n_' + note.bookId + '_' + note.id;
+}
+
+function seedNodePositions(nodes, centerX, centerY, radius, angleOffset = 0) {
+  if (!nodes.length) return;
+  nodes.forEach((node, index) => {
+    const angle = angleOffset + (index / nodes.length) * Math.PI * 2;
+    node.x = centerX + Math.cos(angle) * radius;
+    node.y = centerY + Math.sin(angle) * radius;
+  });
 }
 </script>
 </body>
