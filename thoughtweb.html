@@ -335,16 +335,16 @@ input::placeholder { color: var(--hint); }
     <div class="entry-form">
       <div class="form-row">
         <div class="form-label">thought</div>
-        <textarea id="capture-text" placeholder="what's bugging you…" oninput="autoExpand(this)"></textarea>
+        <textarea id="capture-text" placeholder="what's on your mind.. ???" oninput="autoExpand(this)"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-label">tags — space or comma to add</div>
+        <input class="tags-input" type="text" id="tag-input" placeholder="#identity  #fear  #work">
+        <div class="live-tags" id="live-tags"></div>
       </div>
       <div class="form-row">
         <div class="form-label">when</div>
         <input type="datetime-local" id="capture-dt">
-      </div>
-      <div class="form-row" style="margin-bottom:4px;">
-        <div class="form-label">tags — space or comma to add</div>
-        <input class="tags-input" type="text" id="tag-input" placeholder="#identity  #fear  #work">
-        <div class="live-tags" id="live-tags"></div>
       </div>
       <button class="btn-save" onclick="saveEntry()">save</button>
     </div>
@@ -389,13 +389,13 @@ input::placeholder { color: var(--hint); }
       <textarea id="edit-text" rows="4" oninput="autoExpand(this)"></textarea>
     </div>
     <div class="form-row">
-      <div class="form-label">when</div>
-      <input type="datetime-local" id="edit-dt">
-    </div>
-    <div class="form-row" style="margin-bottom:8px;">
       <div class="form-label">tags</div>
       <input class="tags-input" type="text" id="edit-tag-input" placeholder="#add tags">
       <div class="live-tags" id="edit-live-tags"></div>
+    </div>
+    <div class="form-row" style="margin-bottom:8px;">
+      <div class="form-label">when</div>
+      <input type="datetime-local" id="edit-dt">
     </div>
     <button class="btn-save" onclick="saveEdit()">save changes</button>
   </div>
@@ -428,6 +428,7 @@ let currentFilter = 'all';
 let editingId = null;
 let editTags = [];
 let captureTags = [];
+const TAG_COLORS = ['#AFA9EC','#5DCAA5','#F0997B','#ED93B1','#85B7EB','#97C459','#EF9F27','#7F77DD','#1D9E75','#D85A30'];
 let graphFilter = null;
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
@@ -526,12 +527,15 @@ function addTagTo(arr, raw) {
   if (!arr.includes(tag)) arr.push(tag);
 }
 
-function renderLiveTags(containerId, tags, onChange) {
+function renderLiveTags(containerId, tags) {
   const wrap = document.getElementById(containerId);
   if (!wrap) return;
-  wrap.innerHTML = tags.map((t, i) =>
-    `<span class="tag-chip" onclick="removeTag('${containerId}',${i})">${esc(t)} ×</span>`
-  ).join('');
+  const allTags = getAllTags();
+  wrap.innerHTML = tags.map((t, i) => {
+    const idx = allTags.indexOf(t);
+    const color = idx !== -1 ? TAG_COLORS[idx % TAG_COLORS.length] : TAG_COLORS[allTags.length % TAG_COLORS.length];
+    return `<span class="tag-chip" style="background:${color}; color:#fff; border-color:${color};" onclick="removeTag('${containerId}',${i})">${esc(t)} ×</span>`;
+  }).join('');
 }
 
 function removeTag(containerId, i) {
@@ -547,14 +551,24 @@ function removeTag(containerId, i) {
 // ── ENTRIES LIST ───────────────────────────────────────────────────────────────
 function renderEntries() {
   const allTags = getAllTags();
+  const tagColorMap = {};
+  allTags.forEach((t, i) => tagColorMap[t] = TAG_COLORS[i % TAG_COLORS.length]);
+
   const fw = document.getElementById('filter-wrap');
   const fc = document.getElementById('filter-chips');
   if (allTags.length) {
     fw.style.display = 'block';
     const opts = ['all', ...allTags];
-    fc.innerHTML = opts.map(t =>
-      `<button class="tag-chip filter ${currentFilter === t ? 'active' : ''}" onclick="setFilter('${esc(t)}')">${esc(t)}</button>`
-    ).join('');
+    fc.innerHTML = opts.map(t => {
+      const isAll = t === 'all';
+      const isActive = currentFilter === t;
+      const color = isAll ? 'var(--muted)' : tagColorMap[t];
+      const style = !isAll ? `background: ${color}22; color: ${color}; border-color: ${color}44;` : '';
+      const activeStyle = `background: ${color}; color: #fff; border-color: ${color};`;
+      return `<button class="tag-chip filter ${isActive ? 'active' : ''}" 
+        style="${isActive ? activeStyle : style}"
+        onclick="setFilter('${esc(t)}')">${esc(t)}</button>`;
+    }).join('');
   } else {
     fw.style.display = 'none';
   }
@@ -570,7 +584,10 @@ function renderEntries() {
   empty.style.display = 'none';
 
   list.innerHTML = filtered.map(e => {
-    const tags = (e.tags || []).map(t => `<span class="entry-tag">${esc(t)}</span>`).join('');
+    const tags = (e.tags || []).map(t => {
+      const color = tagColorMap[t] || 'var(--purple)';
+      return `<span class="entry-tag" style="background:${color}; color:#fff; border-color:${color}; opacity:0.85;">${esc(t)}</span>`;
+    }).join('');
     return `<div class="entry-item">
       <div class="entry-body">${esc(e.text)}</div>
       <div class="entry-meta">
@@ -711,8 +728,6 @@ function renderGraph() {
   const surfaceCol = cs.getPropertyValue('--surface').trim() || '#fff';
   const borderMed = cs.getPropertyValue('--border-med').trim() || 'rgba(0,0,0,0.16)';
 
-  const TAG_COLORS = ['#AFA9EC','#5DCAA5','#F0997B','#ED93B1','#85B7EB','#97C459','#EF9F27','#7F77DD','#1D9E75','#D85A30'];
-
   const entriesToShow = graphFilter
     ? allEntries.filter(e => (e.tags || []).includes(graphFilter))
     : allEntries;
@@ -735,14 +750,14 @@ function renderGraph() {
   // Build nodes: each entry is a node; each tag is a node
   const entryNodes = entriesToShow.map(e => ({
     id: 'e_' + e.id, type: 'entry', entry: e,
-    r: 7 + Math.min((e.tags||[]).length * 2, 8)
+    r: 3 + Math.min((e.tags||[]).length, 4)
   }));
 
   const tagSet = new Set();
   entriesToShow.forEach(e => (e.tags||[]).forEach(t => tagSet.add(t)));
   const tagNodes = [...tagSet].map(t => ({
     id: 't_' + t, type: 'tag', tag: t,
-    r: 14 + allEntries.filter(e => (e.tags||[]).includes(t)).length * 1.5,
+    r: 6 + allEntries.filter(e => (e.tags||[]).includes(t)).length * 0.8,
     color: tagColorMap[t]
   }));
 
@@ -761,7 +776,7 @@ function renderGraph() {
     .force('link', d3.forceLink(links).id(d => d.id).distance(60).strength(0.6))
     .force('charge', d3.forceManyBody().strength(-120))
     .force('center', d3.forceCenter(W/2, H/2))
-    .force('collision', d3.forceCollide().radius(d => d.r + 5));
+    .force('collision', d3.forceCollide().radius(d => d.r + 3));
 
   const s = d3.select(svg).attr('viewBox', `0 0 ${W} ${H}`);
 
@@ -785,14 +800,9 @@ function renderGraph() {
       return tags.length ? tagColorMap[tags[0]] + '55' : purpleCol + '44';
     })
     .attr('stroke', d => d.type === 'tag' ? d.color : borderMed)
-    .attr('stroke-width', d => d.type === 'tag' ? 2 : 1);
+    .attr('stroke-width', d => d.type === 'tag' ? 1.5 : 1);
 
-  // tag labels
-  nodeSel.filter(d => d.type === 'tag').append('text')
-    .attr('text-anchor', 'middle').attr('dy', '0.35em')
-    .attr('font-size', 10).attr('font-family', '-apple-system, sans-serif')
-    .attr('fill', surfaceCol).attr('font-weight', '500')
-    .text(d => d.tag.replace('#',''));
+  // tag labels removed per user request
 
   // tooltip
   const tooltip = document.getElementById('tooltip');
@@ -832,14 +842,26 @@ function renderGraphTags(TAG_COLORS) {
   const allTags = getAllTags();
   const wrap = document.getElementById('graph-tags');
   if (!allTags.length) { wrap.innerHTML = '<span style="font-size:12px;color:var(--hint);font-family:-apple-system,sans-serif;">tags will appear here</span>'; return; }
-  wrap.innerHTML = ['all', ...allTags].map(t =>
-    `<button class="tag-chip filter ${graphFilter === t || (t === 'all' && !graphFilter) ? 'active' : ''}" onclick="setGraphFilter('${esc(t)}')">${esc(t)}</button>`
-  ).join('');
+  
+  const tagColorMap = {};
+  allTags.forEach((t, i) => tagColorMap[t] = TAG_COLORS[i % TAG_COLORS.length]);
+
+  wrap.innerHTML = ['all', ...allTags].map(t => {
+    const isAll = t === 'all';
+    const isActive = graphFilter === t || (isAll && !graphFilter);
+    const color = isAll ? 'var(--muted)' : tagColorMap[t];
+    const style = !isAll ? `background: ${color}22; color: ${color}; border-color: ${color}44;` : '';
+    const activeStyle = `background: ${color}; color: #fff; border-color: ${color};`;
+    
+    return `<button class="tag-chip filter ${isActive ? 'active' : ''}" 
+      style="${isActive ? activeStyle : style}"
+      onclick="setGraphFilter('${esc(t)}')">${esc(t)}</button>`;
+  }).join('');
 }
 
 function setGraphFilter(tag) {
   graphFilter = tag === 'all' ? null : tag;
-  document.getElementById('graph-info').textContent = graphFilter ? `showing #${graphFilter}` : 'tap a tag to filter · tap a node to peek';
+  document.getElementById('graph-info').textContent = graphFilter ? `showing ${graphFilter}` : 'tap a tag to filter · tap a node to peek';
   renderGraph();
 }
 
