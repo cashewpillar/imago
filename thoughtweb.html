@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>thoughtweb</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/3.2.4/dexie.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -244,50 +243,6 @@ input::placeholder { color: var(--hint); }
 
 .empty { text-align: center; padding: 2.5rem 1rem; color: var(--muted); font-size: 15px; line-height: 1.7; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 
-/* ── GRAPH SCREEN ── */
-#s-graph { flex-direction: column; overflow: hidden; }
-
-.graph-canvas-wrap { flex: 1; position: relative; overflow: hidden; }
-
-#graph-svg { width: 100%; height: 100%; display: block; }
-
-.graph-bottom {
-  background: var(--bg);
-  border-top: 0.5px solid var(--border);
-  padding: 0.75rem 1rem;
-}
-.graph-tag-row { display: flex; gap: 5px; flex-wrap: wrap; }
-.graph-info {
-  font-size: 12px; color: var(--muted);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  margin-bottom: 8px;
-  min-height: 18px;
-}
-
-/* Node tooltip */
-.tooltip {
-  position: absolute;
-  background: var(--surface);
-  border: 0.5px solid var(--border-med);
-  border-radius: var(--radius-sm);
-  padding: 10px 13px;
-  max-width: 240px;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.15s;
-  z-index: 20;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
-}
-.tooltip.visible { opacity: 1; }
-.tooltip-text {
-  font-size: 13px; line-height: 1.6; color: var(--text);
-  font-style: italic; margin-bottom: 6px;
-}
-.tooltip-date {
-  font-size: 11px; color: var(--hint);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-}
-
 /* Edit modal */
 .modal-overlay {
   display: none; position: fixed; inset: 0;
@@ -322,7 +277,7 @@ input::placeholder { color: var(--hint); }
     <span class="nav-title">thoughtweb</span>
     <div class="nav-tabs">
       <button class="nav-tab active" id="tab-notes" onclick="switchTab('notes')">notes</button>
-      <button class="nav-tab" id="tab-graph" onclick="switchTab('graph')">graph</button>
+      <button class="nav-tab" id="tab-graph" onclick="openThoughtGraph()">graph</button>
     </div>
     <button class="btn-ghost" onclick="toggleTheme()" title="toggle theme">◐</button>
     <button class="btn-ghost" style="font-size:12px;" onclick="showExportImport()" title="export / import">⇅</button>
@@ -357,21 +312,6 @@ input::placeholder { color: var(--hint); }
     <div id="entry-list"></div>
     <div id="entry-empty" class="empty" style="display:none;">
       No entries yet.<br>Write the first thought.
-    </div>
-  </div>
-
-  <!-- GRAPH SCREEN -->
-  <div id="s-graph" class="screen">
-    <div class="graph-canvas-wrap" id="graph-wrap">
-      <svg id="graph-svg"></svg>
-      <div class="tooltip" id="tooltip">
-        <div class="tooltip-text" id="tt-text"></div>
-        <div class="tooltip-date" id="tt-date"></div>
-      </div>
-    </div>
-    <div class="graph-bottom">
-      <div class="graph-info" id="graph-info">tap a tag to filter · tap a node to peek</div>
-      <div class="graph-tag-row" id="graph-tags"></div>
     </div>
   </div>
 
@@ -429,7 +369,6 @@ let editingId = null;
 let editTags = [];
 let captureTags = [];
 const TAG_COLORS = ['#AFA9EC','#5DCAA5','#F0997B','#ED93B1','#85B7EB','#97C459','#EF9F27','#7F77DD','#1D9E75','#D85A30'];
-let graphFilter = null;
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -442,7 +381,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function loadEntries() {
   allEntries = await db.entries.orderBy('dt').reverse().toArray();
   renderEntries();
-  if (document.getElementById('s-graph').classList.contains('active')) renderGraph();
 }
 
 // ── THEME ────────────────────────────────────────────────────────────────────
@@ -456,16 +394,22 @@ function toggleTheme() {
   document.body.classList.toggle('dark-mode', !isDark);
   document.body.classList.toggle('light-mode', isDark);
   localStorage.setItem('tw-theme', isDark ? 'light' : 'dark');
-  if (document.getElementById('s-graph').classList.contains('active')) renderGraph();
 }
 
 // ── TABS ─────────────────────────────────────────────────────────────────────
 function switchTab(tab) {
+  if (tab === 'graph') {
+    openThoughtGraph();
+    return;
+  }
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
   document.getElementById('s-' + tab).classList.add('active');
   document.getElementById('tab-' + tab).classList.add('active');
-  if (tab === 'graph') renderGraph();
+}
+
+function openThoughtGraph() {
+  window.location.href = 'thoughtgraph.html';
 }
 
 // ── CAPTURE ───────────────────────────────────────────────────────────────────
@@ -711,162 +655,7 @@ async function doImport(event) {
   event.target.value = '';
 }
 
-// ── GRAPH ─────────────────────────────────────────────────────────────────────
-function renderGraph() {
-  const wrap = document.getElementById('graph-wrap');
-  const svg = document.getElementById('graph-svg');
-  svg.innerHTML = '';
-
-  const W = wrap.clientWidth || 360;
-  const H = wrap.clientHeight || 500;
-
-  // compute --purple from computed style
-  const cs = getComputedStyle(document.body);
-  const purpleCol = cs.getPropertyValue('--purple').trim() || '#7F77DD';
-  const textCol = cs.getPropertyValue('--text').trim() || '#1a1a18';
-  const mutedCol = cs.getPropertyValue('--muted').trim() || '#6b6b67';
-  const surfaceCol = cs.getPropertyValue('--surface').trim() || '#fff';
-  const borderMed = cs.getPropertyValue('--border-med').trim() || 'rgba(0,0,0,0.16)';
-
-  const entriesToShow = graphFilter
-    ? allEntries.filter(e => (e.tags || []).includes(graphFilter))
-    : allEntries;
-
-  if (!entriesToShow.length) {
-    // empty state
-    const s = d3.select(svg).attr('viewBox', `0 0 ${W} ${H}`);
-    s.append('text').attr('x', W/2).attr('y', H/2)
-      .attr('text-anchor','middle').attr('fill', mutedCol)
-      .attr('font-size', 14).attr('font-family', '-apple-system, sans-serif')
-      .text('no entries yet');
-    renderGraphTags(TAG_COLORS);
-    return;
-  }
-
-  const allTags = getAllTags();
-  const tagColorMap = {};
-  allTags.forEach((t, i) => tagColorMap[t] = TAG_COLORS[i % TAG_COLORS.length]);
-
-  // Build nodes: each entry is a node; each tag is a node
-  const entryNodes = entriesToShow.map(e => ({
-    id: 'e_' + e.id, type: 'entry', entry: e,
-    r: 3 + Math.min((e.tags||[]).length, 4)
-  }));
-
-  const tagSet = new Set();
-  entriesToShow.forEach(e => (e.tags||[]).forEach(t => tagSet.add(t)));
-  const tagNodes = [...tagSet].map(t => ({
-    id: 't_' + t, type: 'tag', tag: t,
-    r: 6 + allEntries.filter(e => (e.tags||[]).includes(t)).length * 0.8,
-    color: tagColorMap[t]
-  }));
-
-  const nodes = [...tagNodes, ...entryNodes];
-
-  // links: entry → its tags
-  const links = [];
-  entriesToShow.forEach(e => {
-    (e.tags||[]).forEach(t => {
-      if (tagSet.has(t)) links.push({ source: 'e_' + e.id, target: 't_' + t });
-    });
-  });
-
-  // D3 simulation
-  const sim = d3.forceSimulation(nodes)
-    .force('link', d3.forceLink(links).id(d => d.id).distance(60).strength(0.6))
-    .force('charge', d3.forceManyBody().strength(-120))
-    .force('center', d3.forceCenter(W/2, H/2))
-    .force('collision', d3.forceCollide().radius(d => d.r + 3));
-
-  const s = d3.select(svg).attr('viewBox', `0 0 ${W} ${H}`);
-
-  const linkSel = s.append('g').selectAll('line').data(links).join('line')
-    .attr('stroke', borderMed).attr('stroke-width', 1).attr('opacity', 0.5);
-
-  const nodeSel = s.append('g').selectAll('g').data(nodes).join('g')
-    .style('cursor', 'pointer')
-    .call(d3.drag()
-      .on('start', (event, d) => { if (!event.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
-      .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
-      .on('end', (event, d) => { if (!event.active) sim.alphaTarget(0); d.fx = null; d.fy = null; })
-    );
-
-  // circles
-  nodeSel.append('circle')
-    .attr('r', d => d.r)
-    .attr('fill', d => {
-      if (d.type === 'tag') return d.color;
-      const tags = d.entry.tags || [];
-      return tags.length ? tagColorMap[tags[0]] + '55' : purpleCol + '44';
-    })
-    .attr('stroke', d => d.type === 'tag' ? d.color : borderMed)
-    .attr('stroke-width', d => d.type === 'tag' ? 1.5 : 1);
-
-  // tag labels removed per user request
-
-  // tooltip
-  const tooltip = document.getElementById('tooltip');
-  nodeSel.filter(d => d.type === 'entry')
-    .on('pointerenter', (event, d) => {
-      const rect = wrap.getBoundingClientRect();
-      document.getElementById('tt-text').textContent = d.entry.text.slice(0, 120) + (d.entry.text.length > 120 ? '…' : '');
-      document.getElementById('tt-date').textContent = fmtDt(d.entry.dt);
-      const x = event.clientX - rect.left;
-      const y = event.clientY - rect.top;
-      tooltip.style.left = Math.min(x + 12, W - 260) + 'px';
-      tooltip.style.top = Math.max(y - 60, 4) + 'px';
-      tooltip.classList.add('visible');
-    })
-    .on('pointerleave', () => tooltip.classList.remove('visible'));
-
-  nodeSel.filter(d => d.type === 'tag')
-    .on('pointerenter', (event, d) => {
-      const count = allEntries.filter(e => (e.tags||[]).includes(d.tag)).length;
-      document.getElementById('graph-info').textContent = `${d.tag} — ${count} entr${count === 1 ? 'y' : 'ies'}`;
-    })
-    .on('pointerleave', () => {
-      document.getElementById('graph-info').textContent = 'tap a tag to filter · tap a node to peek';
-    });
-
-  sim.on('tick', () => {
-    linkSel
-      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
-      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
-    nodeSel.attr('transform', d => `translate(${clamp(d.x, d.r, W-d.r)},${clamp(d.y, d.r, H-d.r)})`);
-  });
-
-  renderGraphTags(TAG_COLORS);
-}
-
-function renderGraphTags(TAG_COLORS) {
-  const allTags = getAllTags();
-  const wrap = document.getElementById('graph-tags');
-  if (!allTags.length) { wrap.innerHTML = '<span style="font-size:12px;color:var(--hint);font-family:-apple-system,sans-serif;">tags will appear here</span>'; return; }
-  
-  const tagColorMap = {};
-  allTags.forEach((t, i) => tagColorMap[t] = TAG_COLORS[i % TAG_COLORS.length]);
-
-  wrap.innerHTML = ['all', ...allTags].map(t => {
-    const isAll = t === 'all';
-    const isActive = graphFilter === t || (isAll && !graphFilter);
-    const color = isAll ? 'var(--muted)' : tagColorMap[t];
-    const style = !isAll ? `background: ${color}22; color: ${color}; border-color: ${color}44;` : '';
-    const activeStyle = `background: ${color}; color: #fff; border-color: ${color};`;
-    
-    return `<button class="tag-chip filter ${isActive ? 'active' : ''}" 
-      style="${isActive ? activeStyle : style}"
-      onclick="setGraphFilter('${esc(t)}')">${esc(t)}</button>`;
-  }).join('');
-}
-
-function setGraphFilter(tag) {
-  graphFilter = tag === 'all' ? null : tag;
-  document.getElementById('graph-info').textContent = graphFilter ? `showing ${graphFilter}` : 'tap a tag to filter · tap a node to peek';
-  renderGraph();
-}
-
 // ── UTILS ─────────────────────────────────────────────────────────────────────
-function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 
 function fmtDt(ts) {
   const d = new Date(ts);

@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>thought graph</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/3.2.4/dexie.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f7f6f2;
+    --surface: #ffffff;
+    --surface2: #f0efe9;
+    --text: #1a1a18;
+    --muted: #6b6b67;
+    --hint: #a0a09b;
+    --border: rgba(0,0,0,0.09);
+    --border-med: rgba(0,0,0,0.16);
+    --radius: 12px;
+    --radius-sm: 8px;
+    --purple: #7F77DD;
+  }
+
+  body.dark-mode {
+    --bg: #1a1a18;
+    --surface: #232321;
+    --surface2: #2a2a28;
+    --text: #f0efe9;
+    --muted: #a0a09b;
+    --hint: #6b6b67;
+    --border: rgba(255,255,255,0.07);
+    --border-med: rgba(255,255,255,0.13);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body:not(.light-mode) {
+      --bg: #1a1a18;
+      --surface: #232321;
+      --surface2: #2a2a28;
+      --text: #f0efe9;
+      --muted: #a0a09b;
+      --hint: #6b6b67;
+      --border: rgba(255,255,255,0.07);
+      --border-med: rgba(255,255,255,0.13);
+    }
+  }
+
+  body {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    transition: background 0.2s, color 0.2s;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .app {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .nav {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0.9rem 1rem 0.75rem;
+    border-bottom: 0.5px solid var(--border);
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .nav-title { flex: 1; min-width: 0; }
+  .nav-title h1 {
+    font-size: 18px;
+    font-weight: normal;
+    letter-spacing: -0.3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .nav-sub {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    margin-top: 2px;
+  }
+
+  .btn-ghost {
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 14px;
+    padding: 6px 4px;
+    cursor: pointer;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  .graph-screen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .graph-top {
+    position: sticky;
+    top: 0;
+    z-index: 9;
+    background: var(--bg);
+    border-bottom: 0.5px solid var(--border);
+    padding: 0.7rem 1rem 0.75rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .graph-top-copy { flex: 1; min-width: 0; }
+
+  .graph-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    margin: 10px;
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: 16px;
+    box-shadow: inset 0 0 0 1px rgba(127,119,221,0.04);
+    touch-action: none;
+  }
+
+  #graph-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    background:
+      radial-gradient(circle at center, rgba(127,119,221,0.05), transparent 55%),
+      linear-gradient(var(--surface), var(--surface));
+    touch-action: none;
+  }
+
+  .graph-info {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 18px;
+  }
+
+  .tag-sidebar-wrap {
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .tag-toggle {
+    border: 0.5px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    cursor: pointer;
+  }
+
+  .tag-sidebar {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: min(240px, 68vw);
+    max-height: 52vh;
+    overflow: auto;
+    background: var(--surface);
+    border: 0.5px solid var(--border-med);
+    border-radius: var(--radius);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+    padding: 10px;
+    display: none;
+  }
+
+  .tag-sidebar.open { display: block; }
+
+  .tag-sidebar-empty {
+    font-size: 12px;
+    color: var(--hint);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    line-height: 1.5;
+    padding: 6px 4px;
+  }
+
+  .graph-tag-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .tag-chip {
+    font-size: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 0.5px solid var(--border);
+    background: var(--surface2);
+    color: var(--muted);
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+  }
+
+  .sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.28);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+    z-index: 30;
+  }
+
+  .sheet-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .detail-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--surface);
+    border-top-left-radius: 18px;
+    border-top-right-radius: 18px;
+    border-top: 0.5px solid var(--border-med);
+    box-shadow: 0 -10px 30px rgba(0,0,0,0.12);
+    transform: translateY(100%);
+    transition: transform 0.22s ease;
+    z-index: 31;
+    max-height: min(70vh, 520px);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .detail-sheet.open { transform: translateY(0); }
+
+  .sheet-handle {
+    width: 38px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--border-med);
+    margin: 10px auto 8px;
+    flex-shrink: 0;
+  }
+
+  .sheet-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 0 14px 10px;
+    border-bottom: 0.5px solid var(--border);
+  }
+
+  .sheet-head-copy { flex: 1; min-width: 0; }
+
+  .sheet-meta {
+    font-size: 11px;
+    color: var(--hint);
+    line-height: 1.5;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  .sheet-close {
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 20px;
+    line-height: 1;
+    padding: 2px 4px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .sheet-body {
+    overflow: auto;
+    padding: 14px;
+  }
+
+  .sheet-text {
+    font-size: 16px;
+    line-height: 1.75;
+    color: var(--text);
+    font-style: italic;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="nav">
+    <button class="btn-ghost" onclick="goBack()">← back</button>
+    <div class="nav-title">
+      <h1 id="book-title">thought graph</h1>
+      <div class="nav-sub" id="book-meta">loading…</div>
+    </div>
+    <button class="btn-ghost" onclick="toggleTheme()" title="Toggle theme">◐</button>
+  </div>
+
+  <div class="graph-screen">
+    <div class="graph-top">
+      <div class="graph-top-copy">
+        <div class="graph-info" id="graph-info"></div>
+      </div>
+      <div class="tag-sidebar-wrap">
+        <button class="tag-toggle" id="tag-toggle" onclick="toggleTagSidebar()">tags</button>
+        <div class="tag-sidebar" id="tag-sidebar">
+          <div class="graph-tag-list" id="graph-tags"></div>
+        </div>
+      </div>
+    </div>
+    <div class="graph-wrap" id="graph-wrap">
+      <svg id="graph-svg"></svg>
+    </div>
+  </div>
+</div>
+<div class="sheet-backdrop" id="sheet-backdrop" onclick="closeDetailSheet()"></div>
+<div class="detail-sheet" id="detail-sheet" aria-hidden="true">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head">
+    <div class="sheet-head-copy">
+      <div class="sheet-meta" id="sheet-meta"></div>
+    </div>
+    <button class="sheet-close" onclick="closeDetailSheet()" aria-label="Close">×</button>
+  </div>
+  <div class="sheet-body">
+    <div class="sheet-text" id="sheet-text"></div>
+  </div>
+</div>
+
+<script>
+const TAG_COLORS = ['#AFA9EC','#5DCAA5','#F0997B','#ED93B1','#85B7EB','#97C459','#EF9F27','#7F77DD','#1D9E75','#D85A30'];
+const BASE_NODE_RADIUS = 2.6;
+
+const db = new Dexie('thoughtweb');
+db.version(1).stores({ entries: '++id, dt, *tags' });
+
+let allEntries = [];
+let graphFilter = null;
+let tagSidebarOpen = false;
+let activeNoteId = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+  initTheme();
+  await loadState();
+  renderHeader();
+  renderGraph();
+  window.addEventListener('resize', renderGraph);
+});
+
+async function loadState() {
+  allEntries = await db.entries.orderBy('dt').reverse().toArray();
+}
+
+function initTheme() {
+  const t = localStorage.getItem('tw-theme');
+  if (t === 'dark') document.body.classList.add('dark-mode');
+  else if (t === 'light') document.body.classList.add('light-mode');
+}
+
+function toggleTheme() {
+  const isDark = document.body.classList.contains('dark-mode');
+  const isLight = document.body.classList.contains('light-mode');
+  const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  document.body.classList.remove('dark-mode', 'light-mode');
+  if (isDark) {
+    document.body.classList.add('light-mode');
+    localStorage.setItem('tw-theme', 'light');
+  } else if (isLight) {
+    document.body.classList.add('dark-mode');
+    localStorage.setItem('tw-theme', 'dark');
+  } else {
+    document.body.classList.add(systemDark ? 'light-mode' : 'dark-mode');
+    localStorage.setItem('tw-theme', systemDark ? 'light' : 'dark');
+  }
+  renderGraph();
+}
+
+function defaultGraphInfo() {
+  if (graphFilter) return `showing ${graphFilter}`;
+  return '';
+}
+
+function toggleTagSidebar(force) {
+  tagSidebarOpen = typeof force === 'boolean' ? force : !tagSidebarOpen;
+  const sidebar = document.getElementById('tag-sidebar');
+  if (sidebar) sidebar.classList.toggle('open', tagSidebarOpen);
+}
+
+function goBack() {
+  window.location.href = 'thoughtweb.html';
+}
+
+function renderHeader() {
+  const title = document.getElementById('book-title');
+  const meta = document.getElementById('book-meta');
+  const notes = getGraphNotes();
+  title.textContent = 'thought graph';
+  meta.textContent = notes.length ? `${notes.length} tagged entr${notes.length === 1 ? 'y' : 'ies'}` : 'no tagged entries yet';
+}
+
+function getGraphNotes() {
+  return allEntries
+    .map(entry => {
+      const tags = (entry.tags || []).filter(Boolean);
+      if (!tags.length) return null;
+      return {
+        id: entry.id,
+        text: entry.text,
+        date: entry.dt,
+        tags
+      };
+    })
+    .filter(Boolean);
+}
+
+function getAllTags(notes) {
+  const set = new Set();
+  notes.forEach(note => (note.tags || []).forEach(tag => set.add(tag)));
+  return [...set].sort();
+}
+
+function renderGraph() {
+  const wrap = document.getElementById('graph-wrap');
+  const svg = document.getElementById('graph-svg');
+  const notes = getGraphNotes();
+  svg.innerHTML = '';
+
+  const W = wrap.clientWidth || 360;
+  const H = wrap.clientHeight || 540;
+  const centerX = W / 2;
+  const centerY = H / 2;
+  const minDim = Math.min(W, H);
+  const cs = getComputedStyle(document.body);
+  const purpleCol = cs.getPropertyValue('--purple').trim() || '#7F77DD';
+  const mutedCol = cs.getPropertyValue('--muted').trim() || '#6b6b67';
+  const borderMed = cs.getPropertyValue('--border-med').trim() || 'rgba(0,0,0,0.16)';
+
+  const shownNotes = notes.filter(note => !graphFilter || note.tags.includes(graphFilter));
+
+  if (!shownNotes.length) {
+    const s = d3.select(svg).attr('viewBox', `0 0 ${W} ${H}`);
+    s.append('text')
+      .attr('x', W / 2)
+      .attr('y', H / 2)
+      .attr('text-anchor', 'middle')
+      .attr('fill', mutedCol)
+      .attr('font-size', 14)
+      .attr('font-family', '-apple-system, sans-serif')
+      .text(notes.length ? 'no tagged entries match this filter' : 'no tagged entries yet');
+    renderGraphTags(notes);
+    return;
+  }
+
+  const allTags = getAllTags(notes);
+  const tagColorMap = {};
+  allTags.forEach((tag, i) => { tagColorMap[tag] = TAG_COLORS[i % TAG_COLORS.length]; });
+
+  const noteNodes = shownNotes.map(note => ({
+    id: noteNodeId(note),
+    type: 'note',
+    note,
+    r: BASE_NODE_RADIUS
+  }));
+
+  const tagSet = new Set();
+  shownNotes.forEach(note => note.tags.forEach(tag => tagSet.add(tag)));
+  const tagNodes = [...tagSet].map(tag => ({
+    id: 't_' + tag,
+    type: 'tag',
+    tag,
+    r: BASE_NODE_RADIUS + Math.min(17, Math.sqrt(notes.filter(note => note.tags.includes(tag)).length - 1) * 2.1),
+    color: tagColorMap[tag]
+  }));
+
+  const nodes = [...tagNodes, ...noteNodes];
+  seedNodePositions(tagNodes, centerX, centerY, minDim * 0.2, Math.PI / 7);
+  seedNodePositions(noteNodes, centerX, centerY, minDim * 0.08);
+
+  const links = [];
+  shownNotes.forEach(note => {
+    note.tags.forEach(tag => {
+      if (tagSet.has(tag)) links.push({ source: noteNodeId(note), target: 't_' + tag });
+    });
+  });
+
+  const sim = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links).id(d => d.id).distance(42).strength(0.5))
+    .force('charge', d3.forceManyBody().strength(d => d.type === 'note' ? -28 : -85))
+    .force('x', d3.forceX(centerX).strength(d => d.type === 'note' ? 0.018 : 0.04))
+    .force('y', d3.forceY(centerY).strength(d => d.type === 'note' ? 0.018 : 0.04))
+    .force('radial', d3.forceRadial(d => d.type === 'tag' ? minDim * 0.2 : minDim * 0.08, centerX, centerY).strength(d => d.type === 'note' ? 0.03 : 0.08))
+    .force('collision', d3.forceCollide().radius(d => d.r + (d.type === 'note' ? 2.5 : 5)));
+
+  const s = d3.select(svg).attr('viewBox', `0 0 ${W} ${H}`);
+  const zoomLayer = s.append('g');
+  s.call(
+    d3.zoom()
+      .scaleExtent([0.45, 2.5])
+      .on('zoom', event => {
+        zoomLayer.attr('transform', event.transform);
+      })
+  );
+
+  const linkSel = zoomLayer.append('g').selectAll('line').data(links).join('line')
+    .attr('stroke', borderMed)
+    .attr('stroke-width', 0.8)
+    .attr('opacity', 0.5);
+
+  const nodeSel = zoomLayer.append('g').selectAll('g').data(nodes).join('g')
+    .style('cursor', 'pointer')
+    .call(d3.drag()
+      .on('start', (event, d) => {
+        if (!event.active) sim.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+      })
+      .on('drag', (event, d) => {
+        d.fx = event.x;
+        d.fy = event.y;
+      })
+      .on('end', (event, d) => {
+        if (!event.active) sim.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+      }));
+
+  nodeSel.append('circle')
+    .attr('r', d => d.r)
+    .attr('fill', d => d.type === 'tag' ? d.color : ((d.note.tags || []).length ? tagColorMap[d.note.tags[0]] + '55' : purpleCol + '44'))
+    .attr('stroke', d => d.type === 'tag' ? d.color : borderMed)
+    .attr('stroke-width', d => d.type === 'tag' ? 1.5 : 1);
+
+  nodeSel.filter(d => d.type === 'note')
+    .on('click', (event, d) => {
+      event.stopPropagation();
+      activeNoteId = d.id;
+      openDetailSheet(d.note);
+    });
+
+  nodeSel.filter(d => d.type === 'tag')
+    .on('pointerenter', (event, d) => {
+      const count = notes.filter(note => note.tags.includes(d.tag)).length;
+      document.getElementById('graph-info').textContent = `${d.tag} — ${count} entr${count === 1 ? 'y' : 'ies'}`;
+    })
+    .on('pointerleave', () => {
+      document.getElementById('graph-info').textContent = defaultGraphInfo();
+    })
+    .on('click', (event, d) => {
+      event.stopPropagation();
+      setGraphFilter(d.tag);
+    });
+
+  sim.on('tick', () => {
+    linkSel
+      .attr('x1', d => d.source.x)
+      .attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x)
+      .attr('y2', d => d.target.y);
+    nodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
+  });
+
+  renderGraphTags(notes);
+  document.getElementById('graph-info').textContent = defaultGraphInfo();
+}
+
+function renderGraphTags(notes) {
+  const allTags = getAllTags(notes);
+  const wrap = document.getElementById('graph-tags');
+  if (!allTags.length) {
+    wrap.innerHTML = '<div class="tag-sidebar-empty">tags will appear here once you add some</div>';
+    return;
+  }
+
+  const tagColorMap = {};
+  allTags.forEach((tag, i) => { tagColorMap[tag] = TAG_COLORS[i % TAG_COLORS.length]; });
+
+  wrap.innerHTML = ['all', ...allTags].map(tag => {
+    const isAll = tag === 'all';
+    const isActive = graphFilter === tag || (isAll && !graphFilter);
+    const color = isAll ? 'var(--muted)' : tagColorMap[tag];
+    const style = !isAll ? `background:${color}22;color:${color};border-color:${color}44;` : '';
+    const activeStyle = `background:${color};color:#fff;border-color:${color};`;
+    return `<button class="tag-chip" style="${isActive ? activeStyle : style}" onclick="setGraphFilter('${esc(tag)}')">${esc(tag)}</button>`;
+  }).join('');
+}
+
+function setGraphFilter(tag) {
+  graphFilter = tag === 'all' ? null : tag;
+  closeDetailSheet();
+  toggleTagSidebar(false);
+  renderGraph();
+}
+
+function relDate(ts) {
+  const d = Math.floor((Date.now() - ts) / 86400000);
+  if (d === 0) return 'today';
+  if (d === 1) return 'yesterday';
+  if (d < 7) return d + 'd ago';
+  if (d < 30) return Math.floor(d / 7) + 'w ago';
+  return Math.floor(d / 30) + 'mo ago';
+}
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function noteNodeId(note) {
+  return 'n_' + note.id;
+}
+
+function openDetailSheet(note) {
+  document.getElementById('sheet-text').textContent = note.text || '';
+  document.getElementById('sheet-meta').textContent = relDate(note.date);
+  document.getElementById('sheet-backdrop').classList.add('open');
+  const sheet = document.getElementById('detail-sheet');
+  sheet.classList.add('open');
+  sheet.setAttribute('aria-hidden', 'false');
+}
+
+function closeDetailSheet() {
+  activeNoteId = null;
+  document.getElementById('sheet-backdrop').classList.remove('open');
+  const sheet = document.getElementById('detail-sheet');
+  sheet.classList.remove('open');
+  sheet.setAttribute('aria-hidden', 'true');
+}
+
+function seedNodePositions(nodes, centerX, centerY, radius, angleOffset = 0) {
+  if (!nodes.length) return;
+  nodes.forEach((node, index) => {
+    const angle = angleOffset + (index / nodes.length) * Math.PI * 2;
+    node.x = centerX + Math.cos(angle) * radius;
+    node.y = centerY + Math.sin(angle) * radius;
+  });
+}
+
+document.addEventListener('click', event => {
+  const sidebar = document.getElementById('tag-sidebar');
+  const toggle = document.getElementById('tag-toggle');
+  if (!sidebar || !toggle || !tagSidebarOpen) return;
+  if (sidebar.contains(event.target) || toggle.contains(event.target)) return;
+  toggleTagSidebar(false);
+});
+</script>
+</body>
+</html>
