@@ -171,6 +171,60 @@ input::placeholder { color: var(--hint); }
 
 .live-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; min-height: 20px; }
 
+.custom-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.custom-field-card {
+  border: 0.5px solid var(--border);
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+}
+
+.custom-field-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.custom-field-name {
+  font-size: 12px;
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  text-transform: lowercase;
+}
+
+.custom-field-meta {
+  font-size: 10px;
+  color: var(--hint);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.field-empty {
+  font-size: 12px;
+  color: var(--hint);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.field-chip {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border-med);
+}
+
+.field-value-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
 .tag-chip {
   font-size: 12px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -202,6 +256,15 @@ input::placeholder { color: var(--hint); }
 }
 .btn-save:hover { opacity: 0.82; }
 .btn-save:active { transform: scale(0.99); }
+
+.btn-inline {
+  border: none;
+  background: transparent;
+  color: var(--purple);
+  font-size: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  cursor: pointer;
+}
 
 .divider { height: 0.5px; background: var(--border); margin: 1rem 0; }
 
@@ -298,6 +361,14 @@ input::placeholder { color: var(--hint); }
         <div class="live-tags" id="live-tags"></div>
       </div>
       <div class="form-row">
+        <div class="custom-field-head" style="margin-bottom:0;">
+          <div class="form-label" style="margin-bottom:0;flex:1;">custom fields</div>
+          <button class="btn-inline" onclick="addCustomField()">+ field</button>
+        </div>
+        <div class="custom-fields" id="capture-custom-fields"></div>
+        <div class="field-empty" id="capture-fields-empty" style="display:none;margin-top:8px;">No custom fields yet. Add up to 7 for structured tags.</div>
+      </div>
+      <div class="form-row">
         <div class="form-label">when</div>
         <input type="datetime-local" id="capture-dt">
       </div>
@@ -333,6 +404,11 @@ input::placeholder { color: var(--hint); }
       <input class="tags-input" type="text" id="edit-tag-input" placeholder="#add tags">
       <div class="live-tags" id="edit-live-tags"></div>
     </div>
+    <div class="form-row">
+      <div class="form-label">custom fields</div>
+      <div class="custom-fields" id="edit-custom-fields"></div>
+      <div class="field-empty" id="edit-fields-empty" style="display:none;margin-top:8px;">No custom fields defined.</div>
+    </div>
     <div class="form-row" style="margin-bottom:8px;">
       <div class="form-label">when</div>
       <input type="datetime-local" id="edit-dt">
@@ -361,6 +437,10 @@ input::placeholder { color: var(--hint); }
 // ── DB ──────────────────────────────────────────────────────────────────────
 const db = new Dexie('thoughtweb');
 db.version(1).stores({ entries: '++id, dt, *tags' });
+db.version(2).stores({
+  entries: '++id, dt, *tags',
+  fields: 'id, name, shape, order'
+});
 
 // ── STATE ───────────────────────────────────────────────────────────────────
 let allEntries = [];
@@ -368,13 +448,21 @@ let currentFilter = 'all';
 let editingId = null;
 let editTags = [];
 let captureTags = [];
+let customFieldDefs = [];
+let captureFieldValues = {};
+let editFieldValues = {};
 const TAG_COLORS = ['#AFA9EC','#5DCAA5','#F0997B','#ED93B1','#85B7EB','#97C459','#EF9F27','#7F77DD','#1D9E75','#D85A30'];
+const FIELD_SHAPES = ['teardrop', 'square', 'diamond', 'triangle', 'pentagon', 'star', 'asterisk'];
+const FIELD_STORAGE_KEY = 'thoughtweb_fields_v1';
+const MAX_CUSTOM_FIELDS = 7;
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   initTheme();
+  await loadFieldDefs();
   setDefaultDt('capture-dt');
   initTagInput('tag-input', () => captureTags, v => { captureTags = v; renderLiveTags('live-tags', captureTags, () => renderLiveTags('live-tags', captureTags)); });
+  renderCustomFieldSections('capture');
   await loadEntries();
 });
 
@@ -412,6 +500,96 @@ function openThoughtGraph() {
   window.location.href = 'thoughtgraph.html';
 }
 
+function loadLegacyFieldDefs() {
+  try {
+    const raw = localStorage.getItem(FIELD_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function normalizeFieldDefs(fields) {
+  return (fields || [])
+    .filter(field => field && field.id && field.name)
+    .map((field, index) => ({
+      id: field.id,
+      name: field.name,
+      shape: field.shape || FIELD_SHAPES[index] || FIELD_SHAPES[FIELD_SHAPES.length - 1],
+      order: Number.isFinite(field.order) ? field.order : index
+    }))
+    .sort((a, b) => a.order - b.order);
+}
+
+async function loadFieldDefs() {
+  const fieldCount = await db.fields.count();
+  if (fieldCount === 0) {
+    const legacyFields = normalizeFieldDefs(loadLegacyFieldDefs()).slice(0, MAX_CUSTOM_FIELDS);
+    if (legacyFields.length) await db.fields.bulkPut(legacyFields);
+  }
+  customFieldDefs = normalizeFieldDefs(await db.fields.orderBy('order').toArray());
+}
+
+async function saveFieldDefs() {
+  customFieldDefs = normalizeFieldDefs(customFieldDefs).map((field, index) => ({ ...field, order: index }));
+  await db.fields.bulkPut(customFieldDefs);
+}
+
+function getFieldShape() {
+  const used = new Set(customFieldDefs.map(field => field.shape));
+  return FIELD_SHAPES.find(shape => !used.has(shape)) || FIELD_SHAPES[FIELD_SHAPES.length - 1];
+}
+
+async function addCustomField() {
+  if (customFieldDefs.length >= MAX_CUSTOM_FIELDS) {
+    alert(`You can add up to ${MAX_CUSTOM_FIELDS} custom fields.`);
+    return;
+  }
+      const rawName = prompt('Field name?');
+  if (!rawName) return;
+  const name = rawName.trim();
+  if (!name) return;
+  const exists = customFieldDefs.some(field => field.name.toLowerCase() === name.toLowerCase());
+  if (exists) {
+    alert('That field already exists.');
+    return;
+  }
+  customFieldDefs.push({
+    id: `field_${Date.now()}_${customFieldDefs.length}`,
+    name,
+    shape: getFieldShape(),
+    order: customFieldDefs.length
+  });
+  await saveFieldDefs();
+  renderCustomFieldSections('capture');
+  renderCustomFieldSections('edit');
+  renderEntries();
+}
+
+async function removeCustomField(fieldId) {
+  const field = customFieldDefs.find(item => item.id === fieldId);
+  if (!field) return;
+  if (!confirm(`Remove "${field.name}" and its values from all entries?`)) return;
+
+  customFieldDefs = customFieldDefs.filter(item => item.id !== fieldId);
+  await saveFieldDefs();
+  await db.fields.delete(fieldId);
+  delete captureFieldValues[fieldId];
+  delete editFieldValues[fieldId];
+
+  const entries = await db.entries.toArray();
+  for (const entry of entries) {
+    if (!entry.customFields || !entry.customFields[fieldId]) continue;
+    const next = { ...(entry.customFields || {}) };
+    delete next[fieldId];
+    await db.entries.update(entry.id, { customFields: next });
+  }
+
+  await loadEntries();
+  renderCustomFieldSections('capture');
+  renderCustomFieldSections('edit');
+}
+
 // ── CAPTURE ───────────────────────────────────────────────────────────────────
 function setDefaultDt(id) {
   const now = new Date();
@@ -431,13 +609,16 @@ async function saveEntry() {
   const dt = dtVal ? new Date(dtVal).getTime() : Date.now();
   const pending = document.getElementById('tag-input').value.trim();
   if (pending) { addTagTo(captureTags, pending); document.getElementById('tag-input').value = ''; }
-  await db.entries.add({ text, dt, tags: [...captureTags] });
+  flushPendingFieldInputs('capture');
+  await db.entries.add({ text, dt, tags: [...captureTags], customFields: cloneFieldValues(captureFieldValues) });
   // reset
   document.getElementById('capture-text').value = '';
   document.getElementById('capture-text').style.height = 'auto';
   setDefaultDt('capture-dt');
   captureTags = [];
+  captureFieldValues = {};
   renderLiveTags('live-tags', captureTags);
+  renderCustomFieldSections('capture');
   await loadEntries();
 }
 
@@ -469,6 +650,101 @@ function initTagInput(inputId, getArr, setArr) {
 function addTagTo(arr, raw) {
   const tag = raw.startsWith('#') ? raw.toLowerCase() : ('#' + raw.toLowerCase());
   if (!arr.includes(tag)) arr.push(tag);
+}
+
+function normalizeFieldValue(raw) {
+  return raw.trim().toLowerCase();
+}
+
+function addFieldValue(valuesObj, fieldId, raw) {
+  const value = normalizeFieldValue(raw);
+  if (!value) return;
+  if (!valuesObj[fieldId]) valuesObj[fieldId] = [];
+  if (!valuesObj[fieldId].includes(value)) valuesObj[fieldId].push(value);
+}
+
+function removeFieldValue(scope, fieldId, index) {
+  const valuesObj = scope === 'capture' ? captureFieldValues : editFieldValues;
+  if (!valuesObj[fieldId]) return;
+  valuesObj[fieldId].splice(index, 1);
+  renderCustomFieldSections(scope);
+}
+
+function cloneFieldValues(valuesObj) {
+  const next = {};
+  Object.entries(valuesObj || {}).forEach(([fieldId, values]) => {
+    if (Array.isArray(values) && values.length) next[fieldId] = [...values];
+  });
+  return next;
+}
+
+function flushPendingFieldInputs(scope) {
+  customFieldDefs.forEach(field => {
+    const input = document.getElementById(`${scope}-field-input-${field.id}`);
+    if (!input) return;
+    const pending = input.value.trim();
+    if (!pending) return;
+    const valuesObj = scope === 'capture' ? captureFieldValues : editFieldValues;
+    addFieldValue(valuesObj, field.id, pending);
+    input.value = '';
+  });
+  renderCustomFieldSections(scope);
+}
+
+function renderCustomFieldSections(scope) {
+  const wrap = document.getElementById(`${scope}-custom-fields`);
+  const empty = document.getElementById(`${scope}-fields-empty`);
+  if (!wrap || !empty) return;
+  if (!customFieldDefs.length) {
+    wrap.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  const valuesObj = scope === 'capture' ? captureFieldValues : editFieldValues;
+  wrap.innerHTML = customFieldDefs.map(field => {
+    const values = valuesObj[field.id] || [];
+    return `<div class="custom-field-card">
+      <div class="custom-field-head">
+        <div style="flex:1;min-width:0;">
+          <div class="custom-field-name">${esc(field.name)}</div>
+          <div class="custom-field-meta">${esc(field.shape)}</div>
+        </div>
+        ${scope === 'capture' ? `<button class="btn-inline" onclick="removeCustomField('${field.id}')">remove</button>` : ''}
+      </div>
+      <input class="tags-input" type="text" id="${scope}-field-input-${field.id}" placeholder="add ${esc(field.name.toLowerCase())} values">
+      <div class="live-tags" id="${scope}-field-values-${field.id}">
+        ${values.map((value, index) => `<span class="tag-chip field-chip" onclick="removeFieldValue('${scope}','${field.id}',${index})">${esc(value)} ×</span>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+
+  customFieldDefs.forEach(field => {
+    const input = document.getElementById(`${scope}-field-input-${field.id}`);
+    if (!input) return;
+    input.addEventListener('input', event => {
+      const val = event.target.value;
+      const last = val[val.length - 1];
+      if (last === ' ' || last === ',') {
+        const raw = val.slice(0, -1).trim();
+        if (raw) {
+          const values = scope === 'capture' ? captureFieldValues : editFieldValues;
+          addFieldValue(values, field.id, raw);
+          renderCustomFieldSections(scope);
+        }
+        event.target.value = '';
+      }
+    });
+    input.addEventListener('keydown', event => {
+      if (event.key === 'Backspace' && event.target.value === '') {
+        const values = scope === 'capture' ? captureFieldValues : editFieldValues;
+        if ((values[field.id] || []).length) {
+          values[field.id].pop();
+          renderCustomFieldSections(scope);
+        }
+      }
+    });
+  });
 }
 
 function renderLiveTags(containerId, tags) {
@@ -532,10 +808,11 @@ function renderEntries() {
       const color = tagColorMap[t] || 'var(--purple)';
       return `<span class="entry-tag" style="background:${color}; color:#fff; border-color:${color}; opacity:0.85;">${esc(t)}</span>`;
     }).join('');
+    const customValues = renderEntryCustomValues(e.customFields || {});
     return `<div class="entry-item">
       <div class="entry-body">${esc(e.text)}</div>
       <div class="entry-meta">
-        ${tags}
+        ${tags}${customValues}
         <span>${fmtDt(e.dt)}</span>
         <span class="entry-actions">
           <button class="act-btn" onclick="openEdit(${e.id})">edit</button>
@@ -550,6 +827,17 @@ function getAllTags() {
   const set = new Set();
   allEntries.forEach(e => (e.tags || []).forEach(t => set.add(t)));
   return [...set].sort();
+}
+
+function renderEntryCustomValues(customFields) {
+  const parts = [];
+  customFieldDefs.forEach(field => {
+    const values = customFields[field.id] || [];
+    values.forEach(value => {
+      parts.push(`<span class="entry-tag" style="background:var(--surface2);color:var(--text);border-color:var(--border-med);">${esc(field.name)}: ${esc(value)}</span>`);
+    });
+  });
+  return parts.join('');
 }
 
 function setFilter(tag) {
@@ -569,6 +857,7 @@ function openEdit(id) {
   if (!e) return;
   editingId = id;
   editTags = [...(e.tags || [])];
+  editFieldValues = cloneFieldValues(e.customFields || {});
   document.getElementById('edit-text').value = e.text;
   autoExpand(document.getElementById('edit-text'));
   const d = new Date(e.dt);
@@ -576,6 +865,7 @@ function openEdit(id) {
   document.getElementById('edit-dt').value = d.toISOString().slice(0, 16);
   document.getElementById('edit-tag-input').value = '';
   renderLiveTags('edit-live-tags', editTags);
+  renderCustomFieldSections('edit');
   // init tag input for edit
   const el = document.getElementById('edit-tag-input');
   el.oninput = ev => {
@@ -599,6 +889,7 @@ function openEdit(id) {
 function closeModal() {
   document.getElementById('edit-modal').classList.remove('open');
   editingId = null;
+  editFieldValues = {};
 }
 
 async function saveEdit() {
@@ -606,9 +897,10 @@ async function saveEdit() {
   if (!text) return;
   const pending = document.getElementById('edit-tag-input').value.trim();
   if (pending) { addTagTo(editTags, pending); }
+  flushPendingFieldInputs('edit');
   const dtVal = document.getElementById('edit-dt').value;
   const dt = dtVal ? new Date(dtVal).getTime() : Date.now();
-  await db.entries.update(editingId, { text, dt, tags: [...editTags] });
+  await db.entries.update(editingId, { text, dt, tags: [...editTags], customFields: cloneFieldValues(editFieldValues) });
   closeModal();
   await loadEntries();
 }
@@ -620,7 +912,7 @@ function showExportImport() {
 
 async function doExport() {
   const data = await db.entries.toArray();
-  const blob = new Blob([JSON.stringify({ version: 1, entries: data }, null, 2)], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify({ version: 2, entries: data, fields: customFieldDefs }, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -638,6 +930,10 @@ async function doImport(event) {
       const data = JSON.parse(e.target.result);
       const entries = data.entries || data; // handle both formats
       if (!Array.isArray(entries)) throw new Error();
+      if (Array.isArray(data.fields)) {
+        customFieldDefs = mergeFieldDefs(customFieldDefs, data.fields);
+        await saveFieldDefs();
+      }
       let added = 0;
       for (const entry of entries) {
         const { id, ...rest } = entry; // strip id so Dexie auto-assigns
@@ -645,6 +941,8 @@ async function doImport(event) {
         added++;
       }
       document.getElementById('ei-modal').classList.remove('open');
+      renderCustomFieldSections('capture');
+      renderCustomFieldSections('edit');
       await loadEntries();
       alert(`Imported ${added} entries.`);
     } catch {
@@ -653,6 +951,23 @@ async function doImport(event) {
   };
   reader.readAsText(file);
   event.target.value = '';
+}
+
+function mergeFieldDefs(existing, incoming) {
+  const next = [...existing];
+  incoming.forEach(field => {
+    if (!field || !field.id || !field.name) return;
+    if (next.some(item => item.id === field.id)) return;
+    if (next.length >= MAX_CUSTOM_FIELDS) return;
+    const used = new Set(next.map(item => item.shape));
+    const shape = field.shape || FIELD_SHAPES.find(item => !used.has(item)) || FIELD_SHAPES[FIELD_SHAPES.length - 1];
+    next.push({
+      id: field.id,
+      name: field.name,
+      shape
+    });
+  });
+  return next;
 }
 
 // ── UTILS ─────────────────────────────────────────────────────────────────────

@@ -161,6 +161,24 @@
     flex-shrink: 0;
   }
 
+  .graph-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .graph-select {
+    border: 0.5px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    cursor: pointer;
+  }
+
   .tag-toggle {
     border: 0.5px solid var(--border);
     background: var(--surface);
@@ -176,8 +194,8 @@
     position: absolute;
     top: calc(100% + 8px);
     right: 0;
-    width: min(240px, 68vw);
-    max-height: 52vh;
+    width: min(260px, 72vw);
+    max-height: 58vh;
     overflow: auto;
     background: var(--surface);
     border: 0.5px solid var(--border-med);
@@ -189,12 +207,18 @@
 
   .tag-sidebar.open { display: block; }
 
-  .tag-sidebar-empty {
+  .tag-sidebar-empty,
+  .filter-group-title {
     font-size: 12px;
     color: var(--hint);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     line-height: 1.5;
-    padding: 6px 4px;
+  }
+
+  .filter-group-title {
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 10px 0 6px;
   }
 
   .graph-tag-list {
@@ -244,7 +268,7 @@
     transform: translateY(100%);
     transition: transform 0.22s ease;
     z-index: 31;
-    max-height: min(70vh, 520px);
+    max-height: min(78vh, 640px);
     display: flex;
     flex-direction: column;
   }
@@ -293,13 +317,111 @@
     padding: 14px;
   }
 
-  .sheet-text {
-    font-size: 16px;
-    line-height: 1.75;
+  .form-row { margin-bottom: 14px; }
+
+  .form-label {
+    font-size: 11px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--hint);
+    margin-bottom: 6px;
+  }
+
+  textarea,
+  input[type=text],
+  input[type=datetime-local] {
+    width: 100%;
+    font-size: 14px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    padding: 10px 12px;
+    border: 0.5px solid var(--border-med);
+    border-radius: var(--radius-sm);
+    background: var(--surface2);
     color: var(--text);
-    font-style: italic;
-    white-space: pre-wrap;
-    word-break: break-word;
+  }
+
+  textarea {
+    resize: none;
+    min-height: 110px;
+    line-height: 1.7;
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-size: 15px;
+  }
+
+  textarea:focus,
+  input:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(127,119,221,0.12);
+  }
+
+  .live-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 8px;
+    min-height: 20px;
+  }
+
+  .sheet-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 0.5px solid var(--border-med);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .custom-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 8px;
+  }
+
+  .custom-field-card {
+    border: 0.5px solid var(--border);
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    padding: 10px;
+  }
+
+  .custom-field-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .custom-field-name {
+    font-size: 12px;
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  .custom-field-meta {
+    font-size: 10px;
+    color: var(--hint);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .btn-save {
+    width: 100%;
+    padding: 12px;
+    background: var(--text);
+    color: var(--surface);
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    cursor: pointer;
   }
 </style>
 </head>
@@ -308,8 +430,8 @@
   <div class="nav">
     <button class="btn-ghost" onclick="goBack()">← back</button>
     <div class="nav-title">
-      <h1 id="book-title">thought graph</h1>
-      <div class="nav-sub" id="book-meta">loading…</div>
+      <h1 id="graph-title">thought graph</h1>
+      <div class="nav-sub" id="graph-meta">loading…</div>
     </div>
     <button class="btn-ghost" onclick="toggleTheme()" title="Toggle theme">◐</button>
   </div>
@@ -319,10 +441,17 @@
       <div class="graph-top-copy">
         <div class="graph-info" id="graph-info"></div>
       </div>
-      <div class="tag-sidebar-wrap">
-        <button class="tag-toggle" id="tag-toggle" onclick="toggleTagSidebar()">tags</button>
-        <div class="tag-sidebar" id="tag-sidebar">
-          <div class="graph-tag-list" id="graph-tags"></div>
+      <div class="graph-controls">
+        <select class="graph-select" id="density-select" onchange="setGraphDensity(this.value)" aria-label="Graph density">
+          <option value="tight">tight</option>
+          <option value="balanced">balanced</option>
+          <option value="loose">loose</option>
+        </select>
+        <div class="tag-sidebar-wrap">
+          <button class="tag-toggle" id="tag-toggle" onclick="toggleTagSidebar()">filters</button>
+          <div class="tag-sidebar" id="tag-sidebar">
+            <div class="graph-tag-list" id="graph-tags"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -331,6 +460,7 @@
     </div>
   </div>
 </div>
+
 <div class="sheet-backdrop" id="sheet-backdrop" onclick="closeDetailSheet()"></div>
 <div class="detail-sheet" id="detail-sheet" aria-hidden="true">
   <div class="sheet-handle"></div>
@@ -341,38 +471,150 @@
     <button class="sheet-close" onclick="closeDetailSheet()" aria-label="Close">×</button>
   </div>
   <div class="sheet-body">
-    <div class="sheet-text" id="sheet-text"></div>
+    <div class="form-row">
+      <div class="form-label">thought</div>
+      <textarea id="sheet-text" oninput="autoExpand(this)"></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-label">tags</div>
+      <input type="text" id="sheet-tag-input" placeholder="#identity  #fear  #work">
+      <div class="live-tags" id="sheet-tags"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-label">custom fields</div>
+      <div class="custom-fields" id="sheet-custom-fields"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-label">when</div>
+      <input type="datetime-local" id="sheet-dt">
+    </div>
+    <button class="btn-save" onclick="saveSheetEntry()">save changes</button>
   </div>
 </div>
 
 <script>
 const TAG_COLORS = ['#AFA9EC','#5DCAA5','#F0997B','#ED93B1','#85B7EB','#97C459','#EF9F27','#7F77DD','#1D9E75','#D85A30'];
+const FIELD_SHAPES = ['teardrop', 'square', 'diamond', 'triangle', 'pentagon', 'star', 'asterisk'];
+const FIELD_STORAGE_KEY = 'thoughtweb_fields_v1';
 const BASE_NODE_RADIUS = 2.6;
+const MAX_CUSTOM_FIELDS = 7;
+const GRAPH_DENSITY_KEY = 'thoughtgraph_density_v1';
+const GRAPH_DENSITY_PRESETS = {
+  tight: {
+    tagRadius: 0.18,
+    fieldRadius: 0.26,
+    noteRadius: 0.06,
+    linkDistance: 34,
+    noteCharge: -20,
+    groupCharge: -62,
+    noteForce: 0.024,
+    groupForce: 0.05,
+    noteRadialStrength: 0.04,
+    groupRadialStrength: 0.09,
+    collisionPadNote: 2,
+    collisionPadGroup: 4
+  },
+  balanced: {
+    tagRadius: 0.22,
+    fieldRadius: 0.32,
+    noteRadius: 0.08,
+    linkDistance: 42,
+    noteCharge: -28,
+    groupCharge: -85,
+    noteForce: 0.018,
+    groupForce: 0.04,
+    noteRadialStrength: 0.03,
+    groupRadialStrength: 0.08,
+    collisionPadNote: 2.5,
+    collisionPadGroup: 5
+  },
+  loose: {
+    tagRadius: 0.28,
+    fieldRadius: 0.4,
+    noteRadius: 0.11,
+    linkDistance: 52,
+    noteCharge: -38,
+    groupCharge: -112,
+    noteForce: 0.014,
+    groupForce: 0.032,
+    noteRadialStrength: 0.024,
+    groupRadialStrength: 0.06,
+    collisionPadNote: 3.5,
+    collisionPadGroup: 6.5
+  }
+};
 
 const db = new Dexie('thoughtweb');
 db.version(1).stores({ entries: '++id, dt, *tags' });
+db.version(2).stores({
+  entries: '++id, dt, *tags',
+  fields: 'id, name, shape, order'
+});
 
 let allEntries = [];
+let customFieldDefs = [];
 let graphFilter = null;
 let tagSidebarOpen = false;
 let activeNoteId = null;
+let sheetState = null;
+let graphDensity = 'balanced';
 
 document.addEventListener('DOMContentLoaded', async () => {
   initTheme();
-  await loadState();
+  loadGraphDensity();
+  await loadFieldDefs();
+  initSheetTagInput();
+  await loadEntries();
   renderHeader();
   renderGraph();
   window.addEventListener('resize', renderGraph);
 });
 
-async function loadState() {
+async function loadEntries() {
   allEntries = await db.entries.orderBy('dt').reverse().toArray();
+}
+
+function loadLegacyFieldDefs() {
+  try {
+    const raw = localStorage.getItem(FIELD_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function normalizeFieldDefs(fields) {
+  return (fields || [])
+    .filter(field => field && field.id && field.name)
+    .map((field, index) => ({
+      id: field.id,
+      name: field.name,
+      shape: field.shape || FIELD_SHAPES[index] || FIELD_SHAPES[FIELD_SHAPES.length - 1],
+      order: Number.isFinite(field.order) ? field.order : index
+    }))
+    .sort((a, b) => a.order - b.order);
+}
+
+async function loadFieldDefs() {
+  const fieldCount = await db.fields.count();
+  if (fieldCount === 0) {
+    const legacyFields = normalizeFieldDefs(loadLegacyFieldDefs()).slice(0, MAX_CUSTOM_FIELDS);
+    if (legacyFields.length) await db.fields.bulkPut(legacyFields);
+  }
+  customFieldDefs = normalizeFieldDefs(await db.fields.orderBy('order').toArray());
 }
 
 function initTheme() {
   const t = localStorage.getItem('tw-theme');
   if (t === 'dark') document.body.classList.add('dark-mode');
   else if (t === 'light') document.body.classList.add('light-mode');
+}
+
+function loadGraphDensity() {
+  const saved = localStorage.getItem(GRAPH_DENSITY_KEY);
+  graphDensity = GRAPH_DENSITY_PRESETS[saved] ? saved : 'balanced';
+  const select = document.getElementById('density-select');
+  if (select) select.value = graphDensity;
 }
 
 function toggleTheme() {
@@ -393,9 +635,21 @@ function toggleTheme() {
   renderGraph();
 }
 
+function goBack() {
+  window.location.href = 'thoughtweb.html';
+}
+
+function setGraphDensity(value) {
+  graphDensity = GRAPH_DENSITY_PRESETS[value] ? value : 'balanced';
+  localStorage.setItem(GRAPH_DENSITY_KEY, graphDensity);
+  renderGraph();
+}
+
 function defaultGraphInfo() {
-  if (graphFilter) return `showing ${graphFilter}`;
-  return '';
+  if (!graphFilter) return '';
+  if (graphFilter.kind === 'tag') return `showing ${graphFilter.value}`;
+  const field = customFieldDefs.find(item => item.id === graphFilter.fieldId);
+  return `showing ${field ? field.name : 'field'}: ${graphFilter.value}`;
 }
 
 function toggleTagSidebar(force) {
@@ -404,31 +658,37 @@ function toggleTagSidebar(force) {
   if (sidebar) sidebar.classList.toggle('open', tagSidebarOpen);
 }
 
-function goBack() {
-  window.location.href = 'thoughtweb.html';
-}
-
 function renderHeader() {
-  const title = document.getElementById('book-title');
-  const meta = document.getElementById('book-meta');
-  const notes = getGraphNotes();
-  title.textContent = 'thought graph';
-  meta.textContent = notes.length ? `${notes.length} tagged entr${notes.length === 1 ? 'y' : 'ies'}` : 'no tagged entries yet';
+  const notes = getGraphEntries();
+  document.getElementById('graph-title').textContent = 'thought graph';
+  document.getElementById('graph-meta').textContent = notes.length ? `${notes.length} tagged entr${notes.length === 1 ? 'y' : 'ies'}` : 'no tagged entries yet';
 }
 
-function getGraphNotes() {
+function getGraphEntries() {
   return allEntries
     .map(entry => {
       const tags = (entry.tags || []).filter(Boolean);
-      if (!tags.length) return null;
+      const customFields = normalizeCustomFields(entry.customFields || {});
+      const hasAnyFieldValues = Object.values(customFields).some(values => values.length);
+      if (!tags.length && !hasAnyFieldValues) return null;
       return {
         id: entry.id,
-        text: entry.text,
+        text: entry.text || '',
         date: entry.dt,
-        tags
+        tags,
+        customFields
       };
     })
     .filter(Boolean);
+}
+
+function normalizeCustomFields(valuesObj) {
+  const next = {};
+  customFieldDefs.forEach(field => {
+    const values = valuesObj[field.id];
+    if (Array.isArray(values) && values.length) next[field.id] = [...values];
+  });
+  return next;
 }
 
 function getAllTags(notes) {
@@ -437,10 +697,28 @@ function getAllTags(notes) {
   return [...set].sort();
 }
 
+function getFieldValueMap(notes) {
+  const map = {};
+  customFieldDefs.forEach(field => { map[field.id] = new Set(); });
+  notes.forEach(note => {
+    customFieldDefs.forEach(field => {
+      (note.customFields[field.id] || []).forEach(value => map[field.id].add(value));
+    });
+  });
+  return map;
+}
+
+function matchesFilter(note) {
+  if (!graphFilter) return true;
+  if (graphFilter.kind === 'tag') return (note.tags || []).includes(graphFilter.value);
+  return (note.customFields[graphFilter.fieldId] || []).includes(graphFilter.value);
+}
+
 function renderGraph() {
   const wrap = document.getElementById('graph-wrap');
   const svg = document.getElementById('graph-svg');
-  const notes = getGraphNotes();
+  const notes = getGraphEntries();
+  const density = GRAPH_DENSITY_PRESETS[graphDensity] || GRAPH_DENSITY_PRESETS.balanced;
   svg.innerHTML = '';
 
   const W = wrap.clientWidth || 360;
@@ -452,8 +730,9 @@ function renderGraph() {
   const purpleCol = cs.getPropertyValue('--purple').trim() || '#7F77DD';
   const mutedCol = cs.getPropertyValue('--muted').trim() || '#6b6b67';
   const borderMed = cs.getPropertyValue('--border-med').trim() || 'rgba(0,0,0,0.16)';
+  const surfaceCol = cs.getPropertyValue('--surface').trim() || '#ffffff';
 
-  const shownNotes = notes.filter(note => !graphFilter || note.tags.includes(graphFilter));
+  const shownNotes = notes.filter(matchesFilter);
 
   if (!shownNotes.length) {
     const s = d3.select(svg).attr('viewBox', `0 0 ${W} ${H}`);
@@ -464,14 +743,16 @@ function renderGraph() {
       .attr('fill', mutedCol)
       .attr('font-size', 14)
       .attr('font-family', '-apple-system, sans-serif')
-      .text(notes.length ? 'no tagged entries match this filter' : 'no tagged entries yet');
-    renderGraphTags(notes);
+      .text(notes.length ? 'no entries match this filter' : 'no tagged entries yet');
+    renderGraphFilters(notes);
     return;
   }
 
   const allTags = getAllTags(notes);
   const tagColorMap = {};
   allTags.forEach((tag, i) => { tagColorMap[tag] = TAG_COLORS[i % TAG_COLORS.length]; });
+  const fieldColorMap = {};
+  customFieldDefs.forEach((field, i) => { fieldColorMap[field.id] = TAG_COLORS[i % TAG_COLORS.length]; });
 
   const noteNodes = shownNotes.map(note => ({
     id: noteNodeId(note),
@@ -490,24 +771,53 @@ function renderGraph() {
     color: tagColorMap[tag]
   }));
 
-  const nodes = [...tagNodes, ...noteNodes];
-  seedNodePositions(tagNodes, centerX, centerY, minDim * 0.2, Math.PI / 7);
-  seedNodePositions(noteNodes, centerX, centerY, minDim * 0.08);
+  const fieldValueNodes = [];
+  customFieldDefs.forEach(field => {
+    const values = new Set();
+    shownNotes.forEach(note => (note.customFields[field.id] || []).forEach(value => values.add(value)));
+    [...values].forEach(value => {
+      const count = notes.filter(note => (note.customFields[field.id] || []).includes(value)).length;
+      fieldValueNodes.push({
+        id: fieldNodeId(field.id, value),
+        type: 'field',
+        fieldId: field.id,
+        fieldName: field.name,
+        fieldShape: field.shape || FIELD_SHAPES[0],
+        value,
+        r: BASE_NODE_RADIUS + Math.min(17, Math.sqrt(count - 1) * 2.1),
+        color: fieldColorMap[field.id]
+      });
+    });
+  });
+
+  const nodes = [...tagNodes, ...fieldValueNodes, ...noteNodes];
+  seedNodePositions(tagNodes, centerX, centerY, minDim * density.tagRadius, 0);
+  seedNodePositions(fieldValueNodes, centerX, centerY, minDim * density.fieldRadius, Math.PI / 9);
+  seedNodePositions(noteNodes, centerX, centerY, minDim * density.noteRadius, 0);
 
   const links = [];
   shownNotes.forEach(note => {
     note.tags.forEach(tag => {
       if (tagSet.has(tag)) links.push({ source: noteNodeId(note), target: 't_' + tag });
     });
+    customFieldDefs.forEach(field => {
+      (note.customFields[field.id] || []).forEach(value => {
+        links.push({ source: noteNodeId(note), target: fieldNodeId(field.id, value) });
+      });
+    });
   });
 
   const sim = d3.forceSimulation(nodes)
-    .force('link', d3.forceLink(links).id(d => d.id).distance(42).strength(0.5))
-    .force('charge', d3.forceManyBody().strength(d => d.type === 'note' ? -28 : -85))
-    .force('x', d3.forceX(centerX).strength(d => d.type === 'note' ? 0.018 : 0.04))
-    .force('y', d3.forceY(centerY).strength(d => d.type === 'note' ? 0.018 : 0.04))
-    .force('radial', d3.forceRadial(d => d.type === 'tag' ? minDim * 0.2 : minDim * 0.08, centerX, centerY).strength(d => d.type === 'note' ? 0.03 : 0.08))
-    .force('collision', d3.forceCollide().radius(d => d.r + (d.type === 'note' ? 2.5 : 5)));
+    .force('link', d3.forceLink(links).id(d => d.id).distance(density.linkDistance).strength(0.5))
+    .force('charge', d3.forceManyBody().strength(d => d.type === 'note' ? density.noteCharge : density.groupCharge))
+    .force('x', d3.forceX(centerX).strength(d => d.type === 'note' ? density.noteForce : density.groupForce))
+    .force('y', d3.forceY(centerY).strength(d => d.type === 'note' ? density.noteForce : density.groupForce))
+    .force('radial', d3.forceRadial(d => {
+      if (d.type === 'tag') return minDim * density.tagRadius;
+      if (d.type === 'field') return minDim * density.fieldRadius;
+      return minDim * density.noteRadius;
+    }, centerX, centerY).strength(d => d.type === 'note' ? density.noteRadialStrength : density.groupRadialStrength))
+    .force('collision', d3.forceCollide().radius(d => d.r + (d.type === 'note' ? density.collisionPadNote : density.collisionPadGroup)));
 
   const s = d3.select(svg).attr('viewBox', `0 0 ${W} ${H}`);
   const zoomLayer = s.append('g');
@@ -542,17 +852,43 @@ function renderGraph() {
         d.fy = null;
       }));
 
-  nodeSel.append('circle')
-    .attr('r', d => d.r)
-    .attr('fill', d => d.type === 'tag' ? d.color : ((d.note.tags || []).length ? tagColorMap[d.note.tags[0]] + '55' : purpleCol + '44'))
-    .attr('stroke', d => d.type === 'tag' ? d.color : borderMed)
-    .attr('stroke-width', d => d.type === 'tag' ? 1.5 : 1);
+  nodeSel.each(function(d) {
+    const el = d3.select(this);
+    if (d.type === 'note') {
+      el.append('circle')
+        .attr('r', d.r)
+        .attr('fill', surfaceCol)
+        .attr('stroke', borderMed)
+        .attr('stroke-width', 1.2);
+      return;
+    }
+    if (d.type === 'tag') {
+      el.append('circle')
+        .attr('r', d.r)
+        .attr('fill', d.color)
+        .attr('stroke', d.color)
+        .attr('stroke-width', 1.5);
+      return;
+    }
+    const path = el.append('path')
+      .attr('d', shapePath(d.fieldShape, d.r))
+      .attr('stroke', d.color);
+    if (d.fieldShape === 'asterisk') {
+      path
+        .attr('fill', 'none')
+        .attr('stroke-width', 1.7)
+        .attr('stroke-linecap', 'round');
+    } else {
+      path
+        .attr('fill', surfaceCol)
+        .attr('stroke-width', 1.8);
+    }
+  });
 
   nodeSel.filter(d => d.type === 'note')
     .on('click', (event, d) => {
       event.stopPropagation();
-      activeNoteId = d.id;
-      openDetailSheet(d.note);
+      openDetailSheet(d.note.id);
     });
 
   nodeSel.filter(d => d.type === 'tag')
@@ -565,7 +901,20 @@ function renderGraph() {
     })
     .on('click', (event, d) => {
       event.stopPropagation();
-      setGraphFilter(d.tag);
+      setGraphFilter({ kind: 'tag', value: d.tag });
+    });
+
+  nodeSel.filter(d => d.type === 'field')
+    .on('pointerenter', (event, d) => {
+      const count = notes.filter(note => (note.customFields[d.fieldId] || []).includes(d.value)).length;
+      document.getElementById('graph-info').textContent = `${d.fieldName}: ${d.value} — ${count} entr${count === 1 ? 'y' : 'ies'}`;
+    })
+    .on('pointerleave', () => {
+      document.getElementById('graph-info').textContent = defaultGraphInfo();
+    })
+    .on('click', (event, d) => {
+      event.stopPropagation();
+      setGraphFilter({ kind: 'field', fieldId: d.fieldId, value: d.value });
     });
 
   sim.on('tick', () => {
@@ -577,36 +926,329 @@ function renderGraph() {
     nodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
   });
 
-  renderGraphTags(notes);
+  renderGraphFilters(notes);
   document.getElementById('graph-info').textContent = defaultGraphInfo();
 }
 
-function renderGraphTags(notes) {
-  const allTags = getAllTags(notes);
+function renderGraphFilters(notes) {
   const wrap = document.getElementById('graph-tags');
-  if (!allTags.length) {
-    wrap.innerHTML = '<div class="tag-sidebar-empty">tags will appear here once you add some</div>';
+  const allTags = getAllTags(notes);
+  const fieldValueMap = getFieldValueMap(notes);
+  const tagColorMap = {};
+  allTags.forEach((tag, i) => { tagColorMap[tag] = TAG_COLORS[i % TAG_COLORS.length]; });
+  const fieldColorMap = {};
+  customFieldDefs.forEach((field, i) => { fieldColorMap[field.id] = TAG_COLORS[i % TAG_COLORS.length]; });
+
+  if (!allTags.length && !customFieldDefs.some(field => fieldValueMap[field.id] && fieldValueMap[field.id].size)) {
+    wrap.innerHTML = '<div class="tag-sidebar-empty">filters will appear here once you add tags or field values</div>';
     return;
   }
 
-  const tagColorMap = {};
-  allTags.forEach((tag, i) => { tagColorMap[tag] = TAG_COLORS[i % TAG_COLORS.length]; });
+  const sections = [];
+  sections.push(renderFilterButton('all', !graphFilter, 'var(--muted)'));
 
-  wrap.innerHTML = ['all', ...allTags].map(tag => {
-    const isAll = tag === 'all';
-    const isActive = graphFilter === tag || (isAll && !graphFilter);
-    const color = isAll ? 'var(--muted)' : tagColorMap[tag];
-    const style = !isAll ? `background:${color}22;color:${color};border-color:${color}44;` : '';
-    const activeStyle = `background:${color};color:#fff;border-color:${color};`;
-    return `<button class="tag-chip" style="${isActive ? activeStyle : style}" onclick="setGraphFilter('${esc(tag)}')">${esc(tag)}</button>`;
-  }).join('');
+  if (allTags.length) {
+    sections.push('<div class="filter-group-title">tags</div>');
+    allTags.forEach(tag => {
+      const isActive = graphFilter && graphFilter.kind === 'tag' && graphFilter.value === tag;
+      sections.push(renderFilterButton(tag, isActive, tagColorMap[tag], `setGraphFilterFromEncoded("${encodeFilter({ kind: 'tag', value: tag })}")`));
+    });
+  }
+
+  customFieldDefs.forEach(field => {
+    const values = [...(fieldValueMap[field.id] || new Set())].sort();
+    if (!values.length) return;
+    sections.push(`<div class="filter-group-title">${esc(field.name)} · ${esc(field.shape || '')}</div>`);
+    values.forEach(value => {
+      const isActive = graphFilter && graphFilter.kind === 'field' && graphFilter.fieldId === field.id && graphFilter.value === value;
+      sections.push(renderFilterButton(value, isActive, fieldColorMap[field.id], `setGraphFilterFromEncoded("${encodeFilter({ kind: 'field', fieldId: field.id, value })}")`));
+    });
+  });
+
+  wrap.innerHTML = sections.join('');
 }
 
-function setGraphFilter(tag) {
-  graphFilter = tag === 'all' ? null : tag;
+function renderFilterButton(label, isActive, color, action = 'setGraphFilter("all")') {
+  const style = isActive
+    ? `background:${color};color:#fff;border-color:${color};`
+    : `background:${color === 'var(--muted)' ? 'var(--surface2)' : color + '22'};color:${color};border-color:${color === 'var(--muted)' ? 'var(--border)' : color + '44'};`;
+  return `<button class="tag-chip" style="${style}" onclick='${action}'>${esc(label)}</button>`;
+}
+
+function sameGraphFilter(a, b) {
+  if (!a || !b || a === 'all' || b === 'all') return false;
+  if (a.kind !== b.kind) return false;
+  if (a.kind === 'tag') return a.value === b.value;
+  if (a.kind === 'field') return a.fieldId === b.fieldId && a.value === b.value;
+  return false;
+}
+
+function setGraphFilter(filter) {
+  if (filter === 'all') {
+    graphFilter = null;
+  } else if (sameGraphFilter(graphFilter, filter)) {
+    graphFilter = null;
+  } else {
+    graphFilter = filter;
+  }
   closeDetailSheet();
   toggleTagSidebar(false);
   renderGraph();
+}
+
+function setGraphFilterFromEncoded(encoded) {
+  try {
+    setGraphFilter(JSON.parse(decodeURIComponent(encoded)));
+  } catch (e) {
+    setGraphFilter('all');
+  }
+}
+
+function openDetailSheet(entryId) {
+  const entry = allEntries.find(item => item.id === entryId);
+  if (!entry) return;
+  sheetState = {
+    id: entry.id,
+    text: entry.text || '',
+    dt: entry.dt || Date.now(),
+    tags: [...(entry.tags || [])],
+    customFields: normalizeCustomFields(entry.customFields || {})
+  };
+  document.getElementById('sheet-text').value = sheetState.text;
+  autoExpand(document.getElementById('sheet-text'));
+  const d = new Date(sheetState.dt);
+  d.setSeconds(0, 0);
+  document.getElementById('sheet-dt').value = d.toISOString().slice(0, 16);
+  document.getElementById('sheet-tag-input').value = '';
+  renderSheetTags();
+  renderSheetCustomFields();
+  document.getElementById('sheet-meta').textContent = relDate(sheetState.dt);
+  document.getElementById('sheet-backdrop').classList.add('open');
+  const sheet = document.getElementById('detail-sheet');
+  sheet.classList.add('open');
+  sheet.setAttribute('aria-hidden', 'false');
+}
+
+function closeDetailSheet() {
+  activeNoteId = null;
+  sheetState = null;
+  document.getElementById('sheet-backdrop').classList.remove('open');
+  const sheet = document.getElementById('detail-sheet');
+  sheet.classList.remove('open');
+  sheet.setAttribute('aria-hidden', 'true');
+}
+
+function initSheetTagInput() {
+  const input = document.getElementById('sheet-tag-input');
+  input.addEventListener('input', event => {
+    const val = event.target.value;
+    const last = val[val.length - 1];
+    if (last === ' ' || last === ',') {
+      const raw = val.slice(0, -1).trim();
+      if (raw) addSheetTag(raw);
+      event.target.value = '';
+    }
+  });
+  input.addEventListener('keydown', event => {
+    if (event.key === 'Backspace' && event.target.value === '' && sheetState && sheetState.tags.length) {
+      sheetState.tags.pop();
+      renderSheetTags();
+    }
+  });
+}
+
+function addSheetTag(raw) {
+  if (!sheetState) return;
+  const tag = raw.startsWith('#') ? raw.toLowerCase() : ('#' + raw.toLowerCase());
+  if (!sheetState.tags.includes(tag)) sheetState.tags.push(tag);
+  renderSheetTags();
+}
+
+function renderSheetTags() {
+  const wrap = document.getElementById('sheet-tags');
+  if (!sheetState) {
+    wrap.innerHTML = '';
+    return;
+  }
+  const allTags = getAllTags(getGraphEntries());
+  const tagColorMap = {};
+  allTags.forEach((tag, i) => { tagColorMap[tag] = TAG_COLORS[i % TAG_COLORS.length]; });
+  wrap.innerHTML = sheetState.tags.map((tag, index) =>
+    `<span class="sheet-chip" style="background:${tagColorMap[tag] || 'var(--surface)'};color:#fff;border-color:${tagColorMap[tag] || 'var(--border-med)'};" onclick="removeSheetTag(${index})">${esc(tag)} ×</span>`
+  ).join('');
+}
+
+function removeSheetTag(index) {
+  if (!sheetState) return;
+  sheetState.tags.splice(index, 1);
+  renderSheetTags();
+}
+
+function renderSheetCustomFields() {
+  const wrap = document.getElementById('sheet-custom-fields');
+  if (!sheetState || !customFieldDefs.length) {
+    wrap.innerHTML = '';
+    return;
+  }
+  wrap.innerHTML = customFieldDefs.map(field => {
+    const values = sheetState.customFields[field.id] || [];
+    return `<div class="custom-field-card">
+      <div class="custom-field-head">
+        <div style="flex:1;min-width:0;">
+          <div class="custom-field-name">${esc(field.name)}</div>
+          <div class="custom-field-meta">${esc(field.shape || '')}</div>
+        </div>
+      </div>
+      <input type="text" id="sheet-field-input-${field.id}" placeholder="add ${esc(field.name.toLowerCase())} values">
+      <div class="live-tags">
+        ${values.map((value, index) => `<span class="sheet-chip" onclick="removeSheetFieldValue('${field.id}',${index})">${esc(value)} ×</span>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+
+  customFieldDefs.forEach(field => {
+    const input = document.getElementById(`sheet-field-input-${field.id}`);
+    if (!input) return;
+    input.addEventListener('input', event => {
+      const val = event.target.value;
+      const last = val[val.length - 1];
+      if (last === ' ' || last === ',') {
+        const raw = val.slice(0, -1).trim();
+        if (raw) addSheetFieldValue(field.id, raw);
+        event.target.value = '';
+      }
+    });
+    input.addEventListener('keydown', event => {
+      if (event.key === 'Backspace' && event.target.value === '') {
+        const values = sheetState.customFields[field.id] || [];
+        if (values.length) {
+          values.pop();
+          renderSheetCustomFields();
+        }
+      }
+    });
+  });
+}
+
+function addSheetFieldValue(fieldId, raw) {
+  if (!sheetState) return;
+  const value = raw.trim().toLowerCase();
+  if (!value) return;
+  if (!sheetState.customFields[fieldId]) sheetState.customFields[fieldId] = [];
+  if (!sheetState.customFields[fieldId].includes(value)) sheetState.customFields[fieldId].push(value);
+  renderSheetCustomFields();
+}
+
+function removeSheetFieldValue(fieldId, index) {
+  if (!sheetState || !sheetState.customFields[fieldId]) return;
+  sheetState.customFields[fieldId].splice(index, 1);
+  renderSheetCustomFields();
+}
+
+function flushPendingSheetInputs() {
+  customFieldDefs.forEach(field => {
+    const input = document.getElementById(`sheet-field-input-${field.id}`);
+    if (!input) return;
+    const pending = input.value.trim();
+    if (!pending) return;
+    addSheetFieldValue(field.id, pending);
+    input.value = '';
+  });
+}
+
+async function saveSheetEntry() {
+  if (!sheetState) return;
+  const text = document.getElementById('sheet-text').value.trim();
+  if (!text) return;
+  const pendingTag = document.getElementById('sheet-tag-input').value.trim();
+  if (pendingTag) {
+    addSheetTag(pendingTag);
+    document.getElementById('sheet-tag-input').value = '';
+  }
+  flushPendingSheetInputs();
+  const dtVal = document.getElementById('sheet-dt').value;
+  const dt = dtVal ? new Date(dtVal).getTime() : Date.now();
+  await db.entries.update(sheetState.id, {
+    text,
+    dt,
+    tags: [...sheetState.tags],
+    customFields: cloneFieldValues(sheetState.customFields)
+  });
+  await loadEntries();
+  renderHeader();
+  renderGraph();
+  closeDetailSheet();
+}
+
+function cloneFieldValues(valuesObj) {
+  const next = {};
+  Object.entries(valuesObj || {}).forEach(([fieldId, values]) => {
+    if (Array.isArray(values) && values.length) next[fieldId] = [...values];
+  });
+  return next;
+}
+
+function noteNodeId(note) {
+  return 'n_' + note.id;
+}
+
+function fieldNodeId(fieldId, value) {
+  return `f_${fieldId}_${value}`;
+}
+
+function seedNodePositions(nodes, centerX, centerY, radius, angleOffset = 0) {
+  if (!nodes.length) return;
+  nodes.forEach((node, index) => {
+    const angle = angleOffset + (index / nodes.length) * Math.PI * 2;
+    node.x = centerX + Math.cos(angle) * radius;
+    node.y = centerY + Math.sin(angle) * radius;
+  });
+}
+
+function shapePath(shape, r) {
+  if (shape === 'square') return polygonPath(r, 4, Math.PI / 4);
+  if (shape === 'diamond') return polygonPath(r, 4, 0);
+  if (shape === 'triangle') return polygonPath(r * 1.1, 3, -Math.PI / 2);
+  if (shape === 'pentagon') return polygonPath(r, 5, -Math.PI / 2);
+  if (shape === 'star') return starPath(r, r * 0.48, 5);
+  if (shape === 'asterisk') return asteriskPath(r);
+  return teardropPath(r);
+}
+
+function polygonPath(r, sides, rotation) {
+  const points = [];
+  for (let i = 0; i < sides; i++) {
+    const angle = rotation + (Math.PI * 2 * i) / sides;
+    points.push(`${Math.cos(angle) * r},${Math.sin(angle) * r}`);
+  }
+  return `M${points.join('L')}Z`;
+}
+
+function starPath(outerR, innerR, points) {
+  const coords = [];
+  for (let i = 0; i < points * 2; i++) {
+    const angle = -Math.PI / 2 + (Math.PI * i) / points;
+    const radius = i % 2 === 0 ? outerR : innerR;
+    coords.push(`${Math.cos(angle) * radius},${Math.sin(angle) * radius}`);
+  }
+  return `M${coords.join('L')}Z`;
+}
+
+function asteriskPath(r) {
+  const arm = r * 1.05;
+  const short = r * 0.45;
+  return [
+    `M0,${-arm}L0,${arm}`,
+    `M${-arm * 0.86},${-short}L${arm * 0.86},${short}`,
+    `M${-arm * 0.86},${short}L${arm * 0.86},${-short}`
+  ].join('');
+}
+
+function teardropPath(r) {
+  const top = r * 1.05;
+  const side = r * 0.86;
+  const bottom = r * 1.5;
+  return `M0,${-top} C${side},${-top} ${r},${-r * 0.1} ${r},${r * 0.45} C${r},${r * 1.05} ${side * 0.35},${bottom * 0.72} 0,${bottom} C${-side * 0.35},${bottom * 0.72} ${-r},${r * 1.05} ${-r},${r * 0.45} C${-r},${-r * 0.1} ${-side},${-top} 0,${-top} Z`;
 }
 
 function relDate(ts) {
@@ -618,6 +1260,11 @@ function relDate(ts) {
   return Math.floor(d / 30) + 'mo ago';
 }
 
+function autoExpand(el) {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+
 function esc(s) {
   return String(s)
     .replace(/&/g, '&amp;')
@@ -627,34 +1274,8 @@ function esc(s) {
     .replace(/'/g, '&#39;');
 }
 
-function noteNodeId(note) {
-  return 'n_' + note.id;
-}
-
-function openDetailSheet(note) {
-  document.getElementById('sheet-text').textContent = note.text || '';
-  document.getElementById('sheet-meta').textContent = relDate(note.date);
-  document.getElementById('sheet-backdrop').classList.add('open');
-  const sheet = document.getElementById('detail-sheet');
-  sheet.classList.add('open');
-  sheet.setAttribute('aria-hidden', 'false');
-}
-
-function closeDetailSheet() {
-  activeNoteId = null;
-  document.getElementById('sheet-backdrop').classList.remove('open');
-  const sheet = document.getElementById('detail-sheet');
-  sheet.classList.remove('open');
-  sheet.setAttribute('aria-hidden', 'true');
-}
-
-function seedNodePositions(nodes, centerX, centerY, radius, angleOffset = 0) {
-  if (!nodes.length) return;
-  nodes.forEach((node, index) => {
-    const angle = angleOffset + (index / nodes.length) * Math.PI * 2;
-    node.x = centerX + Math.cos(angle) * radius;
-    node.y = centerY + Math.sin(angle) * radius;
-  });
+function encodeFilter(filter) {
+  return encodeURIComponent(JSON.stringify(filter));
 }
 
 document.addEventListener('click', event => {

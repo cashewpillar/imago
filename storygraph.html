@@ -742,15 +742,25 @@ function renderGraphTags(notes) {
 
 function setGraphFilter(tag) {
   const isAll = tag === 'all';
-  graphFilter = isAll ? null : tag;
-  if (isAll) graphBookFilter = null;
+  const isSameTag = !isAll && graphFilter === tag;
+  if (isAll || isSameTag) {
+    graphFilter = null;
+    graphBookFilter = null;
+  } else {
+    graphFilter = tag;
+  }
   closeDetailSheet();
   toggleTagSidebar(false);
   renderGraph();
 }
 
 function setBookFilter(bookId) {
-  graphBookFilter = graphBookFilter === bookId ? null : bookId;
+  if (graphBookFilter === bookId) {
+    graphBookFilter = null;
+    graphFilter = null;
+  } else {
+    graphBookFilter = bookId;
+  }
   closeDetailSheet();
   renderGraph();
 }
