@@ -775,24 +775,27 @@ function removeTag(containerId, i) {
 
 // ── ENTRIES LIST ───────────────────────────────────────────────────────────────
 function renderEntries() {
-  const allTags = getAllTags();
+  const tagData = getAllTags(); // returns [{tag, count}] sorted desc
   const tagColorMap = {};
-  allTags.forEach((t, i) => tagColorMap[t] = TAG_COLORS[i % TAG_COLORS.length]);
+  tagData.forEach((td, i) => tagColorMap[td.tag] = TAG_COLORS[i % TAG_COLORS.length]);
 
   const fw = document.getElementById('filter-wrap');
   const fc = document.getElementById('filter-chips');
-  if (allTags.length) {
+  if (tagData.length) {
     fw.style.display = 'block';
-    const opts = ['all', ...allTags];
-    fc.innerHTML = opts.map(t => {
+    const opts = [{tag: 'all', count: allEntries.length}, ...tagData];
+    fc.innerHTML = opts.map(td => {
+      const t = td.tag;
       const isAll = t === 'all';
       const isActive = currentFilter === t;
       const color = isAll ? 'var(--muted)' : tagColorMap[t];
       const style = !isAll ? `background: ${color}22; color: ${color}; border-color: ${color}44;` : '';
       const activeStyle = `background: ${color}; color: #fff; border-color: ${color};`;
+      const label = isAll ? t : `${t} · ${td.count}`;
+      
       return `<button class="tag-chip filter ${isActive ? 'active' : ''}" 
         style="${isActive ? activeStyle : style}"
-        onclick="setFilter('${esc(t)}')">${esc(t)}</button>`;
+        onclick="setFilter('${esc(t)}')">${esc(label)}</button>`;
     }).join('');
   } else {
     fw.style.display = 'none';
@@ -829,9 +832,15 @@ function renderEntries() {
 }
 
 function getAllTags() {
-  const set = new Set();
-  allEntries.forEach(e => (e.tags || []).forEach(t => set.add(t)));
-  return [...set].sort();
+  const counts = {};
+  allEntries.forEach(e => {
+    (e.tags || []).forEach(t => {
+      counts[t] = (counts[t] || 0) + 1;
+    });
+  });
+  return Object.entries(counts)
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
 }
 
 function renderEntryCustomValues(customFields) {

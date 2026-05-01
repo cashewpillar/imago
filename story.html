@@ -777,21 +777,31 @@ function renderBook() {
   document.getElementById('book-last').textContent = notes.length ? 'last ' + relDate(notes[notes.length-1].date) : 'nothing yet';
   const idx = state.books.findIndex(x => x.id === b.id);
   document.getElementById('book-spine').style.background = SPINE_COLORS[idx % SPINE_COLORS.length];
-  const allTags = [];
-  notes.forEach(n => (n.tags||[]).forEach(t => { if(!allTags.includes(t)) allTags.push(t); }));
+  const tagCounts = {};
+  notes.forEach(n => (n.tags||[]).forEach(t => { tagCounts[t] = (tagCounts[t] || 0) + 1; }));
+  const sortedTags = Object.entries(tagCounts)
+    .sort((a,b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(entry => ({ name: entry[0], count: entry[1] }));
+
   const fa = document.getElementById('filter-area');
   const fc = document.getElementById('filter-chips');
-  if(allTags.length) {
+  if(sortedTags.length) {
     fa.style.display = 'block';
     fc.innerHTML = '';
     const hasUntagged = notes.some(n => !(n.tags || []).length);
-    const filterOptions = ['all', ...(hasUntagged ? ['untagged'] : []), ...allTags];
+    const untaggedCount = notes.filter(n => !(n.tags || []).length).length;
     
-    filterOptions.forEach(tag => {
+    const filterOptions = [
+      { name: 'all', count: notes.length },
+      ...(hasUntagged ? [{ name: 'untagged', count: untaggedCount }] : []),
+      ...sortedTags
+    ];
+    
+    filterOptions.forEach(opt => {
       const chip = document.createElement('button');
-      chip.className = 'filter-chip' + (currentFilter === tag ? ' active' : '');
-      chip.textContent = tag;
-      chip.onclick = () => { currentFilter = tag; renderBook(); };
+      chip.className = 'filter-chip' + (currentFilter === opt.name ? ' active' : '');
+      chip.textContent = opt.name === 'all' ? 'all' : `${opt.name} · ${opt.count}`;
+      chip.onclick = () => { currentFilter = opt.name; renderBook(); };
       fc.appendChild(chip);
     });
   } else {
