@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>pollination graph</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/3.2.4/dexie.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f7f6f2;
+    --surface: #ffffff;
+    --surface2: #f0efe9;
+    --text: #1a1a18;
+    --muted: #6b6b67;
+    --hint: #a0a09b;
+    --border: rgba(0,0,0,0.09);
+    --border-med: rgba(0,0,0,0.16);
+    --radius: 12px;
+    --radius-sm: 8px;
+    --accent: #E24B4A;
+  }
+
+  body.dark-mode {
+    --bg: #1a1a18;
+    --surface: #232321;
+    --surface2: #2a2a28;
+    --text: #f0efe9;
+    --muted: #a0a09b;
+    --hint: #6b6b67;
+    --border: rgba(255,255,255,0.07);
+    --border-med: rgba(255,255,255,0.13);
+  }
+
+  body {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    transition: background 0.2s, color 0.2s;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .app {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .nav {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0.9rem 1rem 0.75rem;
+    border-bottom: 0.5px solid var(--border);
+    background: var(--bg);
+    z-index: 10;
+  }
+
+  .nav-title { flex: 1; min-width: 0; }
+  .nav-title h1 {
+    font-size: 18px;
+    font-weight: normal;
+    letter-spacing: -0.3px;
+  }
+
+  .btn-ghost {
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 14px;
+    padding: 6px 4px;
+    cursor: pointer;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  .graph-screen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .graph-top {
+    background: var(--bg);
+    border-bottom: 0.5px solid var(--border);
+    padding: 0.7rem 1rem 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+  }
+
+  .graph-info {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .graph-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    margin: 10px;
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: 16px;
+    touch-action: none;
+  }
+
+  #graph-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .tag-sidebar {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 1rem;
+    width: min(260px, 72vw);
+    max-height: 58vh;
+    overflow: auto;
+    background: var(--surface);
+    border: 0.5px solid var(--border-med);
+    border-radius: var(--radius);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+    padding: 10px;
+    display: none;
+    z-index: 20;
+  }
+
+  .tag-sidebar.open { display: block; }
+
+  .graph-tag-list { display: flex; flex-direction: column; gap: 4px; }
+
+  .tag-chip {
+    font-size: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 0.5px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    transition: all 0.1s;
+  }
+
+  .tag-chip.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+
+  .detail-sheet {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    background: var(--surface);
+    border-top-left-radius: 18px;
+    border-top-right-radius: 18px;
+    border-top: 0.5px solid var(--border-med);
+    box-shadow: 0 -10px 30px rgba(0,0,0,0.12);
+    transform: translateY(100%);
+    transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+    z-index: 31;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+  }
+
+  .detail-sheet.open { transform: translateY(0); }
+
+  .sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.3);
+    display: none;
+    z-index: 30;
+  }
+
+  .sheet-backdrop.open { display: block; }
+
+  .quote-box {
+    font-size: 14px;
+    font-style: italic;
+    color: var(--muted);
+    border-left: 2px solid var(--accent);
+    padding-left: 14px;
+    margin: 20px 0;
+    line-height: 1.6;
+  }
+
+  .thought-box {
+    font-size: 17px;
+    line-height: 1.7;
+    margin-bottom: 20px;
+    color: var(--text);
+  }
+
+  .tag-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tag-pill {
+    font-size: 11px;
+    font-family: -apple-system, sans-serif;
+    background: var(--surface2);
+    padding: 4px 10px;
+    border-radius: 20px;
+    color: var(--muted);
+    border: 0.5px solid var(--border);
+  }
+
+  .btn-primary {
+    background: var(--text);
+    color: var(--surface);
+    border: none;
+    padding: 12px;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-family: -apple-system, sans-serif;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 20px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="nav">
+    <button class="btn-ghost" onclick="location.href='thoughtweb.html'">← back</button>
+    <div class="nav-title">
+      <h1>pollination</h1>
+    </div>
+    <button class="btn-ghost" onclick="toggleTheme()">◐</button>
+  </div>
+
+  <div class="graph-screen">
+    <div class="graph-top">
+      <div class="graph-info" id="graph-info">tap a node to explore connections</div>
+      <select class="btn-ghost" id="density-select" onchange="setGraphDensity(this.value)" style="border:0.5px solid var(--border); border-radius:20px; padding:4px 10px; margin-right:8px;">
+        <option value="tight">tight</option>
+        <option value="balanced">balanced</option>
+        <option value="loose">loose</option>
+      </select>
+      <button class="btn-ghost" onclick="toggleSidebar()">filters</button>
+      <div class="tag-sidebar" id="tag-sidebar">
+        <div class="graph-tag-list" id="graph-tags"></div>
+      </div>
+    </div>
+    <div class="graph-wrap" id="graph-wrap">
+      <svg id="graph-svg"></svg>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-backdrop" id="sheet-backdrop" onclick="closeSheet()"></div>
+<div class="detail-sheet" id="detail-sheet">
+  <div id="sheet-content" style="overflow:auto; flex:1;"></div>
+  <button class="btn-primary" onclick="closeSheet()">close</button>
+</div>
+
+<script>
+const db = new Dexie('thoughtweb');
+db.version(1).stores({ entries: '++id, dt, *tags' });
+db.version(2).stores({ entries: '++id, dt, *tags', fields: 'id, name, shape, order' });
+
+const BASE_NODE_RADIUS = 5;
+const GRAPH_DENSITY_KEY = 'thoughtgraph_density_v1';
+const GRAPH_DENSITY_PRESETS = {
+  tight: {
+    tagRadius: 0.18,
+    fieldRadius: 0.26,
+    noteRadius: 0.06,
+    linkDistance: 34,
+    noteCharge: -20,
+    groupCharge: -62,
+    noteForce: 0.024,
+    groupForce: 0.05,
+    noteRadialStrength: 0.04,
+    groupRadialStrength: 0.09,
+    collisionPadNote: 2,
+    collisionPadGroup: 4
+  },
+  balanced: {
+    tagRadius: 0.22,
+    fieldRadius: 0.32,
+    noteRadius: 0.08,
+    linkDistance: 42,
+    noteCharge: -28,
+    groupCharge: -85,
+    noteForce: 0.018,
+    groupForce: 0.04,
+    noteRadialStrength: 0.03,
+    groupRadialStrength: 0.08,
+    collisionPadNote: 2.5,
+    collisionPadGroup: 5
+  },
+  loose: {
+    tagRadius: 0.28,
+    fieldRadius: 0.4,
+    noteRadius: 0.11,
+    linkDistance: 52,
+    noteCharge: -38,
+    groupCharge: -112,
+    noteForce: 0.014,
+    groupForce: 0.032,
+    noteRadialStrength: 0.024,
+    groupRadialStrength: 0.06,
+    collisionPadNote: 3.5,
+    collisionPadGroup: 6.5
+  }
+};
+
+let allEntries = [];
+let storyEntries = [];
+let graphFilter = null;
+let graphDensity = localStorage.getItem(GRAPH_DENSITY_KEY) || 'balanced';
+
+async function init() {
+  initTheme();
+  allEntries = await db.entries.toArray();
+  storyEntries = getStoryData();
+  const select = document.getElementById('density-select');
+  if (select) select.value = graphDensity;
+  renderGraph();
+  window.addEventListener('resize', debounce(renderGraph, 200));
+}
+
+function getStoryData() {
+  const books = [];
+  try {
+    const raw = localStorage.getItem('reader_v3');
+    if (raw) {
+      const data = JSON.parse(raw);
+      data.books.forEach(b => {
+        b.notes.forEach(n => {
+          books.push({
+            id: 's_' + n.id,
+            text: n.meaning || n.text,
+            quote: n.meaning ? n.text : null,
+            date: n.date,
+            tags: [...(n.tags || []), b.title],
+            bookTitle: b.title,
+            type: 'story'
+          });
+        });
+      });
+    }
+  } catch(e) {}
+  return books;
+}
+
+function getVisibleEntries() {
+  const combined = [...allEntries.map(e => ({...e, type: 'thought'})), ...storyEntries];
+  if (!graphFilter) return combined;
+  return combined.filter(e => (e.tags || []).includes(graphFilter));
+}
+
+function renderGraph() {
+  const entries = getVisibleEntries();
+  const wrap = document.getElementById('graph-wrap');
+  const svg = document.getElementById('graph-svg');
+  svg.innerHTML = '';
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  const centerX = W/2, centerY = H/2;
+  const minDim = Math.min(W, H);
+  const density = GRAPH_DENSITY_PRESETS[graphDensity] || GRAPH_DENSITY_PRESETS.balanced;
+
+  const tagSet = new Set();
+  entries.forEach(e => (e.tags || []).forEach(t => tagSet.add(t)));
+  const bookTitles = new Set(storyEntries.map(e => e.bookTitle));
+
+  const tagNodes = [...tagSet].map(tag => {
+    const isBook = bookTitles.has(tag);
+    const related = entries.filter(e => (e.tags || []).includes(tag));
+    const connections = new Set();
+    related.forEach(re => (re.tags || []).forEach(rt => { if(rt !== tag) connections.add(rt) }));
+    
+    const volume = related.length;
+    const hasHub = connections.size > 0;
+    
+    // Starting point: volume 1 is the "base" whisper
+    // Ramp up significantly from 1 to 2 to 3
+    const intensity = Math.min(1, (volume - 1) * 0.18);
+    
+    const isDark = document.body.classList.contains('dark-mode');
+    let color;
+    
+    if (isDark) {
+      if (volume <= 1) {
+        color = 'hsl(0, 20%, 25%)'; // Faint, dark dusty rose for base
+      } else {
+        const s = hasHub ? 85 : 35; 
+        const l = 30 + (intensity * 40);
+        color = `hsl(0, ${s}%, ${l}%)`;
+      }
+    } else {
+      if (volume <= 1) {
+        color = 'hsl(0, 15%, 88%)'; // Faint, pale blush pink for base
+      } else {
+        const s = hasHub ? 80 : 30; 
+        const l = 85 - (intensity * 50); 
+        color = `hsl(0, ${s}%, ${l}%)`;
+      }
+    }
+
+    return {
+      id: 'tag_' + tag,
+      type: isBook ? 'book' : 'tag',
+      label: tag,
+      color: color,
+      intensity,
+      r: BASE_NODE_RADIUS
+    };
+  });
+
+  const entryNodes = entries.map(e => ({
+    id: e.type === 'thought' ? 't_' + e.id : e.id,
+    type: 'entry',
+    data: e,
+    r: BASE_NODE_RADIUS - 1.5,
+    color: '#fff'
+  }));
+
+  const allNodes = [...tagNodes, ...entryNodes];
+  
+  // Seed positions like thoughtgraph
+  seedNodePositions(tagNodes, centerX, centerY, minDim * density.tagRadius, 0);
+  seedNodePositions(entryNodes, centerX, centerY, minDim * density.noteRadius, 0);
+
+  const links = [];
+  entries.forEach(e => {
+    const eId = e.type === 'thought' ? 't_' + e.id : e.id;
+    (e.tags || []).forEach(t => {
+      if (tagSet.has(t)) links.push({ source: eId, target: 'tag_' + t });
+    });
+  });
+
+  const sim = d3.forceSimulation(allNodes)
+    .force('link', d3.forceLink(links).id(d => d.id).distance(density.linkDistance).strength(0.5))
+    .force('charge', d3.forceManyBody().strength(d => d.type === 'entry' ? density.noteCharge : density.groupCharge))
+    .force('x', d3.forceX(centerX).strength(d => d.type === 'entry' ? density.noteForce : density.groupForce))
+    .force('y', d3.forceY(centerY).strength(d => d.type === 'entry' ? density.noteForce : density.groupForce))
+    .force('radial', d3.forceRadial(d => {
+      if (d.type === 'tag' || d.type === 'book') return minDim * density.tagRadius;
+      return minDim * density.noteRadius;
+    }, centerX, centerY).strength(d => d.type === 'entry' ? density.noteRadialStrength : density.groupRadialStrength))
+    .force('collision', d3.forceCollide().radius(d => d.r + (d.type === 'entry' ? density.collisionPadNote : density.collisionPadGroup)));
+
+  const s = d3.select(svg).attr('viewBox', `0 0 ${W} ${H}`);
+  const g = s.append('g');
+  s.call(d3.zoom().scaleExtent([0.2, 4]).on('zoom', (e) => g.attr('transform', e.transform)));
+
+  const linkSel = g.selectAll('line').data(links).join('line')
+    .attr('stroke', 'var(--border-med)').attr('stroke-width', 0.5).attr('opacity', 0.4);
+
+  const nodeSel = g.selectAll('g').data(allNodes).join('g')
+    .style('cursor', 'pointer')
+    .on('click', (ev, d) => {
+      ev.stopPropagation();
+      if (d.type === 'entry') openSheet(d.data);
+      else setFilter(d.label);
+    })
+    .call(d3.drag()
+      .on('start', (ev, d) => { if (!ev.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on('drag', (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
+      .on('end', (ev, d) => { if (!ev.active) sim.alphaTarget(0); d.fx = null; d.fy = null; }));
+
+  nodeSel.each(function(d) {
+    const el = d3.select(this);
+    const isDark = document.body.classList.contains('dark-mode');
+    const entryBorder = isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.25)';
+    
+    if (d.type === 'entry') {
+      el.append('circle').attr('r', d.r).attr('fill', isDark ? '#444' : '#fff').attr('stroke', entryBorder).attr('stroke-width', 1);
+    } else if (d.type === 'book') {
+      el.append('path').attr('d', `M0,${-d.r*1.2} C${d.r},${-d.r*1.2} ${d.r},${d.r*0.5} 0,${d.r*1.5} C${-d.r},${d.r*0.5} ${-d.r},${-d.r*1.2} 0,${-d.r*1.2} Z`)
+        .attr('fill', d.color).attr('stroke', d.intensity > 0.6 ? '#fff' : entryBorder).attr('stroke-width', 1);
+    } else {
+      el.append('circle').attr('r', d.r).attr('fill', d.color).attr('stroke', d.intensity > 0.6 ? '#fff' : entryBorder).attr('stroke-width', 1);
+    }
+  });
+
+  sim.on('tick', () => {
+    linkSel.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    nodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
+  });
+
+  renderFilters([...tagSet].sort());
+}
+
+function renderFilters(tags) {
+  const wrap = document.getElementById('graph-tags');
+  let html = `<button class="tag-chip ${!graphFilter?'active':''}" onclick="setFilter(null)">all</button>`;
+  tags.forEach(t => {
+    html += `<button class="tag-chip ${graphFilter===t?'active':''}" onclick="setFilter('${t}')">${t}</button>`;
+  });
+  wrap.innerHTML = html;
+}
+
+function setFilter(tag) {
+  graphFilter = (graphFilter === tag) ? null : tag;
+  document.getElementById('graph-info').textContent = graphFilter ? `filtered: ${graphFilter}` : 'tap a node to explore connections';
+  document.getElementById('tag-sidebar').classList.remove('open');
+  renderGraph();
+}
+
+function openSheet(data) {
+  const content = document.getElementById('sheet-content');
+  let html = `<div class="thought-box">${esc(data.text)}</div>`;
+  if (data.quote) html += `<div class="quote-box">${esc(data.quote)}</div>`;
+  html += `<div class="tag-row">${(data.tags || []).map(t => `<span class="tag-pill">${esc(t)}</span>`).join('')}</div>`;
+  if (data.bookTitle) html += `<div style="font-size:12px; color:var(--hint); margin-top:15px; font-family:sans-serif;">Source: ${esc(data.bookTitle)}</div>`;
+  
+  content.innerHTML = html;
+  document.getElementById('sheet-backdrop').classList.add('open');
+  document.getElementById('detail-sheet').classList.add('open');
+}
+
+function closeSheet() {
+  document.getElementById('sheet-backdrop').classList.remove('open');
+  document.getElementById('detail-sheet').classList.remove('open');
+}
+
+function toggleSidebar() { document.getElementById('tag-sidebar').classList.toggle('open'); }
+
+function setGraphDensity(val) {
+  graphDensity = val;
+  localStorage.setItem(GRAPH_DENSITY_KEY, val);
+  renderGraph();
+}
+
+function toggleTheme() {
+  document.body.classList.toggle('dark-mode');
+  localStorage.setItem('tw-theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+  renderGraph();
+}
+
+function initTheme() {
+  if (localStorage.getItem('tw-theme') === 'dark') document.body.classList.add('dark-mode');
+}
+
+function debounce(fn, ms) {
+  let timeout;
+  return function() {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn.apply(this, arguments), ms);
+  };
+}
+
+function seedNodePositions(nodes, centerX, centerY, radius, angleOffset = 0) {
+  if (!nodes.length) return;
+  nodes.forEach((node, index) => {
+    const angle = angleOffset + (index / nodes.length) * Math.PI * 2;
+    node.x = centerX + Math.cos(angle) * radius;
+    node.y = centerY + Math.sin(angle) * radius;
+  });
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+init();
+</script>
+</body>
+</html>

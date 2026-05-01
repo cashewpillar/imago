@@ -341,6 +341,7 @@ input::placeholder { color: var(--hint); }
     <div class="nav-tabs">
       <button class="nav-tab active" id="tab-notes" onclick="switchTab('notes')">notes</button>
       <button class="nav-tab" id="tab-graph" onclick="openThoughtGraph()">graph</button>
+      <button class="nav-tab" id="tab-pollinate" onclick="openPollinationGraph()">pollinate</button>
     </div>
     <button class="btn-ghost" onclick="toggleTheme()" title="toggle theme">◐</button>
     <button class="btn-ghost" style="font-size:12px;" onclick="showExportImport()" title="export / import">⇅</button>
@@ -498,6 +499,10 @@ function switchTab(tab) {
 
 function openThoughtGraph() {
   window.location.href = 'thoughtgraph.html';
+}
+
+function openPollinationGraph() {
+  window.location.href = 'pollination.html';
 }
 
 function loadLegacyFieldDefs() {
