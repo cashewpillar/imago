@@ -558,10 +558,12 @@ let tagSidebarOpen = false;
 let activeNoteId = null;
 let sheetState = null;
 let graphDensity = 'balanced';
+let showStoryPollination = localStorage.getItem('tw_story_pollination') === 'true';
 
 document.addEventListener('DOMContentLoaded', async () => {
   initTheme();
   loadGraphDensity();
+  initPollinationToggle();
   await loadFieldDefs();
   initSheetTagInput();
   await loadEntries();
@@ -645,6 +647,21 @@ function setGraphDensity(value) {
   renderGraph();
 }
 
+function initPollinationToggle() {
+  const ctrl = document.querySelector('.graph-controls');
+  const label = document.createElement('label');
+  label.style.cssText = 'font-size:11px; font-family:-apple-system, sans-serif; color:var(--muted); display:flex; align-items:center; gap:4px; cursor:pointer; margin-right:4px;';
+  label.innerHTML = `<input type="checkbox" id="pollination-toggle" ${showStoryPollination ? 'checked' : ''}> pollinate`;
+  ctrl.insertBefore(label, ctrl.firstChild);
+  
+  document.getElementById('pollination-toggle').onchange = (e) => {
+    showStoryPollination = e.target.checked;
+    localStorage.setItem('tw_story_pollination', showStoryPollination);
+    renderHeader();
+    renderGraph();
+  };
+}
+
 function defaultGraphInfo() {
   if (!graphFilter) return '';
   if (graphFilter.kind === 'tag') return `showing ${graphFilter.value}`;
@@ -661,11 +678,15 @@ function toggleTagSidebar(force) {
 function renderHeader() {
   const notes = getGraphEntries();
   document.getElementById('graph-title').textContent = 'thought graph';
-  document.getElementById('graph-meta').textContent = notes.length ? `${notes.length} tagged entr${notes.length === 1 ? 'y' : 'ies'}` : 'no tagged entries yet';
+  const realCount = allEntries.filter(e => (e.tags || []).length > 0).length;
+  const storyCount = notes.length - realCount;
+  let metaText = `${notes.length} nodes`;
+  if (showStoryPollination && storyCount > 0) metaText = `${realCount} thoughts + ${storyCount} book lines`;
+  document.getElementById('graph-meta').textContent = metaText;
 }
 
 function getGraphEntries() {
-  return allEntries
+  const entries = allEntries
     .map(entry => {
       const tags = (entry.tags || []).filter(Boolean);
       const customFields = normalizeCustomFields(entry.customFields || {});
@@ -676,10 +697,36 @@ function getGraphEntries() {
         text: entry.text || '',
         date: entry.dt,
         tags,
-        customFields
+        customFields,
+        type: 'thought'
       };
     })
     .filter(Boolean);
+
+  if (showStoryPollination) {
+    try {
+      const storyRaw = localStorage.getItem('reader_v3');
+      if (storyRaw) {
+        const storyData = JSON.parse(storyRaw);
+        (storyData.books || []).forEach(book => {
+          (book.notes || []).forEach(note => {
+            const tags = [...(note.tags || []), book.title];
+            entries.push({
+              id: 'story_' + note.id,
+              text: note.meaning || note.text,
+              quote: note.meaning ? note.text : null,
+              date: note.date,
+              tags,
+              customFields: {},
+              type: 'story',
+              bookTitle: book.title
+            });
+          });
+        });
+      }
+    } catch(e) {}
+  }
+  return entries;
 }
 
 function normalizeCustomFields(valuesObj) {
@@ -763,20 +810,54 @@ function renderGraph() {
 
   const tagSet = new Set();
   shownNotes.forEach(note => note.tags.forEach(tag => tagSet.add(tag)));
-  const tagNodes = [...tagSet].map(tag => ({
-    id: 't_' + tag,
-    type: 'tag',
-    tag,
-    r: BASE_NODE_RADIUS + Math.min(17, Math.sqrt(notes.filter(note => note.tags.includes(tag)).length - 1) * 2.1),
-    color: tagColorMap[tag]
-  }));
+  const bookTitles = new Set(notes.filter(n => n.type === 'story').map(n => n.bookTitle));
+
+  const tagNodes = [...tagSet].map(tag => {
+    const isBook = bookTitles.has(tag);
+    const notesWithTag = shownNotes.filter(note => note.tags.includes(tag));
+    const connections = new Set();
+    notesWithTag.forEach(n => {
+      (n.tags || []).forEach(t => { if (t !== tag) connections.add('t_' + t); });
+      customFieldDefs.forEach(f => {
+        (n.customFields[f.id] || []).forEach(v => connections.add(fieldNodeId(f.id, v)));
+      });
+    });
+    
+    // Hubness is the switch; Growth is volume-based
+    const hasConnections = connections.size > 0;
+    const volume = notesWithTag.length;
+    // Books stay default size; others grow
+    const growth = (hasConnections && !isBook) ? Math.min(14, Math.sqrt(volume - 1) * 2.8) : 0;
+    
+    return {
+      id: 't_' + tag,
+      type: isBook ? 'book' : 'tag',
+      tag,
+      r: BASE_NODE_RADIUS + growth,
+      color: tagColorMap[tag]
+    };
+  });
 
   const fieldValueNodes = [];
   customFieldDefs.forEach(field => {
     const values = new Set();
     shownNotes.forEach(note => (note.customFields[field.id] || []).forEach(value => values.add(value)));
     [...values].forEach(value => {
-      const count = notes.filter(note => (note.customFields[field.id] || []).includes(value)).length;
+      const notesWithVal = shownNotes.filter(note => (note.customFields[field.id] || []).includes(value));
+      const connections = new Set();
+      notesWithVal.forEach(n => {
+        (n.tags || []).forEach(t => connections.add('t_' + t));
+        customFieldDefs.forEach(f => {
+          (n.customFields[f.id] || []).forEach(v => {
+            if (f.id !== field.id || v !== value) connections.add(fieldNodeId(f.id, v));
+          });
+        });
+      });
+
+      const hasConnections = connections.size > 0;
+      const volume = notesWithVal.length;
+      const growth = hasConnections ? Math.min(14, Math.sqrt(volume - 1) * 2.8) : 0;
+
       fieldValueNodes.push({
         id: fieldNodeId(field.id, value),
         type: 'field',
@@ -784,7 +865,7 @@ function renderGraph() {
         fieldName: field.name,
         fieldShape: field.shape || FIELD_SHAPES[0],
         value,
-        r: BASE_NODE_RADIUS + Math.min(17, Math.sqrt(count - 1) * 2.1),
+        r: BASE_NODE_RADIUS + growth,
         color: fieldColorMap[field.id]
       });
     });
@@ -854,12 +935,21 @@ function renderGraph() {
 
   nodeSel.each(function(d) {
     const el = d3.select(this);
+    
     if (d.type === 'note') {
       el.append('circle')
         .attr('r', d.r)
         .attr('fill', surfaceCol)
         .attr('stroke', borderMed)
         .attr('stroke-width', 1.2);
+      return;
+    }
+    if (d.type === 'book') {
+      el.append('path')
+        .attr('d', shapePath('teardrop', d.r + 1))
+        .attr('fill', surfaceCol)
+        .attr('stroke', d.color)
+        .attr('stroke-width', 1.8);
       return;
     }
     if (d.type === 'tag') {
@@ -873,6 +963,7 @@ function renderGraph() {
     const path = el.append('path')
       .attr('d', shapePath(d.fieldShape, d.r))
       .attr('stroke', d.color);
+    
     if (d.fieldShape === 'asterisk') {
       path
         .attr('fill', 'none')
@@ -1005,6 +1096,33 @@ function setGraphFilterFromEncoded(encoded) {
 }
 
 function openDetailSheet(entryId) {
+  if (String(entryId).startsWith('story_')) {
+    const notes = getGraphEntries();
+    const entry = notes.find(item => item.id === entryId);
+    if (!entry) return;
+    
+    // Read-only view for story notes
+    document.getElementById('sheet-text').value = entry.text;
+    document.getElementById('sheet-text').readOnly = true;
+    document.getElementById('sheet-tag-input').style.display = 'none';
+    document.getElementById('sheet-tags').innerHTML = entry.tags.map(t => `<span class="sheet-chip" style="opacity:0.7">${esc(t)}</span>`).join('');
+    document.getElementById('sheet-custom-fields').innerHTML = entry.quote ? `<div class="form-label">Source Quote</div><div style="font-size:13px; font-style:italic; color:var(--muted); border-left:2px solid var(--border); padding-left:10px;">${esc(entry.quote)}</div>` : '';
+    document.getElementById('sheet-dt').value = new Date(entry.date).toISOString().slice(0, 16);
+    document.getElementById('sheet-dt').disabled = true;
+    document.querySelector('.detail-sheet .btn-save').style.display = 'none';
+    
+    document.getElementById('sheet-meta').textContent = `From: ${entry.bookTitle}`;
+    document.getElementById('sheet-backdrop').classList.add('open');
+    document.getElementById('detail-sheet').classList.add('open');
+    return;
+  }
+
+  // Restore defaults for thought entries
+  document.getElementById('sheet-text').readOnly = false;
+  document.getElementById('sheet-tag-input').style.display = 'block';
+  document.getElementById('sheet-dt').disabled = false;
+  document.querySelector('.detail-sheet .btn-save').style.display = 'block';
+
   const entry = allEntries.find(item => item.id === entryId);
   if (!entry) return;
   sheetState = {
