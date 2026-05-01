@@ -131,6 +131,7 @@
   textarea {
     width: 100%;
     resize: none;
+    overflow: hidden;
     font-size: 15px;
     font-family: 'Georgia', 'Times New Roman', serif;
     padding: 12px 14px;
@@ -140,6 +141,7 @@
     color: var(--text);
     line-height: 1.7;
     transition: border-color 0.15s;
+    min-height: 80px;
   }
   textarea:focus { outline: none; border-color: var(--border-med); box-shadow: 0 0 0 3px rgba(127,119,221,0.12); }
   textarea::placeholder { color: var(--hint); font-style: italic; }
@@ -553,7 +555,7 @@
         <button class="stance-btn" id="sb-no" onclick="setStance('no')">disagree</button>
       </div>
       <div id="stance-note-wrap" style="display:none;margin-top:10px;">
-        <textarea id="stance-note" rows="2" placeholder="what's the complication, or why do you disagree..."></textarea>
+        <textarea id="stance-note" rows="2" placeholder="what's the complication, or why do you disagree..." oninput="autoExpand(this)"></textarea>
       </div>
     </div>
 
@@ -866,6 +868,7 @@ function editNote(id) {
   currentStance = n.stance;
   currentTags = [...(n.tags || [])];
   setStance(n.stance);
+  autoExpand(document.getElementById('stance-note'));
   renderLiveTags();
 }
 
@@ -892,6 +895,7 @@ function initHighlightForm() {
   hlText.value = '';
   hlText.style.height = 'auto';
   document.getElementById('stance-note').value = '';
+  document.getElementById('stance-note').style.height = 'auto';
   document.getElementById('stance-note-wrap').style.display = 'none';
   const hlMeaning = document.getElementById('hl-meaning');
   hlMeaning.value = '';

@@ -124,7 +124,7 @@ body {
 }
 
 textarea {
-  width: 100%; resize: none;
+  width: 100%; resize: none; overflow: hidden;
   font-size: 15px;
   font-family: 'Georgia', 'Times New Roman', serif;
   padding: 10px 12px;
@@ -873,7 +873,6 @@ function openEdit(id) {
   editTags = [...(e.tags || [])];
   editFieldValues = cloneFieldValues(e.customFields || {});
   document.getElementById('edit-text').value = e.text;
-  autoExpand(document.getElementById('edit-text'));
   const d = new Date(e.dt);
   d.setSeconds(0, 0);
   document.getElementById('edit-dt').value = d.toISOString().slice(0, 16);
@@ -898,6 +897,7 @@ function openEdit(id) {
     }
   };
   document.getElementById('edit-modal').classList.add('open');
+  autoExpand(document.getElementById('edit-text'));
 }
 
 function closeModal() {
