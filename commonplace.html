@@ -365,12 +365,122 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
 <script>
 const db = new Dexie('cp3');
 db.version(1).stores({ media:'++id,type,title,createdAt', moments:'++id,mediaId,createdAt', relations:'++id,fromId,toId' });
+db.version(2).stores({
+  media:'++id,&uuid,type,title,createdAt,updatedAt',
+  moments:'++id,&uuid,mediaId,mediaUuid,createdAt,updatedAt',
+  relations:'++id,&uuid,fromId,toId,fromUuid,toUuid,label'
+}).upgrade(async tx => {
+  const mediaTable = tx.table('media');
+  const momentTable = tx.table('moments');
+  const relationTable = tx.table('relations');
+  const media = await mediaTable.toArray();
+  const mediaById = new Map();
+  for (const item of media) {
+    const uuid = item.uuid || makeUuid();
+    mediaById.set(item.id, uuid);
+    await mediaTable.update(item.id, {
+      uuid,
+      updatedAt: item.updatedAt || item.createdAt || Date.now()
+    });
+  }
+  const moments = await momentTable.toArray();
+  const momentById = new Map();
+  for (const item of moments) {
+    const uuid = item.uuid || makeUuid();
+    momentById.set(item.id, uuid);
+    await momentTable.update(item.id, {
+      uuid,
+      mediaUuid: item.mediaUuid || mediaById.get(item.mediaId) || null,
+      updatedAt: item.updatedAt || item.createdAt || Date.now()
+    });
+  }
+  const relations = await relationTable.toArray();
+  for (const item of relations) {
+    await relationTable.update(item.id, {
+      uuid: item.uuid || makeUuid(),
+      fromUuid: item.fromUuid || momentById.get(item.fromId) || null,
+      toUuid: item.toUuid || momentById.get(item.toId) || null
+    });
+  }
+});
 
 let AM=[], AMO=[], AR=[];
 let cFilter='all', cTag=null, cSearch='', cMediaId=null, edMediaId=null, edMomId=null, edMomMediaId=null;
 let mdTag=null;
 let mTags=[], relRows=[];
 const vStack=[];
+let compatReady = false;
+
+function makeUuid(){
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+  return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 11);
+}
+function sortTags(tags){return [...new Set((tags||[]).map(t=>String(t||'').trim().toLowerCase()).filter(Boolean))].sort();}
+function normText(v){return String(v||'').trim();}
+function mediaFingerprint(item){
+  return JSON.stringify([
+    normText(item.type).toLowerCase(),
+    normText(item.title).toLowerCase(),
+    normText(item.creator).toLowerCase(),
+    normText(item.reason)
+  ]);
+}
+function momentFingerprint(item, mediaStableKey){
+  return JSON.stringify([
+    mediaStableKey || '',
+    normText(item.anchor),
+    normText(item.thought),
+    normText(item.connection),
+    normText(item.line),
+    sortTags(item.tags),
+    Number(item.createdAt) || 0
+  ]);
+}
+function relationFingerprint(item, fromStableKey, toStableKey){
+  return JSON.stringify([
+    fromStableKey || '',
+    toStableKey || '',
+    normText(item.label)
+  ]);
+}
+function safeNumId(v){
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+function stableMediaKey(item){
+  return item && (item.uuid || (safeNumId(item.id) != null ? `legacy-media:${item.id}` : mediaFingerprint(item)));
+}
+function stableMomentKey(item){
+  return item && (item.uuid || (safeNumId(item.id) != null ? `legacy-moment:${item.id}` : null));
+}
+async function ensureCompatibility(){
+  if (compatReady) return;
+  compatReady = true;
+  const [media, moments, relations] = await Promise.all([db.media.toArray(), db.moments.toArray(), db.relations.toArray()]);
+  const mediaUuidById = new Map();
+  for (const item of media) {
+    const patch = {};
+    if (!item.uuid) patch.uuid = makeUuid();
+    if (!item.updatedAt) patch.updatedAt = item.createdAt || Date.now();
+    if (Object.keys(patch).length) await db.media.update(item.id, patch);
+    mediaUuidById.set(item.id, patch.uuid || item.uuid);
+  }
+  const momentUuidById = new Map();
+  for (const item of moments) {
+    const patch = {};
+    if (!item.uuid) patch.uuid = makeUuid();
+    if (!item.mediaUuid) patch.mediaUuid = mediaUuidById.get(item.mediaId) || null;
+    if (!item.updatedAt) patch.updatedAt = item.createdAt || Date.now();
+    if (Object.keys(patch).length) await db.moments.update(item.id, patch);
+    momentUuidById.set(item.id, patch.uuid || item.uuid);
+  }
+  for (const item of relations) {
+    const patch = {};
+    if (!item.uuid) patch.uuid = makeUuid();
+    if (!item.fromUuid) patch.fromUuid = momentUuidById.get(item.fromId) || null;
+    if (!item.toUuid) patch.toUuid = momentUuidById.get(item.toId) || null;
+    if (Object.keys(patch).length) await db.relations.update(item.id, patch);
+  }
+}
 
 const VIEWS=['home','tags','connections','mdetail','med','momed'];
 function sv(n,push=true){
@@ -462,6 +572,7 @@ function toggleSearch(){
 }
 
 async function loadAll(){
+  await ensureCompatibility();
   [AM,AMO,AR]=await Promise.all([db.media.orderBy('createdAt').reverse().toArray(),db.moments.orderBy('createdAt').toArray(),db.relations.toArray()]);
   const now = new Date();
   const dayStr = now.toLocaleDateString('en-GB',{weekday:'long'});
@@ -616,12 +727,15 @@ function editCurrentMedia(){openMediaEd(cMediaId);}
 async function saveMedia(){
   const title=document.getElementById('me-title').value.trim();
   if(!title){toast('Add a title first');return;}
+  const existing = edMediaId ? AM.find(x=>x.id===edMediaId) : null;
   const data={
+    uuid: existing?.uuid || makeUuid(),
     type:document.getElementById('me-type').value,
     title,
     creator:document.getElementById('me-creator').value.trim(),
     reason:getBlks('me-reason-blks'),
-    createdAt:Date.now()
+    createdAt: existing?.createdAt || Date.now(),
+    updatedAt: Date.now()
   };
   if(edMediaId){await db.media.update(edMediaId,data);toast('Updated');await loadAll();back();}
   else{const id=await db.media.add(data);cMediaId=id;toast('Added');await loadAll();renderMD(id);vStack.length=0;vStack.push('home','mdetail');sv('mdetail',false);}
@@ -670,7 +784,7 @@ function openMomEd(momId,mediaId){
     renderBlks('mo-conn-blks', mo.connection||'');
     renderBlks('mo-line-blks', mo.line||'');
     mTags=[...(mo.tags||[])];
-    relRows=AR.filter(r=>r.fromId===momId).map(r=>({label:r.label,toId:r.toId,dbId:r.id}));
+    relRows=AR.filter(r=>r.fromId===momId).map(r=>({label:r.label,toId:r.toId,dbId:r.id,uuid:r.uuid}));
     meta.textContent=fdtFull(mo.createdAt);
     setMoStage(2);
   } else {
@@ -684,12 +798,20 @@ function openMomEd(momId,mediaId){
   renderTI();renderRelRows();sv('momed');
 }
 async function saveMoment(){
-  const data={mediaId:edMomMediaId,anchor:document.getElementById('mo-anchor').value.trim(),thought:getBlks('mo-thought-blks'),connection:getBlks('mo-conn-blks'),line:getBlks('mo-line-blks'),tags:mTags,createdAt:edMomId?(AMO.find(x=>x.id===edMomId)?.createdAt||Date.now()):Date.now(),updatedAt:Date.now()};
+  const existing = edMomId ? AMO.find(x=>x.id===edMomId) : null;
+  const media = AM.find(x=>x.id===edMomMediaId);
+  const data={uuid:existing?.uuid||makeUuid(),mediaId:edMomMediaId,mediaUuid:media?.uuid||existing?.mediaUuid||null,anchor:document.getElementById('mo-anchor').value.trim(),thought:getBlks('mo-thought-blks'),connection:getBlks('mo-conn-blks'),line:getBlks('mo-line-blks'),tags:sortTags(mTags),createdAt:existing?.createdAt||Date.now(),updatedAt:Date.now()};
   let mid=edMomId;
   if(mid){await db.moments.update(mid,data);}
   else{mid=await db.moments.add(data);}
   if(edMomId){const old=await db.relations.where('fromId').equals(edMomId).toArray();for(const r of old)await db.relations.delete(r.id);}
-  for(const r of relRows){if(r.toId&&r.label)await db.relations.add({fromId:mid,toId:r.toId,label:r.label});}
+  const savedMomentUuid = data.uuid;
+  for(const r of relRows){
+    if(r.toId&&r.label){
+      const target = AMO.find(x=>x.id===r.toId);
+      await db.relations.add({uuid:r.uuid||makeUuid(),fromId:mid,toId:r.toId,fromUuid:savedMomentUuid,toUuid:target?.uuid||null,label:r.label});
+    }
+  }
   toast(edMomId?'Moment updated':'Moment saved');
   const mMediaId=edMomMediaId||cMediaId;edMomId=null;
   await loadAll();renderMD(mMediaId);back();
@@ -709,17 +831,17 @@ function renderTI(){
   disp.innerHTML='';
   mTags.forEach((t,i)=>{const p=document.createElement('span');p.className='tp-rm';p.innerHTML=`#${esc(t)}<button onclick="rmTag(${i})">×</button>`;disp.appendChild(p);});
 }
-function handleTagKey(e){if(e.key===' '||e.key==='Enter'){if(e.target.value.trim()){e.preventDefault();commitTag();}}if(e.key==='Backspace'&&!e.target.value&&mTags.length){mTags.pop();renderTI();}}
+function handleTagKey(e){if(e.key===' '||e.key==='Enter'){if(e.target.value.trim()){e.preventDefault();commitTag();}}if(e.key==='Backspace'&&!e.target.value&&mTags.length){mTags.pop();mTags=sortTags(mTags);renderTI();}}
 function handleTagInput(e){if(e.target.value.endsWith(' '))commitTag();}
-function commitTag(){const raw=document.getElementById('ti');const v=raw.value.trim().replace(/\s+/g,'').toLowerCase();if(v&&!mTags.includes(v)){mTags.push(v);renderTI();}raw.value='';}
-function rmTag(i){mTags.splice(i,1);renderTI();}
+function commitTag(){const raw=document.getElementById('ti');const v=raw.value.trim().replace(/\s+/g,'').toLowerCase();if(v&&!mTags.includes(v)){mTags.push(v);mTags=sortTags(mTags);renderTI();}raw.value='';}
+function rmTag(i){mTags.splice(i,1);mTags=sortTags(mTags);renderTI();}
 
 // REL ROWS
 function renderRelRows(){
   document.getElementById('rel-rows').innerHTML=relRows.map((r,i)=>`
     <div class="rel-row">
       <input class="fi" style="flex:0 0 90px;" placeholder="Label…" value="${esc(r.label||'')}" oninput="relRows[${i}].label=this.value">
-      <select class="fi" onchange="relRows[${i}].toId=+this.value">${momOpts(r.toId)}</select>
+      <select class="fi" onchange="relRows[${i}].toId=this.value?+this.value:null">${momOpts(r.toId)}</select>
       <button class="rel-rm-btn" onclick="rmRel(${i})">×</button>
     </div>`).join('');
 }
@@ -789,11 +911,128 @@ async function handleImport(e){
   try{
     const d=JSON.parse(await f.text());
     const media=d.media||[],moments=d.moments||[],rels=d.relations||[];
+    await ensureCompatibility();
+    const [existingMedia, existingMoments, existingRelations] = await Promise.all([db.media.toArray(), db.moments.toArray(), db.relations.toArray()]);
+    const mediaByUuid = new Map(existingMedia.filter(x=>x.uuid).map(x=>[x.uuid, x]));
+    const mediaByFingerprint = new Map(existingMedia.map(x=>[mediaFingerprint(x), x]));
+    const momentByUuid = new Map(existingMoments.filter(x=>x.uuid).map(x=>[x.uuid, x]));
+    const relationByUuid = new Map(existingRelations.filter(x=>x.uuid).map(x=>[x.uuid, x]));
+    const momentByFingerprint = new Map();
+    existingMoments.forEach(x=>{
+      const media = existingMedia.find(m=>m.id===x.mediaId);
+      momentByFingerprint.set(momentFingerprint(x, stableMediaKey(media)), x);
+    });
+    const relationByFingerprint = new Map();
+    existingRelations.forEach(x=>{
+      const from = existingMoments.find(m=>m.id===x.fromId);
+      const to = existingMoments.find(m=>m.id===x.toId);
+      relationByFingerprint.set(relationFingerprint(x, stableMomentKey(from), stableMomentKey(to)), x);
+    });
     const medMap={}, momMap={};
-    for(const m of media){const{id, ...r}=m; const newId=await db.media.add({...r,createdAt:r.createdAt||Date.now()}); medMap[id]=newId;}
-    for(const m of moments){const{id, mediaId, ...r}=m; const newId=await db.moments.add({...r,mediaId:medMap[mediaId],createdAt:r.createdAt||Date.now()}); momMap[id]=newId;}
-    for(const r of rels){const{id, fromId, toId, ...rest}=r; if(momMap[fromId] && momMap[toId]) await db.relations.add({...rest, fromId:momMap[fromId], toId:momMap[toId]});}
-    await loadAll();toast(`Imported ${media.length} media, ${moments.length} moments`);
+    let addedMedia=0, addedMoments=0, addedRelations=0, skippedMedia=0, skippedMoments=0, skippedRelations=0;
+
+    for(const item of media){
+      const uuid = item.uuid || null;
+      const fp = mediaFingerprint(item);
+      let existing = (uuid && mediaByUuid.get(uuid)) || mediaByFingerprint.get(fp);
+      if(existing){
+        if(uuid && !existing.uuid){
+          await db.media.update(existing.id, { uuid, updatedAt: existing.updatedAt || existing.createdAt || Date.now() });
+          existing = { ...existing, uuid };
+        }
+        medMap[item.id] = existing.id;
+        skippedMedia++;
+        continue;
+      }
+      const payload = {
+        uuid: uuid || makeUuid(),
+        type: item.type || 'book',
+        title: item.title || '',
+        creator: item.creator || '',
+        reason: item.reason || '',
+        createdAt: item.createdAt || Date.now(),
+        updatedAt: item.updatedAt || item.createdAt || Date.now()
+      };
+      const newId = await db.media.add(payload);
+      const inserted = { ...payload, id: newId };
+      medMap[item.id] = newId;
+      mediaByUuid.set(inserted.uuid, inserted);
+      mediaByFingerprint.set(mediaFingerprint(inserted), inserted);
+      existingMedia.push(inserted);
+      addedMedia++;
+    }
+
+    for(const item of moments){
+      const mappedMediaId = medMap[item.mediaId];
+      if(!mappedMediaId) continue;
+      const parentMedia = existingMedia.find(m=>m.id===mappedMediaId);
+      const mediaKey = stableMediaKey(parentMedia);
+      const uuid = item.uuid || null;
+      const fp = momentFingerprint(item, mediaKey);
+      let existing = (uuid && momentByUuid.get(uuid)) || momentByFingerprint.get(fp);
+      if(existing){
+        if(uuid && !existing.uuid){
+          await db.moments.update(existing.id, { uuid, mediaUuid: existing.mediaUuid || parentMedia?.uuid || null, updatedAt: existing.updatedAt || existing.createdAt || Date.now() });
+          existing = { ...existing, uuid, mediaUuid: existing.mediaUuid || parentMedia?.uuid || null };
+        }
+        momMap[item.id] = existing.id;
+        skippedMoments++;
+        continue;
+      }
+      const payload = {
+        uuid: uuid || makeUuid(),
+        mediaId: mappedMediaId,
+        mediaUuid: item.mediaUuid || parentMedia?.uuid || null,
+        anchor: item.anchor || '',
+        thought: item.thought || '',
+        connection: item.connection || '',
+        line: item.line || '',
+        tags: sortTags(item.tags),
+        createdAt: item.createdAt || Date.now(),
+        updatedAt: item.updatedAt || item.createdAt || Date.now()
+      };
+      const newId = await db.moments.add(payload);
+      const inserted = { ...payload, id: newId };
+      momMap[item.id] = newId;
+      momentByUuid.set(inserted.uuid, inserted);
+      momentByFingerprint.set(momentFingerprint(inserted, mediaKey), inserted);
+      existingMoments.push(inserted);
+      addedMoments++;
+    }
+
+    for(const item of rels){
+      const mappedFromId = momMap[item.fromId];
+      const mappedToId = momMap[item.toId];
+      if(!mappedFromId || !mappedToId) continue;
+      const from = existingMoments.find(m=>m.id===mappedFromId);
+      const to = existingMoments.find(m=>m.id===mappedToId);
+      const fromKey = stableMomentKey(from) || momentFingerprint(from, from?.mediaUuid || '');
+      const toKey = stableMomentKey(to) || momentFingerprint(to, to?.mediaUuid || '');
+      const uuid = item.uuid || null;
+      const fp = relationFingerprint(item, fromKey, toKey);
+      let existing = (uuid && relationByUuid.get(uuid)) || relationByFingerprint.get(fp);
+      if(existing){
+        skippedRelations++;
+        continue;
+      }
+      const payload = {
+        uuid: uuid || makeUuid(),
+        fromId: mappedFromId,
+        toId: mappedToId,
+        fromUuid: item.fromUuid || from?.uuid || null,
+        toUuid: item.toUuid || to?.uuid || null,
+        label: item.label || ''
+      };
+      const newId = await db.relations.add(payload);
+      const inserted = { ...payload, id: newId };
+      relationByUuid.set(inserted.uuid, inserted);
+      relationByFingerprint.set(fp, inserted);
+      existingRelations.push(inserted);
+      addedRelations++;
+    }
+
+    await loadAll();
+    toast(`Imported ${addedMedia} media, ${addedMoments} moments, ${addedRelations} links · skipped ${skippedMedia + skippedMoments + skippedRelations}`);
   }catch(err){console.error(err);toast('Could not read file');}
   e.target.value='';
 }
