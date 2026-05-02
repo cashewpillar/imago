@@ -265,6 +265,7 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
     <div class="fg"><label class="fl">Type</label><select class="fi" id="me-type"><option value="book">Book</option><option value="film">Film</option><option value="tv">TV series</option><option value="other">Other</option></select></div>
     <div class="fg"><label class="fl">Title</label><input class="fi" id="me-title" placeholder="Title of the work…"></div>
     <div class="fg"><label class="fl">Author / Director / Creator</label><input class="fi" id="me-creator" placeholder="Who made it…"></div>
+    <div class="fg"><label class="fl">Why did you pick this?</label><textarea class="ta" id="me-reason" placeholder="What drew you to it… (e.g. a recommendation, a specific theme, etc.)" rows="2" oninput="ar(this)"></textarea></div>
   </div>
   <div class="save-bar"><button class="btn bd" id="me-del-btn" onclick="delMedia()" style="display:none">Delete</button><button class="btn" onclick="back()">Cancel</button><button class="btn bp" onclick="saveMedia()">Save</button></div>
 </div>
@@ -458,6 +459,7 @@ function renderMD(id){
       <div class="md-type">${TL[m.type]||m.type}</div>
       <div class="md-title">${esc(m.title||'Untitled')}</div>
       ${m.creator?`<div class="md-creator">${esc(m.creator)}</div>`:''}
+      ${m.reason?`<div class="mc-preview" style="padding:4px 0 0; opacity:0.8; font-size:13px">"${esc(m.reason)}"</div>`:''}
       ${(untagged>0||sortedTags.length)?`<div class="md-tags" style="margin-top:10px; border-top:1px solid var(--b); padding-top:10px;">${tagsHtml}</div>`:''}
     </div>
     <div class="sec-head"><span class="sec-lbl">Moments ${mdTag?`(${moms.length})`:''}</span><button class="btn" style="font-size:12px;padding:5px 10px;" onclick="openMomEd(null,${id})">+ add moment</button></div>
@@ -498,14 +500,26 @@ async function jumpTo(mid){
 // MEDIA EDITOR
 function openMediaEd(id){edMediaId=id;document.getElementById('me-lbl').textContent=id?'Edit media':'New media';
   document.getElementById('me-del-btn').style.display=id?'':'none';
-  if(id){const m=AM.find(x=>x.id===id);document.getElementById('me-type').value=m.type||'book';document.getElementById('me-title').value=m.title||'';document.getElementById('me-creator').value=m.creator||'';}
-  else{document.getElementById('me-type').value='book';document.getElementById('me-title').value='';document.getElementById('me-creator').value='';}
+  if(id){
+    const m=AM.find(x=>x.id===id);
+    document.getElementById('me-type').value=m.type||'book';
+    document.getElementById('me-title').value=m.title||'';
+    document.getElementById('me-creator').value=m.creator||'';
+    const re=document.getElementById('me-reason'); re.value=m.reason||''; ar(re);
+  }
+  else{document.getElementById('me-type').value='book';document.getElementById('me-title').value='';document.getElementById('me-creator').value='';document.getElementById('me-reason').value='';}
   sv('med');}
 function editCurrentMedia(){openMediaEd(cMediaId);}
 async function saveMedia(){
   const title=document.getElementById('me-title').value.trim();
   if(!title){toast('Add a title first');return;}
-  const data={type:document.getElementById('me-type').value,title,creator:document.getElementById('me-creator').value.trim(),createdAt:Date.now()};
+  const data={
+    type:document.getElementById('me-type').value,
+    title,
+    creator:document.getElementById('me-creator').value.trim(),
+    reason:document.getElementById('me-reason').value.trim(),
+    createdAt:Date.now()
+  };
   if(edMediaId){await db.media.update(edMediaId,data);toast('Updated');await loadAll();back();}
   else{const id=await db.media.add(data);cMediaId=id;toast('Added');await loadAll();renderMD(id);vStack.length=0;vStack.push('home','mdetail');sv('mdetail',false);}
   edMediaId=null;
