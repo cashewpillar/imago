@@ -429,7 +429,20 @@ input::placeholder { color: var(--hint); }
       <button class="btn-save" onclick="doExport()">export all entries (.json)</button>
       <button class="btn-save" style="background:var(--surface2);color:var(--text);border:0.5px solid var(--border-med);" onclick="document.getElementById('import-file').click()">import from backup</button>
       <input type="file" id="import-file" accept=".json" style="display:none;" onchange="doImport(event)">
-      <div style="font-size:12px;color:var(--hint);font-family:-apple-system,sans-serif;text-align:center;">import merges — it won't overwrite existing entries</div>
+      <div style="font-size:12px;color:var(--hint);font-family:-apple-system,sans-serif;text-align:center;">idempotent merge — matching date + text prevents duplicates</div>    </div>
+  </div>
+</div>
+
+<!-- CONFLICT MODAL -->
+<div class="modal-overlay" id="conflict-modal">
+  <div class="modal" style="max-width: 600px;">
+    <div class="modal-title">
+      <span>review conflicts</span>
+    </div>
+    <div id="conflict-list" style="display:flex;flex-direction:column;gap:1.5rem;margin-bottom:1.5rem;"></div>
+    <div style="display:flex;gap:10px;">
+      <button class="btn-save" style="background:var(--surface2);color:var(--text);border:1px solid var(--border-med);" onclick="resolveAll('local')">keep all local</button>
+      <button class="btn-save" onclick="resolveAll('incoming')">take all incoming</button>
     </div>
   </div>
 </div>
@@ -442,6 +455,14 @@ db.version(2).stores({
   entries: '++id, dt, *tags',
   fields: 'id, name, shape, order'
 });
+db.version(3).stores({
+  entries: '++id, dt, uid, *tags',
+  fields: 'id, name, shape, order'
+});
+
+function genUid() {
+  return 'u_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
 
 // ── STATE ───────────────────────────────────────────────────────────────────
 let allEntries = [];
@@ -468,7 +489,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function loadEntries() {
-  allEntries = await db.entries.orderBy('dt').reverse().toArray();
+  const entries = await db.entries.orderBy('dt').reverse().toArray();
+  let migrated = false;
+  for (const e of entries) {
+    let needsUpdate = false;
+    const updateObj = {};
+    if (!e.uid) { updateObj.uid = genUid(); needsUpdate = true; }
+    if (!e.updated) { updateObj.updated = e.dt || Date.now(); needsUpdate = true; }
+    
+    if (needsUpdate) {
+      await db.entries.update(e.id, updateObj);
+      migrated = true;
+    }
+  }
+  allEntries = migrated ? await db.entries.orderBy('dt').reverse().toArray() : entries;
   renderEntries();
 }
 
@@ -615,7 +649,14 @@ async function saveEntry() {
   const pending = document.getElementById('tag-input').value.trim();
   if (pending) { addTagTo(captureTags, pending); document.getElementById('tag-input').value = ''; }
   flushPendingFieldInputs('capture');
-  await db.entries.add({ text, dt, tags: [...captureTags], customFields: cloneFieldValues(captureFieldValues) });
+  const now = Date.now();
+  await db.entries.add({ 
+    text, dt, 
+    tags: [...captureTags], 
+    customFields: cloneFieldValues(captureFieldValues),
+    uid: genUid(),
+    updated: now
+  });
   // reset
   document.getElementById('capture-text').value = '';
   document.getElementById('capture-text').style.height = 'auto';
@@ -914,7 +955,12 @@ async function saveEdit() {
   flushPendingFieldInputs('edit');
   const dtVal = document.getElementById('edit-dt').value;
   const dt = dtVal ? new Date(dtVal).getTime() : Date.now();
-  await db.entries.update(editingId, { text, dt, tags: [...editTags], customFields: cloneFieldValues(editFieldValues) });
+  await db.entries.update(editingId, { 
+    text, dt, 
+    tags: [...editTags], 
+    customFields: cloneFieldValues(editFieldValues),
+    updated: Date.now()
+  });
   closeModal();
   await loadEntries();
 }
@@ -942,29 +988,120 @@ async function doImport(event) {
   reader.onload = async e => {
     try {
       const data = JSON.parse(e.target.result);
-      const entries = data.entries || data; // handle both formats
-      if (!Array.isArray(entries)) throw new Error();
+      const incomingEntries = data.entries || data; // handle both formats
+      if (!Array.isArray(incomingEntries)) throw new Error();
+
       if (Array.isArray(data.fields)) {
         customFieldDefs = mergeFieldDefs(customFieldDefs, data.fields);
         await saveFieldDefs();
       }
+
       let added = 0;
-      for (const entry of entries) {
-        const { id, ...rest } = entry; // strip id so Dexie auto-assigns
-        await db.entries.add(rest);
-        added++;
+      pendingConflicts = [];
+      const existingEntries = await db.entries.toArray();
+
+      for (const incoming of incomingEntries) {
+        // 1. Try match by UID
+        let local = existingEntries.find(x => x.uid && x.uid === incoming.uid);
+        
+        // 2. Fallback to dt + text for older backups
+        if (!local) {
+          local = existingEntries.find(x => x.dt === incoming.dt && x.text === incoming.text);
+        }
+
+        if (!local) {
+          const { id, ...rest } = incoming;
+          await db.entries.add(rest);
+          added++;
+        } else {
+          // Check for differences
+          const isDifferent = 
+            local.text !== incoming.text || 
+            JSON.stringify(local.tags) !== JSON.stringify(incoming.tags) ||
+            JSON.stringify(local.customFields) !== JSON.stringify(incoming.customFields);
+
+          if (isDifferent) {
+            pendingConflicts.push({ local, incoming });
+          }
+        }
       }
+
       document.getElementById('ei-modal').classList.remove('open');
-      renderCustomFieldSections('capture');
-      renderCustomFieldSections('edit');
-      await loadEntries();
-      alert(`Imported ${added} entries.`);
-    } catch {
+      
+      if (pendingConflicts.length > 0) {
+        renderConflictReview();
+        document.getElementById('conflict-modal').classList.add('open');
+      } else {
+        await loadEntries();
+        alert(`Imported ${added} new entries.`);
+      }
+    } catch (err) {
+      console.error(err);
       alert('Could not read that file. Make sure it\'s a thoughtweb backup.');
     }
+    event.target.value = '';
   };
   reader.readAsText(file);
-  event.target.value = '';
+}
+
+function renderConflictReview() {
+  const list = document.getElementById('conflict-list');
+  list.innerHTML = pendingConflicts.map((c, i) => {
+    return `<div class="conflict-item" style="padding:12px; background:var(--surface2); border-radius:var(--radius-sm); font-size:14px;">
+      <div style="font-weight:600; margin-bottom:8px; font-size:12px; color:var(--muted);">${fmtDt(c.local.dt)}</div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+        <div onclick="resolveConflict(${i}, 'local')" style="cursor:pointer; padding:8px; border:1px solid var(--border-med); border-radius:4px; background:var(--surface);">
+          <div style="font-size:10px; text-transform:uppercase; color:var(--hint);">local version</div>
+          <div style="margin-top:4px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">${esc(c.local.text)}</div>
+        </div>
+        <div onclick="resolveConflict(${i}, 'incoming')" style="cursor:pointer; padding:8px; border:1px solid var(--purple-border); border-radius:4px; background:var(--purple-bg);">
+          <div style="font-size:10px; text-transform:uppercase; color:var(--purple-text);">incoming version</div>
+          <div style="margin-top:4px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">${esc(c.incoming.text)}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function resolveConflict(index, choice) {
+  const c = pendingConflicts[index];
+  if (choice === 'incoming') {
+    await db.entries.update(c.local.id, { 
+      text: c.incoming.text, 
+      tags: c.incoming.tags, 
+      customFields: c.incoming.customFields,
+      dt: c.incoming.dt,
+      uid: c.incoming.uid || c.local.uid,
+      updated: c.incoming.updated || Date.now()
+    });
+  }
+  pendingConflicts.splice(index, 1);
+  if (pendingConflicts.length === 0) {
+    document.getElementById('conflict-modal').classList.remove('open');
+    await loadEntries();
+  } else {
+    renderConflictReview();
+  }
+}
+
+async function resolveAll(choice) {
+  const items = [...pendingConflicts];
+  for (let i = 0; i < items.length; i++) {
+    const c = items[i];
+    if (choice === 'incoming') {
+      await db.entries.update(c.local.id, { 
+        text: c.incoming.text, 
+        tags: c.incoming.tags, 
+        customFields: c.incoming.customFields,
+        dt: c.incoming.dt,
+        uid: c.incoming.uid || c.local.uid,
+        updated: c.incoming.updated || Date.now()
+      });
+    }
+  }
+  pendingConflicts = [];
+  document.getElementById('conflict-modal').classList.remove('open');
+  await loadEntries();
 }
 
 function mergeFieldDefs(existing, incoming) {

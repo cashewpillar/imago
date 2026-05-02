@@ -551,6 +551,10 @@ db.version(2).stores({
   entries: '++id, dt, *tags',
   fields: 'id, name, shape, order'
 });
+db.version(3).stores({
+  entries: '++id, dt, uid, *tags',
+  fields: 'id, name, shape, order'
+});
 
 let allEntries = [];
 let customFieldDefs = [];
@@ -571,8 +575,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.addEventListener('resize', renderGraph);
 });
 
+function genUid() {
+  return 'u_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
 async function loadEntries() {
-  allEntries = await db.entries.orderBy('dt').reverse().toArray();
+  const entries = await db.entries.orderBy('dt').reverse().toArray();
+  let migrated = false;
+  for (const e of entries) {
+    let needsUpdate = false;
+    const updateObj = {};
+    if (!e.uid) { updateObj.uid = genUid(); needsUpdate = true; }
+    if (!e.updated) { updateObj.updated = e.dt || Date.now(); needsUpdate = true; }
+    
+    if (needsUpdate) {
+      await db.entries.update(e.id, updateObj);
+      migrated = true;
+    }
+  }
+  allEntries = migrated ? await db.entries.orderBy('dt').reverse().toArray() : entries;
 }
 
 function loadLegacyFieldDefs() {
@@ -1286,8 +1307,6 @@ document.addEventListener('click', event => {
   if (sidebar.contains(event.target) || toggle.contains(event.target)) return;
   toggleTagSidebar(false);
 });
-
-init();
 </script>
 </body>
 </html>
