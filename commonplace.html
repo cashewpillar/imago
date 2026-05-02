@@ -50,9 +50,16 @@ html,body{background:var(--cream);color:var(--ink);font-family:'DM Sans',sans-se
 .fi:focus{border-color:var(--rust);}
 .fi::placeholder{color:var(--ink4);font-style:italic;}
 select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238A837A' stroke-width='1.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;padding-right:28px;}
-.ta{width:100%;background:var(--paper);border:1px solid var(--bm);border-radius:8px;padding:11px 12px;font-family:'Lora',serif;font-size:14px;color:var(--ink);line-height:1.7;outline:none;resize:none;min-height:88px;transition:border-color .13s;-webkit-appearance:none;}
+.ta, .ta-view{width:100%;background:var(--paper);border:1px solid var(--bm);border-radius:8px;padding:11px 12px;font-family:'Lora',serif;font-size:14px;color:var(--ink);line-height:1.7;outline:none;resize:none;min-height:88px;transition:border-color .13s;-webkit-appearance:none;}
 .ta:focus{border-color:var(--rust);}
 .ta::placeholder{color:var(--ink4);font-style:italic;}
+.ta.off{display:none;}
+.ta-view{display:none;cursor:text;white-space:pre-wrap;overflow-wrap:break-word;}
+.ta-view.on{display:block;}
+.note{color:var(--ink3);font-style:italic;font-size:0.92em;font-family:'DM Sans',sans-serif;margin:0 1px;background:var(--cream2);padding:0 4px;border-radius:3px;}
+.ta-view b{font-weight:600;}
+.ta-view u{text-decoration:underline;text-decoration-color:var(--rust3);text-underline-offset:3px;}
+.ta-view hr{border:none;border-top:1px solid var(--b);margin:14px 0;}
 .fl{font-size:10px;font-weight:500;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);display:block;margin-bottom:5px;}
 .fg{margin-bottom:16px;}
 
@@ -267,7 +274,10 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
     <div class="fg"><label class="fl">Type</label><select class="fi" id="me-type"><option value="book">Book</option><option value="film">Film</option><option value="tv">TV series</option><option value="other">Other</option></select></div>
     <div class="fg"><label class="fl">Title</label><input class="fi" id="me-title" placeholder="Title of the work…"></div>
     <div class="fg"><label class="fl">Author / Director / Creator</label><input class="fi" id="me-creator" placeholder="Who made it…"></div>
-    <div class="fg"><label class="fl">Why did you pick this?</label><textarea class="ta" id="me-reason" placeholder="What drew you to it… (e.g. a recommendation, a specific theme, etc.)" rows="2" oninput="ar(this)"></textarea></div>
+    <div class="fg"><label class="fl">Why did you pick this?</label>
+      <textarea class="ta" id="me-reason" placeholder="What drew you to it…" rows="2" oninput="ar(this)" onfocus="toEdit(this)" onblur="toView(this)"></textarea>
+      <div id="me-reason-v" class="ta-view" onclick="toEdit(document.getElementById('me-reason'))"></div>
+    </div>
   </div>
   <div class="save-bar"><button class="btn bd" id="me-del-btn" onclick="delMedia()" style="display:none">Delete</button><button class="btn" onclick="back()">Cancel</button><button class="btn bp" onclick="saveMedia()">Save</button></div>
 </div>
@@ -279,7 +289,8 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
     <!-- STAGE 1: capture thoughts -->
     <div id="mo-s1">
       <div class="fg"><label class="fl">Thoughts</label>
-        <textarea class="ta" id="mo-thought" placeholder="Let your mind wander." rows="3" oninput="ar(this)"></textarea>
+        <textarea class="ta" id="mo-thought" placeholder="Let your mind wander." rows="3" oninput="ar(this)" onfocus="toEdit(this)" onblur="toView(this)"></textarea>
+        <div id="mo-thought-v" class="ta-view" onclick="toEdit(document.getElementById('mo-thought'))"></div>
         <div class="pcs">
           <span class="pc" onclick="ap('mo-thought','It reminded me of a time when ')">a memory</span>
           <span class="pc" onclick="ap('mo-thought','I kept thinking about ')">something I lingered on</span>
@@ -302,7 +313,8 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
       <div class="div-lbl">Details</div>
 
       <div class="fg"><label class="fl">How does it connect to your life?</label>
-        <textarea class="ta" id="mo-conn" placeholder="People, places, feelings…" rows="3" oninput="ar(this)"></textarea>
+        <textarea class="ta" id="mo-conn" placeholder="People, places, feelings…" rows="3" oninput="ar(this)" onfocus="toEdit(this)" onblur="toView(this)"></textarea>
+        <div id="mo-conn-v" class="ta-view" onclick="toEdit(document.getElementById('mo-conn'))"></div>
         <div class="pcs">
           <span class="pc" onclick="ap('mo-conn','This made me think of someone I know: ')">a person</span>
           <span class="pc" onclick="ap('mo-conn','At this point in my life ')">where I am now</span>
@@ -310,7 +322,10 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
         </div>
       </div>
 
-      <div class="fg"><label class="fl">A line or moment that means something to you <span style="color:var(--ink4);font-style:italic;font-size:9px;">optional</span></label><textarea class="ta" id="mo-line" placeholder="Something you'd want to remember." rows="2" oninput="ar(this)"></textarea></div>
+      <div class="fg"><label class="fl">A line or moment that means something to you <span style="color:var(--ink4);font-style:italic;font-size:9px;">optional</span></label>
+        <textarea class="ta" id="mo-line" placeholder="Something you'd want to remember." rows="2" oninput="ar(this)" onfocus="toEdit(this)" onblur="toView(this)"></textarea>
+        <div id="mo-line-v" class="ta-view" onclick="toEdit(document.getElementById('mo-line'))"></div>
+      </div>
 
       <div style="height:24px;"></div>
       <div class="div-lbl">Connections</div>
@@ -377,7 +392,36 @@ function toast(m){const e=document.getElementById('toast');e.textContent=m;e.cla
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function fdt(ts){return new Date(ts).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});}
 function ar(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
-function ap(id,t){const el=document.getElementById(id);if(el.value&&!el.value.endsWith('\n'))el.value+='\n';el.value+=t;el.focus();ar(el);}
+function toEdit(el){
+  if(typeof el === 'string') el = document.getElementById(el);
+  el.classList.remove('off');
+  const v=document.getElementById(el.id+'-v');
+  if(v) v.classList.remove('on');
+  ar(el);
+  el.focus();
+}
+function toView(el){
+  if(!el.value.trim()){
+    el.classList.remove('off');
+    const v=document.getElementById(el.id+'-v');
+    if(v) v.classList.remove('on');
+    return;
+  }
+  el.classList.add('off');
+  const v=document.getElementById(el.id+'-v');
+  if(v){ v.innerHTML=parseMd(el.value); v.classList.add('on'); }
+}
+function parseMd(t){
+  let h=esc(t);
+  h=h.replace(/\*\*(.*?)\*\*/g,'<b>$1</b>');
+  h=h.replace(/__(.*?)__/g,'<u>$1</u>');
+  h=h.replace(/\*(.*?)\*/g,'<i>$1</i>');
+  h=h.replace(/^---$/gm,'<hr>');
+  h=h.replace(/^- (.*)$/gm,'• $1');
+  h=h.replace(/\((.*?)\)/g,'<span class="note">($1)</span>');
+  return h.replace(/\n/g,'<br>');
+}
+function ap(id,t){const el=document.getElementById(id);toEdit(el);if(el.value&&!el.value.endsWith('\n'))el.value+='\n';el.value+=t;el.focus();ar(el);}
 
 function toggleSearch(){
   const wrap = document.getElementById('s-wrap');
@@ -519,14 +563,22 @@ async function jumpTo(mid){
 // MEDIA EDITOR
 function openMediaEd(id){edMediaId=id;document.getElementById('me-lbl').textContent=id?'Edit media':'New media';
   document.getElementById('me-del-btn').style.display=id?'':'none';
+  const re=document.getElementById('me-reason');
   if(id){
     const m=AM.find(x=>x.id===id);
     document.getElementById('me-type').value=m.type||'book';
     document.getElementById('me-title').value=m.title||'';
     document.getElementById('me-creator').value=m.creator||'';
-    const re=document.getElementById('me-reason'); re.value=m.reason||''; ar(re);
+    re.value=m.reason||''; ar(re);
+    toView(re);
   }
-  else{document.getElementById('me-type').value='book';document.getElementById('me-title').value='';document.getElementById('me-creator').value='';document.getElementById('me-reason').value='';}
+  else{
+    document.getElementById('me-type').value='book';
+    document.getElementById('me-title').value='';
+    document.getElementById('me-creator').value='';
+    re.value=''; re.classList.remove('off');
+    document.getElementById('me-reason-v').classList.remove('on');
+  }
   sv('med');}
 function editCurrentMedia(){openMediaEd(cMediaId);}
 async function saveMedia(){
@@ -575,7 +627,11 @@ function openMomEd(momId,mediaId){
   edMomId=momId;edMomMediaId=mediaId;mTags=[];relRows=[];
   document.getElementById('momed-lbl').textContent=momId?'Edit moment':'New moment';
   document.getElementById('mo-del-btn').style.display=momId?'':'none';
-  ['mo-thought','mo-conn','mo-line'].forEach(id=>{const el=document.getElementById(id);el.value='';el.style.height='auto';});
+  ['mo-thought','mo-conn','mo-line'].forEach(id=>{
+    const el=document.getElementById(id);el.value='';el.style.height='auto';
+    el.classList.remove('off');
+    const v=document.getElementById(id+'-v');if(v)v.classList.remove('on');
+  });
   document.getElementById('mo-anchor').value='';
   if(momId){
     const mo=AMO.find(x=>x.id===momId);
@@ -585,9 +641,13 @@ function openMomEd(momId,mediaId){
     document.getElementById('mo-line').value=mo.line||'';
     mTags=[...(mo.tags||[])];
     relRows=AR.filter(r=>r.fromId===momId).map(r=>({label:r.label,toId:r.toId,dbId:r.id}));
+    ['mo-thought','mo-conn','mo-line'].forEach(id=>{
+      const el=document.getElementById(id);if(el.value.trim())toView(el);
+    });
     setMoStage(2);
   } else {
     setMoStage(1);
+    setTimeout(()=>document.getElementById('mo-thought').focus(),100);
   }
   renderTI();renderRelRows();sv('momed');
 }
