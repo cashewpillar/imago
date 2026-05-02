@@ -21,12 +21,18 @@ html,body{background:var(--cream);color:var(--ink);font-family:'DM Sans',sans-se
 .view.active{display:block;}
 
 /* TOPBAR */
-.tb{position:sticky;top:0;z-index:100;background:var(--cream);border-bottom:1px solid var(--b);height:50px;display:flex;align-items:center;padding:0 14px;gap:10px;}
-.tb-brand{font-family:'Lora',serif;font-size:17px;font-weight:500;letter-spacing:-.02em;flex:1;}
-.tb-brand i{color:var(--rust);font-style:italic;}
+.tb{position:sticky;top:0;z-index:100;background:var(--cream);border-bottom:1px solid var(--b);height:50px;display:flex;align-items:center;padding:0 14px;gap:8px;}
+.tb-brand{font-family:'Lora',serif;font-size:16px;font-weight:500;letter-spacing:-.01em;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);}
+.tb-brand i{color:var(--rust);font-style:italic;margin-left:4px;font-weight:400;}
 .tb-lbl{font-size:13px;color:var(--ink2);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
-/* BUTTONS */
+/* SEARCH */
+.search-wrap{padding:8px 14px 6px;display:none;}
+.search-wrap.active{display:block;}
+.search-inner{display:flex;align-items:center;background:var(--paper);border:1px solid var(--bm);border-radius:20px;padding:6px 13px;gap:7px;}
+.search-inner input{background:none;border:none;outline:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--ink);flex:1;width:100%;}
+.search-inner input::placeholder{color:var(--ink4);}
+.s-ico{font-size:13px;color:var(--ink4);}
 .btn{display:inline-flex;align-items:center;gap:5px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;border:1px solid var(--bm);background:transparent;color:var(--ink2);border-radius:6px;padding:6px 12px;transition:background .13s,color .13s;-webkit-appearance:none;}
 .btn:hover{background:var(--cream2);}
 .btn:active{transform:scale(.97);}
@@ -138,13 +144,9 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
 .pc{font-size:11px;padding:4px 9px;border-radius:4px;border:1px solid var(--b);background:var(--cream2);color:var(--ink2);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .12s;}
 .pc:hover{border-color:var(--rust);color:var(--rust);background:var(--rust2);}
 
-/* TAG INPUT */
-.ti-wrap{background:var(--paper);border:1px solid var(--bm);border-radius:8px;padding:7px 10px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-height:38px;cursor:text;transition:border-color .13s;}
-.ti-wrap:focus-within{border-color:var(--rust);}
+/* TAG CHIPS */
 .tp-rm{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 7px;border-radius:3px;background:var(--teal2);color:var(--teal);border:1px solid rgba(26,107,90,.2);}
 .tp-rm button{background:none;border:none;cursor:pointer;font-size:12px;color:var(--teal);padding:0;line-height:1;opacity:.7;}
-.ti{border:none;outline:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--ink);background:transparent;min-width:80px;flex:1;}
-.ti::placeholder{color:var(--ink4);}
 
 /* REL ROWS */
 .rel-row{display:flex;gap:7px;align-items:center;margin-bottom:7px;}
@@ -195,9 +197,12 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
 
 <!-- HOME -->
 <div id="v-home" class="view active">
-  <div class="tb"><div class="tb-brand">common<i>place</i></div><button class="btn ib" onclick="openMenu()">⋯</button></div>
-  <div class="pg-head"><div class="pg-date" id="h-date"></div><div class="pg-h">Your <em>personal</em> commonplace</div></div>
-  <div class="search-wrap"><div class="search-inner"><span class="s-ico">○</span><input id="s-in" placeholder="Search media, moments, tags…" oninput="onSearch(this.value)"></div></div>
+  <div class="tb">
+    <div class="tb-brand" id="tb-brand"></div>
+    <button class="btn ib" onclick="toggleSearch()" id="search-btn"><span style="font-size:15px">○</span></button>
+    <button class="btn ib" onclick="openMenu()">⋯</button>
+  </div>
+  <div class="search-wrap" id="s-wrap"><div class="search-inner"><span class="s-ico">○</span><input id="s-in" placeholder="Search media, moments, tags…" oninput="onSearch(this.value)"></div></div>
   <div class="tabs" id="type-tabs">
     <button class="chip on" onclick="setFilter('all',this)">All</button>
     <button class="chip" onclick="setFilter('book',this)">Books</button>
@@ -206,11 +211,6 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
     <button class="chip" onclick="setFilter('other',this)">Other</button>
   </div>
   <div class="tag-row" id="tag-row"></div>
-  <div class="stats" id="stats" style="display:none">
-    <div class="stat"><div class="stat-n" id="st-a">0</div><div class="stat-l">media</div></div>
-    <div class="stat"><div class="stat-n" id="st-m">0</div><div class="stat-l">moments</div></div>
-    <div class="stat"><div class="stat-n" id="st-t">0</div><div class="stat-l">tags</div></div>
-  </div>
   <div class="list" id="m-list"></div>
   <button class="fab" onclick="openMediaEd(null)">+</button>
   <div class="bnav">
@@ -222,8 +222,11 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
 
 <!-- TAGS -->
 <div id="v-tags" class="view">
-  <div class="tb"><div class="tb-brand">common<i>place</i></div><button class="btn ib" onclick="openMenu()">⋯</button></div>
-  <div class="pg-head"><div class="pg-date" id="t-date"></div><div class="pg-h">By <em>tag</em></div></div>
+  <div class="tb">
+    <div class="tb-brand" id="t-tb-brand"></div>
+    <button class="btn ib" onclick="openMenu()">⋯</button>
+  </div>
+  <div class="pg-head"><div class="pg-h">Your <em>tags</em></div></div>
   <div class="list" id="t-list"></div>
   <div class="bnav">
     <button class="nt" onclick="switchTab('home')"><span class="nt-ico">◎</span>Library</button>
@@ -234,7 +237,10 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
 
 <!-- CONNECTIONS -->
 <div id="v-connections" class="view">
-  <div class="tb"><div class="tb-brand">common<i>place</i></div><button class="btn ib" onclick="openMenu()">⋯</button></div>
+  <div class="tb">
+    <div class="tb-brand" id="c-tb-brand"></div>
+    <button class="btn ib" onclick="openMenu()">⋯</button>
+  </div>
   <div class="pg-head"><div class="pg-h">Your <em>connections</em></div></div>
   <div class="list" id="c-list"></div>
   <div class="bnav">
@@ -258,7 +264,7 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
     <div class="fg"><label class="fl">Title</label><input class="fi" id="me-title" placeholder="Title of the work…"></div>
     <div class="fg"><label class="fl">Author / Director / Creator</label><input class="fi" id="me-creator" placeholder="Who made it…"></div>
   </div>
-  <div class="save-bar"><button class="btn" onclick="back()">Cancel</button><button class="btn bp" onclick="saveMedia()">Save</button></div>
+  <div class="save-bar"><button class="btn bd" id="me-del-btn" onclick="delMedia()" style="display:none">Delete</button><button class="btn" onclick="back()">Cancel</button><button class="btn bp" onclick="saveMedia()">Save</button></div>
 </div>
 
 <!-- MOMENT EDITOR -->
@@ -285,9 +291,8 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
     <div class="fg"><label class="fl">A line or moment that means something to you <span style="color:var(--ink4);font-style:italic;font-size:9px;">optional</span></label><textarea class="ta" id="mo-line" placeholder="Something you'd want to remember." rows="2" oninput="ar(this)"></textarea></div>
     <div class="fg">
       <label class="fl">Tags <span style="color:var(--ink4);font-style:italic;font-size:9px;">type then space</span></label>
-      <div class="ti-wrap" id="ti-wrap" onclick="document.getElementById('ti').focus()">
-        <input id="ti" class="ti" placeholder="grief, identity, memory…" onkeydown="handleTagKey(event)" oninput="handleTagInput(event)">
-      </div>
+      <input id="ti" class="fi" placeholder="grief, identity, memory…" onkeydown="handleTagKey(event)" oninput="handleTagInput(event)">
+      <div id="ti-display" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
     </div>
     <div class="fg">
       <label class="fl">Connections to other moments</label>
@@ -319,6 +324,7 @@ db.version(1).stores({ media:'++id,type,title,createdAt', moments:'++id,mediaId,
 
 let AM=[], AMO=[], AR=[];
 let cFilter='all', cTag=null, cSearch='', cMediaId=null, edMediaId=null, edMomId=null, edMomMediaId=null;
+let mdTag=null;
 let mTags=[], relRows=[];
 const vStack=[];
 
@@ -351,8 +357,20 @@ function fdt(ts){return new Date(ts).toLocaleDateString('en-GB',{day:'numeric',m
 function ar(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
 function ap(id,t){const el=document.getElementById(id);if(el.value&&!el.value.endsWith('\n'))el.value+='\n';el.value+=t;el.focus();ar(el);}
 
+function toggleSearch(){
+  const wrap = document.getElementById('s-wrap');
+  wrap.classList.toggle('active');
+  if(wrap.classList.contains('active')) document.getElementById('s-in').focus();
+  else { document.getElementById('s-in').value=''; onSearch(''); }
+}
+
 async function loadAll(){
   [AM,AMO,AR]=await Promise.all([db.media.orderBy('createdAt').reverse().toArray(),db.moments.orderBy('createdAt').toArray(),db.relations.toArray()]);
+  const now = new Date();
+  const dayStr = now.toLocaleDateString('en-GB',{weekday:'long'});
+  const dateStr = now.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  const fullHtml = `${dayStr} <i>${dateStr}</i>`;
+  ['tb-brand','t-tb-brand','c-tb-brand'].forEach(id => { const el = document.getElementById(id); if(el) el.innerHTML = fullHtml; });
   renderHome();
 }
 function allTags(){const s=new Set();AMO.forEach(m=>(m.tags||[]).forEach(t=>s.add(t)));return[...s].sort();}
@@ -360,21 +378,28 @@ function momsFor(mid){return AMO.filter(m=>m.mediaId===mid);}
 function momsByTag(t){return AMO.filter(m=>(m.tags||[]).includes(t));}
 
 function renderHome(){
-  document.getElementById('h-date').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  const st=document.getElementById('stats');
-  if(AM.length){st.style.display='flex';document.getElementById('st-a').textContent=AM.length;document.getElementById('st-m').textContent=AMO.length;document.getElementById('st-t').textContent=allTags().length;}
-  else st.style.display='none';
   renderTagRow(); renderList();
 }
 function renderTagRow(){
-  const tags=allTags();
-  document.getElementById('tag-row').innerHTML=tags.map(t=>`<button class="chip chip-t${cTag===t?' on':''}" onclick="setTag('${esc(t)}',this)">#${esc(t)}</button>`).join('');
+  const counts={}; let untagged=0;
+  AMO.forEach(m=>{ if(!m.tags||!m.tags.length) untagged++; else m.tags.forEach(t=>{counts[t]=(counts[t]||0)+1;}); });
+  const sorted=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  let html='';
+  if(untagged>0) html+=`<button class="chip chip-t${cTag==='_untagged'?' on':''}" onclick="setTag('_untagged',this)">Untagged <span style="opacity:0.5;margin-left:2px">${untagged}</span></button>`;
+  html+=sorted.map(([t,n])=>`<button class="chip chip-t${cTag===t?' on':''}" onclick="setTag('${esc(t)}',this)">#${esc(t)} <span style="opacity:0.5;margin-left:2px">${n}</span></button>`).join('');
+  document.getElementById('tag-row').innerHTML=html;
 }
 function renderList(){
   const c=document.getElementById('m-list');
   let media=AM;
   if(cFilter!=='all') media=media.filter(m=>m.type===cFilter);
-  if(cTag){const mids=new Set(momsByTag(cTag).map(m=>m.mediaId));media=media.filter(m=>mids.has(m.id));}
+  if(cTag){
+    const matchMids=new Set(AMO.filter(m=>{
+      if(cTag==='_untagged') return !m.tags||!m.tags.length;
+      return (m.tags||[]).includes(cTag);
+    }).map(m=>m.mediaId));
+    media=media.filter(m=>matchMids.has(m.id));
+  }
   if(cSearch.trim()){
     const q=cSearch.toLowerCase();
     const matchMids=new Set(AMO.filter(m=>(m.thought||'').toLowerCase().includes(q)||(m.connection||'').toLowerCase().includes(q)||(m.line||'').toLowerCase().includes(q)||(m.anchor||'').toLowerCase().includes(q)||(m.tags||[]).some(t=>t.includes(q))).map(m=>m.mediaId));
@@ -403,23 +428,39 @@ function setTag(t,el){cTag=cTag===t?null:t;document.querySelectorAll('.chip-t').
 function onSearch(v){cSearch=v;renderList();}
 
 // MEDIA DETAIL
-function openMD(id){cMediaId=id;renderMD(id);sv('mdetail');}
+function openMD(id){cMediaId=id;mdTag=null;renderMD(id);sv('mdetail');}
+function setMdTag(t){mdTag=mdTag===t?null:t;renderMD(cMediaId);}
 function renderMD(id){
   const m=AM.find(x=>x.id===id);if(!m)return;
-  const moms=momsFor(id);
-  const tags=[...new Set(moms.flatMap(x=>x.tags||[]))];
+  const allMoms=momsFor(id);
+  
+  const counts={}; let untagged=0;
+  allMoms.forEach(mo=>{ if(!mo.tags||!mo.tags.length) untagged++; else mo.tags.forEach(t=>{counts[t]=(counts[t]||0)+1;}); });
+  const sortedTags=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  
+  let moms=[...allMoms].sort((a,b)=>b.createdAt-a.createdAt);
+  if(mdTag){
+    if(mdTag==='_untagged') moms=moms.filter(mo=>!mo.tags||!mo.tags.length);
+    else moms=moms.filter(mo=>(mo.tags||[]).includes(mdTag));
+  }
+  
   const TL={book:'Book',film:'Film',tv:'TV series',other:'Other'};
   document.getElementById('mdt-lbl').textContent=m.title||'Untitled';
+  
+  let tagsHtml='';
+  if(untagged>0) tagsHtml+=`<button class="chip chip-t${mdTag==='_untagged'?' on':''}" onclick="setMdTag('_untagged')">Untagged <span style="opacity:0.5;margin-left:2px">${untagged}</span></button>`;
+  tagsHtml+=sortedTags.map(([t,n])=>`<button class="chip chip-t${mdTag===t?' on':''}" onclick="setMdTag('${esc(t)}')">#${esc(t)} <span style="opacity:0.5;margin-left:2px">${n}</span></button>`).join('');
+
   document.getElementById('mdt-body').innerHTML=`
     <div class="md-head">
       <div class="md-type">${TL[m.type]||m.type}</div>
       <div class="md-title">${esc(m.title||'Untitled')}</div>
       ${m.creator?`<div class="md-creator">${esc(m.creator)}</div>`:''}
-      ${tags.length?`<div class="md-tags">${tags.map(t=>`<span class="tp">#${esc(t)}</span>`).join('')}</div>`:''}
+      ${(untagged>0||sortedTags.length)?`<div class="md-tags" style="margin-top:10px; border-top:1px solid var(--b); padding-top:10px;">${tagsHtml}</div>`:''}
     </div>
-    <div class="sec-head"><span class="sec-lbl">Moments</span><button class="btn" style="font-size:12px;padding:5px 10px;" onclick="openMomEd(null,${id})">+ add moment</button></div>
+    <div class="sec-head"><span class="sec-lbl">Moments ${mdTag?`(${moms.length})`:''}</span><button class="btn" style="font-size:12px;padding:5px 10px;" onclick="openMomEd(null,${id})">+ add moment</button></div>
     <div class="moments-wrap" id="mw-${id}">
-      ${!moms.length?`<div class="no-mom">No moments yet. Add your first one above.</div>`:''}
+      ${!moms.length?`<div class="no-mom">${mdTag?'No moments match this filter.':'No moments yet. Add your first one above.'}</div>`:''}
       ${moms.map(mo=>renderMomCard(mo)).join('')}
     </div>`;
 }
@@ -455,6 +496,7 @@ async function jumpTo(mid){
 
 // MEDIA EDITOR
 function openMediaEd(id){edMediaId=id;document.getElementById('me-lbl').textContent=id?'Edit media':'New media';
+  document.getElementById('me-del-btn').style.display=id?'':'none';
   if(id){const m=AM.find(x=>x.id===id);document.getElementById('me-type').value=m.type||'book';document.getElementById('me-title').value=m.title||'';document.getElementById('me-creator').value=m.creator||'';}
   else{document.getElementById('me-type').value='book';document.getElementById('me-title').value='';document.getElementById('me-creator').value='';}
   sv('med');}
@@ -466,6 +508,21 @@ async function saveMedia(){
   if(edMediaId){await db.media.update(edMediaId,data);toast('Updated');await loadAll();back();}
   else{const id=await db.media.add(data);cMediaId=id;toast('Added');await loadAll();renderMD(id);vStack.length=0;vStack.push('home','mdetail');sv('mdetail',false);}
   edMediaId=null;
+}
+async function delMedia(){
+  if(!confirm('Delete this entire piece of media and all its moments?'))return;
+  const moments = await db.moments.where('mediaId').equals(edMediaId).toArray();
+  const momIds = moments.map(m => m.id);
+  await db.media.delete(edMediaId);
+  await db.moments.where('mediaId').equals(edMediaId).delete();
+  for(const mid of momIds){
+    await db.relations.where('fromId').equals(mid).delete();
+    await db.relations.where('toId').equals(mid).delete();
+  }
+  toast('Media deleted');
+  edMediaId=null;
+  await loadAll();
+  switchTab('home');
 }
 
 // MOMENT EDITOR
@@ -507,14 +564,13 @@ async function delMoment(){
 
 // TAG INPUT
 function renderTI(){
-  const wrap=document.getElementById('ti-wrap'),raw=document.getElementById('ti');
-  wrap.innerHTML='';
-  mTags.forEach((t,i)=>{const p=document.createElement('span');p.className='tp-rm';p.innerHTML=`#${esc(t)}<button onclick="rmTag(${i})">×</button>`;wrap.appendChild(p);});
-  wrap.appendChild(raw);raw.value='';
+  const disp=document.getElementById('ti-display');
+  disp.innerHTML='';
+  mTags.forEach((t,i)=>{const p=document.createElement('span');p.className='tp-rm';p.innerHTML=`#${esc(t)}<button onclick="rmTag(${i})">×</button>`;disp.appendChild(p);});
 }
-function handleTagKey(e){if(e.key===' '||e.key==='Enter'){e.preventDefault();commitTag();}if(e.key==='Backspace'&&!e.target.value&&mTags.length){mTags.pop();renderTI();}}
+function handleTagKey(e){if(e.key===' '||e.key==='Enter'){if(e.target.value.trim()){e.preventDefault();commitTag();}}if(e.key==='Backspace'&&!e.target.value&&mTags.length){mTags.pop();renderTI();}}
 function handleTagInput(e){if(e.target.value.endsWith(' '))commitTag();}
-function commitTag(){const raw=document.getElementById('ti');const v=raw.value.trim().replace(/\s+/g,'').toLowerCase();if(v&&!mTags.includes(v)){mTags.push(v);renderTI();}else raw.value='';}
+function commitTag(){const raw=document.getElementById('ti');const v=raw.value.trim().replace(/\s+/g,'').toLowerCase();if(v&&!mTags.includes(v)){mTags.push(v);renderTI();}raw.value='';}
 function rmTag(i){mTags.splice(i,1);renderTI();}
 
 // REL ROWS
@@ -537,7 +593,6 @@ function rmRel(i){relRows.splice(i,1);renderRelRows();}
 
 // TAGS VIEW
 function renderTags(){
-  document.getElementById('t-date').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   const tags=allTags();const c=document.getElementById('t-list');
   if(!tags.length){c.innerHTML=`<div class="empty"><div class="empty-ico">◈</div><p>No tags yet.<br>Add them when creating moments.</p></div>`;return;}
   c.innerHTML=tags.map(t=>{
