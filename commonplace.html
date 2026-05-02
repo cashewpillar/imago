@@ -399,7 +399,7 @@ function toast(m){const e=document.getElementById('toast');e.textContent=m;e.cla
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function fdt(ts){return new Date(ts).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});}
 function ar(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
-function bEdit(ta,v){ta.classList.remove('off');v.classList.remove('on');ar(ta);ta.focus();}
+function bEdit(ta,v){ta.classList.remove('off');v.classList.remove('on');ar(ta);ta.focus();ta.selectionStart=ta.selectionEnd=ta.value.length;}
 function bView(ta,v){if(!ta.value.trim()){ta.classList.remove('off');v.classList.remove('on');return;}ta.classList.add('off');v.innerHTML=parseMd(ta.value);v.classList.add('on');}
 
 function renderBlks(cid,text){const c=document.getElementById(cid);c.innerHTML='';const ps=(text||'').split(/\n\n+/);ps.forEach(p=>addBlk(cid,p));if(!c.children.length)addBlk(cid,'');}
@@ -409,7 +409,7 @@ function addBlk(cid,val='',focus=false,afterEl=null){
   if(afterEl)afterEl.after(div);else c.appendChild(div);
   const ta=div.querySelector('textarea'),v=div.querySelector('.ta-view');
   if(val)bView(ta,v);else bEdit(ta,v);
-  if(focus)ta.focus();
+  if(focus){ta.focus();ta.selectionStart=ta.selectionEnd=ta.value.length;}
 }
 function rmBlk(el){const c=el.parentElement;el.remove();if(!c.children.length)addBlk(c.id,'');}
 function blkKey(e,ta){
@@ -418,7 +418,7 @@ function blkKey(e,ta){
   if(e.key==='('){e.preventDefault();const ts=fdtRef();const start=ta.selectionStart,end=ta.selectionEnd;ta.value=ta.value.substring(0,start)+'('+ts+ta.value.substring(end);ta.selectionStart=ta.selectionEnd=start+ts.length+1;ar(ta);}
 }
 function getBlks(cid){return [...document.getElementById(cid).querySelectorAll('textarea')].map(t=>t.value.trim()).filter(Boolean).join('\n\n');}
-function apBlock(cid,t){const c=document.getElementById(cid);let act=c.querySelector('textarea:not(.off)');if(!act)act=c.lastElementChild.querySelector('textarea');bEdit(act,act.nextElementSibling);if(act.value&&!act.value.endsWith('\n'))act.value+='\n';act.value+=t;act.focus();ar(act);}
+function apBlock(cid,t){const c=document.getElementById(cid);let act=c.querySelector('textarea:not(.off)');if(!act)act=c.lastElementChild.querySelector('textarea');bEdit(act,act.nextElementSibling);if(act.value&&!act.value.endsWith('\n'))act.value+='\n';act.value+=t;act.focus();act.selectionStart=act.selectionEnd=act.value.length;ar(act);}
 
 function fdtFull(ts){
   const d = new Date(ts).toLocaleDateString('en-GB', { day:'numeric', month:'short' });
@@ -670,7 +670,7 @@ function openMomEd(momId,mediaId){
     renderBlks('mo-conn-blks', '');
     renderBlks('mo-line-blks', '');
     setMoStage(1);
-    setTimeout(()=>{const ta=document.querySelector('#mo-thought-blks textarea');if(ta)ta.focus();},100);
+    setTimeout(()=>{const ta=document.querySelector('#mo-thought-blks textarea');if(ta){ta.focus();ta.selectionStart=ta.selectionEnd=ta.value.length;}},100);
   }
   renderTI();renderRelRows();sv('momed');
 }
