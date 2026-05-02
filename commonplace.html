@@ -106,7 +106,8 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
 .mc-count{font-size:11px;color:var(--ink3);flex-shrink:0;margin-top:3px;white-space:nowrap;}
 .mc-preview{padding:0 14px 10px;font-family:'Lora',serif;font-size:12px;color:var(--ink2);line-height:1.55;font-style:italic;}
 .mc-foot{display:flex;flex-wrap:wrap;gap:4px;padding:0 14px 11px;}
-.tp{font-size:10px;padding:2px 7px;border-radius:3px;background:var(--teal2);color:var(--teal);border:1px solid rgba(26,107,90,.18);}
+.tp{font-size:10px;padding:2px 7px;border-radius:3px;background:var(--teal2);color:var(--teal);border:1px solid rgba(26,107,90,.18);transition:all .12s;}
+.tp:hover{background:rgba(26,107,90,.14);border-color:var(--teal);}
 
 /* MEDIA DETAIL */
 .md-head{padding:20px 18px 14px;border-bottom:1px solid var(--b);}
@@ -121,6 +122,7 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
 
 /* MOMENT CARD */
 .mom-card{background:var(--paper);border:1px solid var(--b);border-radius:9px;margin-bottom:8px;overflow:hidden;transition:border-color .2s;}
+.mom-card:hover{border-color:var(--bm);}
 .mom-card.hl{border-color:var(--rust);animation:hl .7s ease;}
 @keyframes hl{0%{background:var(--rust2)}100%{background:var(--paper)}}
 .mom-card-head{display:flex;align-items:center;gap:8px;padding:10px 13px 9px;border-bottom:1px solid var(--b);}
@@ -129,7 +131,7 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
 .mom-body{padding:10px 13px;}
 .mom-sec{font-size:9px;font-weight:500;letter-spacing:.09em;text-transform:uppercase;color:var(--rust);margin-bottom:4px;margin-top:9px;}
 .mom-sec:first-child{margin-top:0;}
-.mom-txt{font-family:'Lora',serif;font-size:13px;line-height:1.68;color:var(--ink);}
+.mom-txt{font-family:'Lora',serif;font-size:13px;line-height:1.68;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .mom-tags{display:flex;flex-wrap:wrap;gap:4px;padding:0 13px 10px;}
 .mom-rels{padding:0 13px 10px;}
 .rel-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 9px;border-radius:4px;background:var(--amber2);color:var(--amber);border:1px solid rgba(122,90,26,.2);margin:2px 2px 2px 0;cursor:pointer;}
@@ -467,16 +469,15 @@ function renderMD(id){
 function renderMomCard(mo){
   const rels=AR.filter(r=>r.fromId===mo.id||r.toId===mo.id);
   const tags=mo.tags||[];
-  return `<div class="mom-card" id="mc-${mo.id}">
+  return `<div class="mom-card" id="mc-${mo.id}" onclick="openMomEd(${mo.id},${mo.mediaId})" style="cursor:pointer">
     <div class="mom-card-head"><span class="mom-anchor">${mo.anchor?esc(mo.anchor):'—'}</span><span class="mom-date">${fdt(mo.createdAt)}</span></div>
     <div class="mom-body">
-      ${mo.thought?`<div class="mom-sec">What it made you think</div><div class="mom-txt">${esc(mo.thought).replace(/\n/g,'<br>')}</div>`:''}
-      ${mo.connection?`<div class="mom-sec">How it connects to your life</div><div class="mom-txt">${esc(mo.connection).replace(/\n/g,'<br>')}</div>`:''}
-      ${mo.line?`<div class="mom-sec">A line or moment</div><div class="mom-txt">${esc(mo.line).replace(/\n/g,'<br>')}</div>`:''}
+      ${mo.thought?`<div class="mom-sec">What it made you think</div><div class="mom-txt">${esc(mo.thought)}</div>`:''}
+      ${mo.connection?`<div class="mom-sec">How it connects to your life</div><div class="mom-txt">${esc(mo.connection)}</div>`:''}
+      ${mo.line?`<div class="mom-sec">A line or moment</div><div class="mom-txt">${esc(mo.line)}</div>`:''}
     </div>
-    ${tags.length?`<div class="mom-tags">${tags.map(t=>`<span class="tp" onclick="event.stopPropagation();switchTab('tags')" style="cursor:pointer">#${esc(t)}</span>`).join('')}</div>`:''}
+    ${tags.length?`<div class="mom-tags">${tags.map(t=>`<span class="tp" onclick="event.stopPropagation();mdTag=null;cTag='${esc(t)}';switchTab('tags')" style="cursor:pointer">#${esc(t)}</span>`).join('')}</div>`:''}
     ${rels.length?`<div class="mom-rels">${rels.map(r=>relChip(r,mo.id)).join('')}</div>`:''}
-    <div class="mom-actions"><button class="btn" style="font-size:12px;padding:5px 10px;" onclick="openMomEd(${mo.id},${mo.mediaId})">Edit</button></div>
   </div>`;
 }
 function relChip(r,moId){
@@ -484,7 +485,7 @@ function relChip(r,moId){
   const other=AMO.find(m=>m.id===otherId);
   const otherM=other?AM.find(m=>m.id===other.mediaId):null;
   const lbl=r.fromId===moId?r.label:('← '+r.label);
-  return `<span class="rel-chip" onclick="jumpTo(${otherId})"><span>${esc(lbl)}</span><span style="font-size:10px;opacity:.6;margin:0 2px;">→</span><span>${otherM?esc(otherM.title.slice(0,18)):'?'}</span></span>`;
+  return `<span class="rel-chip" onclick="event.stopPropagation();jumpTo(${otherId})"><span>${esc(lbl)}</span><span style="font-size:10px;opacity:.6;margin:0 2px;">→</span><span>${otherM?esc(otherM.title.slice(0,18)):'?'}</span></span>`;
 }
 async function jumpTo(mid){
   await loadAll();
