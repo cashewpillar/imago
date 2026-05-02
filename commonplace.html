@@ -140,6 +140,8 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
 
 /* MOMENT EDITOR */
 .me-body{padding:18px 18px 130px;}
+.mo-s2{opacity:0;transform:translateY(10px);transition:all .4s ease;pointer-events:none;max-height:0;overflow:hidden;}
+.mo-s2.on{opacity:1;transform:translateY(0);pointer-events:auto;max-height:2000px;margin-top:20px;}
 .div-lbl{font-family:'Lora',serif;font-size:12px;font-style:italic;color:var(--ink3);display:flex;align-items:center;gap:9px;margin:6px 0 14px;}
 .div-lbl::after{content:'';flex:1;height:1px;background:var(--b);}
 .pcs{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
@@ -274,39 +276,56 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
 <div id="v-momed" class="view">
   <div class="tb"><button class="btn ib" onclick="back()">←</button><span class="tb-lbl" id="momed-lbl">New moment</span></div>
   <div class="me-body">
-    <div class="fg"><label class="fl">Anchor <span style="color:var(--ink4);font-style:italic;font-size:9px;">chapter, episode, scene, timestamp…</span></label><input class="fi" id="mo-anchor" placeholder="e.g. Chapter 12, Episode 4, 00:42…"></div>
-    <div class="fg"><label class="fl">Thoughts</label>
-      <textarea class="ta" id="mo-thought" placeholder="Let your mind wander." rows="3" oninput="ar(this)"></textarea>
-      <div class="pcs">
-        <span class="pc" onclick="ap('mo-thought','It reminded me of a time when ')">a memory</span>
-        <span class="pc" onclick="ap('mo-thought','I kept thinking about ')">something I lingered on</span>
-        <span class="pc" onclick="ap('mo-thought','I disagreed with ')">where I pushed back</span>
+    <!-- STAGE 1: capture thoughts -->
+    <div id="mo-s1">
+      <div class="fg"><label class="fl">Thoughts</label>
+        <textarea class="ta" id="mo-thought" placeholder="Let your mind wander." rows="3" oninput="ar(this)"></textarea>
+        <div class="pcs">
+          <span class="pc" onclick="ap('mo-thought','It reminded me of a time when ')">a memory</span>
+          <span class="pc" onclick="ap('mo-thought','I kept thinking about ')">something I lingered on</span>
+          <span class="pc" onclick="ap('mo-thought','I disagreed with ')">where I pushed back</span>
+        </div>
       </div>
     </div>
-    <div class="fg"><label class="fl">How does it connect to your life?</label>
-      <textarea class="ta" id="mo-conn" placeholder="People, places, feelings…" rows="3" oninput="ar(this)"></textarea>
-      <div class="pcs">
-        <span class="pc" onclick="ap('mo-conn','This made me think of someone I know: ')">a person</span>
-        <span class="pc" onclick="ap('mo-conn','At this point in my life ')">where I am now</span>
-        <span class="pc" onclick="ap('mo-conn','I wonder if I ')">a question it raised</span>
+
+    <!-- STAGE 2: metadata and details -->
+    <div id="mo-s2" class="mo-s2">
+      <div class="fg"><label class="fl">Anchor <span style="color:var(--ink4);font-style:italic;font-size:9px;">chapter, episode, scene, timestamp…</span></label><input class="fi" id="mo-anchor" placeholder="e.g. Chapter 12, Episode 4, 00:42…"></div>
+      
+      <div class="fg">
+        <label class="fl">Tags <span style="color:var(--ink4);font-style:italic;font-size:9px;">type then space</span></label>
+        <input id="ti" class="fi" placeholder="grief, identity, memory…" onkeydown="handleTagKey(event)" oninput="handleTagInput(event)">
+        <div id="ti-display" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
       </div>
-    </div>
-    <div class="fg"><label class="fl">A line or moment that means something to you <span style="color:var(--ink4);font-style:italic;font-size:9px;">optional</span></label><textarea class="ta" id="mo-line" placeholder="Something you'd want to remember." rows="2" oninput="ar(this)"></textarea></div>
-    <div class="fg">
-      <label class="fl">Tags <span style="color:var(--ink4);font-style:italic;font-size:9px;">type then space</span></label>
-      <input id="ti" class="fi" placeholder="grief, identity, memory…" onkeydown="handleTagKey(event)" oninput="handleTagInput(event)">
-      <div id="ti-display" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
-    </div>
-    <div class="fg">
-      <label class="fl">Connections to other moments</label>
-      <div id="rel-rows"></div>
-      <button class="btn" style="font-size:12px;margin-top:5px;" onclick="addRel()">+ add connection</button>
+
+      <div style="height:24px;"></div>
+      <div class="div-lbl">Details</div>
+
+      <div class="fg"><label class="fl">How does it connect to your life?</label>
+        <textarea class="ta" id="mo-conn" placeholder="People, places, feelings…" rows="3" oninput="ar(this)"></textarea>
+        <div class="pcs">
+          <span class="pc" onclick="ap('mo-conn','This made me think of someone I know: ')">a person</span>
+          <span class="pc" onclick="ap('mo-conn','At this point in my life ')">where I am now</span>
+          <span class="pc" onclick="ap('mo-conn','I wonder if I ')">a question it raised</span>
+        </div>
+      </div>
+
+      <div class="fg"><label class="fl">A line or moment that means something to you <span style="color:var(--ink4);font-style:italic;font-size:9px;">optional</span></label><textarea class="ta" id="mo-line" placeholder="Something you'd want to remember." rows="2" oninput="ar(this)"></textarea></div>
+
+      <div style="height:24px;"></div>
+      <div class="div-lbl">Connections</div>
+
+      <div class="fg">
+        <label class="fl">Connections to other moments</label>
+        <div id="rel-rows"></div>
+        <button class="btn" style="font-size:12px;margin-top:5px;" onclick="addRel()">+ add connection</button>
+      </div>
     </div>
   </div>
   <div class="save-bar">
     <button class="btn bd" id="mo-del-btn" onclick="delMoment()" style="display:none">Delete</button>
     <button class="btn" onclick="back()">Cancel</button>
-    <button class="btn bp" onclick="saveMoment()">Save moment</button>
+    <button class="btn bp" id="mo-main-btn" onclick="handleMoMain()">Next</button>
   </div>
 </div>
 
@@ -541,11 +560,23 @@ async function delMedia(){
 }
 
 // MOMENT EDITOR
+let curMoStg=1;
+function setMoStage(s){
+  curMoStg=s;
+  const s2=document.getElementById('mo-s2'),btn=document.getElementById('mo-main-btn');
+  if(s===1){s2.classList.remove('on');btn.textContent='Next';}
+  else{s2.classList.add('on');btn.textContent='Save';
+    const fields=['mo-conn','mo-line'];
+    fields.forEach(id=>ar(document.getElementById(id)));
+  }
+}
+function handleMoMain(){if(curMoStg===1)setMoStage(2);else saveMoment();}
 function openMomEd(momId,mediaId){
   edMomId=momId;edMomMediaId=mediaId;mTags=[];relRows=[];
   document.getElementById('momed-lbl').textContent=momId?'Edit moment':'New moment';
   document.getElementById('mo-del-btn').style.display=momId?'':'none';
-  ['mo-anchor','mo-thought','mo-conn','mo-line'].forEach(id=>document.getElementById(id).value='');
+  ['mo-thought','mo-conn','mo-line'].forEach(id=>{const el=document.getElementById(id);el.value='';el.style.height='auto';});
+  document.getElementById('mo-anchor').value='';
   if(momId){
     const mo=AMO.find(x=>x.id===momId);
     document.getElementById('mo-anchor').value=mo.anchor||'';
@@ -554,6 +585,9 @@ function openMomEd(momId,mediaId){
     document.getElementById('mo-line').value=mo.line||'';
     mTags=[...(mo.tags||[])];
     relRows=AR.filter(r=>r.fromId===momId).map(r=>({label:r.label,toId:r.toId,dbId:r.id}));
+    setMoStage(2);
+  } else {
+    setMoStage(1);
   }
   renderTI();renderRelRows();sv('momed');
 }
