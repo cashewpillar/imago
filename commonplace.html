@@ -431,6 +431,14 @@ function fdtRef(){
   const t = now.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
   return `${d}, ${t}: `;
 }
+function smart(t){
+  return t
+    .replace(/(^|[-\u2014/(\[{"\s])'/g, "$1\u2018")      // opening singles
+    .replace(/'/g, "\u2019")                            // closing singles & apostrophes
+    .replace(/(^|[-\u2014/(\[{"\s])"/g, "$1\u201c")      // opening doubles
+    .replace(/"/g, "\u201d")                            // closing doubles
+    .replace(/--/g, "\u2014");                          // em-dashes
+}
 function parseMd(t){
   let h=esc(t);
   h=h.replace(/\*\*(.*?)\*\*/g,'<b>$1</b>');
@@ -442,6 +450,7 @@ function parseMd(t){
   h=h.replace(/\((\d{1,2} [A-Za-z]{3}, \d{2}:\d{2}: )(.*?)\)/g,'<span class="note ref"><span class="ref-ts">$1</span>$2</span>');
   // Handle standard asides
   h=h.replace(/\((.*?)\)/g,'<span class="note">$1</span>');
+  h=smart(h);
   return h.replace(/\n/g,'<br>');
 }
 
@@ -544,7 +553,7 @@ function renderMD(id){
       <div class="md-type">${TL[m.type]||m.type}</div>
       <div class="md-title">${esc(m.title||'Untitled')}</div>
       ${m.creator?`<div class="md-creator">${esc(m.creator)}</div>`:''}
-      ${m.reason?`<div class="mc-preview" style="padding:4px 0 0; opacity:0.8; font-size:13px">"${esc(m.reason)}"</div>`:''}
+      ${m.reason?`<div style="padding:4px 0 0; opacity:0.8; font-size:13px; font-family:'Lora',serif; line-height:1.6; font-style:italic;">${parseMd(m.reason)}</div>`:''}
       ${(untagged>0||sortedTags.length)?`<div class="md-tags" style="margin-top:10px; border-top:1px solid var(--b); padding-top:10px;">${tagsHtml}</div>`:''}
     </div>
     <div class="sec-head"><span class="sec-lbl">Moments ${mdTag?`(${moms.length})`:''}</span><button class="btn" style="font-size:12px;padding:5px 10px;" onclick="openMomEd(null,${id})">+ add moment</button></div>
@@ -559,9 +568,9 @@ function renderMomCard(mo){
   return `<div class="mom-card" id="mc-${mo.id}" onclick="openMomEd(${mo.id},${mo.mediaId})" style="cursor:pointer">
     <div class="mom-card-head"><span class="mom-anchor">${mo.anchor?esc(mo.anchor):'—'}</span><span class="mom-date">${fdt(mo.createdAt)}</span></div>
     <div class="mom-body">
-      ${mo.thought?`<div class="mom-sec">Thoughts</div><div class="mom-txt">${esc(mo.thought)}</div>`:''}
-      ${mo.connection?`<div class="mom-sec">How it connects to my life</div><div class="mom-txt">${esc(mo.connection)}</div>`:''}
-      ${mo.line?`<div class="mom-sec">A line or moment</div><div class="mom-txt">${esc(mo.line)}</div>`:''}
+      ${mo.thought?`<div class="mom-sec">Thoughts</div><div class="mom-txt" style="white-space:normal; overflow:visible; text-overflow:clip;">${parseMd(mo.thought)}</div>`:''}
+      ${mo.connection?`<div class="mom-sec">How it connects to my life</div><div class="mom-txt" style="white-space:normal; overflow:visible; text-overflow:clip;">${parseMd(mo.connection)}</div>`:''}
+      ${mo.line?`<div class="mom-sec">A line or moment</div><div class="mom-txt" style="white-space:normal; overflow:visible; text-overflow:clip;">${parseMd(mo.line)}</div>`:''}
     </div>
     ${tags.length?`<div class="mom-tags">${tags.map(t=>`<span class="tp" onclick="event.stopPropagation();mdTag=null;cTag='${esc(t)}';switchTab('tags')" style="cursor:pointer">#${esc(t)}</span>`).join('')}</div>`:''}
     ${rels.length?`<div class="mom-rels">${rels.map(r=>relChip(r,mo.id)).join('')}</div>`:''}
