@@ -347,6 +347,8 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
   <div class="mi" onclick="doExport()"><span class="mi-ico">↓</span><div><div>Export all</div><div class="mi-sub">Download as JSON</div></div></div>
   <div class="mi" onclick="doImport()"><span class="mi-ico">↑</span><div><div>Import</div><div class="mi-sub">Merge from JSON file</div></div></div>
   <div class="mdiv"></div>
+  <div class="mi" onclick="resetData()"><span class="mi-ico">⚠</span><div><div>Reset Data</div><div class="mi-sub">Wipe all data from this device</div></div></div>
+  <div class="mdiv"></div>
   <div class="mi" style="cursor:default;opacity:.5;"><span class="mi-ico">○</span><div><div>Commonplace</div><div class="mi-sub">Media as anchors. Thoughts as record.</div></div></div>
 </div></div>
 <input type="file" id="imp-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -770,12 +772,22 @@ async function handleImport(e){
   try{
     const d=JSON.parse(await f.text());
     const media=d.media||[],moments=d.moments||[],rels=d.relations||[];
-    for(const m of media){const{id,...r}=m;await db.media.add({...r,createdAt:r.createdAt||Date.now()});}
-    for(const m of moments){const{id,...r}=m;await db.moments.add({...r,createdAt:r.createdAt||Date.now()});}
-    for(const r of rels){const{id,...rest}=r;await db.relations.add(rest);}
+    const medMap={}, momMap={};
+    for(const m of media){const{id, ...r}=m; const newId=await db.media.add({...r,createdAt:r.createdAt||Date.now()}); medMap[id]=newId;}
+    for(const m of moments){const{id, mediaId, ...r}=m; const newId=await db.moments.add({...r,mediaId:medMap[mediaId],createdAt:r.createdAt||Date.now()}); momMap[id]=newId;}
+    for(const r of rels){const{id, fromId, toId, ...rest}=r; if(momMap[fromId] && momMap[toId]) await db.relations.add({...rest, fromId:momMap[fromId], toId:momMap[toId]});}
     await loadAll();toast(`Imported ${media.length} media, ${moments.length} moments`);
-  }catch{toast('Could not read file');}
+  }catch(err){console.error(err);toast('Could not read file');}
   e.target.value='';
+}
+
+async function resetData() {
+  document.getElementById('ov').classList.remove('open');
+  if(!confirm('DANGER: Delete ALL media, moments, and connections? This cannot be undone.')) return;
+  await Promise.all([db.media.clear(), db.moments.clear(), db.relations.clear()]);
+  toast('All data cleared');
+  await loadAll();
+  switchTab('home');
 }
 
 vStack.push('home');
