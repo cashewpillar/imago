@@ -393,16 +393,17 @@ function bEdit(ta,v){ta.classList.remove('off');v.classList.remove('on');ar(ta);
 function bView(ta,v){if(!ta.value.trim()){ta.classList.remove('off');v.classList.remove('on');return;}ta.classList.add('off');v.innerHTML=parseMd(ta.value);v.classList.add('on');}
 
 function renderBlks(cid,text){const c=document.getElementById(cid);c.innerHTML='';const ps=(text||'').split(/\n\n+/);ps.forEach(p=>addBlk(cid,p));if(!c.children.length)addBlk(cid,'');}
-function addBlk(cid,val='',focus=false){
+function addBlk(cid,val='',focus=false,afterEl=null){
   const c=document.getElementById(cid);const div=document.createElement('div');div.className='block-wrap';
   div.innerHTML=`<textarea class="ta" placeholder="Paragraph…" oninput="ar(this)" onblur="bView(this,this.nextElementSibling)" onkeydown="blkKey(event,this)">${esc(val)}</textarea><div class="ta-view" onclick="bEdit(this.previousElementSibling,this)"></div><button class="block-rm" onclick="rmBlk(this.parentElement)">×</button>`;
-  c.appendChild(div);const ta=div.querySelector('textarea'),v=div.querySelector('.ta-view');
+  if(afterEl)afterEl.after(div);else c.appendChild(div);
+  const ta=div.querySelector('textarea'),v=div.querySelector('.ta-view');
   if(val)bView(ta,v);else bEdit(ta,v);
   if(focus)ta.focus();
 }
 function rmBlk(el){const c=el.parentElement;el.remove();if(!c.children.length)addBlk(c.id,'');}
 function blkKey(e,ta){
-  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();const next=ta.parentElement.nextElementSibling;if(next)bEdit(next.querySelector('textarea'),next.querySelector('.ta-view'));else addBlk(ta.parentElement.parentElement.id,'',true);}
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addBlk(ta.parentElement.parentElement.id,'',true,ta.parentElement);}
   if(e.key==='Backspace'&&!ta.value&&ta.parentElement.previousElementSibling){e.preventDefault();const prev=ta.parentElement.previousElementSibling;ta.parentElement.remove();const pTa=prev.querySelector('textarea');bEdit(pTa,prev.querySelector('.ta-view'));pTa.selectionStart=pTa.selectionEnd=pTa.value.length;}
   if(e.key==='('){e.preventDefault();const ts=fdtRef();const start=ta.selectionStart,end=ta.selectionEnd;ta.value=ta.value.substring(0,start)+'('+ts+ta.value.substring(end);ta.selectionStart=ta.selectionEnd=start+ts.length+1;ar(ta);}
 }
