@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Commonplace</title>
+<script src="https://unpkg.com/dexie@3.2.4/dist/dexie.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400;1,500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --cream:#F8F4ED;--cream2:#F0EAE0;--cream3:#E6DDD1;
+  --paper:#FEFCF8;--ink:#1A1714;--ink2:#46423D;--ink3:#8A837A;--ink4:#C2BAB1;
+  --rust:#9B4A1E;--rust2:#F5EBE4;--rust3:#E8C9B8;
+  --teal:#1A6B5A;--teal2:#E4F0ED;
+  --amber:#7A5A1A;--amber2:#F5F0E4;
+  --b:rgba(26,23,20,.11);--bm:rgba(26,23,20,.2);
+}
+html,body{background:var(--cream);color:var(--ink);font-family:'DM Sans',sans-serif;font-size:16px;min-height:100vh;-webkit-font-smoothing:antialiased;}
+.view{display:none;min-height:100vh;padding-bottom:60px;}
+.view.active{display:block;}
+
+/* TOPBAR */
+.tb{position:sticky;top:0;z-index:100;background:var(--cream);border-bottom:1px solid var(--b);height:50px;display:flex;align-items:center;padding:0 14px;gap:10px;}
+.tb-brand{font-family:'Lora',serif;font-size:17px;font-weight:500;letter-spacing:-.02em;flex:1;}
+.tb-brand i{color:var(--rust);font-style:italic;}
+.tb-lbl{font-size:13px;color:var(--ink2);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:5px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;border:1px solid var(--bm);background:transparent;color:var(--ink2);border-radius:6px;padding:6px 12px;transition:background .13s,color .13s;-webkit-appearance:none;}
+.btn:hover{background:var(--cream2);}
+.btn:active{transform:scale(.97);}
+.bp{background:var(--ink);color:var(--cream);border-color:var(--ink);}
+.bp:hover{background:var(--ink2);}
+.bd{color:var(--rust);border-color:rgba(155,74,30,.3);}
+.bd:hover{background:var(--rust2);}
+.ib{width:36px;height:36px;padding:0;justify-content:center;border-radius:50%;border:none;font-size:17px;flex-shrink:0;}
+.ib:hover{background:var(--cream2);}
+.fab{position:fixed;bottom:68px;right:18px;width:50px;height:50px;border-radius:50%;background:var(--ink);color:var(--cream);border:none;font-size:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 14px rgba(26,23,20,.22);z-index:200;transition:transform .13s;}
+.fab:active{transform:scale(.92);}
+
+/* INPUTS */
+.fi{width:100%;background:var(--paper);border:1px solid var(--bm);border-radius:8px;padding:9px 12px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--ink);outline:none;transition:border-color .13s;-webkit-appearance:none;}
+.fi:focus{border-color:var(--rust);}
+.fi::placeholder{color:var(--ink4);font-style:italic;}
+select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238A837A' stroke-width='1.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;padding-right:28px;}
+.ta{width:100%;background:var(--paper);border:1px solid var(--bm);border-radius:8px;padding:11px 12px;font-family:'Lora',serif;font-size:14px;color:var(--ink);line-height:1.7;outline:none;resize:none;min-height:88px;transition:border-color .13s;-webkit-appearance:none;}
+.ta:focus{border-color:var(--rust);}
+.ta::placeholder{color:var(--ink4);font-style:italic;}
+.fl{font-size:10px;font-weight:500;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);display:block;margin-bottom:5px;}
+.fg{margin-bottom:16px;}
+
+/* SHARED HEAD */
+.pg-head{padding:22px 18px 10px;}
+.pg-date{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin-bottom:3px;}
+.pg-h{font-family:'Lora',serif;font-size:21px;font-weight:400;line-height:1.3;}
+.pg-h em{color:var(--rust);font-style:italic;}
+
+/* SEARCH */
+.search-wrap{padding:8px 14px 6px;}
+.search-inner{display:flex;align-items:center;background:var(--paper);border:1px solid var(--bm);border-radius:20px;padding:6px 13px;gap:7px;}
+.search-inner input{background:none;border:none;outline:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--ink);flex:1;width:100%;}
+.search-inner input::placeholder{color:var(--ink4);}
+.s-ico{font-size:13px;color:var(--ink4);}
+
+/* CHIPS */
+.tabs{display:flex;gap:5px;padding:6px 14px 6px;overflow-x:auto;scrollbar-width:none;}
+.tabs::-webkit-scrollbar{display:none;}
+.chip{flex-shrink:0;font-size:11px;padding:4px 10px;border-radius:16px;border:1px solid var(--bm);background:transparent;color:var(--ink2);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .12s;}
+.chip.on{background:var(--ink);color:var(--cream);border-color:var(--ink);}
+.chip:hover:not(.on){background:var(--cream2);}
+.chip-t{border-color:rgba(26,107,90,.3);color:var(--teal);}
+.chip-t.on{background:var(--teal);border-color:var(--teal);color:#fff;}
+
+/* TAG ROW */
+.tag-row{display:flex;flex-wrap:wrap;gap:5px;padding:2px 14px 10px;}
+
+/* STATS */
+.stats{display:flex;padding:0 14px 12px;gap:0;}
+.stat{flex:1;text-align:center;padding:8px 0;border:1px solid var(--b);background:var(--paper);}
+.stat:first-child{border-radius:7px 0 0 7px;}
+.stat:last-child{border-radius:0 7px 7px 0;border-left:none;}
+.stat:not(:first-child):not(:last-child){border-left:none;}
+.stat-n{font-family:'Lora',serif;font-size:17px;font-weight:500;color:var(--ink);}
+.stat-l{font-size:9px;color:var(--ink3);letter-spacing:.04em;margin-top:1px;}
+
+/* MEDIA CARD */
+.list{padding:4px 14px 12px;}
+.empty{padding:52px 20px;text-align:center;}
+.empty-ico{font-size:36px;opacity:.2;margin-bottom:12px;}
+.empty p{font-family:'Lora',serif;font-size:15px;font-style:italic;color:var(--ink3);line-height:1.6;}
+.mc{background:var(--paper);border:1px solid var(--b);border-radius:10px;margin-bottom:8px;overflow:hidden;cursor:pointer;transition:border-color .13s;}
+.mc:hover{border-color:var(--bm);}
+.mc:active{transform:scale(.99);}
+.mc-head{display:flex;align-items:flex-start;gap:10px;padding:13px 14px 9px;}
+.mc-type{font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);background:var(--cream2);border-radius:3px;padding:2px 6px;flex-shrink:0;margin-top:2px;}
+.mc-info{flex:1;min-width:0;}
+.mc-title{font-family:'Lora',serif;font-size:15px;font-weight:500;line-height:1.3;color:var(--ink);margin-bottom:2px;}
+.mc-creator{font-size:12px;color:var(--ink3);}
+.mc-count{font-size:11px;color:var(--ink3);flex-shrink:0;margin-top:3px;white-space:nowrap;}
+.mc-preview{padding:0 14px 10px;font-family:'Lora',serif;font-size:12px;color:var(--ink2);line-height:1.55;font-style:italic;}
+.mc-foot{display:flex;flex-wrap:wrap;gap:4px;padding:0 14px 11px;}
+.tp{font-size:10px;padding:2px 7px;border-radius:3px;background:var(--teal2);color:var(--teal);border:1px solid rgba(26,107,90,.18);}
+
+/* MEDIA DETAIL */
+.md-head{padding:20px 18px 14px;border-bottom:1px solid var(--b);}
+.md-type{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);margin-bottom:7px;}
+.md-title{font-family:'Lora',serif;font-size:23px;font-weight:500;line-height:1.2;margin-bottom:3px;}
+.md-creator{font-size:13px;color:var(--ink3);margin-bottom:12px;}
+.md-tags{display:flex;flex-wrap:wrap;gap:5px;}
+.sec-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 8px;}
+.sec-lbl{font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--rust);}
+.moments-wrap{padding:0 14px 16px;}
+.no-mom{padding:24px;text-align:center;font-family:'Lora',serif;font-size:14px;font-style:italic;color:var(--ink3);}
+
+/* MOMENT CARD */
+.mom-card{background:var(--paper);border:1px solid var(--b);border-radius:9px;margin-bottom:8px;overflow:hidden;transition:border-color .2s;}
+.mom-card.hl{border-color:var(--rust);animation:hl .7s ease;}
+@keyframes hl{0%{background:var(--rust2)}100%{background:var(--paper)}}
+.mom-card-head{display:flex;align-items:center;gap:8px;padding:10px 13px 9px;border-bottom:1px solid var(--b);}
+.mom-anchor{font-size:11px;color:var(--ink3);flex:1;}
+.mom-date{font-size:10px;color:var(--ink4);}
+.mom-body{padding:10px 13px;}
+.mom-sec{font-size:9px;font-weight:500;letter-spacing:.09em;text-transform:uppercase;color:var(--rust);margin-bottom:4px;margin-top:9px;}
+.mom-sec:first-child{margin-top:0;}
+.mom-txt{font-family:'Lora',serif;font-size:13px;line-height:1.68;color:var(--ink);}
+.mom-tags{display:flex;flex-wrap:wrap;gap:4px;padding:0 13px 10px;}
+.mom-rels{padding:0 13px 10px;}
+.rel-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 9px;border-radius:4px;background:var(--amber2);color:var(--amber);border:1px solid rgba(122,90,26,.2);margin:2px 2px 2px 0;cursor:pointer;}
+.rel-chip:hover{background:rgba(122,90,26,.14);}
+.mom-actions{padding:0 13px 10px;display:flex;gap:7px;}
+
+/* MOMENT EDITOR */
+.me-body{padding:18px 18px 130px;}
+.div-lbl{font-family:'Lora',serif;font-size:12px;font-style:italic;color:var(--ink3);display:flex;align-items:center;gap:9px;margin:6px 0 14px;}
+.div-lbl::after{content:'';flex:1;height:1px;background:var(--b);}
+.pcs{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
+.pc{font-size:11px;padding:4px 9px;border-radius:4px;border:1px solid var(--b);background:var(--cream2);color:var(--ink2);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .12s;}
+.pc:hover{border-color:var(--rust);color:var(--rust);background:var(--rust2);}
+
+/* TAG INPUT */
+.ti-wrap{background:var(--paper);border:1px solid var(--bm);border-radius:8px;padding:7px 10px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-height:38px;cursor:text;transition:border-color .13s;}
+.ti-wrap:focus-within{border-color:var(--rust);}
+.tp-rm{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 7px;border-radius:3px;background:var(--teal2);color:var(--teal);border:1px solid rgba(26,107,90,.2);}
+.tp-rm button{background:none;border:none;cursor:pointer;font-size:12px;color:var(--teal);padding:0;line-height:1;opacity:.7;}
+.ti{border:none;outline:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--ink);background:transparent;min-width:80px;flex:1;}
+.ti::placeholder{color:var(--ink4);}
+
+/* REL ROWS */
+.rel-row{display:flex;gap:7px;align-items:center;margin-bottom:7px;}
+.rel-row select,.rel-row input{flex:1;}
+.rel-rm-btn{background:none;border:none;cursor:pointer;font-size:16px;color:var(--ink3);padding:4px;flex-shrink:0;}
+
+/* CONNECTIONS */
+.cg{margin-bottom:18px;}
+.cg-lbl{font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:7px;padding-left:2px;}
+.ci{background:var(--paper);border:1px solid var(--b);border-radius:8px;padding:11px 13px;margin-bottom:6px;cursor:pointer;}
+.ci:hover{border-color:var(--bm);}
+.ci-top{display:flex;align-items:flex-start;gap:8px;margin-bottom:4px;}
+.ci-anch{font-size:11px;color:var(--ink3);flex-shrink:0;}
+.ci-title{font-family:'Lora',serif;font-size:13px;color:var(--ink);line-height:1.4;flex:1;}
+.ci-preview{font-family:'Lora',serif;font-size:12px;color:var(--ink2);line-height:1.5;font-style:italic;margin-top:3px;}
+.ci-to{font-size:12px;color:var(--ink2);margin-top:7px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.rel-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:2px 7px;border-radius:3px;background:var(--amber2);color:var(--amber);border:1px solid rgba(122,90,26,.2);}
+
+/* SAVE BAR */
+.save-bar{position:fixed;bottom:0;left:0;right:0;padding:10px 14px;background:var(--cream);border-top:1px solid var(--b);display:flex;gap:8px;z-index:200;}
+.save-bar .btn{flex:1;justify-content:center;padding:10px;font-size:13px;}
+
+/* BOTTOM NAV */
+.bnav{position:fixed;bottom:0;left:0;right:0;background:var(--cream);border-top:1px solid var(--b);display:flex;z-index:150;height:56px;}
+.nt{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;border:none;background:transparent;color:var(--ink3);font-size:10px;font-family:'DM Sans',sans-serif;transition:color .12s;}
+.nt.on{color:var(--rust);}
+.nt-ico{font-size:18px;line-height:1;}
+
+/* MENU */
+.ov{display:none;position:fixed;inset:0;background:rgba(26,23,20,.32);z-index:300;}
+.ov.open{display:block;}
+.sheet{position:absolute;bottom:0;left:0;right:0;background:var(--cream);border-radius:14px 14px 0 0;padding:14px 0 38px;transform:translateY(100%);transition:transform .26s cubic-bezier(.22,1,.36,1);}
+.ov.open .sheet{transform:translateY(0);}
+.handle{width:34px;height:4px;border-radius:2px;background:var(--ink4);margin:0 auto 18px;}
+.mi{display:flex;align-items:center;gap:13px;padding:13px 22px;cursor:pointer;font-size:14px;color:var(--ink);transition:background .12s;}
+.mi:hover{background:var(--cream2);}
+.mi-ico{font-size:17px;width:22px;text-align:center;}
+.mi-sub{font-size:11px;color:var(--ink3);margin-top:1px;}
+.ms-t{font-size:9px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);padding:14px 22px 6px;}
+.mdiv{height:1px;background:var(--b);margin:6px 0;}
+
+/* TOAST */
+.toast{position:fixed;bottom:72px;left:50%;transform:translateX(-50%) translateY(14px);background:var(--ink);color:var(--cream);font-size:12px;padding:7px 15px;border-radius:18px;opacity:0;transition:all .22s;z-index:999;white-space:nowrap;pointer-events:none;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+
+<!-- HOME -->
+<div id="v-home" class="view active">
+  <div class="tb"><div class="tb-brand">common<i>place</i></div><button class="btn ib" onclick="openMenu()">⋯</button></div>
+  <div class="pg-head"><div class="pg-date" id="h-date"></div><div class="pg-h">Your <em>personal</em> commonplace</div></div>
+  <div class="search-wrap"><div class="search-inner"><span class="s-ico">○</span><input id="s-in" placeholder="Search media, moments, tags…" oninput="onSearch(this.value)"></div></div>
+  <div class="tabs" id="type-tabs">
+    <button class="chip on" onclick="setFilter('all',this)">All</button>
+    <button class="chip" onclick="setFilter('book',this)">Books</button>
+    <button class="chip" onclick="setFilter('film',this)">Films</button>
+    <button class="chip" onclick="setFilter('tv',this)">TV</button>
+    <button class="chip" onclick="setFilter('other',this)">Other</button>
+  </div>
+  <div class="tag-row" id="tag-row"></div>
+  <div class="stats" id="stats" style="display:none">
+    <div class="stat"><div class="stat-n" id="st-a">0</div><div class="stat-l">media</div></div>
+    <div class="stat"><div class="stat-n" id="st-m">0</div><div class="stat-l">moments</div></div>
+    <div class="stat"><div class="stat-n" id="st-t">0</div><div class="stat-l">tags</div></div>
+  </div>
+  <div class="list" id="m-list"></div>
+  <button class="fab" onclick="openMediaEd(null)">+</button>
+  <div class="bnav">
+    <button class="nt on" onclick="switchTab('home')"><span class="nt-ico">◎</span>Library</button>
+    <button class="nt" onclick="switchTab('tags')"><span class="nt-ico">◈</span>Tags</button>
+    <button class="nt" onclick="switchTab('connections')"><span class="nt-ico">◇</span>Connections</button>
+  </div>
+</div>
+
+<!-- TAGS -->
+<div id="v-tags" class="view">
+  <div class="tb"><div class="tb-brand">common<i>place</i></div><button class="btn ib" onclick="openMenu()">⋯</button></div>
+  <div class="pg-head"><div class="pg-date" id="t-date"></div><div class="pg-h">By <em>tag</em></div></div>
+  <div class="list" id="t-list"></div>
+  <div class="bnav">
+    <button class="nt" onclick="switchTab('home')"><span class="nt-ico">◎</span>Library</button>
+    <button class="nt on" onclick="switchTab('tags')"><span class="nt-ico">◈</span>Tags</button>
+    <button class="nt" onclick="switchTab('connections')"><span class="nt-ico">◇</span>Connections</button>
+  </div>
+</div>
+
+<!-- CONNECTIONS -->
+<div id="v-connections" class="view">
+  <div class="tb"><div class="tb-brand">common<i>place</i></div><button class="btn ib" onclick="openMenu()">⋯</button></div>
+  <div class="pg-head"><div class="pg-h">Your <em>connections</em></div></div>
+  <div class="list" id="c-list"></div>
+  <div class="bnav">
+    <button class="nt" onclick="switchTab('home')"><span class="nt-ico">◎</span>Library</button>
+    <button class="nt" onclick="switchTab('tags')"><span class="nt-ico">◈</span>Tags</button>
+    <button class="nt on" onclick="switchTab('connections')"><span class="nt-ico">◇</span>Connections</button>
+  </div>
+</div>
+
+<!-- MEDIA DETAIL -->
+<div id="v-mdetail" class="view">
+  <div class="tb"><button class="btn ib" onclick="back()">←</button><span class="tb-lbl" id="mdt-lbl"></span><button class="btn ib" onclick="editCurrentMedia()">✎</button></div>
+  <div id="mdt-body"></div>
+</div>
+
+<!-- MEDIA EDITOR -->
+<div id="v-med" class="view">
+  <div class="tb"><button class="btn ib" onclick="back()">←</button><span class="tb-lbl" id="me-lbl">New media</span></div>
+  <div class="me-body">
+    <div class="fg"><label class="fl">Type</label><select class="fi" id="me-type"><option value="book">Book</option><option value="film">Film</option><option value="tv">TV series</option><option value="other">Other</option></select></div>
+    <div class="fg"><label class="fl">Title</label><input class="fi" id="me-title" placeholder="Title of the work…"></div>
+    <div class="fg"><label class="fl">Author / Director / Creator</label><input class="fi" id="me-creator" placeholder="Who made it…"></div>
+  </div>
+  <div class="save-bar"><button class="btn" onclick="back()">Cancel</button><button class="btn bp" onclick="saveMedia()">Save</button></div>
+</div>
+
+<!-- MOMENT EDITOR -->
+<div id="v-momed" class="view">
+  <div class="tb"><button class="btn ib" onclick="back()">←</button><span class="tb-lbl" id="momed-lbl">New moment</span></div>
+  <div class="me-body">
+    <div class="fg"><label class="fl">Anchor <span style="color:var(--ink4);font-style:italic;font-size:9px;">chapter, episode, scene, timestamp…</span></label><input class="fi" id="mo-anchor" placeholder="e.g. Chapter 12, Episode 4, 00:42…"></div>
+    <div class="fg"><label class="fl">Thoughts</label>
+      <textarea class="ta" id="mo-thought" placeholder="Let your mind wander." rows="3" oninput="ar(this)"></textarea>
+      <div class="pcs">
+        <span class="pc" onclick="ap('mo-thought','It reminded me of a time when ')">a memory</span>
+        <span class="pc" onclick="ap('mo-thought','I kept thinking about ')">something I lingered on</span>
+        <span class="pc" onclick="ap('mo-thought','I disagreed with ')">where I pushed back</span>
+      </div>
+    </div>
+    <div class="fg"><label class="fl">How does it connect to your life?</label>
+      <textarea class="ta" id="mo-conn" placeholder="People, places, feelings…" rows="3" oninput="ar(this)"></textarea>
+      <div class="pcs">
+        <span class="pc" onclick="ap('mo-conn','This made me think of someone I know: ')">a person</span>
+        <span class="pc" onclick="ap('mo-conn','At this point in my life ')">where I am now</span>
+        <span class="pc" onclick="ap('mo-conn','I wonder if I ')">a question it raised</span>
+      </div>
+    </div>
+    <div class="fg"><label class="fl">A line or moment that means something to you <span style="color:var(--ink4);font-style:italic;font-size:9px;">optional</span></label><textarea class="ta" id="mo-line" placeholder="Something you'd want to remember." rows="2" oninput="ar(this)"></textarea></div>
+    <div class="fg">
+      <label class="fl">Tags <span style="color:var(--ink4);font-style:italic;font-size:9px;">type then space</span></label>
+      <div class="ti-wrap" id="ti-wrap" onclick="document.getElementById('ti').focus()">
+        <input id="ti" class="ti" placeholder="grief, identity, memory…" onkeydown="handleTagKey(event)" oninput="handleTagInput(event)">
+      </div>
+    </div>
+    <div class="fg">
+      <label class="fl">Connections to other moments</label>
+      <div id="rel-rows"></div>
+      <button class="btn" style="font-size:12px;margin-top:5px;" onclick="addRel()">+ add connection</button>
+    </div>
+  </div>
+  <div class="save-bar">
+    <button class="btn bd" id="mo-del-btn" onclick="delMoment()" style="display:none">Delete</button>
+    <button class="btn" onclick="back()">Cancel</button>
+    <button class="btn bp" onclick="saveMoment()">Save moment</button>
+  </div>
+</div>
+
+<!-- MENU -->
+<div id="ov" class="ov" onclick="handleOv(event)"><div class="sheet"><div class="handle"></div>
+  <div class="ms-t">Your commonplace</div>
+  <div class="mi" onclick="doExport()"><span class="mi-ico">↓</span><div><div>Export all</div><div class="mi-sub">Download as JSON</div></div></div>
+  <div class="mi" onclick="doImport()"><span class="mi-ico">↑</span><div><div>Import</div><div class="mi-sub">Merge from JSON file</div></div></div>
+  <div class="mdiv"></div>
+  <div class="mi" style="cursor:default;opacity:.5;"><span class="mi-ico">○</span><div><div>Commonplace</div><div class="mi-sub">Media as anchors. Thoughts as record.</div></div></div>
+</div></div>
+<input type="file" id="imp-file" accept=".json" style="display:none" onchange="handleImport(event)">
+<div class="toast" id="toast"></div>
+
+<script>
+const db = new Dexie('cp3');
+db.version(1).stores({ media:'++id,type,title,createdAt', moments:'++id,mediaId,createdAt', relations:'++id,fromId,toId' });
+
+let AM=[], AMO=[], AR=[];
+let cFilter='all', cTag=null, cSearch='', cMediaId=null, edMediaId=null, edMomId=null, edMomMediaId=null;
+let mTags=[], relRows=[];
+const vStack=[];
+
+const VIEWS=['home','tags','connections','mdetail','med','momed'];
+function sv(n,push=true){
+  if(push && vStack[vStack.length-1]!==n) vStack.push(n);
+  VIEWS.forEach(v=>document.getElementById('v-'+v).classList.toggle('active',v===n));
+  window.scrollTo(0,0);
+}
+function back(){
+  vStack.pop();
+  const p=vStack[vStack.length-1]||'home';
+  sv(p,false);
+  if(p==='mdetail'&&cMediaId) renderMD(cMediaId);
+  if(['home','tags','connections'].includes(p)) loadAll();
+}
+function switchTab(t){
+  vStack.length=0; vStack.push(t); sv(t,false);
+  if(t==='home') loadAll();
+  if(t==='tags'){loadAll();renderTags();}
+  if(t==='connections'){loadAll();renderConns();}
+  document.querySelectorAll('.nt').forEach(n=>n.classList.remove('on'));
+  const map={home:0,tags:1,connections:2};
+  document.querySelectorAll('.nt')[map[t]||0].classList.add('on');
+}
+
+function toast(m){const e=document.getElementById('toast');e.textContent=m;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2400);}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fdt(ts){return new Date(ts).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});}
+function ar(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
+function ap(id,t){const el=document.getElementById(id);if(el.value&&!el.value.endsWith('\n'))el.value+='\n';el.value+=t;el.focus();ar(el);}
+
+async function loadAll(){
+  [AM,AMO,AR]=await Promise.all([db.media.orderBy('createdAt').reverse().toArray(),db.moments.orderBy('createdAt').toArray(),db.relations.toArray()]);
+  renderHome();
+}
+function allTags(){const s=new Set();AMO.forEach(m=>(m.tags||[]).forEach(t=>s.add(t)));return[...s].sort();}
+function momsFor(mid){return AMO.filter(m=>m.mediaId===mid);}
+function momsByTag(t){return AMO.filter(m=>(m.tags||[]).includes(t));}
+
+function renderHome(){
+  document.getElementById('h-date').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const st=document.getElementById('stats');
+  if(AM.length){st.style.display='flex';document.getElementById('st-a').textContent=AM.length;document.getElementById('st-m').textContent=AMO.length;document.getElementById('st-t').textContent=allTags().length;}
+  else st.style.display='none';
+  renderTagRow(); renderList();
+}
+function renderTagRow(){
+  const tags=allTags();
+  document.getElementById('tag-row').innerHTML=tags.map(t=>`<button class="chip chip-t${cTag===t?' on':''}" onclick="setTag('${esc(t)}',this)">#${esc(t)}</button>`).join('');
+}
+function renderList(){
+  const c=document.getElementById('m-list');
+  let media=AM;
+  if(cFilter!=='all') media=media.filter(m=>m.type===cFilter);
+  if(cTag){const mids=new Set(momsByTag(cTag).map(m=>m.mediaId));media=media.filter(m=>mids.has(m.id));}
+  if(cSearch.trim()){
+    const q=cSearch.toLowerCase();
+    const matchMids=new Set(AMO.filter(m=>(m.thought||'').toLowerCase().includes(q)||(m.connection||'').toLowerCase().includes(q)||(m.line||'').toLowerCase().includes(q)||(m.anchor||'').toLowerCase().includes(q)||(m.tags||[]).some(t=>t.includes(q))).map(m=>m.mediaId));
+    media=media.filter(m=>(m.title||'').toLowerCase().includes(q)||(m.creator||'').toLowerCase().includes(q)||matchMids.has(m.id));
+  }
+  if(!media.length){c.innerHTML=`<div class="empty"><div class="empty-ico">◌</div><p>${cSearch||cTag?'Nothing matches.':'Nothing yet.<br>Tap + to add your first piece of media.'}</p></div>`;return;}
+  const TL={book:'Book',film:'Film',tv:'TV',other:'Other'};
+  c.innerHTML=media.map(m=>{
+    const moms=momsFor(m.id);
+    const tags=[...new Set(moms.flatMap(x=>x.tags||[]))];
+    const last=moms[moms.length-1];
+    const prev=last?(last.thought||last.connection||last.line||''):'';
+    return `<div class="mc" onclick="openMD(${m.id})">
+      <div class="mc-head">
+        <span class="mc-type">${TL[m.type]||m.type}</span>
+        <div class="mc-info"><div class="mc-title">${esc(m.title||'Untitled')}</div>${m.creator?`<div class="mc-creator">${esc(m.creator)}</div>`:''}</div>
+        <div class="mc-count">${moms.length} moment${moms.length!==1?'s':''}</div>
+      </div>
+      ${prev?`<div class="mc-preview">"${esc(prev.slice(0,110))}${prev.length>110?'…':''}"</div>`:''}
+      ${tags.length?`<div class="mc-foot">${tags.map(t=>`<span class="tp">#${esc(t)}</span>`).join('')}</div>`:''}
+    </div>`;
+  }).join('');
+}
+function setFilter(f,el){cFilter=f;cTag=null;document.querySelectorAll('#type-tabs .chip').forEach(c=>c.classList.remove('on'));el.classList.add('on');renderTagRow();renderList();}
+function setTag(t,el){cTag=cTag===t?null:t;document.querySelectorAll('.chip-t').forEach(c=>c.classList.remove('on'));if(cTag)el.classList.add('on');renderList();}
+function onSearch(v){cSearch=v;renderList();}
+
+// MEDIA DETAIL
+function openMD(id){cMediaId=id;renderMD(id);sv('mdetail');}
+function renderMD(id){
+  const m=AM.find(x=>x.id===id);if(!m)return;
+  const moms=momsFor(id);
+  const tags=[...new Set(moms.flatMap(x=>x.tags||[]))];
+  const TL={book:'Book',film:'Film',tv:'TV series',other:'Other'};
+  document.getElementById('mdt-lbl').textContent=m.title||'Untitled';
+  document.getElementById('mdt-body').innerHTML=`
+    <div class="md-head">
+      <div class="md-type">${TL[m.type]||m.type}</div>
+      <div class="md-title">${esc(m.title||'Untitled')}</div>
+      ${m.creator?`<div class="md-creator">${esc(m.creator)}</div>`:''}
+      ${tags.length?`<div class="md-tags">${tags.map(t=>`<span class="tp">#${esc(t)}</span>`).join('')}</div>`:''}
+    </div>
+    <div class="sec-head"><span class="sec-lbl">Moments</span><button class="btn" style="font-size:12px;padding:5px 10px;" onclick="openMomEd(null,${id})">+ add moment</button></div>
+    <div class="moments-wrap" id="mw-${id}">
+      ${!moms.length?`<div class="no-mom">No moments yet. Add your first one above.</div>`:''}
+      ${moms.map(mo=>renderMomCard(mo)).join('')}
+    </div>`;
+}
+function renderMomCard(mo){
+  const rels=AR.filter(r=>r.fromId===mo.id||r.toId===mo.id);
+  const tags=mo.tags||[];
+  return `<div class="mom-card" id="mc-${mo.id}">
+    <div class="mom-card-head"><span class="mom-anchor">${mo.anchor?esc(mo.anchor):'—'}</span><span class="mom-date">${fdt(mo.createdAt)}</span></div>
+    <div class="mom-body">
+      ${mo.thought?`<div class="mom-sec">What it made you think</div><div class="mom-txt">${esc(mo.thought).replace(/\n/g,'<br>')}</div>`:''}
+      ${mo.connection?`<div class="mom-sec">How it connects to your life</div><div class="mom-txt">${esc(mo.connection).replace(/\n/g,'<br>')}</div>`:''}
+      ${mo.line?`<div class="mom-sec">A line or moment</div><div class="mom-txt">${esc(mo.line).replace(/\n/g,'<br>')}</div>`:''}
+    </div>
+    ${tags.length?`<div class="mom-tags">${tags.map(t=>`<span class="tp" onclick="event.stopPropagation();switchTab('tags')" style="cursor:pointer">#${esc(t)}</span>`).join('')}</div>`:''}
+    ${rels.length?`<div class="mom-rels">${rels.map(r=>relChip(r,mo.id)).join('')}</div>`:''}
+    <div class="mom-actions"><button class="btn" style="font-size:12px;padding:5px 10px;" onclick="openMomEd(${mo.id},${mo.mediaId})">Edit</button></div>
+  </div>`;
+}
+function relChip(r,moId){
+  const otherId=r.fromId===moId?r.toId:r.fromId;
+  const other=AMO.find(m=>m.id===otherId);
+  const otherM=other?AM.find(m=>m.id===other.mediaId):null;
+  const lbl=r.fromId===moId?r.label:('← '+r.label);
+  return `<span class="rel-chip" onclick="jumpTo(${otherId})"><span>${esc(lbl)}</span><span style="font-size:10px;opacity:.6;margin:0 2px;">→</span><span>${otherM?esc(otherM.title.slice(0,18)):'?'}</span></span>`;
+}
+async function jumpTo(mid){
+  await loadAll();
+  const mo=AMO.find(m=>m.id===mid);if(!mo)return;
+  cMediaId=mo.mediaId;renderMD(mo.mediaId);
+  vStack.push('mdetail');sv('mdetail',false);
+  setTimeout(()=>{const el=document.getElementById('mc-'+mid);if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.add('hl');setTimeout(()=>el.classList.remove('hl'),900);}},280);
+}
+
+// MEDIA EDITOR
+function openMediaEd(id){edMediaId=id;document.getElementById('me-lbl').textContent=id?'Edit media':'New media';
+  if(id){const m=AM.find(x=>x.id===id);document.getElementById('me-type').value=m.type||'book';document.getElementById('me-title').value=m.title||'';document.getElementById('me-creator').value=m.creator||'';}
+  else{document.getElementById('me-type').value='book';document.getElementById('me-title').value='';document.getElementById('me-creator').value='';}
+  sv('med');}
+function editCurrentMedia(){openMediaEd(cMediaId);}
+async function saveMedia(){
+  const title=document.getElementById('me-title').value.trim();
+  if(!title){toast('Add a title first');return;}
+  const data={type:document.getElementById('me-type').value,title,creator:document.getElementById('me-creator').value.trim(),createdAt:Date.now()};
+  if(edMediaId){await db.media.update(edMediaId,data);toast('Updated');await loadAll();back();}
+  else{const id=await db.media.add(data);cMediaId=id;toast('Added');await loadAll();renderMD(id);vStack.length=0;vStack.push('home','mdetail');sv('mdetail',false);}
+  edMediaId=null;
+}
+
+// MOMENT EDITOR
+function openMomEd(momId,mediaId){
+  edMomId=momId;edMomMediaId=mediaId;mTags=[];relRows=[];
+  document.getElementById('momed-lbl').textContent=momId?'Edit moment':'New moment';
+  document.getElementById('mo-del-btn').style.display=momId?'':'none';
+  ['mo-anchor','mo-thought','mo-conn','mo-line'].forEach(id=>document.getElementById(id).value='');
+  if(momId){
+    const mo=AMO.find(x=>x.id===momId);
+    document.getElementById('mo-anchor').value=mo.anchor||'';
+    document.getElementById('mo-thought').value=mo.thought||'';
+    document.getElementById('mo-conn').value=mo.connection||'';
+    document.getElementById('mo-line').value=mo.line||'';
+    mTags=[...(mo.tags||[])];
+    relRows=AR.filter(r=>r.fromId===momId).map(r=>({label:r.label,toId:r.toId,dbId:r.id}));
+  }
+  renderTI();renderRelRows();sv('momed');
+}
+async function saveMoment(){
+  const data={mediaId:edMomMediaId,anchor:document.getElementById('mo-anchor').value.trim(),thought:document.getElementById('mo-thought').value.trim(),connection:document.getElementById('mo-conn').value.trim(),line:document.getElementById('mo-line').value.trim(),tags:mTags,createdAt:edMomId?(AMO.find(x=>x.id===edMomId)?.createdAt||Date.now()):Date.now(),updatedAt:Date.now()};
+  let mid=edMomId;
+  if(mid){await db.moments.update(mid,data);}
+  else{mid=await db.moments.add(data);}
+  if(edMomId){const old=await db.relations.where('fromId').equals(edMomId).toArray();for(const r of old)await db.relations.delete(r.id);}
+  for(const r of relRows){if(r.toId&&r.label)await db.relations.add({fromId:mid,toId:r.toId,label:r.label});}
+  toast(edMomId?'Moment updated':'Moment saved');
+  const mMediaId=edMomMediaId||cMediaId;edMomId=null;
+  await loadAll();renderMD(mMediaId);back();
+}
+async function delMoment(){
+  if(!confirm('Delete this moment?'))return;
+  await db.moments.delete(edMomId);
+  const rels=AR.filter(r=>r.fromId===edMomId||r.toId===edMomId);
+  for(const r of rels)await db.relations.delete(r.id);
+  toast('Deleted');const mMediaId=edMomMediaId||cMediaId;edMomId=null;
+  await loadAll();renderMD(mMediaId);back();
+}
+
+// TAG INPUT
+function renderTI(){
+  const wrap=document.getElementById('ti-wrap'),raw=document.getElementById('ti');
+  wrap.innerHTML='';
+  mTags.forEach((t,i)=>{const p=document.createElement('span');p.className='tp-rm';p.innerHTML=`#${esc(t)}<button onclick="rmTag(${i})">×</button>`;wrap.appendChild(p);});
+  wrap.appendChild(raw);raw.value='';
+}
+function handleTagKey(e){if(e.key===' '||e.key==='Enter'){e.preventDefault();commitTag();}if(e.key==='Backspace'&&!e.target.value&&mTags.length){mTags.pop();renderTI();}}
+function handleTagInput(e){if(e.target.value.endsWith(' '))commitTag();}
+function commitTag(){const raw=document.getElementById('ti');const v=raw.value.trim().replace(/\s+/g,'').toLowerCase();if(v&&!mTags.includes(v)){mTags.push(v);renderTI();}else raw.value='';}
+function rmTag(i){mTags.splice(i,1);renderTI();}
+
+// REL ROWS
+function renderRelRows(){
+  document.getElementById('rel-rows').innerHTML=relRows.map((r,i)=>`
+    <div class="rel-row">
+      <input class="fi" style="flex:0 0 90px;" placeholder="Label…" value="${esc(r.label||'')}" oninput="relRows[${i}].label=this.value">
+      <select class="fi" onchange="relRows[${i}].toId=+this.value">${momOpts(r.toId)}</select>
+      <button class="rel-rm-btn" onclick="rmRel(${i})">×</button>
+    </div>`).join('');
+}
+function momOpts(sel){
+  return `<option value="">— pick a moment —</option>`+AMO.filter(m=>m.id!==edMomId).map(m=>{
+    const med=AM.find(x=>x.id===m.mediaId);
+    return `<option value="${m.id}"${m.id===sel?' selected':''}>${esc((med?med.title.slice(0,16):'?')+' / '+(m.anchor||fdt(m.createdAt)))}</option>`;
+  }).join('');
+}
+function addRel(){relRows.push({label:'',toId:null});renderRelRows();}
+function rmRel(i){relRows.splice(i,1);renderRelRows();}
+
+// TAGS VIEW
+function renderTags(){
+  document.getElementById('t-date').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const tags=allTags();const c=document.getElementById('t-list');
+  if(!tags.length){c.innerHTML=`<div class="empty"><div class="empty-ico">◈</div><p>No tags yet.<br>Add them when creating moments.</p></div>`;return;}
+  c.innerHTML=tags.map(t=>{
+    const moms=momsByTag(t);
+    return `<div class="cg">
+      <div class="cg-lbl">#${esc(t)} · ${moms.length} moment${moms.length!==1?'s':''}</div>
+      ${moms.map(mo=>{
+        const med=AM.find(x=>x.id===mo.mediaId);
+        const prev=mo.thought||mo.connection||mo.line||'';
+        return `<div class="ci" onclick="jumpTo(${mo.id})">
+          <div class="ci-top"><span class="ci-anch">${mo.anchor||'—'}</span><span class="ci-title">${med?esc(med.title):'?'}</span></div>
+          ${prev?`<div class="ci-preview">"${esc(prev.slice(0,100))}${prev.length>100?'…':''}"</div>`:''}
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+
+// CONNECTIONS VIEW
+function renderConns(){
+  const c=document.getElementById('c-list');
+  if(!AR.length){c.innerHTML=`<div class="empty"><div class="empty-ico">◇</div><p>No connections yet.<br>Link moments when adding them.</p></div>`;return;}
+  const byLbl={};
+  AR.forEach(r=>{const l=r.label||'related';if(!byLbl[l])byLbl[l]=[];byLbl[l].push(r);});
+  c.innerHTML=Object.entries(byLbl).map(([lbl,rels])=>`
+    <div class="cg">
+      <div class="cg-lbl">${esc(lbl)}</div>
+      ${rels.map(r=>{
+        const from=AMO.find(m=>m.id===r.fromId),to=AMO.find(m=>m.id===r.toId);
+        const fromM=from?AM.find(m=>m.id===from.mediaId):null,toM=to?AM.find(m=>m.id===to.mediaId):null;
+        const fp=from?(from.thought||from.connection||from.line||''):'';
+        return `<div class="ci" onclick="jumpTo(${r.fromId})">
+          <div class="ci-top"><span class="ci-anch">${from&&from.anchor?esc(from.anchor):'—'}</span><span class="ci-title">${fromM?esc(fromM.title):'?'}</span></div>
+          ${fp?`<div class="ci-preview">"${esc(fp.slice(0,80))}${fp.length>80?'…':''}"</div>`:''}
+          <div class="ci-to"><span class="rel-badge">${esc(lbl)} →</span><span>${toM?esc(toM.title):'?'}${to&&to.anchor?' / '+esc(to.anchor):''}</span></div>
+        </div>`;
+      }).join('')}
+    </div>`).join('');
+}
+
+// MENU
+function openMenu(){document.getElementById('ov').classList.add('open');}
+function handleOv(e){if(e.target===document.getElementById('ov'))document.getElementById('ov').classList.remove('open');}
+function doExport(){document.getElementById('ov').classList.remove('open');exportAll();}
+function doImport(){document.getElementById('ov').classList.remove('open');document.getElementById('imp-file').click();}
+async function exportAll(){
+  const[media,moments,relations]=await Promise.all([db.media.toArray(),db.moments.toArray(),db.relations.toArray()]);
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({version:2,exported:new Date().toISOString(),media,moments,relations},null,2)],{type:'application/json'}));
+  a.download='commonplace-'+new Date().toISOString().slice(0,10)+'.json';a.click();toast('Exported');
+}
+async function handleImport(e){
+  const f=e.target.files[0];if(!f)return;
+  try{
+    const d=JSON.parse(await f.text());
+    const media=d.media||[],moments=d.moments||[],rels=d.relations||[];
+    for(const m of media){const{id,...r}=m;await db.media.add({...r,createdAt:r.createdAt||Date.now()});}
+    for(const m of moments){const{id,...r}=m;await db.moments.add({...r,createdAt:r.createdAt||Date.now()});}
+    for(const r of rels){const{id,...rest}=r;await db.relations.add(rest);}
+    await loadAll();toast(`Imported ${media.length} media, ${moments.length} moments`);
+  }catch{toast('Could not read file');}
+  e.target.value='';
+}
+
+vStack.push('home');
+loadAll();
+</script>
+</body>
+</html>
