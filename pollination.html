@@ -283,6 +283,7 @@
 const db = new Dexie('thoughtweb');
 db.version(1).stores({ entries: '++id, dt, *tags' });
 db.version(2).stores({ entries: '++id, dt, *tags', fields: 'id, name, shape, order' });
+db.version(3).stores({ entries: '++id, dt, uid, *tags', fields: 'id, name, shape, order' });
 
 const BASE_NODE_RADIUS = 5;
 const GRAPH_DENSITY_KEY = 'thoughtgraph_density_v1';
