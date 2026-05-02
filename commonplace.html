@@ -25,6 +25,7 @@ html,body{background:var(--cream);color:var(--ink);font-family:'DM Sans',sans-se
 .tb-brand{font-family:'Lora',serif;font-size:16px;font-weight:500;letter-spacing:-.01em;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);}
 .tb-brand i{color:var(--rust);font-style:italic;margin-left:4px;font-weight:400;}
 .tb-lbl{font-size:13px;color:var(--ink2);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tb-meta{font-size:10px;color:var(--ink3);letter-spacing:0.02em;margin-left:auto;padding-right:4px;}
 
 /* SEARCH */
 .search-wrap{padding:8px 14px 6px;display:none;}
@@ -50,13 +51,15 @@ html,body{background:var(--cream);color:var(--ink);font-family:'DM Sans',sans-se
 .fi:focus{border-color:var(--rust);}
 .fi::placeholder{color:var(--ink4);font-style:italic;}
 select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238A837A' stroke-width='1.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;padding-right:28px;}
-.ta, .ta-view{width:100%;background:var(--paper);border:1px solid var(--bm);border-radius:8px;padding:11px 12px;font-family:'Lora',serif;font-size:14px;color:var(--ink);line-height:1.7;outline:none;resize:none;min-height:88px;transition:border-color .13s;-webkit-appearance:none;}
+.ta, .ta-view{width:100%;background:var(--paper);border:1px solid var(--bm);border-radius:8px;padding:11px 12px;font-family:'Lora',serif;font-size:14px;color:var(--ink);line-height:1.7;outline:none;resize:none;min-height:88px;transition:border-color .13s;-webkit-appearance:none;overflow:hidden;}
 .ta:focus{border-color:var(--rust);}
 .ta::placeholder{color:var(--ink4);font-style:italic;}
 .ta.off{display:none;}
 .ta-view{display:none;cursor:text;white-space:pre-wrap;overflow-wrap:break-word;}
 .ta-view.on{display:block;}
 .note{color:var(--ink3);font-style:italic;font-size:0.92em;font-family:'DM Sans',sans-serif;margin:0 1px;background:var(--cream2);padding:0 4px;border-radius:3px;}
+.note.ref{background:var(--rust2);color:var(--ink);border-left:1px solid var(--rust3);font-style:normal;}
+.ref-ts{color:var(--rust);font-weight:600;font-size:0.85em;margin-right:4px;font-family:'DM Sans',sans-serif;}
 .ta-view b{font-weight:600;}
 .ta-view u{text-decoration:underline;text-decoration-color:var(--rust3);text-underline-offset:3px;}
 .ta-view hr{border:none;border-top:1px solid var(--b);margin:14px 0;}
@@ -68,13 +71,6 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
 .pg-date{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin-bottom:3px;}
 .pg-h{font-family:'Lora',serif;font-size:21px;font-weight:400;line-height:1.3;}
 .pg-h em{color:var(--rust);font-style:italic;}
-
-/* SEARCH */
-.search-wrap{padding:8px 14px 6px;}
-.search-inner{display:flex;align-items:center;background:var(--paper);border:1px solid var(--bm);border-radius:20px;padding:6px 13px;gap:7px;}
-.search-inner input{background:none;border:none;outline:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--ink);flex:1;width:100%;}
-.search-inner input::placeholder{color:var(--ink4);}
-.s-ico{font-size:13px;color:var(--ink4);}
 
 /* CHIPS */
 .tabs{display:flex;gap:5px;padding:6px 14px 6px;overflow-x:auto;scrollbar-width:none;}
@@ -103,7 +99,7 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
 .empty-ico{font-size:36px;opacity:.2;margin-bottom:12px;}
 .empty p{font-family:'Lora',serif;font-size:15px;font-style:italic;color:var(--ink3);line-height:1.6;}
 .mc{background:var(--paper);border:1px solid var(--b);border-radius:10px;margin-bottom:8px;overflow:hidden;cursor:pointer;transition:border-color .13s;}
-.mc:hover{border-color:var(--bm);}
+.mc:hover{border-color:var(--ink);}
 .mc:active{transform:scale(.99);}
 .mc-head{display:flex;align-items:flex-start;gap:10px;padding:13px 14px 9px;}
 .mc-type{font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);background:var(--cream2);border-radius:3px;padding:2px 6px;flex-shrink:0;margin-top:2px;}
@@ -129,7 +125,7 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
 
 /* MOMENT CARD */
 .mom-card{background:var(--paper);border:1px solid var(--b);border-radius:9px;margin-bottom:8px;overflow:hidden;transition:border-color .2s;}
-.mom-card:hover{border-color:var(--bm);}
+.mom-card:hover{border-color:var(--ink);}
 .mom-card.hl{border-color:var(--rust);animation:hl .7s ease;}
 @keyframes hl{0%{background:var(--rust2)}100%{background:var(--paper)}}
 .mom-card-head{display:flex;align-items:center;gap:8px;padding:10px 13px 9px;border-bottom:1px solid var(--b);}
@@ -168,7 +164,7 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
 .cg{margin-bottom:18px;}
 .cg-lbl{font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:7px;padding-left:2px;}
 .ci{background:var(--paper);border:1px solid var(--b);border-radius:8px;padding:11px 13px;margin-bottom:6px;cursor:pointer;}
-.ci:hover{border-color:var(--bm);}
+.ci:hover{border-color:var(--ink);}
 .ci-top{display:flex;align-items:flex-start;gap:8px;margin-bottom:4px;}
 .ci-anch{font-size:11px;color:var(--ink3);flex-shrink:0;}
 .ci-title{font-family:'Lora',serif;font-size:13px;color:var(--ink);line-height:1.4;flex:1;}
@@ -269,13 +265,13 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
 
 <!-- MEDIA EDITOR -->
 <div id="v-med" class="view">
-  <div class="tb"><button class="btn ib" onclick="back()">←</button><span class="tb-lbl" id="me-lbl">New media</span></div>
+  <div class="tb"><button class="btn ib" onclick="back()">←</button><span class="tb-lbl" id="me-lbl">New media</span><span class="tb-meta" id="me-meta"></span></div>
   <div class="me-body">
     <div class="fg"><label class="fl">Type</label><select class="fi" id="me-type"><option value="book">Book</option><option value="film">Film</option><option value="tv">TV series</option><option value="other">Other</option></select></div>
     <div class="fg"><label class="fl">Title</label><input class="fi" id="me-title" placeholder="Title of the work…"></div>
     <div class="fg"><label class="fl">Author / Director / Creator</label><input class="fi" id="me-creator" placeholder="Who made it…"></div>
     <div class="fg"><label class="fl">Why did you pick this?</label>
-      <textarea class="ta" id="me-reason" placeholder="What drew you to it…" rows="2" oninput="ar(this)" onfocus="toEdit(this)" onblur="toView(this)"></textarea>
+      <textarea class="ta" id="me-reason" placeholder="What drew you to it…" rows="2" oninput="ar(this)" onfocus="toEdit(this)" onblur="toView(this)" onkeydown="handleTaKey(event, this)"></textarea>
       <div id="me-reason-v" class="ta-view" onclick="toEdit(document.getElementById('me-reason'))"></div>
     </div>
   </div>
@@ -284,12 +280,12 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
 
 <!-- MOMENT EDITOR -->
 <div id="v-momed" class="view">
-  <div class="tb"><button class="btn ib" onclick="back()">←</button><span class="tb-lbl" id="momed-lbl">New moment</span></div>
+  <div class="tb"><button class="btn ib" onclick="back()">←</button><span class="tb-lbl" id="momed-lbl">New moment</span><span class="tb-meta" id="mo-meta"></span></div>
   <div class="me-body">
     <!-- STAGE 1: capture thoughts -->
     <div id="mo-s1">
       <div class="fg"><label class="fl">Thoughts</label>
-        <textarea class="ta" id="mo-thought" placeholder="Let your mind wander." rows="3" oninput="ar(this)" onfocus="toEdit(this)" onblur="toView(this)"></textarea>
+        <textarea class="ta" id="mo-thought" placeholder="Let your mind wander." rows="3" oninput="ar(this)" onfocus="toEdit(this)" onblur="toView(this)" onkeydown="handleTaKey(event, this)"></textarea>
         <div id="mo-thought-v" class="ta-view" onclick="toEdit(document.getElementById('mo-thought'))"></div>
         <div class="pcs">
           <span class="pc" onclick="ap('mo-thought','It reminded me of a time when ')">a memory</span>
@@ -312,19 +308,19 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
       <div style="height:24px;"></div>
       <div class="div-lbl">Details</div>
 
+      <div class="fg"><label class="fl">A line or moment that means something to you <span style="color:var(--ink4);font-style:italic;font-size:9px;">optional</span></label>
+        <textarea class="ta" id="mo-line" placeholder="Something you'd want to remember." rows="2" oninput="ar(this)" onfocus="toEdit(this)" onblur="toView(this)" onkeydown="handleTaKey(event, this)"></textarea>
+        <div id="mo-line-v" class="ta-view" onclick="toEdit(document.getElementById('mo-line'))"></div>
+      </div>
+
       <div class="fg"><label class="fl">How does it connect to your life?</label>
-        <textarea class="ta" id="mo-conn" placeholder="People, places, feelings…" rows="3" oninput="ar(this)" onfocus="toEdit(this)" onblur="toView(this)"></textarea>
+        <textarea class="ta" id="mo-conn" placeholder="People, places, feelings…" rows="3" oninput="ar(this)" onfocus="toEdit(this)" onblur="toView(this)" onkeydown="handleTaKey(event, this)"></textarea>
         <div id="mo-conn-v" class="ta-view" onclick="toEdit(document.getElementById('mo-conn'))"></div>
         <div class="pcs">
           <span class="pc" onclick="ap('mo-conn','This made me think of someone I know: ')">a person</span>
           <span class="pc" onclick="ap('mo-conn','At this point in my life ')">where I am now</span>
           <span class="pc" onclick="ap('mo-conn','I wonder if I ')">a question it raised</span>
         </div>
-      </div>
-
-      <div class="fg"><label class="fl">A line or moment that means something to you <span style="color:var(--ink4);font-style:italic;font-size:9px;">optional</span></label>
-        <textarea class="ta" id="mo-line" placeholder="Something you'd want to remember." rows="2" oninput="ar(this)" onfocus="toEdit(this)" onblur="toView(this)"></textarea>
-        <div id="mo-line-v" class="ta-view" onclick="toEdit(document.getElementById('mo-line'))"></div>
       </div>
 
       <div style="height:24px;"></div>
@@ -411,6 +407,17 @@ function toView(el){
   const v=document.getElementById(el.id+'-v');
   if(v){ v.innerHTML=parseMd(el.value); v.classList.add('on'); }
 }
+function fdtFull(ts){
+  const d = new Date(ts).toLocaleDateString('en-GB', { day:'numeric', month:'short' });
+  const t = new Date(ts).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+  return `${d}, ${t}`;
+}
+function fdtRef(){
+  const now = new Date();
+  const d = now.toLocaleDateString('en-GB', { day:'numeric', month:'short' });
+  const t = now.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+  return `${d}, ${t}: `;
+}
 function parseMd(t){
   let h=esc(t);
   h=h.replace(/\*\*(.*?)\*\*/g,'<b>$1</b>');
@@ -418,10 +425,23 @@ function parseMd(t){
   h=h.replace(/\*(.*?)\*/g,'<i>$1</i>');
   h=h.replace(/^---$/gm,'<hr>');
   h=h.replace(/^- (.*)$/gm,'• $1');
-  h=h.replace(/\((.*?)\)/g,'<span class="note">($1)</span>');
+  // Handle timestamped reflections
+  h=h.replace(/\((\d{1,2} [A-Za-z]{3}, \d{2}:\d{2}: )(.*?)\)/g,'<span class="note ref"><span class="ref-ts">$1</span>$2</span>');
+  // Handle standard asides
+  h=h.replace(/\((.*?)\)/g,'<span class="note">$1</span>');
   return h.replace(/\n/g,'<br>');
 }
 function ap(id,t){const el=document.getElementById(id);toEdit(el);if(el.value&&!el.value.endsWith('\n'))el.value+='\n';el.value+=t;el.focus();ar(el);}
+function handleTaKey(e, el){
+  if(edMomId && e.key === '('){
+    e.preventDefault();
+    const ts = fdtRef();
+    const start = el.selectionStart, end = el.selectionEnd;
+    el.value = el.value.substring(0, start) + '(' + ts + el.value.substring(end);
+    el.selectionStart = el.selectionEnd = start + ts.length + 1;
+    ar(el);
+  }
+}
 
 function toggleSearch(){
   const wrap = document.getElementById('s-wrap');
@@ -563,7 +583,7 @@ async function jumpTo(mid){
 // MEDIA EDITOR
 function openMediaEd(id){edMediaId=id;document.getElementById('me-lbl').textContent=id?'Edit media':'New media';
   document.getElementById('me-del-btn').style.display=id?'':'none';
-  const re=document.getElementById('me-reason');
+  const re=document.getElementById('me-reason'),meta=document.getElementById('me-meta');
   if(id){
     const m=AM.find(x=>x.id===id);
     document.getElementById('me-type').value=m.type||'book';
@@ -571,6 +591,7 @@ function openMediaEd(id){edMediaId=id;document.getElementById('me-lbl').textCont
     document.getElementById('me-creator').value=m.creator||'';
     re.value=m.reason||''; ar(re);
     toView(re);
+    meta.textContent=fdtFull(m.createdAt);
   }
   else{
     document.getElementById('me-type').value='book';
@@ -578,6 +599,7 @@ function openMediaEd(id){edMediaId=id;document.getElementById('me-lbl').textCont
     document.getElementById('me-creator').value='';
     re.value=''; re.classList.remove('off');
     document.getElementById('me-reason-v').classList.remove('on');
+    meta.textContent='';
   }
   sv('med');}
 function editCurrentMedia(){openMediaEd(cMediaId);}
@@ -627,6 +649,7 @@ function openMomEd(momId,mediaId){
   edMomId=momId;edMomMediaId=mediaId;mTags=[];relRows=[];
   document.getElementById('momed-lbl').textContent=momId?'Edit moment':'New moment';
   document.getElementById('mo-del-btn').style.display=momId?'':'none';
+  const meta=document.getElementById('mo-meta');
   ['mo-thought','mo-conn','mo-line'].forEach(id=>{
     const el=document.getElementById(id);el.value='';el.style.height='auto';
     el.classList.remove('off');
@@ -644,8 +667,10 @@ function openMomEd(momId,mediaId){
     ['mo-thought','mo-conn','mo-line'].forEach(id=>{
       const el=document.getElementById(id);if(el.value.trim())toView(el);
     });
+    meta.textContent=fdtFull(mo.createdAt);
     setMoStage(2);
   } else {
+    meta.textContent='';
     setMoStage(1);
     setTimeout(()=>document.getElementById('mo-thought').focus(),100);
   }
