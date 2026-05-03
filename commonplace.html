@@ -314,6 +314,7 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
   <div class="tb"><button class="btn ib" onclick="back()">←</button><span class="tb-lbl" id="me-lbl">New media</span><span class="tb-meta" id="me-meta"></span></div>
   <div class="me-body">
     <div class="fg"><label class="fl">Type</label><select class="fi" id="me-type"><option value="book">Book</option><option value="film">Film</option><option value="tv">TV series</option><option value="other">Other</option></select></div>
+    <div class="fg"><label class="fl">Status</label><select class="fi" id="me-status"><option value="in-progress">In Progress</option><option value="done">Done</option></select></div>
     <div class="fg"><label class="fl">Title</label><input class="fi" id="me-title" placeholder="Title of the work…"></div>
     <div class="fg"><label class="fl">Author / Director / Creator</label><input class="fi" id="me-creator" placeholder="Who made it…"></div>
     <div class="fg"><label class="fl">Why did you pick this?</label>
@@ -1172,18 +1173,27 @@ function renderList(){
   }
   if(!media.length){c.innerHTML=`<div class="empty"><div class="empty-ico">◌</div><p>${cSearch||cTag?'Nothing matches.':'Nothing yet.<br>Tap + to add your first piece of media.'}</p></div>`;return;}
   const TL={book:'Book',film:'Film',tv:'TV',other:'Other'};
-  c.innerHTML=media.map(m=>{
-    const moms=momsFor(m.id);
-    return `<div class="mc" onclick="openMD(${m.id})" style="border-left-color:${getStrColor(m.title)}">
-      <div class="mc-head">
-        <div class="mc-info">
-          <div class="mc-title">${esc(m.title||'Untitled')} <span class="mc-type" style="margin-left:6px; vertical-align:middle;">${TL[m.type]||m.type}</span></div>
-          ${m.creator?`<div class="mc-creator">${esc(m.creator)}</div>`:''}
-        </div>
-        <div class="mc-count">${moms.length} moment${moms.length!==1?'s':''}</div>
-      </div>
-    </div>`;
-  }).join('');
+  const inProgress = media.filter(m => (m.status || 'in-progress') === 'in-progress');
+  const done = media.filter(m => m.status === 'done');
+
+  function renderGroup(title, list) {
+    if (!list.length) return '';
+    return `<div class="sec-head" style="padding-top:10px;"><span class="sec-lbl">${title}</span></div>` +
+      list.map(m => {
+        const moms = momsFor(m.id);
+        return `<div class="mc" onclick="openMD(${m.id})" style="border-left-color:${getStrColor(m.title)}">
+          <div class="mc-head">
+            <div class="mc-info">
+              <div class="mc-title">${esc(m.title || 'Untitled')} <span class="mc-type" style="margin-left:6px; vertical-align:middle;">${TL[m.type] || m.type}</span></div>
+              ${m.creator ? `<div class="mc-creator">${esc(m.creator)}</div>` : ''}
+            </div>
+            <div class="mc-count">${moms.length} moment${moms.length !== 1 ? 's' : ''}</div>
+          </div>
+        </div>`;
+      }).join('');
+  }
+
+  c.innerHTML = renderGroup('In Progress', inProgress) + renderGroup('Done', done);
 }
 function setFilter(f,el){cFilter=f;cTag=null;document.querySelectorAll('#type-tabs .chip').forEach(c=>c.classList.remove('on'));el.classList.add('on');renderTagRow();renderList();}
 function setTag(t,el){cTag=cTag===t?null:t;document.querySelectorAll('.chip-t').forEach(c=>c.classList.remove('on'));if(cTag)el.classList.add('on');renderList();}
@@ -1263,6 +1273,7 @@ function openMediaEd(id){edMediaId=id;document.getElementById('me-lbl').textCont
   if(id){
     const m=AM.find(x=>x.id===id);
     document.getElementById('me-type').value=m.type||'book';
+    document.getElementById('me-status').value=m.status||'in-progress';
     document.getElementById('me-title').value=m.title||'';
     document.getElementById('me-creator').value=m.creator||'';
     renderBlks('me-reason-blks', m.reason||'', m.createdAt);
@@ -1270,6 +1281,7 @@ function openMediaEd(id){edMediaId=id;document.getElementById('me-lbl').textCont
   }
   else{
     document.getElementById('me-type').value='book';
+    document.getElementById('me-status').value='in-progress';
     document.getElementById('me-title').value='';
     document.getElementById('me-creator').value='';
     renderBlks('me-reason-blks', '', Date.now());
@@ -1285,6 +1297,7 @@ async function saveMedia(){
   const data={
     uuid: existing?.uuid || makeUuid(),
     type:document.getElementById('me-type').value,
+    status:document.getElementById('me-status').value,
     title,
     creator:document.getElementById('me-creator').value.trim(),
     reason:getBlks('me-reason-blks'),
