@@ -509,13 +509,32 @@ function toast(m){const e=document.getElementById('toast');e.textContent=m;e.cla
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function fdt(ts){return new Date(ts).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});}
 function ar(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
+function taInput(el){
+  ar(el);
+  const start = el.selectionStart;
+  const val = el.value;
+  const cor = {
+    'im': "I'm", 'dont': "don't", 'cant': "can't", 'wont': "won't",
+    'wouldnt': "wouldn't", 'couldnt': "couldn't", 'shouldnt': "shouldn't", 'aint': "ain't"
+  };
+  let nv = val;
+  for (let key in cor) {
+    const re = new RegExp(`\\b${key}(\\s)`, 'g');
+    nv = nv.replace(re, cor[key] + '$1');
+  }
+  nv = nv.replace(/\bi(\s)/g, 'I$1');
+  if (nv !== val) {
+    el.value = nv;
+    el.selectionStart = el.selectionEnd = start + (nv.length - val.length);
+  }
+}
 function bEdit(ta,v){ta.classList.remove('off');v.classList.remove('on');ar(ta);ta.focus();ta.selectionStart=ta.selectionEnd=ta.value.length;}
 function bView(ta,v){if(!ta.value.trim()){ta.classList.remove('off');v.classList.remove('on');return;}ta.classList.add('off');v.innerHTML=parseMd(ta.value);v.classList.add('on');}
 
 function renderBlks(cid,text){const c=document.getElementById(cid);c.innerHTML='';const ps=(text||'').split(/\n\n+/);ps.forEach(p=>addBlk(cid,p));if(!c.children.length)addBlk(cid,'');}
 function addBlk(cid,val='',focus=false,afterEl=null){
   const c=document.getElementById(cid);const div=document.createElement('div');div.className='block-wrap';
-  div.innerHTML=`<textarea class="ta" placeholder="Paragraph…" oninput="ar(this)" onblur="bView(this,this.nextElementSibling)" onkeydown="blkKey(event,this)">${esc(val)}</textarea><div class="ta-view" onclick="bEdit(this.previousElementSibling,this)"></div><button class="block-rm" onclick="rmBlk(this.parentElement)">×</button>`;
+  div.innerHTML=`<textarea class="ta" placeholder="Paragraph…" oninput="taInput(this)" onblur="bView(this,this.nextElementSibling)" onkeydown="blkKey(event,this)">${esc(val)}</textarea><div class="ta-view" onclick="bEdit(this.previousElementSibling,this)"></div><button class="block-rm" onclick="rmBlk(this.parentElement)">×</button>`;
   if(afterEl)afterEl.after(div);else c.appendChild(div);
   const ta=div.querySelector('textarea'),v=div.querySelector('.ta-view');
   if(val)bView(ta,v);else bEdit(ta,v);
@@ -550,7 +569,7 @@ function smart(t){
     .replace(/--/g, "\u2014");                          // em-dashes
 }
 function parseMd(t){
-  let h=smart(esc(t));
+  let h=esc(smart(t));
   h=h.replace(/\*\*(.*?)\*\*/g,'<b>$1</b>');
   h=h.replace(/__(.*?)__/g,'<u>$1</u>');
   h=h.replace(/\*(.*?)\*/g,'<i>$1</i>');
