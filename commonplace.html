@@ -366,6 +366,8 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
         </div>
       </div>
 
+      <div class="fg" style="margin-top:20px;"><label class="fl">Date & Time</label><input type="datetime-local" class="fi" id="mo-date"></div>
+
       <div style="height:24px;"></div>
       <div class="div-lbl">Connections</div>
 
@@ -768,6 +770,11 @@ function fdtFull(ts){
   const d = new Date(ts).toLocaleDateString('en-GB', { day:'numeric', month:'short' });
   const t = new Date(ts).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
   return `${d}, ${t}`;
+}
+function fdtLocal(ts){
+  const d = new Date(ts);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 function fdtRef(){
   const now = new Date();
@@ -1354,6 +1361,7 @@ function openMomEd(momId,mediaId){
   if(momId){
     const mo=AMO.find(x=>x.id===momId);
     document.getElementById('mo-anchor').value=mo.anchor||'';
+    document.getElementById('mo-date').value=fdtLocal(mo.createdAt);
     renderBlks('mo-thought-blks', mo.thought||'', mo.createdAt);
     renderBlks('mo-conn-blks', mo.connection||'', mo.createdAt);
     renderBlks('mo-line-blks', mo.line||'', mo.createdAt);
@@ -1364,6 +1372,7 @@ function openMomEd(momId,mediaId){
   } else {
     meta.textContent='';
     const now = Date.now();
+    document.getElementById('mo-date').value=fdtLocal(now);
     renderBlks('mo-thought-blks', '', now);
     renderBlks('mo-conn-blks', '', now);
     renderBlks('mo-line-blks', '', now);
@@ -1375,7 +1384,9 @@ function openMomEd(momId,mediaId){
 async function saveMoment(){
   const existing = edMomId ? AMO.find(x=>x.id===edMomId) : null;
   const media = AM.find(x=>x.id===edMomMediaId);
-  const data={uuid:existing?.uuid||makeUuid(),mediaId:edMomMediaId,mediaUuid:media?.uuid||existing?.mediaUuid||null,anchor:document.getElementById('mo-anchor').value.trim(),thought:getBlks('mo-thought-blks'),connection:getBlks('mo-conn-blks'),line:getBlks('mo-line-blks'),tags:sortTags(mTags),createdAt:existing?.createdAt||Date.now(),updatedAt:Date.now()};
+  const userDateVal = document.getElementById('mo-date').value;
+  const createdAt = userDateVal ? new Date(userDateVal).getTime() : (existing?.createdAt || Date.now());
+  const data={uuid:existing?.uuid||makeUuid(),mediaId:edMomMediaId,mediaUuid:media?.uuid||existing?.mediaUuid||null,anchor:document.getElementById('mo-anchor').value.trim(),thought:getBlks('mo-thought-blks'),connection:getBlks('mo-conn-blks'),line:getBlks('mo-line-blks'),tags:sortTags(mTags),createdAt,updatedAt:Date.now()};
   let mid=edMomId;
   if(mid){await db.moments.update(mid,data);}
   else{mid=await db.moments.add(data);}
