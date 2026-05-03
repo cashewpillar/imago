@@ -550,7 +550,7 @@ function smart(t){
     .replace(/--/g, "\u2014");                          // em-dashes
 }
 function parseMd(t){
-  let h=esc(t);
+  let h=smart(esc(t));
   h=h.replace(/\*\*(.*?)\*\*/g,'<b>$1</b>');
   h=h.replace(/__(.*?)__/g,'<u>$1</u>');
   h=h.replace(/\*(.*?)\*/g,'<i>$1</i>');
@@ -560,7 +560,6 @@ function parseMd(t){
   h=h.replace(/\((\d{1,2} [A-Za-z]{3}, \d{2}:\d{2}: )(.*?)\)/g,'<span class="note ref"><span class="ref-ts">$1</span>$2</span>');
   // Handle standard asides
   h=h.replace(/\((.*?)\)/g,'<span class="note">$1</span>');
-  h=smart(h);
   return h.replace(/\n/g,'<br>');
 }
 
