@@ -65,6 +65,19 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
 .ta.off{display:none;}
 .ta-view{display:none;cursor:text;white-space:pre-wrap;overflow-wrap:break-word;}
 .ta-view.on{display:block;}
+.cdh-mark{position:relative;display:inline;cursor:help;text-decoration-line:underline;text-decoration-style:dotted;text-decoration-thickness:2px;text-underline-offset:3px;}
+.cdh-mark.cdh-tier1{text-decoration-color:oklch(55% 0.15 25);}
+.cdh-mark.cdh-tier2{text-decoration-color:oklch(55% 0.1 250);}
+.cdh-tip{position:fixed;left:0;top:0;min-width:220px;max-width:min(280px,calc(100vw - 32px));padding:8px 10px;border-radius:8px;background:rgba(26,23,20,.96);color:var(--cream);font-family:'DM Sans',sans-serif;font-size:11px;line-height:1.45;white-space:normal;box-shadow:0 8px 28px rgba(26,23,20,.2);opacity:0;pointer-events:none;transition:opacity .16s ease,transform .16s ease;z-index:9999;transform:translate(-50%,-100%);}
+.cdh-tip.show{opacity:1;}
+.cdh-tip[data-place="above"][data-align="center"].show{transform:translate(-50%,-100%);}
+.cdh-tip[data-place="below"][data-align="center"].show{transform:translate(-50%,0);}
+.cdh-tip[data-place="above"][data-align="left"].show{transform:translate(0,-100%);}
+.cdh-tip[data-place="below"][data-align="left"].show{transform:translate(0,0);}
+.cdh-tip[data-place="above"][data-align="right"].show{transform:translate(-100%,-100%);}
+.cdh-tip[data-place="below"][data-align="right"].show{transform:translate(-100%,0);}
+.cdh-tip-item{display:block;}
+.cdh-tip-item + .cdh-tip-item{margin-top:4px;padding-top:4px;border-top:1px solid rgba(248,244,237,.14);}
 .block-wrap{margin-bottom:8px;position:relative;}
 .block-wrap:last-child{margin-bottom:0;}
 .block-rm{position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:transparent;border:none;color:var(--rust);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity .15s;}
@@ -360,6 +373,7 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
   <div class="mi" style="cursor:default;opacity:.5;"><span class="mi-ico">○</span><div><div>Commonplace</div><div class="mi-sub">Media as anchors. Thoughts as record.</div></div></div>
 </div></div>
 <input type="file" id="imp-file" accept=".json" style="display:none" onchange="handleImport(event)">
+<div class="cdh-tip" id="cdh-tip" aria-hidden="true"></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -410,6 +424,75 @@ let mdTag=null;
 let mTags=[], relRows=[];
 const vStack=[];
 let compatReady = false;
+let activeDistortionMark = null;
+const DISTORTION_RULES = [
+  {
+    category: 'All-or-Nothing',
+    tier: 1,
+    regex: /\b(always|never|everyone|nobody|everything|nothing|entirely|completely|perfect|perfectly|total|totally|absolute|absolutely|every single|not once)\b/gi,
+    tooltip: '!potential all-or-nothing thinking — is this always true?'
+  },
+  {
+    category: 'Should Statements',
+    tier: 1,
+    regex: /\b(should|shouldn't|must|mustn't|ought to|have to|has to|had to|supposed to|need to|needs to|have no choice|must always|must never)\b/gi,
+    tooltip: '!potential "should" statement — whose rule is this?'
+  },
+  {
+    category: 'Labeling',
+    tier: 1,
+    regex: /\b(loser|failure|idiot|stupid|useless|pathetic|worthless|mess|clown|incompetent|broken|damaged|I'm such a|I am such a|I'm a failure|I'm an idiot|he is a|she is a|they are|you're such a|what is wrong with me|why am I like this|what kind of person)\b/gi,
+    tooltip: '!potential labeling — describing a moment, not a person'
+  },
+  {
+    category: 'Personalization',
+    tier: 1,
+    regex: /\b(my fault|blame myself|because of me|responsible for|caused this|if I hadn't|I should have stopped|I should have known|I ruined|it's all me)\b/gi,
+    tooltip: '!potential personalization — are you the only cause here?'
+  },
+  {
+    category: 'Catastrophizing',
+    tier: 2,
+    regex: /\b(terrible|awful|horrible|disaster|ruined|catastrophe|nightmare|worst|unbearable|devastating|can't handle|the end of|what if everyone|what if I never|what if it all)\b/gi,
+    tooltip: '!potential catastrophizing — what\'s the realistic outcome?'
+  },
+  {
+    category: 'Mind Reading',
+    tier: 2,
+    regex: /(they think|they probably think|I could tell they|they must think|they were judging|everyone noticed|everyone could tell|I know they|she thinks he thinks|they don't like|they hate me|nobody cares|they were laughing at|I just know that|I can tell that)/gi,
+    tooltip: '!potential mind reading — do you know this for certain?'
+  },
+  {
+    category: 'Fortune Telling',
+    tier: 2,
+    regex: /(it's going to go wrong|I'll probably fail|it won't work|nothing will change|I'll never be able to|it's pointless|there's no point|it'll end badly|I know how this ends|nothing ever changes|this always ends|it won't matter)/gi,
+    tooltip: '!potential fortune telling — is this a prediction or a fact?'
+  },
+  {
+    category: 'Minimization',
+    tier: 2,
+    regex: /(it's fine|I'm fine|no big deal|not a big deal|it's nothing|I don't care|who cares|doesn't matter|not worth thinking about|I shouldn't complain|others have it worse|at least I'm not|could be worse|I'm being dramatic|I'm overreacting|too sensitive|stop being so sensitive)/gi,
+    tooltip: '!potential minimization — are you giving this enough weight?'
+  },
+  {
+    category: 'Mental Filtering',
+    tier: 2,
+    regex: /(doesn't count|was just luck|not good enough|they were just being nice|probably felt sorry|anyone could have|would've happened anyway|not because of me|only because they|just got lucky|yeah but|not really that|it was nothing|that doesn't mean|not a big deal)/gi,
+    tooltip: '!potential mental filtering — is there something being discounted?'
+  },
+  {
+    category: 'Magnification',
+    tier: 2,
+    regex: /\b(massive|enormous|huge|completely ruined|absolute disaster|total failure|the worst possible|beyond repair|irreparable|everyone will know|my whole life|everything is ruined)\b/gi,
+    tooltip: '!potential magnification — is this being mentally zoomed in?'
+  },
+  {
+    category: 'Self-Comparison',
+    tier: 2,
+    regex: /(compared to|not as good as|worse than|better than me|ahead of me|more successful than|has it together|unlike me|everyone else can|other people can|normal people|they make it look|why can't I|how come they|at least they|even they managed|I'm the only one who|no one else struggles with)/gi,
+    tooltip: '!potential self-comparison — comparing your inside to their outside?'
+  }
+];
 
 function makeUuid(){
   if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
@@ -568,6 +651,131 @@ function smart(t){
     .replace(/"/g, "\u201d")                            // closing doubles
     .replace(/--/g, "\u2014");                          // em-dashes
 }
+function closeDistortionTips(exceptEl=null){
+  const tip = document.getElementById('cdh-tip');
+  document.querySelectorAll('.cdh-mark.is-open').forEach(el=>{if(el!==exceptEl)el.classList.remove('is-open');});
+  if (!exceptEl) activeDistortionMark = null;
+  if (!exceptEl || activeDistortionMark !== exceptEl) {
+    tip.classList.remove('show');
+    tip.innerHTML = '';
+    tip.setAttribute('aria-hidden', 'true');
+  }
+}
+function showDistortionTip(mark){
+  const tip = document.getElementById('cdh-tip');
+  const items = (mark.dataset.tooltips || '').split('\n').filter(Boolean);
+  if (!items.length) return;
+  tip.innerHTML = items.map(text=>`<span class="cdh-tip-item">${esc(text)}</span>`).join('');
+  tip.setAttribute('aria-hidden', 'false');
+  tip.classList.add('show');
+  activeDistortionMark = mark;
+  requestAnimationFrame(() => positionDistortionTip(mark));
+}
+function positionDistortionTip(mark){
+  const tip = document.getElementById('cdh-tip');
+  if (!mark || !tip.classList.contains('show')) return;
+  const rect = mark.getBoundingClientRect();
+  const tipRect = tip.getBoundingClientRect();
+  const margin = 12;
+  const anchorCenter = rect.left + rect.width / 2;
+  const anchorLeft = Math.max(margin, rect.left);
+  const anchorRight = Math.min(window.innerWidth - margin, rect.right);
+  const spaceLeft = anchorCenter - margin;
+  const spaceRight = window.innerWidth - margin - anchorCenter;
+  let left = anchorCenter;
+  let align = 'center';
+  if (tipRect.width / 2 > spaceLeft) {
+    left = anchorLeft;
+    align = 'left';
+  } else if (tipRect.width / 2 > spaceRight) {
+    left = anchorRight;
+    align = 'right';
+  }
+  const fitsAbove = rect.top - tipRect.height - 10 >= margin;
+  const top = fitsAbove ? rect.top - 10 : Math.min(window.innerHeight - margin - tipRect.height, rect.bottom + 10);
+  tip.dataset.place = fitsAbove ? 'above' : 'below';
+  tip.dataset.align = align;
+  tip.style.left = `${left}px`;
+  tip.style.top = `${Math.max(margin, top)}px`;
+}
+function distortionRegex(rule){
+  return new RegExp(rule.regex.source.replace(/'/g, "['\\u2019]"), rule.regex.flags);
+}
+function collectDistortionMatches(text){
+  const matches = [];
+  DISTORTION_RULES.forEach(rule => {
+    const regex = distortionRegex(rule);
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      if (!match[0]) {
+        regex.lastIndex += 1;
+        continue;
+      }
+      matches.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        category: rule.category,
+        tier: rule.tier,
+        tooltip: rule.tooltip
+      });
+    }
+  });
+  return matches.sort((a,b)=>a.start-b.start||b.end-a.end||a.category.localeCompare(b.category));
+}
+function buildDistortionFragment(text){
+  const matches = collectDistortionMatches(text);
+  if (!matches.length) return null;
+  const points = new Set([0, text.length]);
+  matches.forEach(match => { points.add(match.start); points.add(match.end); });
+  const cuts = [...points].sort((a,b)=>a-b);
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < cuts.length - 1; i++) {
+    const start = cuts[i];
+    const end = cuts[i + 1];
+    if (start === end) continue;
+    const segmentText = text.slice(start, end);
+    const covering = matches.filter(match => match.start < end && match.end > start);
+    if (!covering.length) {
+      frag.appendChild(document.createTextNode(segmentText));
+      continue;
+    }
+    const unique = [];
+    const seen = new Set();
+    covering.forEach(match => {
+      const key = `${match.category}|${match.tooltip}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(match);
+      }
+    });
+    const mark = document.createElement('span');
+    mark.className = `cdh-mark ${unique.some(match => match.tier === 1) ? 'cdh-tier1' : 'cdh-tier2'}`;
+    mark.tabIndex = 0;
+    mark.setAttribute('role', 'button');
+    mark.setAttribute('aria-label', unique.map(match => match.tooltip).join(' '));
+    mark.dataset.tooltips = unique.map(match => match.tooltip).join('\n');
+    mark.appendChild(document.createTextNode(segmentText));
+    frag.appendChild(mark);
+  }
+  return frag;
+}
+function applyDistortionHighlights(root){
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node){
+      if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+      const parent = node.parentElement;
+      if (!parent) return NodeFilter.FILTER_REJECT;
+      if (parent.closest('.cdh-mark, .cdh-tip, script, style')) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  const textNodes = [];
+  while (walker.nextNode()) textNodes.push(walker.currentNode);
+  textNodes.forEach(node => {
+    const frag = buildDistortionFragment(node.nodeValue);
+    if (frag) node.replaceWith(frag);
+  });
+}
 function parseMd(t){
   let h=esc(smart(t));
   h=h.replace(/\*\*(.*?)\*\*/g,'<b>$1</b>');
@@ -579,8 +787,55 @@ function parseMd(t){
   h=h.replace(/\((\d{1,2} [A-Za-z]{3}, \d{2}:\d{2}: )(.*?)\)/g,'<span class="note ref"><span class="ref-ts">$1</span>$2</span>');
   // Handle standard asides
   h=h.replace(/\((.*?)\)/g,'<span class="note">$1</span>');
-  return h.replace(/\n/g,'<br>');
+  const container = document.createElement('div');
+  container.innerHTML = h.replace(/\n/g,'<br>');
+  applyDistortionHighlights(container);
+  return container.innerHTML;
 }
+document.addEventListener('click', e => {
+  const mark = e.target.closest('.cdh-mark');
+  if (mark) {
+    e.preventDefault();
+    e.stopPropagation();
+    const willOpen = !mark.classList.contains('is-open');
+    closeDistortionTips(mark);
+    mark.classList.toggle('is-open', willOpen);
+    activeDistortionMark = willOpen ? mark : null;
+    if (willOpen) showDistortionTip(mark);
+    else closeDistortionTips();
+    return;
+  }
+  closeDistortionTips();
+}, true);
+document.addEventListener('mouseover', e => {
+  const mark = e.target.closest('.cdh-mark');
+  if (!mark || mark.classList.contains('is-open')) return;
+  showDistortionTip(mark);
+});
+document.addEventListener('mouseout', e => {
+  const mark = e.target.closest('.cdh-mark');
+  if (!mark || mark.classList.contains('is-open')) return;
+  if (mark.contains(e.relatedTarget)) return;
+  if (activeDistortionMark === mark) closeDistortionTips();
+});
+document.addEventListener('focusin', e => {
+  const mark = e.target.closest('.cdh-mark');
+  if (mark) {
+    closeDistortionTips(mark);
+    showDistortionTip(mark);
+    return;
+  }
+  closeDistortionTips();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeDistortionTips();
+});
+window.addEventListener('scroll', () => {
+  if (activeDistortionMark) positionDistortionTip(activeDistortionMark);
+}, { passive: true });
+window.addEventListener('resize', () => {
+  if (activeDistortionMark) positionDistortionTip(activeDistortionMark);
+});
 
 function toggleSearch(){
   const wrap = document.getElementById('s-wrap');
