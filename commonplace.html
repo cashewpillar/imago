@@ -144,7 +144,7 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
 .empty{padding:52px 20px;text-align:center;}
 .empty-ico{font-size:36px;opacity:.2;margin-bottom:12px;}
 .empty p{font-family:'Lora',serif;font-size:15px;font-style:italic;color:var(--ink3);line-height:1.6;}
-.mc{background:var(--paper);border:1px solid var(--b);border-radius:10px;margin-bottom:8px;overflow:hidden;cursor:pointer;transition:border-color .13s;}
+.mc{background:var(--paper);border:1px solid var(--b);border-left:4px solid var(--ink4);border-radius:10px;margin-bottom:8px;overflow:hidden;cursor:pointer;transition:border-color .13s;}
 .mc:hover{border-color:var(--ink);}
 .mc:active{transform:scale(.99);}
 .mc-head{display:flex;align-items:flex-start;gap:10px;padding:13px 14px 9px;}
@@ -718,6 +718,10 @@ function toast(m){const e=document.getElementById('toast');e.textContent=m;e.cla
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function fdt(ts){return new Date(ts).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});}
 function ar(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
+function getStrColor(s){
+  let h=0;for(let i=0;i<s.length;i++)h=s.charCodeAt(i)+((h<<5)-h);
+  return `hsl(${Math.abs(h)%360}, 55%, 38%)`;
+}
 function taInput(el){
   ar(el);
   const start = el.selectionStart;
@@ -1170,10 +1174,12 @@ function renderList(){
   const TL={book:'Book',film:'Film',tv:'TV',other:'Other'};
   c.innerHTML=media.map(m=>{
     const moms=momsFor(m.id);
-    return `<div class="mc" onclick="openMD(${m.id})">
+    return `<div class="mc" onclick="openMD(${m.id})" style="border-left-color:${getStrColor(m.title)}">
       <div class="mc-head">
-        <span class="mc-type">${TL[m.type]||m.type}</span>
-        <div class="mc-info"><div class="mc-title">${esc(m.title||'Untitled')}</div>${m.creator?`<div class="mc-creator">${esc(m.creator)}</div>`:''}</div>
+        <div class="mc-info">
+          <div class="mc-title">${esc(m.title||'Untitled')} <span class="mc-type" style="margin-left:6px; vertical-align:middle;">${TL[m.type]||m.type}</span></div>
+          ${m.creator?`<div class="mc-creator">${esc(m.creator)}</div>`:''}
+        </div>
         <div class="mc-count">${moms.length} moment${moms.length!==1?'s':''}</div>
       </div>
     </div>`;
