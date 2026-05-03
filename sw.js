@@ -1,15 +1,20 @@
 const CACHE_NAME = 'imago-shell-v2';
 const APP_SHELL = [
   './',
-  './index.html',
-  './story.html',
+  // BEGIN GENERATED HTML PAGES
   './commonplace.html',
-  './thoughtweb.html',
   './filling-up.html',
+  './habit-triggers.html',
+  './habits.html',
+  './index.html',
+  './journal.html',
   './no-rituals.html',
-  './thoughtgraph.html',
-  './storygraph.html',
   './pollination.html',
+  './story.html',
+  './storygraph.html',
+  './thoughtgraph.html',
+  './thoughtweb.html',
+  // END GENERATED HTML PAGES
   './imago-export.js',
   './pwa-register.js',
   './manifest.webmanifest',

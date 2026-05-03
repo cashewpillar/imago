@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>habits</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f0e8;
+    --surface: #faf7f2;
+    --border: #ddd6c8;
+    --border-soft: #ede8de;
+    --text: #2d2a24;
+    --muted: #9e9080;
+    --muted2: #b0a898;
+    --accent: #1a1714;
+    --strip: #f0ebe0;
+    --flash: #ede3d0;
+    --input-bg: #f0ebe0;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { background: var(--bg); min-height: 100vh; }
+  body { font-family: 'Lora', Georgia, serif; color: var(--text); max-width: 520px; margin: 0 auto; padding-bottom: 100px; }
+  button { cursor: pointer; font-family: inherit; }
+  input, textarea, select { font-family: 'DM Mono', monospace; }
+  ::selection { background: #c8b89a44; }
+
+  /* HEADER */
+  .header { padding: 36px 24px 20px; border-bottom: 1px solid var(--border); }
+  .title { font-size: 30px; font-weight: 600; letter-spacing: -0.5px; color: var(--text); }
+  .subtitle { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); font-style: italic; margin-top: 4px; }
+  .nav { display: flex; gap: 6px; margin-top: 18px; flex-wrap: wrap; }
+  .nav-btn { background: none; border: 1px solid var(--border); border-radius: 20px; padding: 5px 16px; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); transition: all 0.15s; }
+  .nav-btn.active { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+
+  /* FILTERS */
+  .filters { display: flex; gap: 6px; padding: 14px 24px 0; overflow-x: auto; scrollbar-width: none; }
+  .filters::-webkit-scrollbar { display: none; }
+  .pill { flex-shrink: 0; background: none; border: 1px solid var(--border); border-radius: 20px; padding: 5px 14px; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+  .pill.active { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+
+  /* GRID */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 14px 24px 0; }
+
+  /* CARD */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 13px 12px; display: flex; flex-direction: column; gap: 6px; transition: background 0.25s; }
+  .card.flash { background: var(--flash); }
+  .card-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .card-emoji { font-size: 24px; line-height: 1; }
+  .card-count { font-family: 'DM Mono', monospace; font-size: 20px; color: var(--text); line-height: 1; }
+  .card-label { font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.35; }
+  .card-meta { font-family: 'DM Mono', monospace; font-size: 9px; color: var(--muted2); }
+  .tap-btn { margin-top: 4px; width: 100%; background: none; border: 1px solid var(--border); border-radius: 8px; padding: 7px; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); transition: all 0.12s; }
+  .tap-btn:active { background: var(--flash); }
+  .time-row { display: flex; gap: 4px; margin-top: 2px; }
+  .t-preset { flex: 1; background: var(--input-bg); border: 1px solid var(--border); border-radius: 6px; padding: 5px 2px; font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); text-align: center; cursor: pointer; transition: all 0.12s; }
+  .t-preset:active { border-color: var(--text); color: var(--text); }
+  .t-custom { width: 100%; background: var(--input-bg); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text); outline: none; margin-top: 4px; }
+  .t-custom:focus { border-color: var(--text); }
+  .log-btn { margin-top: 4px; width: 100%; background: none; border: 1px solid var(--border); border-radius: 8px; padding: 7px; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); transition: all 0.12s; }
+  .log-btn:active { background: var(--flash); }
+
+  /* FAB */
+  .fab { position: fixed; bottom: 24px; right: 20px; width: 50px; height: 50px; background: var(--accent); border: none; border-radius: 50%; font-size: 22px; color: var(--bg); box-shadow: 0 3px 14px rgba(0,0,0,0.18); display: flex; align-items: center; justify-content: center; z-index: 50; transition: transform 0.15s; }
+  .fab:active { transform: scale(0.92); }
+
+  /* LOG VIEW */
+  .log-wrap { padding: 20px 24px; }
+  .log-day { margin-bottom: 28px; }
+  .log-date { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted2); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+  .log-entry { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border-soft); }
+  .log-emoji { font-size: 15px; flex-shrink: 0; }
+  .log-label { flex: 1; font-size: 13px; font-style: italic; color: #4a4438; }
+  .log-dur { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted2); }
+  .log-adj { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
+  .adj-btn { background: none; border: 1px solid var(--border); border-radius: 5px; width: 26px; height: 26px; font-family: 'DM Mono', monospace; font-size: 15px; color: var(--muted); display: flex; align-items: center; justify-content: center; padding: 0; transition: all 0.1s; }
+  .adj-btn:active { background: var(--flash); color: var(--text); }
+  .adj-count { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--text); min-width: 20px; text-align: center; }
+  .log-stat { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted2); margin-top: 8px; font-style: italic; }
+
+  /* MANAGE VIEW */
+  .manage-wrap { padding: 20px 24px; }
+  .manage-note { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); font-style: italic; margin-bottom: 16px; }
+  .manage-row { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
+  .manage-emoji { font-size: 20px; flex-shrink: 0; }
+  .manage-info { flex: 1; min-width: 0; }
+  .manage-name { font-size: 14px; font-weight: 600; }
+  .manage-sub { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .edit-btn { background: none; border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); }
+  .section-title { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted2); letter-spacing: 0.1em; text-transform: uppercase; margin: 24px 0 10px; }
+  .cat-manage-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .cat-tag { background: var(--input-bg); border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); flex: 1; }
+  .cat-del { background: none; border: none; color: var(--muted2); font-size: 16px; padding: 2px 6px; }
+  .add-row { display: flex; gap: 8px; margin-top: 8px; }
+  .add-input { flex: 1; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; font-size: 13px; color: var(--text); outline: none; transition: border-color 0.15s; }
+  .add-input:focus { border-color: var(--text); }
+  .add-btn-small { background: var(--accent); border: none; border-radius: 8px; padding: 9px 16px; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--bg); }
+  .io-row { display: flex; gap: 8px; padding: 12px 24px 0; }
+  .io-btn { background: none; border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); transition: all 0.12s; }
+  .io-btn:hover { color: var(--text); border-color: var(--muted2); }
+
+  /* SHEET */
+  .overlay { display: none; position: fixed; inset: 0; background: rgba(26,23,20,0.5); z-index: 200; align-items: flex-end; justify-content: center; }
+  .overlay.open { display: flex; }
+  .sheet { background: var(--surface); border: 1px solid var(--border); border-radius: 20px 20px 0 0; padding: 24px 20px 44px; width: 100%; max-width: 520px; max-height: 88vh; overflow-y: auto; animation: sheetUp 0.22s ease; }
+  @keyframes sheetUp { from{transform:translateY(32px);opacity:0} to{transform:translateY(0);opacity:1} }
+  .sheet-title { font-size: 18px; font-weight: 600; color: var(--text); margin-bottom: 20px; }
+  .field-label { display: block; font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin: 16px 0 6px; }
+  .field-input { width: 100%; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-family: 'Lora', Georgia, serif; font-size: 14px; color: var(--text); outline: none; transition: border-color 0.15s; }
+  .field-input:focus { border-color: var(--text); }
+  .emoji-input { width: 70px; font-size: 18px; text-align: center; }
+  .cat-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .cat-chip { background: none; border: 1px solid var(--border); border-radius: 20px; padding: 5px 14px; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); cursor: pointer; transition: all 0.12s; }
+  .cat-chip.sel { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; }
+  .toggle-label { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); }
+  .toggle { width: 40px; height: 22px; background: var(--border); border-radius: 11px; border: none; position: relative; transition: background 0.2s; flex-shrink: 0; }
+  .toggle.on { background: var(--accent); }
+  .toggle::after { content: ''; position: absolute; width: 16px; height: 16px; background: white; border-radius: 50%; top: 3px; left: 3px; transition: left 0.2s; }
+  .toggle.on::after { left: 21px; }
+  .sheet-btns { display: flex; gap: 8px; margin-top: 24px; }
+  .btn-cancel { flex: 1; background: none; border: 1px solid var(--border); border-radius: 10px; padding: 12px; font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted); }
+  .btn-save { flex: 2; background: var(--accent); border: none; border-radius: 10px; padding: 12px; font-family: 'DM Mono', monospace; font-size: 12px; color: var(--bg); transition: opacity 0.15s; }
+  .btn-save:disabled { opacity: 0.35; cursor: default; }
+  .btn-danger { width: 100%; background: none; border: 1px solid #d4a8a8; border-radius: 10px; padding: 11px; font-family: 'DM Mono', monospace; font-size: 11px; color: #b05050; margin-top: 10px; }
+  .empty { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted2); font-style: italic; text-align: center; padding: 48px 20px; grid-column: 1/-1; line-height: 1.8; }
+</style>
+  <meta name="theme-color" content="#f7f6f2">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="imago">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/imago-icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+</head>
+<body>
+
+<div class="header">
+  <div class="title">habits</div>
+  <div class="subtitle" id="subtitle">tap to record</div>
+  <div class="nav">
+    <button class="nav-btn active" onclick="setView('tap',this)">tap</button>
+    <button class="nav-btn" onclick="setView('log',this)">log</button>
+    <button class="nav-btn" onclick="setView('manage',this)">manage</button>
+  </div>
+</div>
+
+<div id="tapSection">
+  <div class="filters" id="filters"></div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<div id="logSection" style="display:none">
+  <div class="log-wrap" id="logWrap"></div>
+</div>
+
+<div id="manageSection" style="display:none">
+  <div class="io-row">
+    <button class="io-btn" onclick="exportData()">export</button>
+    <button class="io-btn" onclick="document.getElementById('importFile').click()">import</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+  </div>
+  <div class="manage-wrap" id="manageWrap"></div>
+</div>
+
+<button class="fab" id="fab" onclick="openAdd()">＋</button>
+
+<!-- HABIT SHEET -->
+<div class="overlay" id="habitOverlay" onclick="maybeCloseSheet(event)">
+  <div class="sheet">
+    <div class="sheet-title" id="sheetTitle">new habit</div>
+    <label class="field-label">emoji</label>
+    <input class="field-input emoji-input" type="text" id="fEmoji" maxlength="2" placeholder="🔴">
+    <label class="field-label">name</label>
+    <input class="field-input" type="text" id="fName" placeholder="e.g. nose picking">
+    <label class="field-label">category</label>
+    <div class="cat-chips" id="fCatChips"></div>
+    <div class="toggle-row">
+      <span class="toggle-label">track duration</span>
+      <button class="toggle" id="fDurToggle" onclick="toggleDur()"></button>
+    </div>
+    <div class="sheet-btns">
+      <button class="btn-cancel" onclick="closeSheet()">cancel</button>
+      <button class="btn-save" onclick="saveHabit()">save</button>
+    </div>
+    <button class="btn-danger" id="sheetDeleteBtn" style="display:none" onclick="deleteHabit()">delete habit &amp; all data</button>
+  </div>
+</div>
+
+<script>
+const KEY = 'habits_v3';
+
+function defaultState() {
+  return {
+    habits: [
+      { id:'h1', emoji:'👆', name:'nose picking',       category:'body', hasDuration:false, log:[] },
+      { id:'h2', emoji:'✂️', name:'beard plucking',     category:'body', hasDuration:false, log:[] },
+      { id:'h3', emoji:'👂', name:'ear picking',        category:'body', hasDuration:false, log:[] },
+      { id:'h4', emoji:'📱', name:'doomscrolling',      category:'tech', hasDuration:true,  log:[] },
+      { id:'h5', emoji:'🎬', name:'youtube novelty',    category:'tech', hasDuration:true,  log:[] },
+      { id:'h6', emoji:'🔞', name:'gooning',            category:'tech', hasDuration:true,  log:[] },
+      { id:'h7', emoji:'💻', name:'forcing work',       category:'work', hasDuration:true,  log:[] },
+      { id:'h8', emoji:'📖', name:'reading unprepared', category:'work', hasDuration:true,  log:[] },
+    ],
+    categories: ['body','tech','work']
+  };
+}
+
+let S = (()=>{ try{ const d=localStorage.getItem(KEY); return d?JSON.parse(d):defaultState(); }catch{ return defaultState(); } })();
+let activeFilter='all', currentView='tap', editingId=null, sheetDur=false, sheetCat='';
+
+function persist(){ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch{} }
+function today(){ return new Date().toISOString().slice(0,10); }
+function nowTime(){ return new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); }
+function byId(id){ return S.habits.find(h=>h.id===id); }
+
+// ── VIEW SWITCHING ────────────────────────────────────────────────────────────
+function setView(v,btn){
+  currentView=v;
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  ['tap','log','manage'].forEach(n=>{
+    document.getElementById(n+'Section').style.display = v===n?'':'none';
+  });
+  document.getElementById('fab').style.display = v==='tap'?'flex':'none';
+  renderCurrent();
+}
+
+function renderCurrent(){
+  if(currentView==='tap')    { renderFilters(); renderGrid(); renderSubtitle(); }
+  if(currentView==='log')    renderLog();
+  if(currentView==='manage') renderManage();
+}
+
+// ── TAP ───────────────────────────────────────────────────────────────────────
+function renderSubtitle(){
+  const t=today(), total=S.habits.reduce((s,h)=>s+h.log.filter(e=>e.date===t).length,0);
+  document.getElementById('subtitle').textContent = total>0 ? total+' logged today' : 'tap to record';
+}
+
+function renderFilters(){
+  const cats=['all',...S.categories];
+  document.getElementById('filters').innerHTML=cats.map(c=>
+    `<button class="pill ${activeFilter===c?'active':''}" onclick="setFilter('${c}')">${c}</button>`
+  ).join('');
+}
+
+function setFilter(c){ activeFilter=c; renderFilters(); renderGrid(); }
+
+function renderGrid(){
+  const habits = activeFilter==='all' ? S.habits : S.habits.filter(h=>h.category===activeFilter);
+  const el=document.getElementById('grid');
+  if(!habits.length){ el.innerHTML=`<div class="empty">no habits here.<br>tap + to add one.</div>`; return; }
+  const t=today();
+  el.innerHTML=habits.map(h=>{
+    const todayLog=h.log.filter(e=>e.date===t);
+    const todayCount=todayLog.length;
+    const totalCount=h.log.length;
+    const todayMins=todayLog.reduce((s,e)=>s+(e.duration||0),0);
+    let inner='';
+    if(h.hasDuration){
+      inner=`
+        <div class="time-row">
+          <button class="t-preset" onclick="tapDur('${h.id}',5)">5m</button>
+          <button class="t-preset" onclick="tapDur('${h.id}',15)">15m</button>
+          <button class="t-preset" onclick="tapDur('${h.id}',30)">30m</button>
+        </div>
+        <input class="t-custom" id="tc_${h.id}" type="number" min="1" max="999" placeholder="custom min"
+          onkeydown="if(event.key==='Enter'){tapCustom('${h.id}');event.preventDefault()}">
+        <button class="log-btn" onclick="tapCustom('${h.id}')">log</button>
+        ${todayMins>0?`<div class="card-meta">${todayMins}m today</div>`:''}
+      `;
+    } else {
+      inner=`
+        <button class="tap-btn" onclick="tapSimple('${h.id}')">tap</button>
+        ${todayCount>0?`<div class="card-meta">${todayCount} today</div>`:''}
+      `;
+    }
+    return `<div class="card" id="card_${h.id}">
+      <div class="card-top"><div class="card-emoji">${h.emoji}</div><div class="card-count">${totalCount}</div></div>
+      <div class="card-label">${h.name}</div>
+      ${inner}
+    </div>`;
+  }).join('');
+}
+
+function tapSimple(id){
+  byId(id).log.push({date:today(),ts:new Date().toISOString(),time:nowTime()});
+  persist(); flashCard(id); renderGrid(); renderSubtitle();
+}
+function tapDur(id,mins){
+  byId(id).log.push({date:today(),ts:new Date().toISOString(),time:nowTime(),duration:mins});
+  persist(); flashCard(id); renderGrid(); renderSubtitle();
+}
+function tapCustom(id){
+  const inp=document.getElementById('tc_'+id);
+  const mins=parseInt(inp?.value)||null;
+  byId(id).log.push({date:today(),ts:new Date().toISOString(),time:nowTime(),duration:mins});
+  persist(); flashCard(id); renderGrid(); renderSubtitle();
+  if(inp) inp.value='';
+}
+function flashCard(id){
+  const el=document.getElementById('card_'+id); if(!el) return;
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+  setTimeout(()=>el.classList.remove('flash'),400);
+}
+
+// ── LOG ───────────────────────────────────────────────────────────────────────
+function renderLog(){
+  const el=document.getElementById('logWrap');
+  // aggregate: date -> habitId -> {count, totalMins}
+  const byDate={};
+  S.habits.forEach(h=>{
+    h.log.forEach(e=>{
+      if(!byDate[e.date]) byDate[e.date]={};
+      if(!byDate[e.date][h.id]) byDate[e.date][h.id]={habit:h,count:0,totalMins:0};
+      byDate[e.date][h.id].count++;
+      byDate[e.date][h.id].totalMins+=(e.duration||0);
+    });
+  });
+  const dates=Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
+  if(!dates.length){ el.innerHTML=`<div class="empty">no entries yet</div>`; return; }
+  el.innerHTML=dates.map(date=>{
+    const entries=Object.values(byDate[date]).sort((a,b)=>b.count-a.count);
+    const total=entries.reduce((s,e)=>s+e.count,0);
+    const rows=entries.map(({habit:h,count,totalMins})=>`
+      <div class="log-entry">
+        <div class="log-emoji">${h.emoji}</div>
+        <div class="log-label">${h.name}</div>
+        ${totalMins>0?`<div class="log-dur">${totalMins}m</div>`:''}
+        <div class="log-adj">
+          <button class="adj-btn" onclick="adjustLog('${h.id}','${date}',-1)">−</button>
+          <div class="adj-count">${count}</div>
+          <button class="adj-btn" onclick="adjustLog('${h.id}','${date}',+1)">＋</button>
+        </div>
+      </div>
+    `).join('');
+    return `<div class="log-day"><div class="log-date">${date}</div>${rows}<div class="log-stat">${total} total</div></div>`;
+  }).join('');
+}
+
+function adjustLog(habitId,date,delta){
+  const h=byId(habitId); if(!h) return;
+  if(delta>0){
+    h.log.push({date,ts:new Date().toISOString(),time:'--:--'});
+  } else {
+    const idx=h.log.map((e,i)=>({e,i})).filter(({e})=>e.date===date).pop()?.i;
+    if(idx!=null) h.log.splice(idx,1);
+  }
+  persist(); renderLog();
+}
+
+// ── MANAGE ────────────────────────────────────────────────────────────────────
+function renderManage(){
+  const habitRows=S.habits.map(h=>`
+    <div class="manage-row">
+      <div class="manage-emoji">${h.emoji}</div>
+      <div class="manage-info">
+        <div class="manage-name">${h.name}</div>
+        <div class="manage-sub">${h.category||'—'} · ${h.log.length} total${h.hasDuration?' · timed':''}</div>
+      </div>
+      <button class="edit-btn" onclick="openEdit('${h.id}')">edit</button>
+    </div>`).join('')||`<div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted2);font-style:italic;padding:16px 0">no habits yet</div>`;
+
+  const catRows=S.categories.map(c=>`
+    <div class="cat-manage-row">
+      <div class="cat-tag">${c}</div>
+      <button class="cat-del" onclick="deleteCat('${c}')">✕</button>
+    </div>`).join('');
+
+  document.getElementById('manageWrap').innerHTML=`
+    <div class="manage-note">tap edit to change name, emoji, category, or duration.</div>
+    ${habitRows}
+    <div class="section-title">categories</div>
+    <div id="catRows">${catRows}</div>
+    <div class="add-row">
+      <input class="add-input" id="newCatInput" type="text" placeholder="new category"
+        onkeydown="if(event.key==='Enter') addCat()">
+      <button class="add-btn-small" onclick="addCat()">add</button>
+    </div>`;
+}
+
+function deleteCat(cat){
+  S.categories=S.categories.filter(c=>c!==cat);
+  S.habits.forEach(h=>{ if(h.category===cat) h.category=''; });
+  persist(); renderManage();
+}
+function addCat(){
+  const inp=document.getElementById('newCatInput');
+  const val=inp.value.trim().toLowerCase();
+  if(!val||S.categories.includes(val)) return;
+  S.categories.push(val); inp.value='';
+  persist(); renderManage(); renderFilters();
+}
+
+// ── HABIT SHEET ───────────────────────────────────────────────────────────────
+function openAdd(){
+  editingId=null; sheetDur=false; sheetCat=S.categories[0]||'';
+  document.getElementById('sheetTitle').textContent='new habit';
+  document.getElementById('fEmoji').value='';
+  document.getElementById('fName').value='';
+  document.getElementById('fDurToggle').className='toggle';
+  document.getElementById('sheetDeleteBtn').style.display='none';
+  renderSheetChips();
+  document.getElementById('habitOverlay').classList.add('open');
+}
+
+function openEdit(id){
+  const h=byId(id);
+  editingId=id; sheetDur=h.hasDuration; sheetCat=h.category||(S.categories[0]||'');
+  document.getElementById('sheetTitle').textContent='edit habit';
+  document.getElementById('fEmoji').value=h.emoji;
+  document.getElementById('fName').value=h.name;
+  document.getElementById('fDurToggle').className='toggle'+(sheetDur?' on':'');
+  document.getElementById('sheetDeleteBtn').style.display='';
+  renderSheetChips();
+  document.getElementById('habitOverlay').classList.add('open');
+}
+
+function renderSheetChips(){
+  document.getElementById('fCatChips').innerHTML=S.categories.map(c=>
+    `<button class="cat-chip ${sheetCat===c?'sel':''}" onclick="pickCat('${c}',this)">${c}</button>`
+  ).join('');
+}
+
+function pickCat(c,el){
+  sheetCat=c;
+  document.querySelectorAll('#fCatChips .cat-chip').forEach(b=>b.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
+function toggleDur(){
+  sheetDur=!sheetDur;
+  document.getElementById('fDurToggle').className='toggle'+(sheetDur?' on':'');
+}
+
+function closeSheet(){ document.getElementById('habitOverlay').classList.remove('open'); }
+function maybeCloseSheet(e){ if(e.target===document.getElementById('habitOverlay')) closeSheet(); }
+
+function saveHabit(){
+  const name=document.getElementById('fName').value.trim();
+  const emoji=document.getElementById('fEmoji').value.trim()||'🔴';
+  if(!name) return;
+  if(editingId){
+    const h=byId(editingId);
+    h.emoji=emoji; h.name=name; h.category=sheetCat; h.hasDuration=sheetDur;
+  } else {
+    S.habits.push({id:'h'+Date.now(),emoji,name,category:sheetCat,hasDuration:sheetDur,log:[]});
+  }
+  persist(); closeSheet(); renderCurrent();
+  if(currentView!=='manage'&&currentView!=='tap') { renderFilters(); renderGrid(); }
+}
+
+function deleteHabit(){
+  if(!editingId||!confirm('delete this habit and all its data?')) return;
+  S.habits=S.habits.filter(h=>h.id!==editingId);
+  persist(); closeSheet(); renderCurrent();
+}
+
+// ── IMPORT / EXPORT ───────────────────────────────────────────────────────────
+function exportData(){
+  const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`habits_${today()}.json`; a.click();
+}
+function importData(e){
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const d=JSON.parse(ev.target.result);
+      if(!d.habits) return alert('invalid file');
+      if(!confirm(`import ${d.habits.length} habits? replaces current data.`)) return;
+      S=d; persist(); activeFilter='all'; renderCurrent();
+    }catch{ alert('could not read file'); }
+  };
+  reader.readAsText(file); e.target.value='';
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+renderCurrent();
+</script>
+  <script src="pwa-register.js"></script>
+</body>
+</html>

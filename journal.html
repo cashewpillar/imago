@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>journal</title>
+<script src="https://unpkg.com/dexie@3.2.4/dist/dexie.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --ink:       #1a1814;
+  --ink-2:     #4a4640;
+  --ink-3:     #8a857e;
+  --ink-4:     #bdb8b0;
+  --paper:     #faf8f4;
+  --paper-2:   #f2efe8;
+  --paper-3:   #e8e4da;
+  --rule:      #dedad2;
+  --aside-bg:  #ede8fb;
+  --aside-ink: #4a3d8a;
+  --tag-bg:    #e8e4da;
+  --tag-ink:   #4a4640;
+  --danger:    #c0392b;
+  --font:      'Lora', Georgia, serif;
+  --mono:      'DM Mono', monospace;
+}
+
+html, body {
+  height: 100%; background: var(--paper); color: var(--ink);
+  font-family: var(--font); font-size: 16px;
+  -webkit-font-smoothing: antialiased; overflow: hidden;
+}
+
+/* bar */
+.bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 13px 20px 11px;
+  background: var(--paper); border-bottom: 1px solid var(--rule);
+}
+.bar-title { font-family: var(--mono); font-size: 13px; color: var(--ink-3); letter-spacing: 0.05em; }
+.bar-right  { display: flex; gap: 8px; }
+
+.btn {
+  font-family: var(--mono); font-size: 12px;
+  background: none; border: 1px solid var(--rule);
+  color: var(--ink-2); padding: 5px 13px;
+  border-radius: 20px; cursor: pointer;
+  transition: background 0.12s; -webkit-tap-highlight-color: transparent;
+}
+.btn:hover  { background: var(--paper-2); }
+.btn.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.btn.ink    { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.btn.ink:hover { background: var(--ink-2); }
+.btn.del    { color: var(--danger); border-color: #f0c0bc; }
+.btn.del:hover { background: #fdf0ee; }
+
+/* views */
+.view { position: fixed; inset: 0; top: 45px; overflow-y: auto; }
+.view.hidden { display: none; }
+
+/* write view */
+#write-view { display: flex; flex-direction: column; }
+
+.write-date {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-4);
+  letter-spacing: 0.04em; padding: 18px 28px 0; pointer-events: none;
+  user-select: none;
+}
+
+/*
+  The editor is a mix of rendered <div class="r-line"> blocks
+  and one live <textarea> at the bottom.
+*/
+#editor-wrap {
+  flex: 1;
+  padding: 14px 28px 120px;
+  cursor: text;
+  min-height: calc(100vh - 90px);
+}
+
+/* rendered lines */
+.block-wrap { position: relative; width: 100%; }
+.r-line, .blk-ta {
+  font-family: var(--font); font-size: 17px; line-height: 1.6;
+  color: var(--ink); min-height: 1.6em;
+  white-space: pre-wrap; word-break: break-word;
+  width: 100%; display: block; 
+  margin: 0; padding: 0 !important;
+  border: none !important; outline: none !important;
+  box-sizing: border-box;
+}
+.blk-ta {
+  background: transparent; resize: none;
+  overflow: hidden; caret-color: var(--ink);
+  -webkit-appearance: none;
+}
+.blk-ta.off { display: none; }
+.r-line { cursor: text; display: none; }
+.r-line.on { display: block; }
+
+.block-rm {
+  position: absolute; top: 6px; right: -24px; width: 20px; height: 20px;
+  border-radius: 50%; background: transparent; border: none;
+  color: var(--ink-4); font-size: 14px; display: flex;
+  align-items: center; justify-content: center; cursor: pointer;
+  opacity: 0; transition: opacity 0.15s;
+}
+.block-wrap:hover .block-rm { opacity: 1; }
+.block-wrap:only-child .block-rm { display: none !important; }
+
+/* rendered inline styles */
+.r-aside { font-style: italic; background: var(--aside-bg); color: var(--aside-ink); border-radius: 3px; padding: 0 3px; }
+.r-abs   { text-decoration: underline dotted var(--ink-4); text-underline-offset: 3px; }
+.r-tag   { display: inline-block; background: var(--tag-bg); color: var(--tag-ink); font-family: var(--mono); font-size: 13px; border-radius: 20px; padding: 0 8px; line-height: 1.75; }
+.r-bold  { font-weight: 500; }
+.r-em    { font-style: italic; }
+.r-code  { font-family: var(--mono); font-size: 0.87em; background: var(--paper-3); padding: 1px 5px; border-radius: 3px; }
+.r-h1    { font-size: 1.35em; font-weight: 500; display: block; line-height: 1.4; margin: 0.2em 0 0.1em; }
+.r-h2    { font-size: 1.15em; font-weight: 500; display: block; line-height: 1.4; margin: 0.15em 0 0.05em; }
+.r-date  { font-family: var(--mono); font-size: 13px; color: var(--ink-3); }
+
+/* save fab */
+.save-fab { position: fixed; bottom: 24px; right: 20px; z-index: 15; }
+
+/* entries view */
+#entries-view { padding: 0 20px 60px; }
+.entries-top  { padding: 16px 0 12px; display: flex; justify-content: flex-end; gap: 8px; }
+.entry-card   { border-bottom: 1px solid var(--rule); padding: 20px 0 16px; }
+.entry-ts     { font-family: var(--mono); font-size: 11px; color: var(--ink-4); letter-spacing: 0.03em; margin-bottom: 8px; }
+.entry-body   { font-size: 16px; line-height: 1.85; white-space: pre-wrap; word-break: break-word; }
+.entry-foot   { margin-top: 10px; opacity: 0; transition: opacity 0.15s; }
+.entry-card:hover .entry-foot,
+.entry-card:focus-within .entry-foot { opacity: 1; }
+.empty        { text-align: center; padding: 80px 20px; font-size: 14px; color: var(--ink-4); font-style: italic; }
+
+/* modal */
+.overlay { display: none; position: fixed; inset: 0; background: rgba(26,24,20,0.45); z-index: 50; align-items: center; justify-content: center; padding: 20px; }
+.overlay.open { display: flex; }
+.modal { background: var(--paper); border-radius: 12px; border: 1px solid var(--rule); padding: 24px; width: 100%; max-width: 460px; }
+.modal h2 { font-size: 15px; font-weight: 500; margin-bottom: 14px; }
+.modal textarea { width: 100%; height: 160px; font-family: var(--mono); font-size: 12px; line-height: 1.6; background: var(--paper-2); border: 1px solid var(--rule); border-radius: 8px; padding: 10px; color: var(--ink); resize: none; outline: none; }
+.modal-msg  { font-family: var(--mono); font-size: 12px; color: var(--ink-3); margin-top: 8px; min-height: 16px; }
+.modal-foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+
+.view::-webkit-scrollbar { width: 4px; }
+.view::-webkit-scrollbar-thumb { background: var(--paper-3); border-radius: 2px; }
+</style>
+  <meta name="theme-color" content="#f7f6f2">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="imago">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/imago-icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+</head>
+<body>
+
+<div class="bar">
+  <span class="bar-title">journal</span>
+  <div class="bar-right">
+    <button class="btn active" id="tab-write"   onclick="showView('write')">write</button>
+    <button class="btn"        id="tab-entries" onclick="showView('entries')">entries</button>
+  </div>
+</div>
+
+<div class="view" id="write-view">
+  <div class="write-date" id="write-date"></div>
+  <div id="editor-wrap">
+    <div id="blk-container"></div>
+  </div>
+</div>
+
+<div class="save-fab">
+  <button class="btn ink" id="save-btn" onclick="saveEntry()">save ↑</button>
+</div>
+
+<div class="view hidden" id="entries-view">
+  <div class="entries-top">
+    <button class="btn" onclick="openImport()">import</button>
+    <button class="btn" onclick="exportAll()">export</button>
+  </div>
+  <div id="entries-list"></div>
+</div>
+
+<div class="overlay" id="import-modal">
+  <div class="modal">
+    <h2>import entries</h2>
+    <textarea id="import-text" placeholder="paste exported JSON here…"></textarea>
+    <div class="modal-msg" id="import-msg"></div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeImport()">cancel</button>
+      <button class="btn ink" onclick="doImport()">import</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── db ──
+const db = new Dexie('journal_v3');
+db.version(1).stores({ entries: '++id, createdAt' });
+
+// ── absolutes ──
+const ABS_LIST = ['never','always','everyone','obviously','definitely','certainly','impossible','clearly','nothing','everything','no one',"i am","i'm not","i will never","i can't","i cannot","i don't","i didn't","i always","i never"];
+const ABS_RE = new RegExp(`\\b(${ABS_LIST.map(w=>w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')})\\b`,'gi');
+
+function escHTML(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function applyAbsOutside(s){
+  // only apply to text nodes outside existing spans
+  const parts = s.split(/(<span[^>]*>[\s\S]*?<\/span>)/g);
+  return parts.map((p,i) => i%2===1 ? p : p.replace(ABS_RE, m=>`<span class="r-abs">${m}</span>`)).join('');
+}
+
+function renderLine(raw){
+  if(!raw.trim()) return '<br>';
+  let s = escHTML(raw);
+
+  // headings (whole line)
+  if(/^## /.test(raw))  return `<span class="r-h2">${escHTML(raw.slice(3))}</span>`;
+  if(/^# /.test(raw))   return `<span class="r-h1">${escHTML(raw.slice(2))}</span>`;
+
+  // inline markdown
+  s = s.replace(/\*\*(.+?)\*\*/g,     '<span class="r-bold">$1</span>');
+  s = s.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<span class="r-em">$1</span>');
+  s = s.replace(/`([^`]+)`/g,          '<span class="r-code">$1</span>');
+  s = s.replace(/#(\w+)/g,             '<span class="r-tag">#$1</span>');
+
+  // asides — abs inside too
+  s = s.replace(/\(([^)]+)\)/g, (_,inner)=>{
+    const wi = inner.replace(ABS_RE, m=>`<span class="r-abs">${m}</span>`);
+    return `<span class="r-aside">(${wi})</span>`;
+  });
+
+  // abs outside
+  s = applyAbsOutside(s);
+
+  return s;
+}
+
+// ── editor state ──
+const container = document.getElementById('blk-container');
+
+function bEdit(ta, v) { ta.classList.remove('off'); v.classList.remove('on'); ar(ta); ta.focus(); }
+function bView(ta, v) { 
+  ta.classList.add('off'); 
+  v.innerHTML = renderLine(ta.value); 
+  v.classList.add('on'); 
+}
+
+function ar(el) { el.style.height = '0'; el.style.height = el.scrollHeight + 'px'; }
+
+function addBlk(val = '', focus = false, afterEl = null) {
+  const div = document.createElement('div'); div.className = 'block-wrap';
+  div.innerHTML = `<textarea class="blk-ta" placeholder="…">${escHTML(val)}</textarea><div class="r-line"></div><button class="block-rm" onclick="rmBlk(this.parentElement)">×</button>`;
+  if (afterEl) afterEl.after(div); else container.appendChild(div);
+  
+  const ta = div.querySelector('textarea'), v = div.querySelector('.r-line');
+  ta.oninput = () => { expandDate(ta); ar(ta); };
+  ta.onblur = () => bView(ta, v);
+  ta.onkeydown = (e) => blkKey(e, ta);
+  v.onclick = () => bEdit(ta, v);
+
+  if (val) bView(ta, v); else bEdit(ta, v);
+  if (focus) ta.focus();
+}
+
+function rmBlk(el) { el.remove(); if (!container.children.length) addBlk('', true); }
+
+function blkKey(e, ta) {
+  const pos = ta.selectionStart;
+  const val = ta.value;
+
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    const before = val.slice(0, pos);
+    const after = val.slice(pos);
+    ta.value = before;
+    bView(ta, ta.nextElementSibling);
+    addBlk(after, true, ta.parentElement);
+  }
+  if (e.key === 'Backspace' && pos === 0 && ta.parentElement.previousElementSibling) {
+    e.preventDefault();
+    const prev = ta.parentElement.previousElementSibling;
+    const pTa = prev.querySelector('.blk-ta');
+    const oldLen = pTa.value.length;
+    pTa.value += val;
+    ta.parentElement.remove();
+    bEdit(pTa, prev.querySelector('.r-line'));
+    pTa.selectionStart = pTa.selectionEnd = oldLen;
+  }
+  if (e.key === 'ArrowUp' && pos === 0 && ta.parentElement.previousElementSibling) {
+    e.preventDefault();
+    const prev = ta.parentElement.previousElementSibling.querySelector('.blk-ta');
+    bEdit(prev, prev.nextElementSibling);
+    prev.selectionStart = prev.selectionEnd = prev.value.length;
+  }
+  if (e.key === 'ArrowDown' && pos === val.length && ta.parentElement.nextElementSibling) {
+    e.preventDefault();
+    const next = ta.parentElement.nextElementSibling.querySelector('.blk-ta');
+    bEdit(next, next.nextElementSibling);
+    next.selectionStart = next.selectionEnd = 0;
+  }
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    e.preventDefault(); saveEntry();
+  }
+}
+
+function expandDate(ta) {
+  const val = ta.value;
+  const dateStr = new Date().toLocaleString('en-SG', { dateStyle: 'medium', timeStyle: 'short' });
+  const replaced = val.replace(/\/date/g, dateStr);
+  if (replaced !== val) {
+    ta.value = replaced;
+    ta.selectionStart = ta.selectionEnd = replaced.length;
+    ar(ta);
+  }
+}
+
+// ── save ──
+async function saveEntry() {
+  const lines = [...container.querySelectorAll('.blk-ta')].map(ta => ta.value.trim()).filter(Boolean);
+  const full = lines.join('\n');
+  if (!full.trim()) return;
+
+  await db.entries.add({ text: full, createdAt: new Date().toISOString() });
+
+  container.innerHTML = '';
+  addBlk('', true);
+
+  const btn = document.getElementById('save-btn');
+  btn.textContent = 'saved ✓'; btn.style.pointerEvents = 'none';
+  setTimeout(() => { btn.textContent = 'save ↑'; btn.style.pointerEvents = ''; }, 1400);
+}
+
+// ── date label ──
+document.getElementById('write-date').textContent =
+  new Date().toLocaleString('en-SG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+// ── views ──
+function showView(v) {
+  document.getElementById('write-view').classList.toggle('hidden', v !== 'write');
+  document.getElementById('entries-view').classList.toggle('hidden', v !== 'entries');
+  document.getElementById('tab-write').classList.toggle('active', v === 'write');
+  document.getElementById('tab-entries').classList.toggle('active', v === 'entries');
+  document.querySelector('.save-fab').style.display = v === 'write' ? '' : 'none';
+  if (v === 'entries') loadEntries();
+  if (v === 'write') {
+    const act = container.querySelector('.blk-ta:not(.off)') || container.lastElementChild.querySelector('.blk-ta');
+    if (act) setTimeout(() => bEdit(act, act.nextElementSibling), 50);
+  }
+}
+
+// ── entries ──
+async function loadEntries() {
+  const list = document.getElementById('entries-list');
+  const rows = await db.entries.orderBy('createdAt').reverse().toArray();
+  if (!rows.length) { list.innerHTML = '<div class="empty">nothing saved yet</div>'; return; }
+  list.innerHTML = rows.map(e => {
+    const ts = new Date(e.createdAt).toLocaleString('en-SG', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const bodyHTML = e.text.split('\n').map(l => `<div class="r-line on">${renderLine(l)}</div>`).join('');
+    return `<div class="entry-card">
+      <div class="entry-ts">${ts}</div>
+      <div class="entry-body">${bodyHTML}</div>
+      <div class="entry-foot"><button class="btn del" onclick="deleteEntry(${e.id})">delete</button></div>
+    </div>`;
+  }).join('');
+}
+
+async function deleteEntry(id) {
+  if (!confirm('delete this entry?')) return;
+  await db.entries.delete(id);
+  loadEntries();
+}
+
+async function exportAll() {
+  const rows = await db.entries.orderBy('createdAt').toArray();
+  const blob = new Blob([JSON.stringify(rows, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `journal-${new Date().toISOString().slice(0, 10)}.json`; a.click();
+}
+
+function openImport() { document.getElementById('import-modal').classList.add('open'); document.getElementById('import-msg').textContent = ''; document.getElementById('import-text').value = ''; }
+function closeImport() { document.getElementById('import-modal').classList.remove('open'); }
+
+async function doImport() {
+  const raw = document.getElementById('import-text').value.trim();
+  const msg = document.getElementById('import-msg');
+  let arr;
+  try { arr = JSON.parse(raw); } catch { msg.style.color = 'var(--danger)'; msg.textContent = 'invalid JSON'; return; }
+  if (!Array.isArray(arr)) { msg.style.color = 'var(--danger)'; msg.textContent = 'expected an array'; return; }
+  let added = 0, skipped = 0;
+  for (const e of arr) {
+    if (!e.text || !e.createdAt) { skipped++; continue; }
+    const exists = await db.entries.where('createdAt').equals(e.createdAt).first();
+    if (exists && exists.text === e.text) { skipped++; continue; }
+    await db.entries.add({ text: e.text, createdAt: e.createdAt }); added++;
+  }
+  msg.style.color = 'var(--ink-3)';
+  msg.textContent = `imported ${added} · skipped ${skipped} duplicates`;
+  if (added > 0) loadEntries();
+}
+document.getElementById('import-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeImport(); });
+
+// init
+addBlk('', true);
+</script>
+  <script src="pwa-register.js"></script>
+</body>
+</html>
