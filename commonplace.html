@@ -1170,17 +1170,12 @@ function renderList(){
   const TL={book:'Book',film:'Film',tv:'TV',other:'Other'};
   c.innerHTML=media.map(m=>{
     const moms=momsFor(m.id);
-    const tags=[...new Set(moms.flatMap(x=>x.tags||[]))];
-    const last=moms[moms.length-1];
-    const prev=last?(last.thought||last.connection||last.line||''):'';
     return `<div class="mc" onclick="openMD(${m.id})">
       <div class="mc-head">
         <span class="mc-type">${TL[m.type]||m.type}</span>
         <div class="mc-info"><div class="mc-title">${esc(m.title||'Untitled')}</div>${m.creator?`<div class="mc-creator">${esc(m.creator)}</div>`:''}</div>
         <div class="mc-count">${moms.length} moment${moms.length!==1?'s':''}</div>
       </div>
-      ${prev?`<div class="mc-preview">"${esc(prev.slice(0,110))}${prev.length>110?'…':''}"</div>`:''}
-      ${tags.length?`<div class="mc-foot">${tags.map(t=>`<span class="tp">#${esc(t)}</span>`).join('')}</div>`:''}
     </div>`;
   }).join('');
 }
