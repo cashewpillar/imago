@@ -1148,7 +1148,7 @@ function renderHome(){
 function renderTagRow(){
   const counts={}; let untagged=0;
   AMO.forEach(m=>{ if(!m.tags||!m.tags.length) untagged++; else m.tags.forEach(t=>{counts[t]=(counts[t]||0)+1;}); });
-  const sorted=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const sorted=Object.entries(counts).sort((a,b)=>b[1]-a[1] || a[0].localeCompare(b[0]));
   let html='';
   if(untagged>0) html+=`<button class="chip chip-t${cTag==='_untagged'?' on':''}" onclick="setTag('_untagged',this)">Untagged <span style="opacity:0.5;margin-left:2px">${untagged}</span></button>`;
   html+=sorted.map(([t,n])=>`<button class="chip chip-t${cTag===t?' on':''}" onclick="setTag('${esc(t)}',this)">#${esc(t)} <span style="opacity:0.5;margin-left:2px">${n}</span></button>`).join('');
@@ -1198,7 +1198,7 @@ function renderMD(id){
   
   const counts={}; let untagged=0;
   allMoms.forEach(mo=>{ if(!mo.tags||!mo.tags.length) untagged++; else mo.tags.forEach(t=>{counts[t]=(counts[t]||0)+1;}); });
-  const sortedTags=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const sortedTags=Object.entries(counts).sort((a,b)=>b[1]-a[1] || a[0].localeCompare(b[0]));
   
   let moms=[...allMoms].sort((a,b)=>b.createdAt-a.createdAt);
   if(mdTag){
