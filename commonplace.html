@@ -722,15 +722,16 @@ function taInput(el){
   }
 }
 function bEdit(ta,v){ta.classList.remove('off');v.classList.remove('on');ar(ta);ta.focus();ta.selectionStart=ta.selectionEnd=ta.value.length;}
-function bView(ta,v){if(!ta.value.trim()){ta.classList.remove('off');v.classList.remove('on');return;}ta.classList.add('off');v.innerHTML=parseMd(ta.value);v.classList.add('on');}
+function bView(ta,v,baseTs=null){if(!ta.value.trim()){ta.classList.remove('off');v.classList.remove('on');return;}ta.classList.add('off');v.innerHTML=parseMd(ta.value,baseTs);v.classList.add('on');}
 
-function renderBlks(cid,text){const c=document.getElementById(cid);c.innerHTML='';const ps=(text||'').split(/\n\n+/);ps.forEach(p=>addBlk(cid,p));if(!c.children.length)addBlk(cid,'');}
+function renderBlks(cid,text,baseTs=null){const c=document.getElementById(cid);if(baseTs)c.dataset.baseTs=String(baseTs);else delete c.dataset.baseTs;c.innerHTML='';const ps=(text||'').split(/\n\n+/);ps.forEach(p=>addBlk(cid,p));if(!c.children.length)addBlk(cid,'');}
 function addBlk(cid,val='',focus=false,afterEl=null){
   const c=document.getElementById(cid);const div=document.createElement('div');div.className='block-wrap';
   div.innerHTML=`<textarea class="ta" placeholder="Paragraph…" oninput="taInput(this)" onblur="bView(this,this.nextElementSibling)" onkeydown="blkKey(event,this)">${esc(val)}</textarea><div class="ta-view" onclick="bEdit(this.previousElementSibling,this)"></div><button class="block-rm" onclick="rmBlk(this.parentElement)">×</button>`;
   if(afterEl)afterEl.after(div);else c.appendChild(div);
   const ta=div.querySelector('textarea'),v=div.querySelector('.ta-view');
-  if(val)bView(ta,v);else bEdit(ta,v);
+  const baseTs = c.dataset.baseTs ? Number(c.dataset.baseTs) : null;
+  if(val)bView(ta,v,baseTs);else bEdit(ta,v);
   if(focus){ta.focus();ta.selectionStart=ta.selectionEnd=ta.value.length;}
 }
 function rmBlk(el){const c=el.parentElement;el.remove();if(!c.children.length)addBlk(c.id,'');}
@@ -752,6 +753,45 @@ function fdtRef(){
   const d = now.toLocaleDateString('en-GB', { day:'numeric', month:'short' });
   const t = now.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
   return `${d}, ${t}: `;
+}
+function parseRefLabel(label, contextTs=null){
+  const match = String(label || '').trim().match(/^(\d{1,2}) ([A-Za-z]{3}), (\d{2}):(\d{2})$/);
+  if (!match) return null;
+  const [, dayStr, monthStr, hourStr, minuteStr] = match;
+  const monthIndex = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].indexOf(monthStr);
+  if (monthIndex === -1) return null;
+  const now = new Date();
+  const yearSource = contextTs ? new Date(contextTs) : now;
+  let year = yearSource.getFullYear();
+  let parsed = new Date(year, monthIndex, Number(dayStr), Number(hourStr), Number(minuteStr));
+  const maxFutureSkew = 36 * 60 * 60 * 1000;
+  if (parsed.getTime() - now.getTime() > maxFutureSkew) parsed = new Date(year - 1, monthIndex, Number(dayStr), Number(hourStr), Number(minuteStr));
+  return parsed;
+}
+function formatRelativeLater(fromTs, toTs){
+  if (!fromTs || !toTs) return null;
+  const delta = Math.max(0, toTs - fromTs);
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  const week = 7 * day;
+  const month = 30 * day;
+  const year = 365 * day;
+  if (delta < hour) return `${Math.max(1, Math.round(delta / minute))}m later`;
+  if (delta < day) return `${Math.max(1, Math.round(delta / hour))}h later`;
+  if (delta < week) return `${Math.max(1, Math.round(delta / day))}d later`;
+  if (delta < month * 1.5) return `${Math.max(1, Math.round(delta / week))}w later`;
+  if (delta < year) return `${Math.max(1, Math.round(delta / month))}mo later`;
+  return `${Math.max(1, Math.round(delta / year))}y later`;
+}
+function formatRefAbsolute(ts){
+  return new Date(ts).toLocaleString('en-GB', {
+    day:'numeric',
+    month:'short',
+    year:'numeric',
+    hour:'2-digit',
+    minute:'2-digit'
+  });
 }
 function smart(t){
   return t
@@ -957,7 +997,7 @@ function applyDistortionHighlights(root){
     if (frag) node.replaceWith(frag);
   });
 }
-function parseMd(t){
+function parseMd(t, baseTs=null){
   let h=esc(smart(t));
   h=h.replace(/\*\*(.*?)\*\*/g,'<b>$1</b>');
   h=h.replace(/__(.*?)__/g,'<u>$1</u>');
@@ -965,7 +1005,14 @@ function parseMd(t){
   h=h.replace(/^---$/gm,'<hr>');
   h=h.replace(/^- (.*)$/gm,'• $1');
   // Handle timestamped reflections
-  h=h.replace(/\((\d{1,2} [A-Za-z]{3}, \d{2}:\d{2}: )(.*?)\)/g,'<span class="note ref"><span class="ref-ts">$1</span>$2</span>');
+  let refAnchorTs = baseTs || null;
+  h=h.replace(/\((\d{1,2} [A-Za-z]{3}, \d{2}:\d{2}): (.*?)\)/g,(full,label,body)=>{
+    const parsed = parseRefLabel(label, refAnchorTs);
+    const rel = parsed && refAnchorTs ? formatRelativeLater(refAnchorTs, parsed.getTime()) : label;
+    if (parsed) refAnchorTs = parsed.getTime();
+    const title = parsed ? formatRefAbsolute(parsed.getTime()) : label;
+    return `<span class="note ref"><span class="ref-ts" title="${esc(title)}">${esc(rel)}</span>${body}</span>`;
+  });
   // Handle standard asides
   h=h.replace(/\((.*?)\)/g,'<span class="note">$1</span>');
   const container = document.createElement('div');
@@ -1133,7 +1180,7 @@ function renderMD(id){
       <div class="md-type">${TL[m.type]||m.type}</div>
       <div class="md-title">${esc(m.title||'Untitled')}</div>
       ${m.creator?`<div class="md-creator">${esc(m.creator)}</div>`:''}
-      ${m.reason?`<div style="padding:4px 0 0; opacity:0.8; font-size:13px; font-family:'Lora',serif; line-height:1.6; font-style:italic;">${parseMd(m.reason)}</div>`:''}
+      ${m.reason?`<div style="padding:4px 0 0; opacity:0.8; font-size:13px; font-family:'Lora',serif; line-height:1.6; font-style:italic;">${parseMd(m.reason,m.createdAt)}</div>`:''}
       ${(untagged>0||sortedTags.length)?`<div class="md-tags" style="margin-top:10px; border-top:1px solid var(--b); padding-top:10px;">${tagsHtml}</div>`:''}
     </div>
     <div class="sec-head"><span class="sec-lbl">Moments ${mdTag?`(${moms.length})`:''}</span><button class="btn" style="font-size:12px;padding:5px 10px;" onclick="openMomEd(null,${id})">+ add moment</button></div>
@@ -1148,9 +1195,9 @@ function renderMomCard(mo){
   return `<div class="mom-card" id="mc-${mo.id}" onclick="openMomEd(${mo.id},${mo.mediaId})" style="cursor:pointer">
     <div class="mom-card-head"><span class="mom-anchor">${mo.anchor?esc(mo.anchor):'—'}</span><span class="mom-date">${fdt(mo.createdAt)}</span></div>
     <div class="mom-body">
-      ${mo.thought?`<div class="mom-sec">Thoughts</div><div class="mom-txt" style="white-space:normal; overflow:visible; text-overflow:clip;">${parseMd(mo.thought)}</div>`:''}
-      ${mo.connection?`<div class="mom-sec">How it connects to my life</div><div class="mom-txt" style="white-space:normal; overflow:visible; text-overflow:clip;">${parseMd(mo.connection)}</div>`:''}
-      ${mo.line?`<div class="mom-sec">A line or moment</div><div class="mom-txt" style="white-space:normal; overflow:visible; text-overflow:clip;">${parseMd(mo.line)}</div>`:''}
+      ${mo.thought?`<div class="mom-sec">Thoughts</div><div class="mom-txt" style="white-space:normal; overflow:visible; text-overflow:clip;">${parseMd(mo.thought,mo.createdAt)}</div>`:''}
+      ${mo.connection?`<div class="mom-sec">How it connects to my life</div><div class="mom-txt" style="white-space:normal; overflow:visible; text-overflow:clip;">${parseMd(mo.connection,mo.createdAt)}</div>`:''}
+      ${mo.line?`<div class="mom-sec">A line or moment</div><div class="mom-txt" style="white-space:normal; overflow:visible; text-overflow:clip;">${parseMd(mo.line,mo.createdAt)}</div>`:''}
     </div>
     ${tags.length?`<div class="mom-tags">${tags.map(t=>`<span class="tp" onclick="event.stopPropagation();mdTag=null;cTag='${esc(t)}';switchTab('tags')" style="cursor:pointer">#${esc(t)}</span>`).join('')}</div>`:''}
     ${rels.length?`<div class="mom-rels">${rels.map(r=>relChip(r,mo.id)).join('')}</div>`:''}
@@ -1180,14 +1227,14 @@ function openMediaEd(id){edMediaId=id;document.getElementById('me-lbl').textCont
     document.getElementById('me-type').value=m.type||'book';
     document.getElementById('me-title').value=m.title||'';
     document.getElementById('me-creator').value=m.creator||'';
-    renderBlks('me-reason-blks', m.reason||'');
+    renderBlks('me-reason-blks', m.reason||'', m.createdAt);
     meta.textContent=fdtFull(m.createdAt);
   }
   else{
     document.getElementById('me-type').value='book';
     document.getElementById('me-title').value='';
     document.getElementById('me-creator').value='';
-    renderBlks('me-reason-blks', '');
+    renderBlks('me-reason-blks', '', Date.now());
     meta.textContent='';
     setTimeout(()=>document.getElementById('me-title').focus(),100);
   }
@@ -1249,18 +1296,19 @@ function openMomEd(momId,mediaId){
   if(momId){
     const mo=AMO.find(x=>x.id===momId);
     document.getElementById('mo-anchor').value=mo.anchor||'';
-    renderBlks('mo-thought-blks', mo.thought||'');
-    renderBlks('mo-conn-blks', mo.connection||'');
-    renderBlks('mo-line-blks', mo.line||'');
+    renderBlks('mo-thought-blks', mo.thought||'', mo.createdAt);
+    renderBlks('mo-conn-blks', mo.connection||'', mo.createdAt);
+    renderBlks('mo-line-blks', mo.line||'', mo.createdAt);
     mTags=[...(mo.tags||[])];
     relRows=AR.filter(r=>r.fromId===momId).map(r=>({label:r.label,toId:r.toId,dbId:r.id,uuid:r.uuid}));
     meta.textContent=fdtFull(mo.createdAt);
     setMoStage(2);
   } else {
     meta.textContent='';
-    renderBlks('mo-thought-blks', '');
-    renderBlks('mo-conn-blks', '');
-    renderBlks('mo-line-blks', '');
+    const now = Date.now();
+    renderBlks('mo-thought-blks', '', now);
+    renderBlks('mo-conn-blks', '', now);
+    renderBlks('mo-line-blks', '', now);
     setMoStage(1);
     setTimeout(()=>{const ta=document.querySelector('#mo-thought-blks textarea');if(ta){ta.focus();ta.selectionStart=ta.selectionEnd=ta.value.length;}},100);
   }
