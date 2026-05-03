@@ -467,6 +467,8 @@ let activeDistortionMark = null;
 let pinnedDistortionMark = null;
 let activeDistortionCategory = null;
 let isDistortionGlossaryExpanded = false;
+let distortionHoverTimer = null;
+let pendingHoverMark = null;
 const DISTORTION_RULES = [
   {
     category: 'All-or-Nothing',
@@ -803,6 +805,11 @@ function smart(t){
 }
 function closeDistortionTips(exceptEl=null){
   const tip = document.getElementById('cdh-tip');
+  if (distortionHoverTimer) {
+    clearTimeout(distortionHoverTimer);
+    distortionHoverTimer = null;
+  }
+  pendingHoverMark = null;
   document.querySelectorAll('.cdh-mark.is-open').forEach(el=>{if(el!==exceptEl)el.classList.remove('is-open');});
   if (!exceptEl) {
     activeDistortionMark = null;
@@ -845,6 +852,11 @@ function isWithinActiveDistortionZone(node){
   );
 }
 function openDistortionTip(mark,{ pinned=false }={}){
+  if (distortionHoverTimer) {
+    clearTimeout(distortionHoverTimer);
+    distortionHoverTimer = null;
+  }
+  pendingHoverMark = null;
   document.querySelectorAll('.cdh-mark.is-open').forEach(el=>{if(el!==mark)el.classList.remove('is-open');});
   mark.classList.add('is-open');
   if (pinned) pinnedDistortionMark = mark;
@@ -1044,11 +1056,22 @@ document.addEventListener('click', e => {
 document.addEventListener('mouseover', e => {
   const mark = e.target.closest('.cdh-mark');
   if (!mark) return;
-  openDistortionTip(mark,{ pinned:true });
+  if (pinnedDistortionMark === mark) return;
+  if (distortionHoverTimer) clearTimeout(distortionHoverTimer);
+  showDistortionTip(mark);
+  pendingHoverMark = mark;
+  distortionHoverTimer = setTimeout(() => {
+    if (pendingHoverMark === mark) openDistortionTip(mark,{ pinned:true });
+  }, 1000);
 });
 document.addEventListener('mouseout', e => {
   const mark = e.target.closest('.cdh-mark');
   if (!mark) return;
+  if (pendingHoverMark === mark && !isWithinActiveDistortionZone(e.relatedTarget)) {
+    clearTimeout(distortionHoverTimer);
+    distortionHoverTimer = null;
+    pendingHoverMark = null;
+  }
   if (pinnedDistortionMark === mark) return;
   if (isWithinActiveDistortionZone(e.relatedTarget)) return;
   if (activeDistortionMark === mark) closeDistortionTips();
