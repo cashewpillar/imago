@@ -69,7 +69,7 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
 .cdh-mark.cdh-tier1{text-decoration-color:oklch(55% 0.15 25);}
 .cdh-mark.cdh-tier2{text-decoration-color:oklch(55% 0.1 250);}
 .cdh-tip{position:fixed;left:0;top:0;min-width:220px;max-width:min(280px,calc(100vw - 32px));padding:8px 10px;border-radius:8px;background:rgba(26,23,20,.96);color:var(--cream);font-family:'DM Sans',sans-serif;font-size:11px;line-height:1.45;white-space:normal;box-shadow:0 8px 28px rgba(26,23,20,.2);opacity:0;pointer-events:none;transition:opacity .16s ease,transform .16s ease;z-index:9999;transform:translate(-50%,-100%);}
-.cdh-tip.show{opacity:1;}
+.cdh-tip.show{opacity:1;pointer-events:auto;}
 .cdh-tip[data-place="above"][data-align="center"].show{transform:translate(-50%,-100%);}
 .cdh-tip[data-place="below"][data-align="center"].show{transform:translate(-50%,0);}
 .cdh-tip[data-place="above"][data-align="left"].show{transform:translate(0,-100%);}
@@ -78,6 +78,26 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
 .cdh-tip[data-place="below"][data-align="right"].show{transform:translate(-100%,0);}
 .cdh-tip-item{display:block;}
 .cdh-tip-item + .cdh-tip-item{margin-top:4px;padding-top:4px;border-top:1px solid rgba(248,244,237,.14);}
+.cdh-tip-copy{display:block;}
+.cdh-tip-link{margin-top:5px;padding:0;border:none;background:none;color:var(--cream3);font:inherit;font-size:10px;letter-spacing:.04em;text-transform:uppercase;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px;cursor:pointer;opacity:.9;}
+.cdh-tip-link:hover{color:#fff;opacity:1;}
+.cdh-modal{display:none;position:fixed;inset:0;background:rgba(26,23,20,.38);z-index:1200;}
+.cdh-modal.open{display:block;}
+.cdh-sheet{position:absolute;left:0;right:0;bottom:0;background:var(--cream);border-radius:16px 16px 0 0;padding:14px 18px 30px;max-height:min(78vh,680px);overflow:auto;transform:translateY(100%);transition:transform .26s cubic-bezier(.22,1,.36,1);}
+.cdh-modal.open .cdh-sheet{transform:translateY(0);}
+.cdh-sheet-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px;}
+.cdh-sheet-k{font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:4px;}
+.cdh-sheet-title{font-family:'Lora',serif;font-size:22px;line-height:1.2;}
+.cdh-sheet-close{border:none;background:transparent;color:var(--ink3);font-size:22px;line-height:1;cursor:pointer;padding:2px 4px;}
+.cdh-sheet-lead{font-family:'Lora',serif;font-size:15px;line-height:1.65;color:var(--ink);background:var(--paper);border:1px solid var(--b);border-radius:10px;padding:14px;}
+.cdh-sheet-actions{display:flex;justify-content:flex-start;margin-top:12px;}
+.cdh-sheet-btn{border:none;background:none;color:var(--rust);font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;padding:0;}
+.cdh-sheet-all{margin-top:16px;padding-top:14px;border-top:1px solid var(--b);}
+.cdh-sheet-list{display:flex;flex-direction:column;gap:10px;}
+.cdh-sheet-item{background:var(--paper);border:1px solid var(--b);border-radius:10px;padding:12px 13px;}
+.cdh-sheet-item.on{border-color:rgba(155,74,30,.35);background:var(--rust2);}
+.cdh-sheet-item h4{font-family:'Lora',serif;font-size:16px;font-weight:500;line-height:1.3;margin-bottom:5px;}
+.cdh-sheet-item p{font-size:13px;line-height:1.6;color:var(--ink2);}
 .block-wrap{margin-bottom:8px;position:relative;}
 .block-wrap:last-child{margin-bottom:0;}
 .block-rm{position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:transparent;border:none;color:var(--rust);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity .15s;}
@@ -374,6 +394,25 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
 </div></div>
 <input type="file" id="imp-file" accept=".json" style="display:none" onchange="handleImport(event)">
 <div class="cdh-tip" id="cdh-tip" aria-hidden="true"></div>
+<div class="cdh-modal" id="cdh-modal" onclick="handleDistortionModal(event)">
+  <div class="cdh-sheet">
+    <div class="handle"></div>
+    <div class="cdh-sheet-head">
+      <div>
+        <div class="cdh-sheet-k">Learn more</div>
+        <div class="cdh-sheet-title" id="cdh-sheet-title">Cognitive distortion</div>
+      </div>
+      <button class="cdh-sheet-close" onclick="closeDistortionLearnMore()" aria-label="Close">×</button>
+    </div>
+    <div class="cdh-sheet-lead" id="cdh-sheet-lead"></div>
+    <div class="cdh-sheet-actions">
+      <button class="cdh-sheet-btn" id="cdh-see-all" onclick="toggleDistortionGlossary()">See all</button>
+    </div>
+    <div class="cdh-sheet-all" id="cdh-sheet-all" style="display:none;">
+      <div class="cdh-sheet-list" id="cdh-sheet-list"></div>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -425,74 +464,145 @@ let mTags=[], relRows=[];
 const vStack=[];
 let compatReady = false;
 let activeDistortionMark = null;
+let pinnedDistortionMark = null;
+let activeDistortionCategory = null;
+let isDistortionGlossaryExpanded = false;
 const DISTORTION_RULES = [
   {
     category: 'All-or-Nothing',
     tier: 1,
     regex: /\b(always|never|everyone|nobody|everything|nothing|entirely|completely|perfect|perfectly|total|totally|absolute|absolutely|every single|not once)\b/gi,
-    tooltip: '!potential all-or-nothing thinking — is this always true?'
+    tooltip: 'potential all-or-nothing thinking — is this always true?'
   },
   {
     category: 'Should Statements',
     tier: 1,
     regex: /\b(should|shouldn't|must|mustn't|ought to|have to|has to|had to|supposed to|need to|needs to|have no choice|must always|must never)\b/gi,
-    tooltip: '!potential "should" statement — whose rule is this?'
+    tooltip: 'potential "should" statement — whose rule is this?'
   },
   {
     category: 'Labeling',
     tier: 1,
     regex: /\b(loser|failure|idiot|stupid|useless|pathetic|worthless|mess|clown|incompetent|broken|damaged|I'm such a|I am such a|I'm a failure|I'm an idiot|he is a|she is a|they are|you're such a|what is wrong with me|why am I like this|what kind of person)\b/gi,
-    tooltip: '!potential labeling — describing a moment, not a person'
+    tooltip: 'potential labeling — describing a moment, not a person'
   },
   {
     category: 'Personalization',
     tier: 1,
     regex: /\b(my fault|blame myself|because of me|responsible for|caused this|if I hadn't|I should have stopped|I should have known|I ruined|it's all me)\b/gi,
-    tooltip: '!potential personalization — are you the only cause here?'
+    tooltip: 'potential personalization — are you the only cause here?'
   },
   {
     category: 'Catastrophizing',
     tier: 2,
     regex: /\b(terrible|awful|horrible|disaster|ruined|catastrophe|nightmare|worst|unbearable|devastating|can't handle|the end of|what if everyone|what if I never|what if it all)\b/gi,
-    tooltip: '!potential catastrophizing — what\'s the realistic outcome?'
+    tooltip: 'potential catastrophizing — what\'s the realistic outcome?'
   },
   {
     category: 'Mind Reading',
     tier: 2,
     regex: /(they think|they probably think|I could tell they|they must think|they were judging|everyone noticed|everyone could tell|I know they|she thinks he thinks|they don't like|they hate me|nobody cares|they were laughing at|I just know that|I can tell that)/gi,
-    tooltip: '!potential mind reading — do you know this for certain?'
+    tooltip: 'potential mind reading — do you know this for certain?'
   },
   {
     category: 'Fortune Telling',
     tier: 2,
     regex: /(it's going to go wrong|I'll probably fail|it won't work|nothing will change|I'll never be able to|it's pointless|there's no point|it'll end badly|I know how this ends|nothing ever changes|this always ends|it won't matter)/gi,
-    tooltip: '!potential fortune telling — is this a prediction or a fact?'
+    tooltip: 'potential fortune telling — is this a prediction or a fact?'
   },
   {
     category: 'Minimization',
     tier: 2,
     regex: /(it's fine|I'm fine|no big deal|not a big deal|it's nothing|I don't care|who cares|doesn't matter|not worth thinking about|I shouldn't complain|others have it worse|at least I'm not|could be worse|I'm being dramatic|I'm overreacting|too sensitive|stop being so sensitive)/gi,
-    tooltip: '!potential minimization — are you giving this enough weight?'
+    tooltip: 'potential minimization — are you giving this enough weight?'
   },
   {
     category: 'Mental Filtering',
     tier: 2,
     regex: /(doesn't count|was just luck|not good enough|they were just being nice|probably felt sorry|anyone could have|would've happened anyway|not because of me|only because they|just got lucky|yeah but|not really that|it was nothing|that doesn't mean|not a big deal)/gi,
-    tooltip: '!potential mental filtering — is there something being discounted?'
+    tooltip: 'potential mental filtering — is there something being discounted?'
   },
   {
     category: 'Magnification',
     tier: 2,
     regex: /\b(massive|enormous|huge|completely ruined|absolute disaster|total failure|the worst possible|beyond repair|irreparable|everyone will know|my whole life|everything is ruined)\b/gi,
-    tooltip: '!potential magnification — is this being mentally zoomed in?'
+    tooltip: 'potential magnification — is this being mentally zoomed in?'
   },
   {
     category: 'Self-Comparison',
     tier: 2,
     regex: /(compared to|not as good as|worse than|better than me|ahead of me|more successful than|has it together|unlike me|everyone else can|other people can|normal people|they make it look|why can't I|how come they|at least they|even they managed|I'm the only one who|no one else struggles with)/gi,
-    tooltip: '!potential self-comparison — comparing your inside to their outside?'
+    tooltip: 'potential self-comparison — comparing your inside to their outside?'
   }
 ];
+const DISTORTION_GLOSSARY = [
+  {
+    key: 'All-or-Nothing',
+    title: 'All-or-Nothing Thinking',
+    body: "Seeing things in black-and-white categories; if a performance isn't perfect, you consider it a total failure."
+  },
+  {
+    key: 'Overgeneralization',
+    title: 'Overgeneralization',
+    body: 'Seeing a single negative event (like a bad date) as a never-ending pattern of defeat.'
+  },
+  {
+    key: 'Mental Filtering',
+    title: 'Mental Filtering',
+    body: 'Dwelling exclusively on a single negative detail while ignoring all the positive things that happened.'
+  },
+  {
+    key: 'Disqualifying the Positive',
+    title: 'Disqualifying the Positive',
+    body: 'Rejecting positive experiences by insisting they "don\'t count" for some reason, maintaining a negative belief.'
+  },
+  {
+    key: 'Mind Reading',
+    title: 'Mind Reading',
+    body: 'Assuming you know what others are thinking and that they are reacting negatively to you without any evidence.'
+  },
+  {
+    key: 'Fortune Telling',
+    title: 'Fortune Telling',
+    body: 'Predicting that things will turn out badly before they even happen.'
+  },
+  {
+    key: 'Catastrophizing',
+    title: 'Catastrophizing',
+    body: 'Blowing things out of proportion or expecting the absolute worst-case scenario to occur.'
+  },
+  {
+    key: 'Emotional Reasoning',
+    title: 'Emotional Reasoning',
+    body: 'Assuming that because you feel a certain way, it must be the objective truth (e.g., "I feel like an idiot, so I must be one").'
+  },
+  {
+    key: 'Should Statements',
+    title: '"Should" Statements',
+    body: 'Using "should," "must," or "ought" to pressure yourself, leading to guilt and frustration when you fall short.'
+  },
+  {
+    key: 'Labeling',
+    title: 'Labeling',
+    body: 'Assigning a global, highly emotional label to yourself or others instead of describing a specific behavior (e.g., "I\'m a loser" vs. "I made a mistake").'
+  },
+  {
+    key: 'Personalization',
+    title: 'Personalization',
+    body: "Holding yourself personally responsible for events that aren't entirely under your control."
+  },
+  {
+    key: 'Magnification',
+    title: 'Magnification / Minimization',
+    body: 'Exaggerating the importance of flaws and problems, or shrinking the significance of your own strengths and achievements. Sometimes called "binocular trick" — looking through the wrong end of the telescope depending on what\'s being assessed.'
+  },
+  {
+    key: 'Minimization',
+    title: 'Magnification / Minimization',
+    body: 'Exaggerating the importance of flaws and problems, or shrinking the significance of your own strengths and achievements. Sometimes called "binocular trick" — looking through the wrong end of the telescope depending on what\'s being assessed.'
+  }
+];
+const DISTORTION_GLOSSARY_BY_KEY = Object.fromEntries(DISTORTION_GLOSSARY.map(item => [item.key, item]));
 
 function makeUuid(){
   if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
@@ -654,22 +764,51 @@ function smart(t){
 function closeDistortionTips(exceptEl=null){
   const tip = document.getElementById('cdh-tip');
   document.querySelectorAll('.cdh-mark.is-open').forEach(el=>{if(el!==exceptEl)el.classList.remove('is-open');});
-  if (!exceptEl) activeDistortionMark = null;
+  if (!exceptEl) {
+    activeDistortionMark = null;
+    pinnedDistortionMark = null;
+  }
   if (!exceptEl || activeDistortionMark !== exceptEl) {
     tip.classList.remove('show');
     tip.innerHTML = '';
     tip.setAttribute('aria-hidden', 'true');
   }
 }
+function distortionMatchesFor(mark){
+  try {
+    return JSON.parse(decodeURIComponent(mark.dataset.matches || '%5B%5D'));
+  } catch (err) {
+    return [];
+  }
+}
 function showDistortionTip(mark){
   const tip = document.getElementById('cdh-tip');
-  const items = (mark.dataset.tooltips || '').split('\n').filter(Boolean);
+  const items = distortionMatchesFor(mark);
   if (!items.length) return;
-  tip.innerHTML = items.map(text=>`<span class="cdh-tip-item">${esc(text)}</span>`).join('');
+  tip.innerHTML = items.map(item=>`
+    <span class="cdh-tip-item">
+      <span class="cdh-tip-copy">${esc(item.tooltip)}</span>
+      <button class="cdh-tip-link" data-category="${esc(item.category)}" type="button">Learn more</button>
+    </span>
+  `).join('');
   tip.setAttribute('aria-hidden', 'false');
   tip.classList.add('show');
   activeDistortionMark = mark;
   requestAnimationFrame(() => positionDistortionTip(mark));
+}
+function isWithinActiveDistortionZone(node){
+  if (!node) return false;
+  const tip = document.getElementById('cdh-tip');
+  return !!(
+    (activeDistortionMark && activeDistortionMark.contains(node)) ||
+    tip.contains(node)
+  );
+}
+function openDistortionTip(mark,{ pinned=false }={}){
+  document.querySelectorAll('.cdh-mark.is-open').forEach(el=>{if(el!==mark)el.classList.remove('is-open');});
+  mark.classList.add('is-open');
+  if (pinned) pinnedDistortionMark = mark;
+  showDistortionTip(mark);
 }
 function positionDistortionTip(mark){
   const tip = document.getElementById('cdh-tip');
@@ -697,6 +836,44 @@ function positionDistortionTip(mark){
   tip.dataset.align = align;
   tip.style.left = `${left}px`;
   tip.style.top = `${Math.max(margin, top)}px`;
+}
+function renderDistortionGlossary(){
+  const current = DISTORTION_GLOSSARY_BY_KEY[activeDistortionCategory] || DISTORTION_GLOSSARY[0];
+  document.getElementById('cdh-sheet-title').textContent = current.title;
+  document.getElementById('cdh-sheet-lead').textContent = current.body;
+  const allWrap = document.getElementById('cdh-sheet-all');
+  const list = document.getElementById('cdh-sheet-list');
+  const btn = document.getElementById('cdh-see-all');
+  allWrap.style.display = isDistortionGlossaryExpanded ? 'block' : 'none';
+  btn.textContent = isDistortionGlossaryExpanded ? 'Show less' : 'See all';
+  if (isDistortionGlossaryExpanded) {
+    const rest = DISTORTION_GLOSSARY.filter(item => item.key !== current.key);
+    list.innerHTML = rest.map(item => `
+      <div class="cdh-sheet-item">
+        <h4>${esc(item.title)}</h4>
+        <p>${esc(item.body)}</p>
+      </div>
+    `).join('');
+  } else {
+    list.innerHTML = '';
+  }
+}
+function openDistortionLearnMore(category){
+  activeDistortionCategory = category;
+  isDistortionGlossaryExpanded = false;
+  renderDistortionGlossary();
+  document.getElementById('cdh-modal').classList.add('open');
+  closeDistortionTips();
+}
+function closeDistortionLearnMore(){
+  document.getElementById('cdh-modal').classList.remove('open');
+}
+function toggleDistortionGlossary(){
+  isDistortionGlossaryExpanded = !isDistortionGlossaryExpanded;
+  renderDistortionGlossary();
+}
+function handleDistortionModal(e){
+  if (e.target === document.getElementById('cdh-modal')) closeDistortionLearnMore();
 }
 function distortionRegex(rule){
   return new RegExp(rule.regex.source.replace(/'/g, "['\\u2019]"), rule.regex.flags);
@@ -753,7 +930,11 @@ function buildDistortionFragment(text){
     mark.tabIndex = 0;
     mark.setAttribute('role', 'button');
     mark.setAttribute('aria-label', unique.map(match => match.tooltip).join(' '));
-    mark.dataset.tooltips = unique.map(match => match.tooltip).join('\n');
+    mark.dataset.matches = encodeURIComponent(JSON.stringify(unique.map(match => ({
+      category: match.category,
+      tooltip: match.tooltip,
+      tier: match.tier
+    }))));
     mark.appendChild(document.createTextNode(segmentText));
     frag.appendChild(mark);
   }
@@ -793,42 +974,57 @@ function parseMd(t){
   return container.innerHTML;
 }
 document.addEventListener('click', e => {
+  const learnMore = e.target.closest('.cdh-tip-link');
+  if (learnMore) {
+    e.preventDefault();
+    e.stopPropagation();
+    openDistortionLearnMore(learnMore.dataset.category);
+    return;
+  }
   const mark = e.target.closest('.cdh-mark');
   if (mark) {
     e.preventDefault();
     e.stopPropagation();
-    const willOpen = !mark.classList.contains('is-open');
-    closeDistortionTips(mark);
-    mark.classList.toggle('is-open', willOpen);
-    activeDistortionMark = willOpen ? mark : null;
-    if (willOpen) showDistortionTip(mark);
-    else closeDistortionTips();
+    if (pinnedDistortionMark === mark) {
+      closeDistortionTips();
+      return;
+    }
+    openDistortionTip(mark,{ pinned:true });
     return;
   }
   closeDistortionTips();
 }, true);
 document.addEventListener('mouseover', e => {
   const mark = e.target.closest('.cdh-mark');
-  if (!mark || mark.classList.contains('is-open')) return;
-  showDistortionTip(mark);
+  if (!mark) return;
+  openDistortionTip(mark,{ pinned:true });
 });
 document.addEventListener('mouseout', e => {
   const mark = e.target.closest('.cdh-mark');
-  if (!mark || mark.classList.contains('is-open')) return;
-  if (mark.contains(e.relatedTarget)) return;
+  if (!mark) return;
+  if (pinnedDistortionMark === mark) return;
+  if (isWithinActiveDistortionZone(e.relatedTarget)) return;
   if (activeDistortionMark === mark) closeDistortionTips();
+});
+document.getElementById('cdh-tip').addEventListener('mouseout', e => {
+  if (pinnedDistortionMark) return;
+  if (isWithinActiveDistortionZone(e.relatedTarget)) return;
+  closeDistortionTips();
 });
 document.addEventListener('focusin', e => {
   const mark = e.target.closest('.cdh-mark');
   if (mark) {
-    closeDistortionTips(mark);
-    showDistortionTip(mark);
+    openDistortionTip(mark,{ pinned:true });
     return;
   }
+  if (pinnedDistortionMark) return;
   closeDistortionTips();
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeDistortionTips();
+  if (e.key === 'Escape') {
+    if (document.getElementById('cdh-modal').classList.contains('open')) closeDistortionLearnMore();
+    else closeDistortionTips();
+  }
 });
 window.addEventListener('scroll', () => {
   if (activeDistortionMark) positionDistortionTip(activeDistortionMark);
