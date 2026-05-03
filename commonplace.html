@@ -387,12 +387,14 @@ select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='
   <div class="ms-t">Your commonplace</div>
   <div class="mi" onclick="doExport()"><span class="mi-ico">↓</span><div><div>Export all</div><div class="mi-sub">Download as JSON</div></div></div>
   <div class="mi" onclick="doImport()"><span class="mi-ico">↑</span><div><div>Import</div><div class="mi-sub">Merge from JSON file</div></div></div>
+  <div class="mi" onclick="doStoryImport()"><span class="mi-ico">↗</span><div><div>Import from Story</div><div class="mi-sub">Bring in books and captured lines</div></div></div>
   <div class="mdiv"></div>
   <div class="mi" onclick="resetData()"><span class="mi-ico">⚠</span><div><div>Reset Data</div><div class="mi-sub">Wipe all data from this device</div></div></div>
   <div class="mdiv"></div>
   <div class="mi" style="cursor:default;opacity:.5;"><span class="mi-ico">○</span><div><div>Commonplace</div><div class="mi-sub">Media as anchors. Thoughts as record.</div></div></div>
 </div></div>
 <input type="file" id="imp-file" accept=".json" style="display:none" onchange="handleImport(event)">
+<input type="file" id="story-imp-file" accept=".json" style="display:none" onchange="handleStoryImport(event)">
 <div class="cdh-tip" id="cdh-tip" aria-hidden="true"></div>
 <div class="cdh-modal" id="cdh-modal" onclick="handleDistortionModal(event)">
   <div class="cdh-sheet">
@@ -612,6 +614,13 @@ function makeUuid(){
 }
 function sortTags(tags){return [...new Set((tags||[]).map(t=>String(t||'').trim().toLowerCase()).filter(Boolean))].sort();}
 function normText(v){return String(v||'').trim();}
+function storyTagToCommonplace(tag){
+  const cleaned = String(tag || '').trim().replace(/^#+/, '');
+  return cleaned ? cleaned.toLowerCase() : '';
+}
+function storyStanceLabel(stance){
+  return ({ yes:'agree', complicated:'complicated', no:'disagree' })[stance] || stance;
+}
 function mediaFingerprint(item){
   return JSON.stringify([
     normText(item.type).toLowerCase(),
@@ -646,6 +655,11 @@ function stableMediaKey(item){
 }
 function stableMomentKey(item){
   return item && (item.uuid || (safeNumId(item.id) != null ? `legacy-moment:${item.id}` : null));
+}
+function storyBooksFromImport(data){
+  if (data && Array.isArray(data.books)) return data.books.filter(book => book && book.title && Array.isArray(book.notes));
+  if (data && data.title && Array.isArray(data.notes)) return [data];
+  return [];
 }
 async function ensureCompatibility(){
   if (compatReady) return;
@@ -1441,6 +1455,7 @@ function openMenu(){document.getElementById('ov').classList.add('open');}
 function handleOv(e){if(e.target===document.getElementById('ov'))document.getElementById('ov').classList.remove('open');}
 function doExport(){document.getElementById('ov').classList.remove('open');exportAll();}
 function doImport(){document.getElementById('ov').classList.remove('open');document.getElementById('imp-file').click();}
+function doStoryImport(){document.getElementById('ov').classList.remove('open');document.getElementById('story-imp-file').click();}
 async function exportAll(){
   const[media,moments,relations]=await Promise.all([db.media.toArray(),db.moments.toArray(),db.relations.toArray()]);
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({version:2,exported:new Date().toISOString(),media,moments,relations},null,2)],{type:'application/json'}));
@@ -1574,6 +1589,85 @@ async function handleImport(e){
     await loadAll();
     toast(`Imported ${addedMedia} media, ${addedMoments} moments, ${addedRelations} links · skipped ${skippedMedia + skippedMoments + skippedRelations}`);
   }catch(err){console.error(err);toast('Could not read file');}
+  e.target.value='';
+}
+async function handleStoryImport(e){
+  const f=e.target.files[0];if(!f)return;
+  try{
+    const data=JSON.parse(await f.text());
+    const books=storyBooksFromImport(data);
+    if(!books.length){toast('No Story books found in file');return;}
+    await ensureCompatibility();
+    const [existingMedia, existingMoments] = await Promise.all([db.media.toArray(), db.moments.toArray()]);
+    const mediaByFingerprint = new Map(existingMedia.map(x=>[mediaFingerprint(x), x]));
+    const momentByFingerprint = new Map();
+    existingMoments.forEach(x=>{
+      const media = existingMedia.find(m=>m.id===x.mediaId);
+      momentByFingerprint.set(momentFingerprint(x, stableMediaKey(media)), x);
+    });
+    let addedMedia=0, addedMoments=0, skippedMoments=0;
+
+    for(const book of books){
+      const noteDates = (book.notes || []).map(note => Number(note.date) || 0).filter(Boolean);
+      const bookCreatedAt = noteDates.length ? Math.min(...noteDates) : Date.now();
+      const mediaPayload = {
+        type:'book',
+        title: book.title || 'Untitled',
+        creator: book.author || '',
+        reason:'',
+      };
+      const mediaFp = mediaFingerprint(mediaPayload);
+      let media = mediaByFingerprint.get(mediaFp);
+      if(!media){
+        const payload = {
+          uuid: makeUuid(),
+          ...mediaPayload,
+          createdAt: bookCreatedAt,
+          updatedAt: Date.now()
+        };
+        const newId = await db.media.add(payload);
+        media = { ...payload, id: newId };
+        existingMedia.push(media);
+        mediaByFingerprint.set(mediaFp, media);
+        addedMedia++;
+      } else if (!media.creator && mediaPayload.creator) {
+        await db.media.update(media.id, { creator: mediaPayload.creator, updatedAt: Date.now() });
+        media.creator = mediaPayload.creator;
+      }
+
+      for(const note of (book.notes || [])){
+        const thoughtParts = [];
+        if (note.meaning) thoughtParts.push(String(note.meaning).trim());
+        if (note.stance) thoughtParts.push(`Take: ${storyStanceLabel(note.stance)}`);
+        if (note.stanceNote) thoughtParts.push(String(note.stanceNote).trim());
+        const momentPayload = {
+          mediaId: media.id,
+          mediaUuid: media.uuid || null,
+          anchor: note.location || '',
+          thought: thoughtParts.filter(Boolean).join('\n\n'),
+          connection: '',
+          line: note.text || '',
+          tags: sortTags((note.tags || []).map(storyTagToCommonplace).filter(Boolean)),
+          createdAt: note.date || Date.now(),
+          updatedAt: note.date || Date.now()
+        };
+        const fp = momentFingerprint(momentPayload, stableMediaKey(media));
+        if(momentByFingerprint.has(fp)){
+          skippedMoments++;
+          continue;
+        }
+        const insertPayload = { uuid: makeUuid(), ...momentPayload };
+        const newId = await db.moments.add(insertPayload);
+        const inserted = { ...insertPayload, id: newId };
+        existingMoments.push(inserted);
+        momentByFingerprint.set(fp, inserted);
+        addedMoments++;
+      }
+    }
+
+    await loadAll();
+    toast(`Imported ${addedMedia} books, ${addedMoments} moments · skipped ${skippedMoments}`);
+  }catch(err){console.error(err);toast('Could not read Story file');}
   e.target.value='';
 }
 
