@@ -679,7 +679,7 @@ function renderGraph() {
     .attr('fill', textCol)
     .attr('font-size', 9)
     .attr('font-family', "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif")
-    .text(d => truncate(d.label, 18));
+    .text(d => d.label);
 
   nodeSel.filter(d => d.type === 'note')
     .on('click', (event, d) => {
@@ -795,10 +795,6 @@ function esc(s) {
     .replace(/'/g, '&#39;');
 }
 
-function truncate(s, max) {
-  const text = String(s || '');
-  return text.length > max ? text.slice(0, max - 1) + '…' : text;
-}
 
 function noteNodeId(note) {
   return 'n_' + note.bookId + '_' + note.id;
