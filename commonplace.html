@@ -1524,9 +1524,14 @@ async function handleImport(e){
       const fp = mediaFingerprint(item);
       let existing = (uuid && mediaByUuid.get(uuid)) || mediaByFingerprint.get(fp);
       if(existing){
-        if(uuid && !existing.uuid){
-          await db.media.update(existing.id, { uuid, updatedAt: existing.updatedAt || existing.createdAt || Date.now() });
-          existing = { ...existing, uuid };
+        const updates = {};
+        if(uuid && !existing.uuid) updates.uuid = uuid;
+        if(item.status && !existing.status) updates.status = item.status;
+        
+        if(Object.keys(updates).length > 0){
+          updates.updatedAt = existing.updatedAt || existing.createdAt || Date.now();
+          await db.media.update(existing.id, updates);
+          existing = { ...existing, ...updates };
         }
         medMap[item.id] = existing.id;
         skippedMedia++;
@@ -1535,6 +1540,7 @@ async function handleImport(e){
       const payload = {
         uuid: uuid || makeUuid(),
         type: item.type || 'book',
+        status: item.status || 'in-progress',
         title: item.title || '',
         creator: item.creator || '',
         reason: item.reason || '',
@@ -1655,6 +1661,7 @@ async function handleStoryImport(e){
         const payload = {
           uuid: makeUuid(),
           ...mediaPayload,
+          status: 'in-progress',
           createdAt: bookCreatedAt,
           updatedAt: Date.now()
         };
