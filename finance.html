@@ -47,7 +47,7 @@ main{max-width:940px;margin:0 auto;padding:20px 16px}
 #chartWrap{position:relative;height:160px}
 canvas#chart{display:block}
 .chart-empty{display:none;text-align:center;color:var(--text-faint);font-size:13px;padding:50px 0}
-.tooltip{position:absolute;background:var(--text);color:#fff;padding:5px 9px;border-radius:6px;font-size:11px;pointer-events:none;white-space:nowrap;z-index:50;transform:translate(-50%,-110%);display:none}
+.tooltip{position:absolute;background:var(--text);color:#fff;padding:6px 10px;border-radius:6px;font-size:11px;pointer-events:none;z-index:1000;transform:translateX(-50%);display:none;max-width:200px;line-height:1.4;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.15)}
 
 .section-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
 .section-title{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-right:4px}
@@ -119,6 +119,8 @@ td.actions{text-align:right;white-space:nowrap}
 .toast.show{opacity:1;transform:translateY(0)}
 .toast.error{background:var(--danger)}
 .empty{text-align:center;padding:36px;color:var(--text-faint);font-size:13px}
+.info-icon{display:inline-flex;align-items:center;margin-left:4px;color:var(--text-faint);vertical-align:middle;cursor:help}
+.info-icon svg{width:12px;height:12px}
 </style>
 <meta name="theme-color" content="#f7f6f2">
 <meta name="mobile-web-app-capable" content="yes">
@@ -160,7 +162,6 @@ td.actions{text-align:right;white-space:nowrap}
     <div id="chartWrap">
       <div class="chart-empty" id="chartEmpty">No history yet — balances are auto-snapshotted each time you save changes.</div>
       <canvas id="chart"></canvas>
-      <div class="tooltip" id="tooltip"></div>
     </div>
   </div>
 
@@ -345,7 +346,8 @@ function renderSummary(accounts) {
   const netLiquid = liquidAssets + credTotal;
 
   const assets = accounts.filter(a => a.balance > 0).reduce((s,a) => s + a.balance, 0);
-  const yld    = accounts.reduce((s,a) => s + (a.balance>0 ? a.balance*(a.rate||0)/100 : 0), 0);
+  const grossYld = accounts.reduce((s,a) => s + (a.balance>0 ? a.balance*(a.rate||0)/100 : 0), 0);
+  const netYld   = grossYld * 0.8; // Assuming 20% withholding tax
 
   document.getElementById('summaryRow').innerHTML = `
     <div class="sum-card">
@@ -364,12 +366,33 @@ function renderSummary(accounts) {
       <div class="sub">credit / negative</div>
     </div>
     <div class="sum-card">
-      <div class="lbl">Est. annual yield</div>
-      <div class="val col-warn">₱${fmtk(yld)}</div>
-      <div class="sub">${assets>0 ? (yld/assets*100).toFixed(2) : 0}% weighted avg</div>
+      <div class="lbl" style="cursor:help" onmouseenter="showTip(event, 'Yield after 20% withholding tax. Monthly/Daily breakdowns are estimates.')" onmouseleave="hideTip()">
+        Est. yield (net)
+      </div>
+      <div class="val col-warn">₱${fmtk(netYld)}</div>
+      <div class="sub">₱${fmtk(netYld/12)}/mo · ₱${(netYld/365*1000).toFixed(0)}/day · ${assets>0 ? (netYld/assets*100).toFixed(2) : 0}% net <span style="opacity:0.6">(after 20% tax)</span></div>
     </div>
   `;
 }
+
+function showTip(e, text) {
+  const tip = document.getElementById('tooltip');
+  tip.textContent = text;
+  tip.style.display = 'block';
+  const rect = e.currentTarget.getBoundingClientRect();
+  const margin = 8;
+  const th = tip.offsetHeight;
+  
+  tip.style.left = (rect.left + rect.width/2 + window.scrollX) + 'px';
+  
+  // If showing it on top would clip, show it on bottom
+  if (rect.top - th - margin < 10) {
+    tip.style.top = (rect.bottom + window.scrollY + margin) + 'px';
+  } else {
+    tip.style.top = (rect.top + window.scrollY - th - margin) + 'px';
+  }
+}
+function hideTip() { document.getElementById('tooltip').style.display = 'none'; }
 
 // ── Line chart ────────────────────────────────────────────────────────────────
 function renderChart(history) {
@@ -470,10 +493,21 @@ function renderChart(history) {
     let ci=0, md=Infinity;
     totals.forEach((_,i) => { const d=Math.abs(xOf(i)-mx); if(d<md){md=d;ci=i;} });
     if (md > 44) { tip.style.display='none'; return; }
+    
+    tip.textContent = dates[ci] + ' · ₱' + fmtk(totals[ci]);
     tip.style.display = 'block';
-    tip.style.left    = xOf(ci)+'px';
-    tip.style.top     = yOf(totals[ci])+'px';
-    tip.textContent   = dates[ci] + ' · ₱' + fmtk(totals[ci]);
+    
+    const margin = 8;
+    const th = tip.offsetHeight;
+    const px = rect.left + xOf(ci) + window.scrollX;
+    const py = rect.top + yOf(totals[ci]); // Viewport Y
+    
+    tip.style.left = px + 'px';
+    if (py - th - margin < 10) {
+      tip.style.top = (py + window.scrollY + margin + 10) + 'px';
+    } else {
+      tip.style.top = (py + window.scrollY - th - margin) + 'px';
+    }
   };
   canvas.onmouseleave = () => { tip.style.display='none'; };
 }
@@ -741,5 +775,6 @@ window.addEventListener('resize', () =>
 );
 </script>
   <script src="pwa-register.js"></script>
+  <div class="tooltip" id="tooltip"></div>
 </body>
 </html>
