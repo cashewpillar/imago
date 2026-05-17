@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>fin</title>
+<script src="https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f8f7f4;--surface:#fff;--border:#e2e0d8;--border-strong:#c8c5bb;
+  --text:#1a1917;--text-muted:#6b6860;--text-faint:#9c9a94;
+  --accent:#1a6b3c;--accent-bg:#eaf4ee;--accent-light:#d0e9d9;
+  --danger:#a32d2d;--danger-bg:#fcebeb;
+  --warning:#854f0b;--warning-bg:#faeeda;
+  --info:#185fa5;--info-bg:#e6f1fb;
+  --r:8px;--rl:12px;
+}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh}
+
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header h1{font-size:17px;font-weight:600;letter-spacing:-.3px}
+.header-actions{display:flex;gap:6px;flex-wrap:wrap}
+
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border:1px solid var(--border-strong);border-radius:var(--r);background:var(--surface);color:var(--text);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .12s}
+.btn:hover{background:var(--bg)}
+.btn-primary{background:var(--text);color:#fff;border-color:var(--text)}
+.btn-primary:hover{background:#333}
+.btn-danger{color:var(--danger);border-color:#f7c1c1}
+.btn-danger:hover{background:var(--danger-bg)}
+.btn svg{width:13px;height:13px;flex-shrink:0}
+
+main{max-width:940px;margin:0 auto;padding:20px 16px}
+
+.summary-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px}
+.sum-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px}
+.sum-card .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:4px}
+.sum-card .val{font-size:22px;font-weight:600;letter-spacing:-.5px}
+.sum-card .sub{font-size:11px;color:var(--text-faint);margin-top:2px}
+.col-pos{color:var(--accent)}
+.col-neg{color:var(--danger)}
+.col-warn{color:var(--warning)}
+
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:16px 18px;margin-bottom:18px}
+.chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.chart-title{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted)}
+#chartWrap{position:relative;height:160px}
+canvas#chart{display:block}
+.chart-empty{display:none;text-align:center;color:var(--text-faint);font-size:13px;padding:50px 0}
+.tooltip{position:absolute;background:var(--text);color:#fff;padding:5px 9px;border-radius:6px;font-size:11px;pointer-events:none;white-space:nowrap;z-index:50;transform:translate(-50%,-110%);display:none}
+
+.section-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.section-title{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-right:4px}
+.filters{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.filter-chip{padding:3px 10px;border:1px solid var(--border-strong);border-radius:99px;font-size:11px;cursor:pointer;background:var(--surface);color:var(--text-muted);transition:all .12s;user-select:none}
+.filter-chip:hover{border-color:var(--text-muted)}
+.filter-chip.active{background:var(--text);color:#fff;border-color:var(--text)}
+.filter-chip.tag-td.active{background:var(--accent);border-color:var(--accent)}
+.filter-chip.tag-savings.active{background:#3b6d11;border-color:#3b6d11}
+.filter-chip.tag-buffer.active{background:var(--warning);border-color:var(--warning)}
+.filter-chip.tag-credit.active{background:var(--danger);border-color:var(--danger)}
+.filter-chip.tag-illiquid.active{background:#5f5e5a;border-color:#5f5e5a}
+.filter-chip.tag-cash.active{background:#444;border-color:#444}
+
+.sort-select{margin-left:auto;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--r);font-size:11px;color:var(--text-muted);background:var(--surface);cursor:pointer;font-family:inherit}
+
+table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;margin-bottom:20px}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);font-weight:500;padding:9px 14px;text-align:left;border-bottom:1px solid var(--border);background:var(--bg)}
+th.num{text-align:right}
+td{padding:9px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#fafaf8}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+td.actions{text-align:right;white-space:nowrap}
+
+.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px}
+.tag.td{background:var(--accent-bg);color:var(--accent)}
+.tag.savings{background:#edf4e8;color:#3b6d11}
+.tag.buffer{background:var(--warning-bg);color:var(--warning)}
+.tag.illiquid{background:#f1efe8;color:#5f5e5a}
+.tag.credit{background:var(--danger-bg);color:var(--danger)}
+.tag.cash{background:#f1efe8;color:#444}
+.bal-pos{font-weight:500}
+.bal-neg{color:var(--danger);font-weight:500}
+.bal-zero{color:var(--text-faint)}
+.note-text{font-size:11px;color:var(--text-faint);font-style:italic}
+.rate-badge{font-size:12px;color:var(--text-muted)}
+.maturity{font-size:12px;color:var(--text-faint)}
+.yield-micro{font-size:10px;color:var(--text-faint)}
+
+.icon-btn{background:none;border:none;cursor:pointer;color:var(--text-faint);padding:3px 5px;border-radius:var(--r);display:inline-flex;align-items:center}
+.icon-btn:hover{background:var(--bg);color:var(--text)}
+.icon-btn svg{width:13px;height:13px}
+
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:100;align-items:center;justify-content:center}
+.modal-backdrop.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:22px;width:min(480px,95vw);max-height:90vh;overflow-y:auto}
+.modal h2{font-size:17px;font-weight:600;margin-bottom:16px}
+.form-row{display:flex;flex-direction:column;gap:3px;margin-bottom:10px}
+.form-row label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}
+.form-row input,.form-row select,.form-row textarea{width:100%;padding:7px 10px;border:1px solid var(--border-strong);border-radius:var(--r);font-family:inherit;font-size:13px;color:var(--text);background:var(--surface)}
+.form-row input:focus,.form-row select:focus{outline:2px solid var(--accent-light);border-color:var(--accent)}
+.form-row textarea{resize:vertical;min-height:100px;font-family:monospace;font-size:11px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
+.import-area{border:2px dashed var(--border-strong);border-radius:var(--r);padding:14px;margin-bottom:10px;font-size:13px;color:var(--text-muted);text-align:center;display:flex;flex-direction:column;gap:6px;align-items:center;justify-content:center;cursor:pointer}
+.import-area:hover{border-color:var(--accent);color:var(--accent)}
+
+.toast{position:fixed;bottom:20px;right:20px;background:var(--text);color:#fff;padding:9px 16px;border-radius:var(--r);font-size:13px;z-index:200;opacity:0;transform:translateY(6px);transition:all .18s;pointer-events:none}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.error{background:var(--danger)}
+.empty{text-align:center;padding:36px;color:var(--text-faint);font-size:13px}
+</style>
+<meta name="theme-color" content="#f7f6f2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="imago">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/imago-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+</head>
+<body>
+
+<header>
+  <h1>fin</h1>
+  <div class="header-actions">
+    <button class="btn" onclick="openAddAccount()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
+      Add account
+    </button>
+    <button class="btn" onclick="openImport()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,10 3,13 13,13 13,10"/><polyline points="5,7 8,10 11,7"/><line x1="8" y1="3" x2="8" y2="10"/></svg>
+      Import
+    </button>
+    <button class="btn" onclick="exportData()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,6 3,3 13,3 13,6"/><polyline points="5,9 8,6 11,9"/><line x1="8" y1="13" x2="8" y2="6"/></svg>
+      Export
+    </button>
+  </div>
+</header>
+
+<main>
+  <div class="summary-row" id="summaryRow"></div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <span class="chart-title">Net worth over time</span>
+      <span id="chartPeriod" style="font-size:11px;color:var(--text-faint)"></span>
+    </div>
+    <div id="chartWrap">
+      <div class="chart-empty" id="chartEmpty">No history yet — balances are auto-snapshotted each time you save changes.</div>
+      <canvas id="chart"></canvas>
+      <div class="tooltip" id="tooltip"></div>
+    </div>
+  </div>
+
+  <div class="section-header">
+    <span class="section-title">Accounts</span>
+    <div class="filters" id="filterBar"></div>
+    <select class="sort-select" id="sortSelect" onchange="renderTable(window._allAccounts||[])">
+      <option value="default">Sort: default</option>
+      <option value="balance-desc">Balance ↓</option>
+      <option value="balance-asc">Balance ↑</option>
+      <option value="rate-desc">Rate ↓</option>
+      <option value="rate-asc">Rate ↑</option>
+    </select>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Account</th>
+        <th>Tag</th>
+        <th>Rate</th>
+        <th>Maturity</th>
+        <th class="num">Balance</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="accountsTbody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+  </table>
+</main>
+
+<!-- Account Modal -->
+<div class="modal-backdrop" id="accountModal">
+  <div class="modal">
+    <h2 id="accountModalTitle">Add account</h2>
+    <div class="form-grid">
+      <div class="form-row"><label>Key</label><input type="text" id="fKey" placeholder="MAYA" maxlength="20"></div>
+      <div class="form-row"><label>Label</label><input type="text" id="fLabel" placeholder="Maya Savings"></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-row"><label>Balance (₱k)</label><input type="number" id="fBalance" step="0.01" placeholder="0"></div>
+      <div class="form-row"><label>Rate (%)</label><input type="number" id="fRate" step="0.01" placeholder="0"></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-row"><label>Tag</label>
+        <select id="fTag">
+          <option value="savings">savings</option>
+          <option value="td">td</option>
+          <option value="buffer">buffer</option>
+          <option value="cash">cash</option>
+          <option value="credit">credit</option>
+          <option value="illiquid">illiquid</option>
+        </select>
+      </div>
+      <div class="form-row"><label>Maturity</label><input type="text" id="fMaturity" placeholder="Jun 2026"></div>
+    </div>
+    <div class="form-row"><label>Note</label><input type="text" id="fNote" placeholder="Optional"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('accountModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveAccount()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import Modal -->
+<div class="modal-backdrop" id="importModal">
+  <div class="modal">
+    <h2>Import data</h2>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px">Duplicates are skipped; conflicts resolve to the newer <code>updated_at</code>. Reset import wipes existing data first.</p>
+    <div class="import-area" ondragover="event.preventDefault()" ondrop="handleDrop(event)">
+      <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,10 3,13 13,13 13,10"/><polyline points="5,7 8,10 11,7"/><line x1="8" y1="3" x2="8" y2="10"/></svg>
+      Drop JSON file here or <label style="color:var(--accent);cursor:pointer;text-decoration:underline">browse<input type="file" accept=".json" style="display:none" onchange="handleFileInput(event)"></label>
+    </div>
+    <div class="form-row"><textarea id="importJson" placeholder="…or paste JSON here"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" onclick="doImport(true)">Reset &amp; import</button>
+      <button class="btn" onclick="closeModal('importModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="doImport(false)">Merge import</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── DB ────────────────────────────────────────────────────────────────────────
+const db = new Dexie('FinanceTrackerV2');
+db.version(1).stores({ accounts:'id,key,label', history:'id,date' });
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let _editId   = null;
+let _activeTag = 'all';
+window._allAccounts = [];
+
+// ── Util ──────────────────────────────────────────────────────────────────────
+function uuid() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function toast(msg, err=false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (err ? ' error' : '');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.className='toast', 2800);
+}
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+document.querySelectorAll('.modal-backdrop').forEach(bd =>
+  bd.addEventListener('click', e => { if (e.target===bd) bd.classList.remove('open'); })
+);
+
+// ── Auto-snapshot ─────────────────────────────────────────────────────────────
+async function autoSnapshot() {
+  const accounts = await db.accounts.toArray();
+  const total    = accounts.reduce((s,a) => s + (a.balance||0), 0);
+  const today    = new Date().toISOString().slice(0,10);
+  const id       = 'h-' + today.replace(/-/g,'');
+  await db.history.put({ id, date:today, total, auto:true });
+}
+
+// ── Main render ───────────────────────────────────────────────────────────────
+async function render() {
+  const accounts = await db.accounts.toArray();
+  const history  = await db.history.orderBy('date').toArray();
+  window._allAccounts = accounts;
+
+  renderSummary(accounts);
+  renderChart(history);
+  renderFilterBar(accounts);
+  renderTable(accounts);
+}
+
+// ── Summary cards ─────────────────────────────────────────────────────────────
+function renderSummary(accounts) {
+  const total  = accounts.reduce((s,a) => s + (a.balance||0), 0);
+  const liab   = accounts.filter(a => a.balance < 0).reduce((s,a) => s + a.balance, 0);
+  const liquid = accounts.filter(a => !a.tags?.includes('illiquid') && !a.tags?.includes('credit'))
+                         .reduce((s,a) => s + Math.max(0, a.balance||0), 0);
+  const assets = accounts.filter(a => a.balance > 0).reduce((s,a) => s + a.balance, 0);
+  const yld    = accounts.reduce((s,a) => s + (a.balance>0 ? a.balance*(a.rate||0)/100 : 0), 0);
+
+  document.getElementById('summaryRow').innerHTML = `
+    <div class="sum-card">
+      <div class="lbl">Net worth</div>
+      <div class="val">₱${total.toFixed(0)}k</div>
+      <div class="sub">${accounts.length} accounts</div>
+    </div>
+    <div class="sum-card">
+      <div class="lbl">Liquid</div>
+      <div class="val col-pos">₱${liquid.toFixed(0)}k</div>
+      <div class="sub">excl. illiquid</div>
+    </div>
+    <div class="sum-card">
+      <div class="lbl">Liabilities</div>
+      <div class="val col-neg">₱${Math.abs(liab).toFixed(0)}k</div>
+      <div class="sub">credit / negative</div>
+    </div>
+    <div class="sum-card">
+      <div class="lbl">Est. annual yield</div>
+      <div class="val col-warn">₱${yld.toFixed(1)}k</div>
+      <div class="sub">${assets>0 ? (yld/assets*100).toFixed(2) : 0}% weighted avg</div>
+    </div>
+  `;
+}
+
+// ── Line chart ────────────────────────────────────────────────────────────────
+function renderChart(history) {
+  const canvas = document.getElementById('chart');
+  const empty  = document.getElementById('chartEmpty');
+  const period = document.getElementById('chartPeriod');
+
+  if (history.length < 2) {
+    canvas.style.display = 'none';
+    empty.style.display  = 'block';
+    period.textContent   = '';
+    return;
+  }
+
+  empty.style.display  = 'none';
+  canvas.style.display = 'block';
+
+  const wrap = document.getElementById('chartWrap');
+  const W = wrap.clientWidth || 700;
+  const H = 160;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const PAD = { top:14, right:16, bottom:28, left:50 };
+  const cW = W - PAD.left - PAD.right;
+  const cH = H - PAD.top  - PAD.bottom;
+
+  const totals = history.map(h => h.total);
+  const dates  = history.map(h => h.date);
+  const minV   = Math.min(...totals);
+  const maxV   = Math.max(...totals);
+  const rng    = maxV - minV || 1;
+
+  const xOf = i => PAD.left + (i / Math.max(history.length-1,1)) * cW;
+  const yOf = v => PAD.top  + cH - ((v-minV)/rng) * cH;
+
+  ctx.clearRect(0,0,W,H);
+
+  // Gridlines + y-axis labels
+  ctx.strokeStyle = '#e2e0d8';
+  ctx.lineWidth   = 0.5;
+  ctx.fillStyle   = '#9c9a94';
+  ctx.font        = '10px system-ui';
+  ctx.textAlign   = 'right';
+  for (let i=0; i<=4; i++) {
+    const y = PAD.top + (cH/4)*i;
+    ctx.beginPath(); ctx.moveTo(PAD.left,y); ctx.lineTo(W-PAD.right,y); ctx.stroke();
+    ctx.fillText('₱'+(maxV-(rng/4)*i).toFixed(0)+'k', PAD.left-5, y+3);
+  }
+
+  // Fill
+  ctx.beginPath();
+  totals.forEach((v,i) => i===0 ? ctx.moveTo(xOf(0),yOf(v)) : ctx.lineTo(xOf(i),yOf(v)));
+  ctx.lineTo(xOf(totals.length-1), PAD.top+cH);
+  ctx.lineTo(xOf(0), PAD.top+cH);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(26,107,60,0.07)';
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  totals.forEach((v,i) => i===0 ? ctx.moveTo(xOf(0),yOf(v)) : ctx.lineTo(xOf(i),yOf(v)));
+  ctx.strokeStyle = '#1a6b3c';
+  ctx.lineWidth   = 1.8;
+  ctx.lineJoin    = 'round';
+  ctx.stroke();
+
+  // Dots
+  totals.forEach((v,i) => {
+    ctx.beginPath(); ctx.arc(xOf(i),yOf(v),3,0,Math.PI*2);
+    ctx.fillStyle='#1a6b3c'; ctx.fill();
+    ctx.beginPath(); ctx.arc(xOf(i),yOf(v),1.5,0,Math.PI*2);
+    ctx.fillStyle='#fff'; ctx.fill();
+  });
+
+  // X-axis date labels
+  ctx.fillStyle  = '#9c9a94';
+  ctx.font       = '10px system-ui';
+  ctx.textAlign  = 'center';
+  const labelIdxs = new Set([0, history.length-1]);
+  const step = Math.ceil(history.length/5);
+  for (let i=step; i<history.length-1; i+=step) labelIdxs.add(i);
+  labelIdxs.forEach(i => ctx.fillText(dates[i].slice(5), xOf(i), H-4));
+
+  period.textContent = dates[0] + ' → ' + dates[dates.length-1];
+
+  // Hover
+  const tip = document.getElementById('tooltip');
+  canvas.onmousemove = e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx   = e.clientX - rect.left;
+    let ci=0, md=Infinity;
+    totals.forEach((_,i) => { const d=Math.abs(xOf(i)-mx); if(d<md){md=d;ci=i;} });
+    if (md > 44) { tip.style.display='none'; return; }
+    tip.style.display = 'block';
+    tip.style.left    = xOf(ci)+'px';
+    tip.style.top     = yOf(totals[ci])+'px';
+    tip.textContent   = dates[ci] + ' · ₱' + totals[ci].toFixed(0) + 'k';
+  };
+  canvas.onmouseleave = () => { tip.style.display='none'; };
+}
+
+// ── Filter bar ────────────────────────────────────────────────────────────────
+function renderFilterBar(accounts) {
+  const tags = ['all', ...new Set(accounts.flatMap(a => a.tags||[]))];
+  const bar  = document.getElementById('filterBar');
+  bar.innerHTML = tags.map(t => {
+    const active = _activeTag === t ? 'active' : '';
+    const cls    = t !== 'all' ? 'tag-'+t : '';
+    return `<span class="filter-chip ${cls} ${active}" data-tag="${esc(t)}">${esc(t)}</span>`;
+  }).join('');
+  bar.querySelectorAll('.filter-chip').forEach(chip =>
+    chip.addEventListener('click', () => { _activeTag = chip.dataset.tag; render(); })
+  );
+}
+
+// ── Accounts table ────────────────────────────────────────────────────────────
+function renderTable(allAccounts) {
+  let accounts = _activeTag === 'all'
+    ? allAccounts
+    : allAccounts.filter(a => (a.tags||[]).includes(_activeTag));
+
+  const sort = document.getElementById('sortSelect').value;
+  if      (sort==='balance-desc') accounts = [...accounts].sort((a,b)=>(b.balance||0)-(a.balance||0));
+  else if (sort==='balance-asc')  accounts = [...accounts].sort((a,b)=>(a.balance||0)-(b.balance||0));
+  else if (sort==='rate-desc')    accounts = [...accounts].sort((a,b)=>(b.rate||0)-(a.rate||0));
+  else if (sort==='rate-asc')     accounts = [...accounts].sort((a,b)=>(a.rate||0)-(b.rate||0));
+
+  const tbody = document.getElementById('accountsTbody');
+  if (accounts.length===0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="empty">No accounts${_activeTag!=='all' ? ' tagged "'+esc(_activeTag)+'"' : ''}.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = accounts.map(a => {
+    const bal      = a.balance||0;
+    const balClass = bal>0 ? 'bal-pos' : bal<0 ? 'bal-neg' : 'bal-zero';
+    const tag      = (a.tags||['savings'])[0];
+    const yldAnn   = a.rate && bal>0 ? (bal*a.rate/100).toFixed(1) : null;
+    return `<tr>
+      <td>
+        <span style="font-weight:500">${esc(a.label||a.key)}</span>
+        ${a.note ? `<div class="note-text">${esc(a.note)}</div>` : ''}
+      </td>
+      <td><span class="tag ${tag}">${tag}</span></td>
+      <td>
+        <span class="rate-badge">${a.rate!=null ? a.rate+'%' : '—'}</span>
+        ${yldAnn ? `<div class="yield-micro">~₱${yldAnn}k/yr</div>` : ''}
+      </td>
+      <td><span class="maturity">${esc(a.maturity||'—')}</span></td>
+      <td class="num"><span class="${balClass}">₱${bal.toFixed(0)}k</span></td>
+      <td class="actions">
+        <button class="icon-btn" onclick="editAccount('${esc(a.id)}')" title="Edit">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 2l3 3L5 14H2v-3z"/></svg>
+        </button>
+        <button class="icon-btn" onclick="deleteAccount('${esc(a.id)}')" title="Delete" style="color:var(--danger)">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="3,5 13,5"/><path d="M6,5V3h4v2"/><path d="M4,5l1,9h6l1-9"/></svg>
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Account CRUD ──────────────────────────────────────────────────────────────
+function openAddAccount() {
+  _editId = null;
+  document.getElementById('accountModalTitle').textContent = 'Add account';
+  ['fKey','fLabel','fBalance','fRate','fMaturity','fNote'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('fTag').value = 'savings';
+  openModal('accountModal');
+}
+
+async function editAccount(id) {
+  const a = await db.accounts.get(id);
+  if (!a) return;
+  _editId = id;
+  document.getElementById('accountModalTitle').textContent = 'Edit account';
+  document.getElementById('fKey').value      = a.key||'';
+  document.getElementById('fLabel').value    = a.label||'';
+  document.getElementById('fBalance').value  = a.balance??'';
+  document.getElementById('fRate').value     = a.rate??'';
+  document.getElementById('fMaturity').value = a.maturity||'';
+  document.getElementById('fNote').value     = a.note||'';
+  document.getElementById('fTag').value      = (a.tags||['savings'])[0];
+  openModal('accountModal');
+}
+
+async function saveAccount() {
+  const key   = document.getElementById('fKey').value.trim();
+  const label = document.getElementById('fLabel').value.trim();
+  const bal   = parseFloat(document.getElementById('fBalance').value);
+  const rate  = parseFloat(document.getElementById('fRate').value);
+  const tag   = document.getElementById('fTag').value;
+  const mat   = document.getElementById('fMaturity').value.trim();
+  const note  = document.getElementById('fNote').value.trim();
+
+  if (!key||!label) { toast('Key and label required.', true); return; }
+
+  await db.accounts.put({
+    id:         _editId || 'acc-'+uuid(),
+    key, label,
+    balance:    isNaN(bal) ? 0 : bal,
+    rate:       isNaN(rate) ? null : rate,
+    tags:       [tag],
+    maturity:   mat||null,
+    note:       note||null,
+    updated_at: new Date().toISOString()
+  });
+
+  await autoSnapshot();
+  closeModal('accountModal');
+  toast(_editId ? 'Updated.' : 'Account added.');
+  render();
+}
+
+async function deleteAccount(id) {
+  if (!confirm('Delete this account?')) return;
+  await db.accounts.delete(id);
+  await autoSnapshot();
+  toast('Deleted.');
+  render();
+}
+
+// ── Import / Export ───────────────────────────────────────────────────────────
+function openImport() {
+  document.getElementById('importJson').value = '';
+  openModal('importModal');
+}
+function handleDrop(e) { e.preventDefault(); readFile(e.dataTransfer.files[0]); }
+function handleFileInput(e) { readFile(e.target.files[0]); }
+function readFile(f) {
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => { document.getElementById('importJson').value = ev.target.result; };
+  r.readAsText(f);
+}
+
+async function doImport(reset) {
+  let raw;
+  try { raw = JSON.parse(document.getElementById('importJson').value.trim()); }
+  catch { toast('Invalid JSON.', true); return; }
+
+  if (reset) {
+    if (!confirm('This will overwrite all existing data. Continue?')) return;
+    await db.accounts.clear();
+    await db.history.clear();
+  }
+
+  const accs = raw.accounts || raw.snapshots?.[0]?.accounts || [];
+  for (const a of accs) {
+    if (!a.id) a.id = 'acc-'+uuid();
+    const ex = await db.accounts.get(a.id);
+    if (!ex || (a.updated_at && ex.updated_at && a.updated_at > ex.updated_at) || !ex.updated_at)
+      await db.accounts.put(a);
+  }
+
+  for (const h of (raw.history||[])) {
+    if (!h.id) h.id = 'h-'+uuid();
+    const ex = await db.history.get(h.id);
+    if (!ex) await db.history.put(h);
+  }
+
+  closeModal('importModal');
+  toast(reset ? 'Reset & imported.' : 'Merged.');
+  render();
+}
+
+async function exportData() {
+  const accounts = await db.accounts.toArray();
+  const history  = await db.history.orderBy('date').toArray();
+  const out = { version:1, exported_at:new Date().toISOString(), accounts, history };
+  const blob = new Blob([JSON.stringify(out,null,2)], {type:'application/json'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href=url; a.download='finance_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click(); URL.revokeObjectURL(url);
+  toast('Exported.');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+render();
+window.addEventListener('resize', () =>
+  db.history.orderBy('date').toArray().then(renderChart)
+);
+</script>
+  <script src="pwa-register.js"></script>
+</body>
+</html>
