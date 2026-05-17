@@ -62,10 +62,11 @@ canvas#chart{display:block}
 .filter-chip.tag-illiquid.active{background:#5f5e5a;border-color:#5f5e5a}
 .filter-chip.tag-cash.active{background:#444;border-color:#444}
 
-.sort-select{margin-left:auto;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--r);font-size:11px;color:var(--text-muted);background:var(--surface);cursor:pointer;font-family:inherit}
-
 table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;margin-bottom:20px}
-th{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);font-weight:500;padding:9px 14px;text-align:left;border-bottom:1px solid var(--border);background:var(--bg)}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);font-weight:500;padding:9px 14px;text-align:left;border-bottom:1px solid var(--border);background:var(--bg);cursor:pointer;user-select:none;transition:background .12s}
+th:hover{background:var(--surface)}
+th.sort-active{color:var(--text);background:var(--surface)}
+th.sort-active::after{content:attr(data-dir);margin-left:4px;font-size:10px;opacity:0.7}
 th.num{text-align:right}
 td{padding:9px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
 tr:last-child td{border-bottom:none}
@@ -105,6 +106,14 @@ td.actions{text-align:right;white-space:nowrap}
 .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
 .import-area{border:2px dashed var(--border-strong);border-radius:var(--r);padding:14px;margin-bottom:10px;font-size:13px;color:var(--text-muted);text-align:center;display:flex;flex-direction:column;gap:6px;align-items:center;justify-content:center;cursor:pointer}
 .import-area:hover{border-color:var(--accent);color:var(--accent)}
+
+.history-section{margin-top:20px;border-top:1px solid var(--border);padding-top:16px}
+.history-section h3{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint);margin-bottom:10px}
+.history-item{display:flex;flex-direction:column;gap:2px;padding:8px 0;border-bottom:1px dashed var(--border)}
+.history-item:last-child{border-bottom:none}
+.history-meta{display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted)}
+.history-note{font-size:12px;color:var(--text);margin-top:2px}
+.history-change{font-family:monospace;font-weight:600}
 
 .toast{position:fixed;bottom:20px;right:20px;background:var(--text);color:#fff;padding:9px 16px;border-radius:var(--r);font-size:13px;z-index:200;opacity:0;transform:translateY(6px);transition:all .18s;pointer-events:none}
 .toast.show{opacity:1;transform:translateY(0)}
@@ -158,23 +167,16 @@ td.actions{text-align:right;white-space:nowrap}
   <div class="section-header">
     <span class="section-title">Accounts</span>
     <div class="filters" id="filterBar"></div>
-    <select class="sort-select" id="sortSelect" onchange="renderTable(window._allAccounts||[])">
-      <option value="default">Sort: default</option>
-      <option value="balance-desc">Balance ↓</option>
-      <option value="balance-asc">Balance ↑</option>
-      <option value="rate-desc">Rate ↓</option>
-      <option value="rate-asc">Rate ↑</option>
-    </select>
   </div>
   <table>
     <thead>
       <tr>
-        <th>Account</th>
-        <th>Tag</th>
-        <th>Rate</th>
-        <th>Maturity</th>
-        <th class="num">Balance</th>
-        <th></th>
+        <th data-col="label" onclick="sortBy('label')">Account</th>
+        <th data-col="tag" onclick="sortBy('tag')">Tag</th>
+        <th data-col="rate" onclick="sortBy('rate')">Rate</th>
+        <th data-col="maturity" onclick="sortBy('maturity')">Maturity</th>
+        <th class="num" data-col="balance" onclick="sortBy('balance')">Balance</th>
+        <th style="cursor:default"></th>
       </tr>
     </thead>
     <tbody id="accountsTbody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
@@ -206,7 +208,17 @@ td.actions{text-align:right;white-space:nowrap}
       </div>
       <div class="form-row"><label>Maturity</label><input type="text" id="fMaturity" placeholder="Jun 2026"></div>
     </div>
-    <div class="form-row"><label>Note</label><input type="text" id="fNote" placeholder="Optional"></div>
+    <div class="form-row"><label>Note</label><input type="text" id="fNote" placeholder="General account notes"></div>
+    <div class="form-row" id="changeReasonRow">
+      <label>Update Reason / Change Note</label>
+      <input type="text" id="fChangeNote" placeholder="e.g. Salary, Rent, Correction">
+    </div>
+    
+    <div class="history-section" id="accountHistorySection" style="display:none">
+      <h3>Recent History</h3>
+      <div id="accountHistoryList"></div>
+    </div>
+
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('accountModal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveAccount()">Save</button>
@@ -238,10 +250,13 @@ td.actions{text-align:right;white-space:nowrap}
 // ── DB ────────────────────────────────────────────────────────────────────────
 const db = new Dexie('FinanceTrackerV2');
 db.version(1).stores({ accounts:'id,key,label', history:'id,date' });
+db.version(2).stores({ accounts:'id,key,label', history:'id,date', logs:'id,accountId,date' });
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let _editId   = null;
 let _activeTag = 'all';
+let _sortCol   = 'balance';
+let _sortDir   = 'desc';
 window._allAccounts = [];
 
 // ── Util ──────────────────────────────────────────────────────────────────────
@@ -253,6 +268,15 @@ function uuid() {
 }
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function sortBy(col) {
+  if (_sortCol === col) {
+    _sortDir = _sortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    _sortCol = col;
+    _sortDir = col === 'label' || col === 'tag' || col === 'maturity' ? 'asc' : 'desc';
+  }
+  renderTable(window._allAccounts);
 }
 function toast(msg, err=false) {
   const el = document.getElementById('toast');
@@ -448,11 +472,30 @@ function renderTable(allAccounts) {
     ? allAccounts
     : allAccounts.filter(a => (a.tags||[]).includes(_activeTag));
 
-  const sort = document.getElementById('sortSelect').value;
-  if      (sort==='balance-desc') accounts = [...accounts].sort((a,b)=>(b.balance||0)-(a.balance||0));
-  else if (sort==='balance-asc')  accounts = [...accounts].sort((a,b)=>(a.balance||0)-(b.balance||0));
-  else if (sort==='rate-desc')    accounts = [...accounts].sort((a,b)=>(b.rate||0)-(a.rate||0));
-  else if (sort==='rate-asc')     accounts = [...accounts].sort((a,b)=>(a.rate||0)-(b.rate||0));
+  // Update headers
+  document.querySelectorAll('th[data-col]').forEach(th => {
+    if (th.dataset.col === _sortCol) {
+      th.classList.add('sort-active');
+      th.setAttribute('data-dir', _sortDir === 'asc' ? '↑' : '↓');
+    } else {
+      th.classList.remove('sort-active');
+      th.removeAttribute('data-dir');
+    }
+  });
+
+  const dir = _sortDir === 'asc' ? 1 : -1;
+  accounts = [...accounts].sort((a, b) => {
+    let vA, vB;
+    if (_sortCol === 'balance') { vA = a.balance || 0; vB = b.balance || 0; }
+    else if (_sortCol === 'rate') { vA = a.rate || 0; vB = b.rate || 0; }
+    else if (_sortCol === 'tag') { vA = (a.tags || [''])[0]; vB = (b.tags || [''])[0]; }
+    else if (_sortCol === 'maturity') { vA = a.maturity || ''; vB = b.maturity || ''; }
+    else { vA = (a.label || a.key || '').toLowerCase(); vB = (b.label || b.key || '').toLowerCase(); }
+
+    if (vA < vB) return -1 * dir;
+    if (vA > vB) return 1 * dir;
+    return 0;
+  });
 
   const tbody = document.getElementById('accountsTbody');
   if (accounts.length===0) {
@@ -492,8 +535,9 @@ function renderTable(allAccounts) {
 function openAddAccount() {
   _editId = null;
   document.getElementById('accountModalTitle').textContent = 'Add account';
-  ['fKey','fLabel','fBalance','fRate','fMaturity','fNote'].forEach(id => document.getElementById(id).value='');
+  ['fKey','fLabel','fBalance','fRate','fMaturity','fNote','fChangeNote'].forEach(id => document.getElementById(id).value='');
   document.getElementById('fTag').value = 'savings';
+  document.getElementById('accountHistorySection').style.display = 'none';
   openModal('accountModal');
 }
 
@@ -508,7 +552,36 @@ async function editAccount(id) {
   document.getElementById('fRate').value     = a.rate??'';
   document.getElementById('fMaturity').value = a.maturity||'';
   document.getElementById('fNote').value     = a.note||'';
+  document.getElementById('fChangeNote').value = '';
   document.getElementById('fTag').value      = (a.tags||['savings'])[0];
+
+  // Render per-account history
+  const history = await db.logs.where('accountId').equals(id).reverse().limit(10).toArray();
+  const list = document.getElementById('accountHistoryList');
+  const section = document.getElementById('accountHistorySection');
+  
+  if (history.length > 0) {
+    section.style.display = 'block';
+    list.innerHTML = history.map(h => {
+      const date = new Date(h.date).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit'});
+      const diff = h.change || 0;
+      const diffStr = diff > 0 ? `+₱${diff.toFixed(1)}k` : diff < 0 ? `-₱${Math.abs(diff).toFixed(1)}k` : 'no change';
+      const diffCls = diff > 0 ? 'col-pos' : diff < 0 ? 'col-neg' : '';
+      return `
+        <div class="history-item">
+          <div class="history-meta">
+            <span>${date}</span>
+            <span class="history-change ${diffCls}">${diffStr}</span>
+          </div>
+          ${h.note ? `<div class="history-note">${esc(h.note)}</div>` : ''}
+          <div style="font-size:10px;color:var(--text-faint)">New balance: ₱${(h.balance||0).toFixed(1)}k</div>
+        </div>
+      `;
+    }).join('');
+  } else {
+    section.style.display = 'none';
+  }
+
   openModal('accountModal');
 }
 
@@ -520,19 +593,36 @@ async function saveAccount() {
   const tag   = document.getElementById('fTag').value;
   const mat   = document.getElementById('fMaturity').value.trim();
   const note  = document.getElementById('fNote').value.trim();
+  const changeNote = document.getElementById('fChangeNote').value.trim();
 
   if (!key||!label) { toast('Key and label required.', true); return; }
 
+  const id = _editId || 'acc-'+uuid();
+  const existing = _editId ? await db.accounts.get(_editId) : null;
+  const newBal = isNaN(bal) ? 0 : bal;
+  const oldBal = existing ? (existing.balance || 0) : 0;
+  const balanceChanged = !existing || newBal !== oldBal;
+
   await db.accounts.put({
-    id:         _editId || 'acc-'+uuid(),
-    key, label,
-    balance:    isNaN(bal) ? 0 : bal,
+    id, key, label,
+    balance:    newBal,
     rate:       isNaN(rate) ? null : rate,
     tags:       [tag],
     maturity:   mat||null,
     note:       note||null,
     updated_at: new Date().toISOString()
   });
+
+  if (balanceChanged || changeNote) {
+    await db.logs.add({
+      id: 'log-'+uuid(),
+      accountId: id,
+      date: new Date().toISOString(),
+      balance: newBal,
+      change: existing ? newBal - oldBal : newBal,
+      note: changeNote || (existing ? 'Balance update' : 'Account created')
+    });
+  }
 
   await autoSnapshot();
   closeModal('accountModal');
@@ -571,6 +661,7 @@ async function doImport(reset) {
     if (!confirm('This will overwrite all existing data. Continue?')) return;
     await db.accounts.clear();
     await db.history.clear();
+    await db.logs.clear();
   }
 
   const accs = raw.accounts || raw.snapshots?.[0]?.accounts || [];
@@ -587,6 +678,12 @@ async function doImport(reset) {
     if (!ex) await db.history.put(h);
   }
 
+  for (const l of (raw.logs||[])) {
+    if (!l.id) l.id = 'log-'+uuid();
+    const ex = await db.logs.get(l.id);
+    if (!ex) await db.logs.put(l);
+  }
+
   closeModal('importModal');
   toast(reset ? 'Reset & imported.' : 'Merged.');
   render();
@@ -595,7 +692,8 @@ async function doImport(reset) {
 async function exportData() {
   const accounts = await db.accounts.toArray();
   const history  = await db.history.orderBy('date').toArray();
-  const out = { version:1, exported_at:new Date().toISOString(), accounts, history };
+  const logs     = await db.logs.toArray();
+  const out = { version:2, exported_at:new Date().toISOString(), accounts, history, logs };
   const blob = new Blob([JSON.stringify(out,null,2)], {type:'application/json'});
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
