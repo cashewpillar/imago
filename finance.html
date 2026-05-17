@@ -206,7 +206,7 @@ td.actions{text-align:right;white-space:nowrap}
           <option value="illiquid">illiquid</option>
         </select>
       </div>
-      <div class="form-row"><label>Maturity</label><input type="text" id="fMaturity" placeholder="Jun 2026"></div>
+      <div class="form-row"><label>Maturity</label><input type="date" id="fMaturity"></div>
     </div>
     <div class="form-row"><label>Note</label><input type="text" id="fNote" placeholder="General account notes"></div>
     <div class="form-row" id="changeReasonRow">
@@ -251,6 +251,16 @@ td.actions{text-align:right;white-space:nowrap}
 const db = new Dexie('FinanceTrackerV2');
 db.version(1).stores({ accounts:'id,key,label', history:'id,date' });
 db.version(2).stores({ accounts:'id,key,label', history:'id,date', logs:'id,accountId,date' });
+db.version(3).stores({ accounts:'id,key,label', history:'id,date', logs:'id,accountId,date' }).upgrade(tx => {
+  return tx.accounts.toCollection().modify(acc => {
+    if (acc.maturity && typeof acc.maturity === 'string' && acc.maturity.length > 4) {
+      const d = new Date(acc.maturity);
+      if (!isNaN(d.getTime())) {
+        acc.maturity = d.toISOString().split('T')[0];
+      }
+    }
+  });
+});
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let _editId   = null;
@@ -505,7 +515,12 @@ function renderTable(allAccounts) {
     if (_sortCol === 'balance') { vA = a.balance || 0; vB = b.balance || 0; }
     else if (_sortCol === 'rate') { vA = a.rate || 0; vB = b.rate || 0; }
     else if (_sortCol === 'tag') { vA = (a.tags || [''])[0]; vB = (b.tags || [''])[0]; }
-    else if (_sortCol === 'maturity') { vA = a.maturity || ''; vB = b.maturity || ''; }
+    else if (_sortCol === 'maturity') { 
+      if (!a.maturity && !b.maturity) return 0;
+      if (!a.maturity) return 1;
+      if (!b.maturity) return -1;
+      vA = a.maturity; vB = b.maturity; 
+    }
     else { vA = (a.label || a.key || '').toLowerCase(); vB = (b.label || b.key || '').toLowerCase(); }
 
     if (vA < vB) return -1 * dir;
@@ -523,6 +538,7 @@ function renderTable(allAccounts) {
     const balClass = bal>0 ? 'bal-pos' : bal<0 ? 'bal-neg' : 'bal-zero';
     const tag      = (a.tags||['savings'])[0];
     const yldAnn   = a.rate && bal>0 ? (bal*a.rate/100).toFixed(1) : null;
+    const matDisp  = a.maturity ? new Date(a.maturity).toLocaleDateString(undefined, {month:'short', year:'numeric', timeZone:'UTC'}) : '—';
     return `<tr>
       <td>
         <span style="font-weight:500">${esc(a.label||a.key)}</span>
@@ -533,7 +549,7 @@ function renderTable(allAccounts) {
         <span class="rate-badge">${a.rate!=null ? a.rate+'%' : '—'}</span>
         ${yldAnn ? `<div class="yield-micro">~₱${yldAnn}k/yr</div>` : ''}
       </td>
-      <td><span class="maturity">${esc(a.maturity||'—')}</span></td>
+      <td><span class="maturity">${matDisp}</span></td>
       <td class="num"><span class="${balClass}">₱${fmtk(bal)}</span></td>
       <td class="actions">
         <button class="icon-btn" onclick="editAccount('${esc(a.id)}')" title="Edit">
