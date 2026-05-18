@@ -341,7 +341,69 @@
     font-size: 13px;
   }
 
-  #main { display: none; }
+  /* ── Slideshow ── */
+  .ss-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: var(--bg);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+  }
+
+  .ss-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .ss-card {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 30px;
+    gap: 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  }
+
+  .ss-alias { font-size: 18px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .ss-can { font-family: var(--mono); font-size: 32px; font-weight: 500; color: var(--text); word-break: break-all; }
+  .ss-amount { font-family: var(--mono); font-size: 48px; font-weight: 500; color: var(--accent-mid); }
+  
+  .ss-footer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 20px;
+  }
+
+  .ss-paid-btn {
+    grid-column: span 2;
+    padding: 18px;
+    font-size: 16px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    transition: background 0.1s;
+  }
+  .ss-paid-btn:hover { background: #163d26; }
+  .ss-paid-btn.is-paid { background: var(--text-faint); }
+  .ss-paid-btn.is-paid:hover { background: var(--text-muted); }
+
+  .ss-nav-btn { padding: 15px; font-size: 14px; }
+
+  tbody tr.paid { opacity: 0.5; }
+  tbody tr.paid .alias, tbody tr.paid .amount { text-decoration: line-through; }
+
+  #main, #slideshow { display: none; }
 </style>
 <meta name="theme-color" content="#f7f6f2">
 <meta name="mobile-web-app-capable" content="yes">
@@ -386,11 +448,13 @@
 
     <!-- Toolbar -->
     <div class="toolbar">
+      <button class="btn-sm btn-primary" onclick="startSlideshow()">Slideshow</button>
+      <div class="toolbar-sep"></div>
       <button class="btn-sm" onclick="selectAll()">Select all</button>
       <button class="btn-sm" onclick="deselectAll()">Deselect all</button>
       <div class="toolbar-sep"></div>
       <input type="date" id="due-date" title="Date to assign to selected entries">
-      <button class="btn-sm btn-primary" onclick="assignDate()">Assign date to selected</button>
+      <button class="btn-sm btn-primary" onclick="assignDate()">Assign date</button>
       <button class="btn-sm" onclick="clearDates()">Clear dates</button>
     </div>
 
@@ -410,11 +474,30 @@
             <th class="sortable" data-col="cxe_can" onclick="sort('cxe_can')">CAN</th>
             <th class="sortable right" data-col="amount" onclick="sort('amount')">Amount</th>
             <th class="sortable" data-col="due" onclick="sort('due')">Due</th>
+            <th class="center">Paid</th>
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
       </table>
       <div class="empty" id="empty" style="display:none;">No entries match the current filter.</div>
+    </div>
+  </div>
+
+  <!-- Slideshow Overlay -->
+  <div id="slideshow" class="ss-overlay">
+    <div class="ss-header">
+      <span class="status" id="ss-count">Card 0 of 0</span>
+      <button onclick="closeSlideshow()">Close</button>
+    </div>
+    <div class="ss-card">
+      <div class="ss-alias" id="ss-alias">—</div>
+      <div class="ss-can" id="ss-can">0000 0000 0000</div>
+      <div class="ss-amount" id="ss-amount">₱0.00</div>
+    </div>
+    <div class="ss-footer">
+      <button class="ss-paid-btn" id="ss-paid-btn" onclick="ssTogglePaid()">Mark Paid</button>
+      <button class="ss-nav-btn" onclick="ssPrev()">Previous</button>
+      <button class="ss-nav-btn" onclick="ssNext()">Next</button>
     </div>
   </div>
 </div>
@@ -424,6 +507,30 @@
   let sortCol = 'alias';
   let sortDir = 1;
   let activeFilter = 'all';
+  let ssIndex = 0;
+  const STORAGE_KEY = 'imago-meralco-state';
+
+  function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ rows, activeFilter, sortCol, sortDir }));
+  }
+
+  function load() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        rows = parsed.rows || [];
+        activeFilter = parsed.activeFilter || 'all';
+        sortCol = parsed.sortCol || 'alias';
+        sortDir = parsed.sortDir || 1;
+        if (rows.length > 0) {
+          document.getElementById('main').style.display = 'block';
+          rebuildFilters();
+          render();
+        }
+      } catch(e) { console.error('Failed to load state', e); }
+    }
+  }
 
   function parseData() {
     const raw = document.getElementById('json-input').value.trim();
@@ -446,6 +553,7 @@
         ...r,
         amount: parseAmt(r.amount),
         selected: false,
+        paid: false,
         due_override: null,
       }));
 
@@ -453,6 +561,7 @@
       document.getElementById('status').textContent =
         `✓ ${arr.length} records — ${pending.length} pending${skipped ? `, ${skipped} zero-amount skipped` : ''}`;
       document.getElementById('main').style.display = 'block';
+      save();
       rebuildFilters();
       render();
     } catch(e) {
@@ -486,14 +595,16 @@
     el.className = 'pill' + (value === 'all' ? '' : (value === 'Immediately' ? ' pill-imm' : '')) +
       (activeFilter === value ? ' active' : '');
     el.textContent = label;
-    el.onclick = () => { activeFilter = value; rebuildFilters(); render(); };
+    el.onclick = () => { activeFilter = value; save(); rebuildFilters(); render(); };
     return el;
   }
 
   function visibleRows() {
-    return rows.filter(r =>
+    const filtered = rows.filter(r =>
       activeFilter === 'all' || effectiveDue(r) === activeFilter
     );
+    const anySelected = filtered.some(r => r.selected);
+    return anySelected ? filtered.filter(r => r.selected) : filtered;
   }
 
   function sort(col) {
@@ -513,6 +624,7 @@
     const th = document.querySelector(`th[data-col="${col}"]`);
     if (th) th.classList.add(sortDir === 1 ? 'sort-asc' : 'sort-desc');
 
+    save();
     render();
   }
 
@@ -532,12 +644,13 @@
           ? `<span class="due-badge due-imm">Immediately</span>`
           : `<span class="due-badge due-sched">${due}</span>`;
         const rowIdx = rows.indexOf(r);
-        return `<tr class="${r.selected ? 'selected' : ''}">
+        return `<tr class="${r.selected ? 'selected' : ''} ${r.paid ? 'paid' : ''}">
           <td class="cb-cell center"><input type="checkbox" ${r.selected ? 'checked' : ''} onchange="toggle(${rowIdx}, this.checked)" aria-label="Select ${r.alias || 'Unknown'}"></td>
           <td><span class="alias">${r.alias || '—'}</span></td>
           <td><span class="can">${r.cxe_can || '—'}</span></td>
           <td class="amount">₱${(r.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
           <td>${dueBadge}</td>
+          <td class="center"><input type="checkbox" ${r.paid ? 'checked' : ''} onchange="togglePaid(${rowIdx}, this.checked)"></td>
         </tr>`;
       }).join('');
     }
@@ -548,12 +661,21 @@
 
   function toggle(i, val) {
     rows[i].selected = val;
+    save();
     updateMetrics();
     syncCheckAll();
+    render();
+  }
+
+  function togglePaid(i, val) {
+    rows[i].paid = val;
+    save();
+    render();
   }
 
   function toggleAll(val) {
     visibleRows().forEach(r => r.selected = val);
+    save();
     render();
   }
 
@@ -565,20 +687,22 @@
     ca.indeterminate = vis.some(r => r.selected) && !vis.every(r => r.selected);
   }
 
-  function selectAll() { rows.forEach(r => r.selected = true); render(); }
-  function deselectAll() { rows.forEach(r => r.selected = false); render(); }
+  function selectAll() { rows.forEach(r => r.selected = true); save(); render(); }
+  function deselectAll() { rows.forEach(r => r.selected = false); save(); render(); }
 
   function assignDate() {
     const d = document.getElementById('due-date').value;
     if (!d) { alert('Pick a date first.'); return; }
     const fmt = new Date(d + 'T12:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
     rows.filter(r => r.selected).forEach(r => r.due_override = fmt);
+    save();
     rebuildFilters();
     render();
   }
 
   function clearDates() {
     rows.filter(r => r.selected).forEach(r => r.due_override = null);
+    save();
     rebuildFilters();
     render();
   }
@@ -592,12 +716,74 @@
   }
 
   function clearAll() {
+    if (!confirm('Clear all data?')) return;
     rows = [];
     activeFilter = 'all';
+    localStorage.removeItem(STORAGE_KEY);
     document.getElementById('json-input').value = '';
     document.getElementById('status').textContent = '';
     document.getElementById('main').style.display = 'none';
   }
+
+  /* ── Slideshow Logic ── */
+  function startSlideshow() {
+    const vis = visibleRows();
+    if (vis.length === 0) { alert('No accounts to show.'); return; }
+    
+    // Find first unpaid
+    const firstUnpaid = vis.findIndex(r => !r.paid);
+    ssIndex = firstUnpaid !== -1 ? firstUnpaid : 0;
+    
+    document.getElementById('slideshow').style.display = 'flex';
+    renderSS();
+  }
+
+  function closeSlideshow() {
+    document.getElementById('slideshow').style.display = 'none';
+  }
+
+  function renderSS() {
+    const vis = visibleRows();
+    const r = vis[ssIndex];
+    if (!r) { closeSlideshow(); return; }
+
+    document.getElementById('ss-count').textContent = `Card ${ssIndex + 1} of ${vis.length}`;
+    document.getElementById('ss-alias').textContent = r.alias || '—';
+    document.getElementById('ss-can').textContent = r.cxe_can || '—';
+    document.getElementById('ss-amount').textContent = '₱' + r.amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    
+    const btn = document.getElementById('ss-paid-btn');
+    btn.textContent = r.paid ? 'Mark Unpaid' : 'Mark Paid';
+    btn.className = 'ss-paid-btn' + (r.paid ? ' is-paid' : '');
+  }
+
+  function ssNext() {
+    const vis = visibleRows();
+    if (ssIndex < vis.length - 1) {
+      ssIndex++;
+      renderSS();
+    }
+  }
+
+  function ssPrev() {
+    if (ssIndex > 0) {
+      ssIndex--;
+      renderSS();
+    }
+  }
+
+  function ssTogglePaid() {
+    const vis = visibleRows();
+    const r = vis[ssIndex];
+    const rowIdx = rows.indexOf(r);
+    togglePaid(rowIdx, !r.paid);
+    renderSS();
+    if (r.paid && ssIndex < vis.length - 1) {
+      setTimeout(ssNext, 300);
+    }
+  }
+
+  load();
 </script>
   <script src="pwa-register.js"></script>
 </body>
