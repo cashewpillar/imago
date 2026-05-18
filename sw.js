@@ -7,6 +7,7 @@ const APP_SHELL = [
   './habits.html',
   './index.html',
   './journal.html',
+  './meralco.html',
   './story.html',
   './storygraph.html',
   // END GENERATED HTML PAGES

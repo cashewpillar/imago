@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SOA Parser</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --border: #dddbd4;
+    --border-strong: #b8b5ac;
+    --text: #1a1917;
+    --text-muted: #6b6860;
+    --text-faint: #9e9b95;
+    --accent: #1a4a2e;
+    --accent-light: #e8f2eb;
+    --accent-mid: #2d7a4a;
+    --danger: #8b2020;
+    --danger-light: #fdf0f0;
+    --warn: #7a4a00;
+    --warn-light: #fdf6e8;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    min-height: 100vh;
+    padding: 32px 24px;
+    font-weight: 400;
+  }
+
+  h1 {
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+  }
+
+  .layout { max-width: 820px; margin: 0 auto; }
+
+  /* ── Paste zone ── */
+  .paste-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .paste-label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 8px;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 90px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px;
+    resize: vertical;
+    outline: none;
+    line-height: 1.6;
+  }
+
+  textarea:focus { border-color: var(--border-strong); }
+  textarea::placeholder { color: var(--text-faint); }
+
+  .parse-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 10px;
+  }
+
+  button {
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 3px;
+    cursor: pointer;
+    padding: 7px 14px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text);
+    transition: background 0.1s;
+    white-space: nowrap;
+  }
+
+  button:hover { background: var(--bg); }
+  button:active { transform: scale(0.98); }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  .btn-primary:hover { background: #163d26; }
+
+  .btn-sm {
+    padding: 5px 11px;
+    font-size: 11px;
+  }
+
+  .status {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--text-muted);
+  }
+
+  /* ── Metrics ── */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .metric {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px 16px;
+  }
+
+  .metric-label {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 6px;
+  }
+
+  .metric-value {
+    font-size: 22px;
+    font-weight: 300;
+    font-family: var(--mono);
+    color: var(--text);
+    letter-spacing: -0.02em;
+  }
+
+  .metric-value.green { color: var(--accent-mid); }
+
+  /* ── Toolbar ── */
+  .toolbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+
+  .toolbar-sep {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+  }
+
+  input[type="date"] {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 5px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: 3px;
+    background: var(--surface);
+    color: var(--text);
+    outline: none;
+  }
+
+  input[type="date"]:focus { border-color: var(--accent); }
+
+  /* ── Filter row ── */
+  .filter-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+
+  .filter-label {
+    font-size: 11px;
+    color: var(--text-faint);
+    white-space: nowrap;
+  }
+
+  .filter-pills {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .pill {
+    font-size: 11px;
+    font-family: var(--mono);
+    padding: 3px 10px;
+    border-radius: 99px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.1s;
+    white-space: nowrap;
+  }
+
+  .pill:hover { border-color: var(--border-strong); color: var(--text); }
+
+  .pill.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .pill.pill-imm.active {
+    background: var(--danger);
+    border-color: var(--danger);
+  }
+
+  /* ── Table ── */
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  thead th {
+    padding: 9px 12px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  thead th.sortable {
+    cursor: pointer;
+  }
+
+  thead th.sortable:hover { color: var(--text); }
+
+  thead th.sort-asc::after { content: ' ↑'; font-size: 10px; }
+  thead th.sort-desc::after { content: ' ↓'; font-size: 10px; }
+
+  th.right, td.right { text-align: right; }
+  th.center, td.center { text-align: center; }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.08s;
+  }
+
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: #fafaf8; }
+  tbody tr.selected { background: var(--accent-light); }
+  tbody tr.selected:hover { background: #deeee3; }
+
+  tbody td { padding: 9px 12px; vertical-align: middle; }
+
+  .cb-cell { width: 36px; }
+
+  input[type="checkbox"] {
+    width: 14px; height: 14px;
+    cursor: pointer;
+    accent-color: var(--accent);
+  }
+
+  .alias { font-weight: 500; }
+
+  .can {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
+  }
+
+  .amount {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    text-align: right;
+  }
+
+  .due-badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+
+  .due-imm {
+    background: var(--danger-light);
+    color: var(--danger);
+    border: 1px solid #f0c8c8;
+  }
+
+  .due-sched {
+    background: var(--accent-light);
+    color: var(--accent);
+    border: 1px solid #b8d9c4;
+  }
+
+  .empty {
+    padding: 40px;
+    text-align: center;
+    color: var(--text-faint);
+    font-size: 13px;
+  }
+
+  #main { display: none; }
+</style>
+<meta name="theme-color" content="#f7f6f2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="imago">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/imago-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+</head>
+<body>
+<div class="layout">
+  <h1>SOA Parser</h1>
+
+  <!-- Paste zone -->
+  <div class="paste-card">
+    <div class="paste-label">Paste JSON data</div>
+    <textarea id="json-input" placeholder='Paste your JSON here — accepts full object {"result":[...]} or a bare array [...]'></textarea>
+    <div class="parse-row">
+      <button class="btn-primary" onclick="parseData()">Parse</button>
+      <button onclick="clearAll()">Clear</button>
+      <span class="status" id="status"></span>
+    </div>
+  </div>
+
+  <div id="main">
+    <!-- Metrics -->
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-label">Pending accounts</div>
+        <div class="metric-value" id="m-total">0</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Selected</div>
+        <div class="metric-value" id="m-sel">0</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Selected total</div>
+        <div class="metric-value green" id="m-amt">₱0.00</div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <button class="btn-sm" onclick="selectAll()">Select all</button>
+      <button class="btn-sm" onclick="deselectAll()">Deselect all</button>
+      <div class="toolbar-sep"></div>
+      <input type="date" id="due-date" title="Date to assign to selected entries">
+      <button class="btn-sm btn-primary" onclick="assignDate()">Assign date to selected</button>
+      <button class="btn-sm" onclick="clearDates()">Clear dates</button>
+    </div>
+
+    <!-- Due date filter -->
+    <div class="filter-row" id="filter-row">
+      <span class="filter-label">Filter by due:</span>
+      <div class="filter-pills" id="filter-pills"></div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="cb-cell center"><input type="checkbox" id="check-all" onchange="toggleAll(this.checked)" title="Toggle all visible"></th>
+            <th class="sortable" data-col="alias" onclick="sort('alias')">Account holder</th>
+            <th class="sortable" data-col="cxe_can" onclick="sort('cxe_can')">CAN</th>
+            <th class="sortable right" data-col="amount" onclick="sort('amount')">Amount</th>
+            <th class="sortable" data-col="due" onclick="sort('due')">Due</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="empty" id="empty" style="display:none;">No entries match the current filter.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let rows = [];
+  let sortCol = 'alias';
+  let sortDir = 1;
+  let activeFilter = 'all';
+
+  function parseData() {
+    const raw = document.getElementById('json-input').value.trim();
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      const arr = Array.isArray(parsed)
+        ? parsed
+        : (parsed.result || parsed.data || Object.values(parsed)[0]);
+      if (!Array.isArray(arr)) throw new Error('No array found in pasted data.');
+
+      const parseAmt = val => {
+        if (typeof val === 'number') return val;
+        if (typeof val !== 'string') return 0;
+        return parseFloat(val.replace(/,/g, '')) || 0;
+      };
+
+      const pending = arr.filter(r => parseAmt(r.amount) > 0);
+      rows = pending.map(r => ({
+        ...r,
+        amount: parseAmt(r.amount),
+        selected: false,
+        due_override: null,
+      }));
+
+      const skipped = arr.length - pending.length;
+      document.getElementById('status').textContent =
+        `✓ ${arr.length} records — ${pending.length} pending${skipped ? `, ${skipped} zero-amount skipped` : ''}`;
+      document.getElementById('main').style.display = 'block';
+      rebuildFilters();
+      render();
+    } catch(e) {
+      document.getElementById('status').textContent = '✗ ' + e.message;
+    }
+  }
+
+  function effectiveDue(r) {
+    return r.due_override || r.due_date || 'Immediately';
+  }
+
+  function rebuildFilters() {
+    const dues = new Set(rows.map(r => effectiveDue(r)));
+    const container = document.getElementById('filter-pills');
+    container.innerHTML = '';
+
+    const allPill = makePill('all', 'All');
+    container.appendChild(allPill);
+
+    [...dues].sort((a, b) => {
+      if (a === 'Immediately') return -1;
+      if (b === 'Immediately') return 1;
+      return a.localeCompare(b);
+    }).forEach(d => {
+      container.appendChild(makePill(d, d === 'Immediately' ? 'Immediately' : d));
+    });
+  }
+
+  function makePill(value, label) {
+    const el = document.createElement('button');
+    el.className = 'pill' + (value === 'all' ? '' : (value === 'Immediately' ? ' pill-imm' : '')) +
+      (activeFilter === value ? ' active' : '');
+    el.textContent = label;
+    el.onclick = () => { activeFilter = value; rebuildFilters(); render(); };
+    return el;
+  }
+
+  function visibleRows() {
+    return rows.filter(r =>
+      activeFilter === 'all' || effectiveDue(r) === activeFilter
+    );
+  }
+
+  function sort(col) {
+    if (sortCol === col) sortDir *= -1;
+    else { sortCol = col; sortDir = 1; }
+
+    rows.sort((a, b) => {
+      let av = col === 'amount' ? a.amount : col === 'due' ? effectiveDue(a) : (a[col] || '');
+      let bv = col === 'amount' ? b.amount : col === 'due' ? effectiveDue(b) : (b[col] || '');
+      if (col === 'amount') return sortDir * (av - bv);
+      return sortDir * String(av).localeCompare(String(bv));
+    });
+
+    document.querySelectorAll('thead th').forEach(th => {
+      th.classList.remove('sort-asc', 'sort-desc');
+    });
+    const th = document.querySelector(`th[data-col="${col}"]`);
+    if (th) th.classList.add(sortDir === 1 ? 'sort-asc' : 'sort-desc');
+
+    render();
+  }
+
+  function render() {
+    const tbody = document.getElementById('tbody');
+    const empty = document.getElementById('empty');
+    const visible = visibleRows();
+
+    if (visible.length === 0) {
+      tbody.innerHTML = '';
+      empty.style.display = 'block';
+    } else {
+      empty.style.display = 'none';
+      tbody.innerHTML = visible.map((r, i) => {
+        const due = effectiveDue(r);
+        const dueBadge = due === 'Immediately'
+          ? `<span class="due-badge due-imm">Immediately</span>`
+          : `<span class="due-badge due-sched">${due}</span>`;
+        const rowIdx = rows.indexOf(r);
+        return `<tr class="${r.selected ? 'selected' : ''}">
+          <td class="cb-cell center"><input type="checkbox" ${r.selected ? 'checked' : ''} onchange="toggle(${rowIdx}, this.checked)" aria-label="Select ${r.alias || 'Unknown'}"></td>
+          <td><span class="alias">${r.alias || '—'}</span></td>
+          <td><span class="can">${r.cxe_can || '—'}</span></td>
+          <td class="amount">₱${(r.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+          <td>${dueBadge}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    updateMetrics();
+    syncCheckAll();
+  }
+
+  function toggle(i, val) {
+    rows[i].selected = val;
+    updateMetrics();
+    syncCheckAll();
+  }
+
+  function toggleAll(val) {
+    visibleRows().forEach(r => r.selected = val);
+    render();
+  }
+
+  function syncCheckAll() {
+    const vis = visibleRows();
+    const ca = document.getElementById('check-all');
+    if (!ca) return;
+    ca.checked = vis.length > 0 && vis.every(r => r.selected);
+    ca.indeterminate = vis.some(r => r.selected) && !vis.every(r => r.selected);
+  }
+
+  function selectAll() { rows.forEach(r => r.selected = true); render(); }
+  function deselectAll() { rows.forEach(r => r.selected = false); render(); }
+
+  function assignDate() {
+    const d = document.getElementById('due-date').value;
+    if (!d) { alert('Pick a date first.'); return; }
+    const fmt = new Date(d + 'T12:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+    rows.filter(r => r.selected).forEach(r => r.due_override = fmt);
+    rebuildFilters();
+    render();
+  }
+
+  function clearDates() {
+    rows.filter(r => r.selected).forEach(r => r.due_override = null);
+    rebuildFilters();
+    render();
+  }
+
+  function updateMetrics() {
+    const sel = rows.filter(r => r.selected);
+    const total = sel.reduce((s, r) => s + r.amount, 0);
+    document.getElementById('m-total').textContent = rows.length;
+    document.getElementById('m-sel').textContent = sel.length;
+    document.getElementById('m-amt').textContent = '₱' + total.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function clearAll() {
+    rows = [];
+    activeFilter = 'all';
+    document.getElementById('json-input').value = '';
+    document.getElementById('status').textContent = '';
+    document.getElementById('main').style.display = 'none';
+  }
+</script>
+  <script src="pwa-register.js"></script>
+</body>
+</html>
