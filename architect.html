@@ -58,12 +58,12 @@ input[type="number"]{width:80px;padding:4px 8px;border:1px solid var(--border-st
 .bucket-row{display:grid;grid-template-columns:1.5fr 1fr 1fr auto;gap:8px}
 .bucket-row label{font-size:9px;color:var(--text-faint);text-transform:uppercase;margin-bottom:2px;display:block}
 
-.impact-bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:min(940px,95vw);background:var(--text);color:#fff;border-radius:var(--rl);padding:16px 24px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 8px 32px rgba(0,0,0,0.2);z-index:200}
-.impact-stat{display:flex;flex-direction:column}
+.impact-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;grid-column:span 2}
+.impact-card{background:var(--surface);padding:14px 16px;border-radius:var(--rl);border:1px solid var(--border);display:flex;flex-direction:column;gap:4px}
 .impact-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-faint)}
 .impact-val{font-size:18px;font-weight:600;font-family:monospace}
-.impact-sep{width:1px;height:30px;background:rgba(255,255,255,0.1)}
-.impact-gain{color:var(--accent-light)}
+.impact-gain{color:var(--accent)}
+@media(max-width:768px){main{grid-template-columns:1fr}.impact-row{grid-column:span 1}}
 
 .tag{display:inline-block;padding:1px 6px;border-radius:4px;font-size:9px;text-transform:uppercase}
 .tag-illiq{background:var(--warning-bg);color:var(--warning)}
@@ -108,6 +108,29 @@ canvas#allocationChart{flex:2;min-width:0;max-width:160px;height:auto}
 </header>
 
 <main>
+  <div class="impact-row">
+    <div class="impact-card">
+      <span class="impact-lbl">Current Yield</span>
+      <span class="impact-val" id="statCurrent">₱0/yr</span>
+    </div>
+    <div class="impact-card">
+      <span class="impact-lbl">Yearly Gain</span>
+      <span class="impact-val impact-gain" id="statYearly">+₱0/yr</span>
+    </div>
+    <div class="impact-card">
+      <span class="impact-lbl">Monthly Gain</span>
+      <span class="impact-val impact-gain" id="statGain">+₱0.00</span>
+    </div>
+    <div class="impact-card" style="border-color:var(--accent-light); background:var(--accent-bg)">
+      <span class="impact-lbl" style="color:var(--accent)">Simulated Yield</span>
+      <span class="impact-val" id="statNew" style="color:var(--accent)">₱0/yr</span>
+    </div>
+    <div class="impact-card">
+      <span class="impact-lbl">Simulated Liquidity</span>
+      <span class="impact-val" id="statLiquid">₱0</span>
+    </div>
+  </div>
+
   <!-- Sources -->
   <section class="panel">
     <div class="panel-h">
@@ -136,7 +159,10 @@ canvas#allocationChart{flex:2;min-width:0;max-width:160px;height:auto}
     <!-- Targets -->
     <section class="panel">
       <div class="panel-h">
-        <span class="panel-title">Investment Targets</span>
+        <div style="display:flex; flex-direction:column">
+          <span class="panel-title">Investment Targets</span>
+          <span id="unallocatedStatus" style="font-size:11px; color:var(--text-faint)">Unallocated: ₱0</span>
+        </div>
         <button class="btn btn-sm" onclick="addBucket()">+ Add Bucket</button>
       </div>
       <div class="panel-content" id="bucketList">
@@ -149,33 +175,6 @@ canvas#allocationChart{flex:2;min-width:0;max-width:160px;height:auto}
   </div>
 </main>
 
-<div class="impact-bar">
-  <div class="impact-stat">
-    <span class="impact-lbl">Current Yield</span>
-    <span class="impact-val" id="statCurrent">₱0/yr</span>
-  </div>
-  <div class="impact-sep"></div>
-  <div class="impact-stat">
-    <span class="impact-lbl">Simulated Yield</span>
-    <span class="impact-val" id="statNew">₱0/yr</span>
-  </div>
-  <div class="impact-sep"></div>
-  <div class="impact-stat">
-    <span class="impact-lbl">Yearly Gain</span>
-    <span class="impact-val impact-gain" id="statYearly">+₱0/yr</span>
-  </div>
-  <div class="impact-sep"></div>
-  <div class="impact-stat">
-    <span class="impact-lbl">Monthly Gain</span>
-    <span class="impact-val impact-gain" id="statGain">+₱0.00</span>
-  </div>
-  <div class="impact-sep"></div>
-  <div class="impact-stat">
-    <span class="impact-lbl">Simulated Liquidity</span>
-    <span class="impact-val" id="statLiquid">₱0</span>
-  </div>
-</div>
-
 <script>
 const db = new Dexie('FinanceTrackerV2');
 db.version(4).stores({ accounts:'id,key,label', history:'id,date', logs:'id,accountId,date' });
@@ -183,7 +182,7 @@ db.version(4).stores({ accounts:'id,key,label', history:'id,date', logs:'id,acco
 const STORAGE_KEY = 'imago-architect-state';
 let _accounts = [];
 let _liabilitiesTotal = 0;
-let _activeTag = 'all';
+let _activeTag = 'savings';
 let _buckets = [
   { id: 'b1', name: 'PAG-IBIG MP2', rate: 7, tax: 0, tag: 'illiquid', allocated: 0, notes: '' },
   { id: 'b2', name: 'High Yield Savings', rate: 5, tax: 20, tag: 'liquid', allocated: 0, notes: '' }
@@ -382,12 +381,12 @@ async function init() {
 }
 
 function renderFilterBar() {
-  const tags = new Set(['all']);
+  const tags = new Set();
   _accounts.forEach(a => (a.tags||[]).forEach(t => tags.add(t)));
   
   const bar = document.getElementById('filterBar');
   bar.innerHTML = [...tags].map(t => `
-    <div class="filter-chip ${t==='all'?'':'tag-'+t} ${_activeTag===t?'active':''}" onclick="setFilter('${t}')">
+    <div class="filter-chip tag-${t} ${_activeTag===t?'active':''}" onclick="setFilter('${t}')">
       ${t}
     </div>
   `).join('');
@@ -401,7 +400,7 @@ function setFilter(tag) {
 
 function renderSources() {
   const list = document.getElementById('sourceList');
-  const filtered = _accounts.filter(a => _activeTag === 'all' || (a.tags||[]).includes(_activeTag));
+  const filtered = _accounts.filter(a => (a.tags||[]).includes(_activeTag));
   
   if (filtered.length === 0) {
     list.innerHTML = `<div class="empty">No accounts matching "${_activeTag}".</div>`;
@@ -417,11 +416,11 @@ function renderSources() {
           <div class="source-label">${esc(a.label||a.key)}</div>
           <div class="source-bal">Available: ₱${fmtk(a.balance)} · Rate: ${a.rate||0}%</div>
         </div>
-        <div style="font-weight:600; font-family:monospace;">₱${fmtk(a.balance - a.moveAmount)} left</div>
+        <div style="font-weight:600; font-family:monospace;" id="src-left-${idx}">₱${fmtk(a.balance - a.moveAmount)} left</div>
       </div>
       <div class="move-row">
-        <input type="range" min="0" max="${a.balance}" step="1000" value="${a.moveAmount}" oninput="onMoveChange(${idx}, this.value)">
-        <input type="number" value="${a.moveAmount}" oninput="onMoveChange(${idx}, this.value)">
+        <input type="range" id="src-range-${idx}" min="0" max="${a.balance}" step="1000" value="${a.moveAmount}" oninput="onMoveChange(${idx}, this.value, true)">
+        <input type="number" id="src-num-${idx}" value="${a.moveAmount}" oninput="onMoveChange(${idx}, this.value, true)">
       </div>
     </div>
   `}).join('');
@@ -430,15 +429,31 @@ function renderSources() {
   document.getElementById('sourceTotal').textContent = `Available: ₱${fmtk(totalAvail)}`;
 }
 
-function onMoveChange(idx, val) {
+function onMoveChange(idx, val, isSurgical = false) {
   val = parseFloat(val) || 0;
   if (val > _accounts[idx].balance) val = _accounts[idx].balance;
   if (val < 0) val = 0;
   
   _accounts[idx].moveAmount = val;
-  save();
-  renderSources();
-  distributePool();
+
+  if (isSurgical) {
+    // Update sibling inputs
+    const range = document.getElementById(`src-range-${idx}`);
+    const num = document.getElementById(`src-num-${idx}`);
+    const left = document.getElementById(`src-left-${idx}`);
+    if (range) range.value = val;
+    if (num) num.value = val;
+    if (left) left.textContent = `₱${fmtk(_accounts[idx].balance - val)} left`;
+    
+    // Impact and Chart need to update because they reflect the new total
+    // But we don't re-render the whole list
+    save();
+    distributePool(true); // Light update
+  } else {
+    save();
+    renderSources();
+    distributePool();
+  }
 }
 
 function addBucket() {
@@ -461,17 +476,47 @@ function removeBucket(id) {
   distributePool();
 }
 
-function onBucketChange(id, field, val) {
+function onBucketChange(id, field, val, isSurgical = false) {
   const b = _buckets.find(x => x.id === id);
   if (!b) return;
-  if (field === 'rate' || field === 'tax') b[field] = parseFloat(val) || 0;
+  if (field === 'rate' || field === 'tax' || field === 'allocated') b[field] = parseFloat(val) || 0;
   else b[field] = val;
   save();
-  updateImpact();
+
+  if (field === 'allocated' && isSurgical) {
+    const range = document.getElementById(`bucket-range-${id}`);
+    const num = document.getElementById(`bucket-num-${id}`);
+    const yld = document.getElementById(`bucket-yield-${id}`);
+    if (range) range.value = val;
+    if (num) num.value = val;
+    if (yld) yld.textContent = `₱${fmtk(b.allocated * b.rate / 100 * (100-b.tax)/100)}/yr`;
+
+    // Only update the cross-cutting elements
+    updateUnallocatedUI();
+    updateImpact();
+  } else {
+    renderBuckets();
+    updateImpact();
+  }
+}
+
+function updateUnallocatedUI() {
+  const totalPool = _accounts.reduce((s, a) => s + a.moveAmount, 0);
+  const totalAllocated = _buckets.reduce((s, b) => s + b.allocated, 0);
+  const unallocated = totalPool - totalAllocated;
+
+  const status = document.getElementById('unallocatedStatus');
+  if (status) {
+    status.textContent = `Unallocated: ₱${fmtk(unallocated)}`;
+    status.style.color = unallocated > 0 ? 'var(--warning)' : (unallocated < 0 ? 'var(--danger)' : 'var(--text-faint)');
+  }
 }
 
 function renderBuckets() {
   const list = document.getElementById('bucketList');
+  const totalPool = _accounts.reduce((s, a) => s + a.moveAmount, 0);
+  updateUnallocatedUI();
+
   list.innerHTML = _buckets.map((b, i) => {
     const color = BUCKET_COLORS[i % BUCKET_COLORS.length];
     return `
@@ -491,7 +536,16 @@ function renderBuckets() {
         </div>
         <button class="btn btn-sm" onclick="removeBucket('${b.id}')" style="color:var(--danger); border:none; margin-top:14px">×</button>
       </div>
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+      
+      <div class="move-row" style="margin-bottom:12px">
+        <input type="range" id="bucket-range-${b.id}" min="0" max="${totalPool}" step="1000" value="${b.allocated}" oninput="onBucketChange('${b.id}', 'allocated', this.value, true)">
+        <input type="number" id="bucket-num-${b.id}" value="${b.allocated}" oninput="onBucketChange('${b.id}', 'allocated', this.value, true)">
+        <button class="btn btn-sm" onclick="fillBucket('${b.id}')" title="Fill with remaining funds">
+          <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0L0 8h5v8h6V8h5z"/></svg>
+        </button>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center">
         <div>
           <label style="font-size:9px;color:var(--text-faint);text-transform:uppercase;margin-bottom:2px;display:block">Liquidity</label>
           <select onchange="onBucketChange('${b.id}', 'tag', this.value)" style="font-size:11px; padding:2px">
@@ -500,11 +554,11 @@ function renderBuckets() {
           </select>
         </div>
         <div style="text-align:right">
-          <div style="font-size:10px; color:var(--text-faint)">Allocated</div>
-          <div style="font-weight:600; font-family:monospace">₱${fmtk(b.allocated)}</div>
+          <div style="font-size:10px; color:var(--text-faint)">Bucket Yield</div>
+          <div style="font-weight:600; font-family:monospace; color:var(--accent)" id="bucket-yield-${b.id}">₱${fmtk(b.allocated * b.rate / 100 * (100-b.tax)/100)}/yr</div>
         </div>
       </div>
-      <div>
+      <div style="margin-top:8px">
         <label style="font-size:9px;color:var(--text-faint);text-transform:uppercase;margin-bottom:2px;display:block">Notes</label>
         <input type="text" value="${esc(b.notes)}" placeholder="Add notes..." style="width:100%; padding:4px; font-size:11px; border:1px solid var(--border); border-radius:4px; background:var(--bg)" oninput="onBucketChange('${b.id}', 'notes', this.value)">
       </div>
@@ -512,19 +566,22 @@ function renderBuckets() {
   `}).join('');
 }
 
-function distributePool() {
+function fillBucket(id) {
   const totalPool = _accounts.reduce((s, a) => s + a.moveAmount, 0);
-  
-  // Simple logic: First bucket gets everything for now
-  // In a more complex version, we could add sliders for targets too
-  _buckets.forEach((b, i) => {
-    b.allocated = (i === 0) ? totalPool : 0;
-  });
-  
+  const totalAllocatedOther = _buckets.filter(b => b.id !== id).reduce((s, b) => s + b.allocated, 0);
+  const b = _buckets.find(x => x.id === id);
+  if (b) {
+    b.allocated = Math.max(0, totalPool - totalAllocatedOther);
+    save();
+    renderBuckets();
+    updateImpact();
+  }
+}
+
+function distributePool() {
   renderBuckets();
   updateImpact();
 }
-
 function updateImpact() {
   // Current Yield Calculation
   const currentGross = _accounts.reduce((s, a) => s + (a.balance * (a.rate || 0) / 100), 0);
