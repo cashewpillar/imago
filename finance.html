@@ -409,6 +409,9 @@ function renderSummary(accounts) {
   const total  = accounts.reduce((s,a) => s + (a.balance||0), 0);
   const liab   = accounts.filter(a => a.balance < 0).reduce((s,a) => s + a.balance, 0);
   
+  const cash   = accounts.filter(a => !a.tags?.includes('illiquid') && !a.tags?.includes('td') && a.balance > 0);
+  const cashTotal = cash.reduce((s,a) => s + a.balance, 0);
+
   const illiqOnly = accounts.filter(a => a.tags?.includes('illiquid'));
   const illiqOnlyTotal = illiqOnly.reduce((s,a) => s + Math.max(0, a.balance||0), 0);
   
@@ -419,24 +422,34 @@ function renderSummary(accounts) {
   const credTotal = credit.reduce((s,a) => s + (a.balance||0), 0);
   const credCount = credit.length;
 
-  const liquidAssets = accounts.filter(a => !a.tags?.includes('illiquid') && !a.tags?.includes('td') && !a.tags?.includes('credit'))
-                               .reduce((s,a) => s + Math.max(0, a.balance||0), 0);
-  const netLiquid = liquidAssets + credTotal;
-
   const assets = accounts.filter(a => a.balance > 0).reduce((s,a) => s + a.balance, 0);
   const grossYld = accounts.reduce((s,a) => s + (a.balance>0 ? a.balance*(a.rate||0)/100 : 0), 0);
   const netYld   = grossYld * 0.8; // Assuming 20% withholding tax
+
+  const liquidAssets = cashTotal;
+  const netLiquid = liquidAssets + credTotal;
 
   document.getElementById('summaryRow').innerHTML = `
     <div class="sum-card">
       <div class="lbl">Net worth</div>
       <div class="val">₱${fmtk(total)}</div>
-      <div class="sub">${accounts.length} accounts</div>
+      <div style="margin-top:10px; padding-top:8px; border-top:1px dashed var(--border); font-family:var(--mono); font-size:10px; line-height:1.6; color:var(--text-muted);">
+        <div style="display:flex; justify-content:space-between;"><span>Cash/Sav</span> <span>+₱${fmtk(cashTotal)}</span></div>
+        <div style="display:flex; justify-content:space-between;"><span>TD</span> <span>+₱${fmtk(tdOnlyTotal)}</span></div>
+        <div style="display:flex; justify-content:space-between;"><span>Illiquid</span> <span>+₱${fmtk(illiqOnlyTotal)}</span></div>
+        <div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border-strong); padding-bottom:2px; margin-bottom:2px;"><span>Credit</span> <span class="col-neg">-₱${fmtk(Math.abs(credTotal))}</span></div>
+        <div style="display:flex; justify-content:space-between; font-weight:600; color:var(--text);"><span>Total</span> <span>₱${fmtk(total)}</span></div>
+      </div>
     </div>
     <div class="sum-card">
       <div class="lbl">Net Liquid</div>
       <div class="val col-pos">₱${fmtk(netLiquid)}</div>
-      <div class="sub">excl. ₱${fmtk(illiqOnlyTotal)} illiq · ₱${fmtk(tdOnlyTotal)} td · ₱${fmtk(Math.abs(credTotal))} credit</div>
+      <div style="margin-top:10px; padding-top:8px; border-top:1px dashed var(--border); font-family:var(--mono); font-size:10px; line-height:1.6; color:var(--text-muted);">
+        <div style="display:flex; justify-content:space-between;"><span>Total NW</span> <span>₱${fmtk(total)}</span></div>
+        <div style="display:flex; justify-content:space-between;"><span>- Illiquid</span> <span class="col-neg">-₱${fmtk(illiqOnlyTotal)}</span></div>
+        <div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border-strong); padding-bottom:2px; margin-bottom:2px;"><span>- TD</span> <span class="col-neg">-₱${fmtk(tdOnlyTotal)}</span></div>
+        <div style="display:flex; justify-content:space-between; font-weight:600; color:var(--accent);"><span>Liquid</span> <span>₱${fmtk(netLiquid)}</span></div>
+      </div>
     </div>
     <div class="sum-card">
       <div class="lbl">Liabilities</div>
@@ -444,19 +457,28 @@ function renderSummary(accounts) {
       <div class="sub">credit / negative</div>
     </div>
     <div class="sum-card">
-      <div class="lbl" style="cursor:help" onmouseenter="showTip(event, 'Yield after 20% withholding tax. Monthly/Daily breakdowns are estimates.')" onmouseleave="hideTip()">
+      <div class="lbl" style="cursor:help" onmouseenter="showTip(event, 'Yield after 20% withholding tax.')" onmouseleave="hideTip()">
         Est. yield (net)
       </div>
       <div class="val col-warn">₱${fmtk(netYld)}</div>
-      <div class="sub">₱${fmtk(netYld/12)}/mo · ₱${(netYld/365*1000).toFixed(0)}/day · ${assets>0 ? (netYld/assets*100).toFixed(2) : 0}% net <span style="opacity:0.6">(after 20% tax)</span></div>
+      <div style="margin-top:10px; padding-top:8px; border-top:1px dashed var(--border); font-family:var(--mono); font-size:10px; line-height:1.6; color:var(--text-muted);">
+        <div style="display:flex; justify-content:space-between;"><span>Gross Yld</span> <span>+₱${fmtk(grossYld)}</span></div>
+        <div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border-strong); padding-bottom:2px; margin-bottom:2px;"><span>Tax (20%)</span> <span class="col-neg">-₱${fmtk(grossYld * 0.2)}</span></div>
+        <div style="display:flex; justify-content:space-between; font-weight:600; color:var(--warning);"><span>Net Annual</span> <span>₱${fmtk(netYld)}</span></div>
+        <div style="display:flex; justify-content:space-between; margin-top:4px; opacity:0.8;"><span>Monthly</span> <span>₱${fmtk(netYld/12)}</span></div>
+        <div style="display:flex; justify-content:space-between; opacity:0.8;"><span>Daily</span> <span>₱${(netYld/365*1000).toFixed(0)}</span></div>
+      </div>
     </div>
   `;
 }
 
-function showTip(e, text) {
+function showTip(e, text, isHtml=false) {
   const tip = document.getElementById('tooltip');
-  tip.textContent = text;
+  if (isHtml) tip.innerHTML = text;
+  else tip.textContent = text;
+  
   tip.style.display = 'block';
+  tip.style.maxWidth = isHtml ? 'none' : '200px';
   const rect = e.currentTarget.getBoundingClientRect();
   const margin = 8;
   const th = tip.offsetHeight;
