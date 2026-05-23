@@ -285,6 +285,11 @@ td.actions{text-align:right;white-space:nowrap}
       </div>
     </div>
 
+    <div class="form-row" style="margin-bottom:20px">
+      <label>Tax Assumption (%)</label>
+      <input type="number" id="wiTaxRate" step="1" value="20" placeholder="e.g. 20 for PH withholding tax" oninput="updateWhatIf()">
+    </div>
+
     <div style="background:var(--bg);padding:16px;border-radius:var(--r);border:1px solid var(--border)">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
         <div>
@@ -296,14 +301,41 @@ td.actions{text-align:right;white-space:nowrap}
           <div style="font-size:18px;font-weight:600;color:var(--accent)" id="wiNewYield">₱0k/yr</div>
         </div>
       </div>
-      <div style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--border);display:flex;justify-content:space-between;align-items:center">
-        <div style="font-size:12px;color:var(--text-muted)">Potential Monthly Gain:</div>
-        <div style="font-size:14px;font-weight:600;color:var(--accent)" id="wiGain">₱0.00</div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--border);display:flex;flex-direction:column;gap:4px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:12px;color:var(--text-muted)">Potential Monthly Gain:</div>
+          <div style="font-size:14px;font-weight:600;color:var(--accent)" id="wiGain">₱0.00</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:12px;color:var(--text-muted)">Potential Yearly Gain:</div>
+          <div style="font-size:14px;font-weight:600;color:var(--accent)" id="wiGainYearly">₱0.00</div>
+        </div>
       </div>
     </div>
 
     <div class="modal-actions">
       <button class="btn btn-primary" onclick="closeModal('whatIfModal')">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Yield Breakdown Modal -->
+<div class="modal-backdrop" id="yieldModal">
+  <div class="modal" style="width:min(500px,95vw)">
+    <h2>Gross Yield Breakdown</h2>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Annual interest contribution per account (before tax).</p>
+    
+    <div style="font-family:var(--mono); font-size:11px; display:flex; flex-direction:column; gap:6px;" id="yieldBreakdownList">
+      <!-- Generated rows -->
+    </div>
+
+    <div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--border); display:flex; justify-content:space-between; font-weight:600; font-family:var(--mono); font-size:12px;">
+      <span>Total Gross Yield</span>
+      <span id="yieldTotalGross">₱0</span>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeModal('yieldModal')">Close</button>
     </div>
   </div>
 </div>
@@ -340,6 +372,7 @@ let _editId   = null;
 let _activeTag = 'all';
 let _sortCol   = 'balance';
 let _sortDir   = 'desc';
+let _excludeTD = false;
 window._allAccounts = [];
 
 // ── Util ──────────────────────────────────────────────────────────────────────
@@ -433,7 +466,9 @@ function renderSummary(accounts) {
   const credCount = credit.length;
 
   const assets = accounts.filter(a => a.balance > 0).reduce((s,a) => s + a.balance, 0);
-  const grossYld = accounts.reduce((s,a) => s + (a.balance>0 ? a.balance*(a.rate||0)/100 : 0), 0);
+  
+  const yieldAccounts = _excludeTD ? accounts.filter(a => !a.tags?.includes('td')) : accounts;
+  const grossYld = yieldAccounts.reduce((s,a) => s + (a.balance>0 ? a.balance*(a.rate||0)/100 : 0), 0);
   const netYld   = grossYld * 0.8; // Assuming 20% withholding tax
 
   const liquidAssets = cashTotal;
@@ -466,9 +501,13 @@ function renderSummary(accounts) {
       <div class="val col-neg">₱${fmtk(Math.abs(liab))}</div>
       <div class="sub">credit / negative</div>
     </div>
-    <div class="sum-card">
-      <div class="lbl" style="cursor:help" onmouseenter="showTip(event, 'Yield after 20% withholding tax.')" onmouseleave="hideTip()">
-        Est. yield (net)
+    <div class="sum-card" onclick="openYieldBreakdown()" style="cursor:pointer" title="Click for breakdown">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+        <div class="lbl" style="margin-bottom:0">Est. yield (net)</div>
+        <label style="font-size:9px; color:var(--text-faint); display:flex; align-items:center; gap:3px; cursor:pointer;" onclick="event.stopPropagation()">
+          <input type="checkbox" ${_excludeTD ? 'checked' : ''} onchange="_excludeTD=this.checked; render();" style="width:10px; height:10px;">
+          Excl. TD
+        </label>
       </div>
       <div class="val col-warn">₱${fmtk(netYld)}</div>
       <div style="margin-top:10px; padding-top:8px; border-top:1px dashed var(--border); font-family:var(--mono); font-size:10px; line-height:1.6; color:var(--text-muted);">
@@ -965,6 +1004,8 @@ function updateWhatIf() {
   const accounts = window._allAccounts || [];
   const moveInputs = document.querySelectorAll('.wi-move-input');
   const targetRate = parseFloat(document.getElementById('wiTargetRate').value) || 0;
+  const taxRate = parseFloat(document.getElementById('wiTaxRate').value) || 0;
+  const taxMultiplier = (100 - taxRate) / 100;
   
   let totalMoved = 0;
   moveInputs.forEach(input => {
@@ -976,17 +1017,49 @@ function updateWhatIf() {
   });
 
   const currentGrossYield = accounts.reduce((s,a) => s + (a.balance>0 ? a.balance*(a.rate||0)/100 : 0), 0);
-  const currentNetYield = currentGrossYield * 0.8;
+  const currentNetYield = currentGrossYield * taxMultiplier;
 
-  // New yield = Current Gross Yield + (moved amount * target rate / 100)
-  // (Since we are moving from 0% accounts, the original yield for moved amount was 0)
   const newGrossYield = currentGrossYield + (totalMoved * targetRate / 100);
-  const newNetYield = newGrossYield * 0.8;
-  const monthlyGain = (newNetYield - currentNetYield) / 12;
+  const newNetYield = newGrossYield * taxMultiplier;
+  const yearlyGain = newNetYield - currentNetYield;
+  const monthlyGain = yearlyGain / 12;
 
   document.getElementById('wiCurrentYield').textContent = `₱${fmtk(currentNetYield)}/yr`;
   document.getElementById('wiNewYield').textContent = `₱${fmtk(newNetYield)}/yr`;
   document.getElementById('wiGain').textContent = `+₱${monthlyGain.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}/mo`;
+  document.getElementById('wiGainYearly').textContent = `+₱${fmtk(yearlyGain)}/yr`;
+}
+
+function openYieldBreakdown() {
+  const accounts = window._allAccounts || [];
+  const list = document.getElementById('yieldBreakdownList');
+  
+  const bearing = accounts.filter(a => (a.rate || 0) > 0 && a.balance > 0)
+                          .filter(a => !_excludeTD || !a.tags?.includes('td'))
+                          .sort((a, b) => (b.balance * b.rate) - (a.balance * a.rate));
+
+  if (bearing.length === 0) {
+    list.innerHTML = `<div class="empty">No interest-bearing accounts${_excludeTD ? ' (excluding TD)' : ''}.</div>`;
+    document.getElementById('yieldTotalGross').textContent = '₱0';
+  } else {
+    let totalGross = 0;
+    list.innerHTML = bearing.map(a => {
+      const annual = a.balance * (a.rate / 100);
+      totalGross += annual;
+      return `
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:1px dashed var(--border); padding-bottom:4px; margin-bottom:2px;">
+          <div style="flex:1;">
+            <div style="color:var(--text); font-weight:500;">${esc(a.label||a.key)}</div>
+            <div style="font-size:9px; color:var(--text-faint);">₱${fmtk(a.balance)} × ${a.rate}%</div>
+          </div>
+          <div style="text-align:right; font-weight:500;">+₱${fmtk(annual)}</div>
+        </div>
+      `;
+    }).join('');
+    document.getElementById('yieldTotalGross').textContent = `₱${fmtk(totalGross)}`;
+  }
+
+  openModal('yieldModal');
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
