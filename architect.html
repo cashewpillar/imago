@@ -116,15 +116,16 @@ canvas#allocationChart{flex:2;min-width:0;max-width:160px;height:auto}
       <span class="impact-val" id="statCurrent">₱0/yr</span>
     </div>
     <div class="impact-card">
-      <span class="impact-lbl">Yearly Gain</span>
+      <span class="impact-lbl">Net Improvement</span>
       <span class="impact-val impact-gain" id="statYearly">+₱0/yr</span>
+      <div style="font-size:9px;color:var(--text-faint);margin-top:2px">vs. baseline</div>
     </div>
     <div class="impact-card">
-      <span class="impact-lbl">Monthly Gain</span>
+      <span class="impact-lbl">Monthly Impact</span>
       <span class="impact-val impact-gain" id="statGain">+₱0.00</span>
     </div>
     <div class="impact-card" style="border-color:var(--accent-light); background:var(--accent-bg)">
-      <span class="impact-lbl" style="color:var(--accent)">Simulated Yield</span>
+      <span class="impact-lbl" style="color:var(--accent)">New Total Yield</span>
       <span class="impact-val" id="statNew" style="color:var(--accent)">₱0/yr</span>
     </div>
     <div class="impact-card">
@@ -568,7 +569,7 @@ function renderBuckets() {
           </select>
         </div>
         <div style="text-align:right">
-          <div style="font-size:10px; color:var(--text-faint)">Bucket Yield</div>
+          <div style="font-size:10px; color:var(--text-faint)">Net Bucket Earnings</div>
           <div style="font-weight:600; font-family:monospace; color:var(--accent)" id="bucket-yield-${b.id}">₱${fmtk(b.allocated * b.rate / 100 * (100-b.tax)/100)}/yr</div>
         </div>
       </div>
