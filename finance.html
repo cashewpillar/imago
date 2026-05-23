@@ -156,9 +156,9 @@ td.actions{text-align:right;white-space:nowrap}
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,10 3,13 13,13 13,10"/><polyline points="5,7 8,10 11,7"/><line x1="8" y1="3" x2="8" y2="10"/></svg>
       Import
     </button>
-    <button class="btn" onclick="openWhatIf()">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="7"/><path d="M9.09 9a3 3 0 0 0-5.83 1c0 2 3 3 3 3"/><line x1="8" y1="11.5" x2="8.01" y2="11.5" stroke-linecap="round"/></svg>
-      What-if
+    <button class="btn" onclick="location.href='architect.html'">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 13l2 2 10-10L12 3 2 13zM9 5l2 2"/></svg>
+      Architect
     </button>
     <button class="btn" onclick="exportData()">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,6 3,3 13,3 13,6"/><polyline points="5,9 8,6 11,9"/><line x1="8" y1="13" x2="8" y2="6"/></svg>
@@ -257,64 +257,6 @@ td.actions{text-align:right;white-space:nowrap}
       <button class="btn btn-danger" onclick="doImport(true)">Reset &amp; import</button>
       <button class="btn" onclick="closeModal('importModal')">Cancel</button>
       <button class="btn btn-primary" onclick="doImport(false)">Merge import</button>
-    </div>
-  </div>
-</div>
-
-<!-- What-If Modal -->
-<div class="modal-backdrop" id="whatIfModal">
-  <div class="modal" style="width:min(540px,95vw)">
-    <h2>Reallocation What-If</h2>
-    <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Simulate moving funds from 0% accounts to high-yield accounts.</p>
-    
-    <div style="margin-bottom:20px">
-      <div style="font-size:11px;text-transform:uppercase;color:var(--text-faint);margin-bottom:8px">Source: 0% Interest Accounts</div>
-      <div id="wiSourceList" style="display:flex;flex-direction:column;gap:8px"></div>
-    </div>
-
-    <div class="form-grid" style="margin-bottom:20px;align-items:end">
-      <div class="form-row">
-        <label>Target Account/Rate</label>
-        <select id="wiTargetAcc" onchange="onWhatIfTargetChange()">
-          <option value="custom">Custom Rate</option>
-        </select>
-      </div>
-      <div class="form-row">
-        <label>Rate (%)</label>
-        <input type="number" id="wiTargetRate" step="0.1" value="5" oninput="updateWhatIf()">
-      </div>
-    </div>
-
-    <div class="form-row" style="margin-bottom:20px">
-      <label>Tax Assumption (%)</label>
-      <input type="number" id="wiTaxRate" step="1" value="20" placeholder="e.g. 20 for PH withholding tax" oninput="updateWhatIf()">
-    </div>
-
-    <div style="background:var(--bg);padding:16px;border-radius:var(--r);border:1px solid var(--border)">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-        <div>
-          <div style="font-size:10px;text-transform:uppercase;color:var(--text-faint)">Current Net Yield</div>
-          <div style="font-size:18px;font-weight:600" id="wiCurrentYield">₱0k/yr</div>
-        </div>
-        <div>
-          <div style="font-size:10px;text-transform:uppercase;color:var(--text-faint)">Simulated Net Yield</div>
-          <div style="font-size:18px;font-weight:600;color:var(--accent)" id="wiNewYield">₱0k/yr</div>
-        </div>
-      </div>
-      <div style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--border);display:flex;flex-direction:column;gap:4px">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div style="font-size:12px;color:var(--text-muted)">Potential Monthly Gain:</div>
-          <div style="font-size:14px;font-weight:600;color:var(--accent)" id="wiGain">₱0.00</div>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div style="font-size:12px;color:var(--text-muted)">Potential Yearly Gain:</div>
-          <div style="font-size:14px;font-weight:600;color:var(--accent)" id="wiGainYearly">₱0.00</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="modal-actions">
-      <button class="btn btn-primary" onclick="closeModal('whatIfModal')">Done</button>
     </div>
   </div>
 </div>
@@ -950,84 +892,6 @@ async function exportData() {
   a.href=url; a.download='finance_'+new Date().toISOString().slice(0,10)+'.json';
   a.click(); URL.revokeObjectURL(url);
   toast('Exported.');
-}
-
-// ── What-If Logic ─────────────────────────────────────────────────────────────
-function openWhatIf() {
-  const accounts = window._allAccounts || [];
-  const sources = accounts.filter(a => (a.rate || 0) === 0 && a.balance > 0);
-  const targets = accounts.filter(a => (a.rate || 0) > 0);
-
-  const sourceList = document.getElementById('wiSourceList');
-  if (sources.length === 0) {
-    sourceList.innerHTML = '<div class="empty" style="padding:10px">No 0% interest accounts with positive balance.</div>';
-  } else {
-    sourceList.innerHTML = sources.map(s => `
-      <div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface);padding:8px 12px;border:1px solid var(--border);border-radius:var(--r)">
-        <div>
-          <div style="font-weight:500">${esc(s.label||s.key)}</div>
-          <div style="font-size:11px;color:var(--text-faint)">Available: ₱${fmtk(s.balance)}</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px">
-          <span style="font-size:11px;color:var(--text-muted)">Move</span>
-          <input type="number" class="wi-move-input" data-id="${s.id}" data-max="${s.balance}" value="0" step="1" style="width:70px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:4px" oninput="updateWhatIf()">
-          <span style="font-size:11px;color:var(--text-muted)">k</span>
-        </div>
-      </div>
-    `).join('');
-  }
-
-  const targetSelect = document.getElementById('wiTargetAcc');
-  targetSelect.innerHTML = '<option value="custom">Custom Rate</option>' + 
-    targets.map(t => `<option value="${t.id}">${esc(t.label||t.key)} (${t.rate}%)</option>`).join('');
-
-  updateWhatIf();
-  openModal('whatIfModal');
-}
-
-function onWhatIfTargetChange() {
-  const select = document.getElementById('wiTargetAcc');
-  const rateInput = document.getElementById('wiTargetRate');
-  if (select.value === 'custom') {
-    rateInput.disabled = false;
-  } else {
-    const target = window._allAccounts.find(a => a.id === select.value);
-    if (target) {
-      rateInput.value = target.rate;
-      rateInput.disabled = true;
-    }
-  }
-  updateWhatIf();
-}
-
-function updateWhatIf() {
-  const accounts = window._allAccounts || [];
-  const moveInputs = document.querySelectorAll('.wi-move-input');
-  const targetRate = parseFloat(document.getElementById('wiTargetRate').value) || 0;
-  const taxRate = parseFloat(document.getElementById('wiTaxRate').value) || 0;
-  const taxMultiplier = (100 - taxRate) / 100;
-  
-  let totalMoved = 0;
-  moveInputs.forEach(input => {
-    let val = parseFloat(input.value) || 0;
-    const max = parseFloat(input.dataset.max);
-    if (val > max) { val = max; input.value = max; }
-    if (val < 0) { val = 0; input.value = 0; }
-    totalMoved += val;
-  });
-
-  const currentGrossYield = accounts.reduce((s,a) => s + (a.balance>0 ? a.balance*(a.rate||0)/100 : 0), 0);
-  const currentNetYield = currentGrossYield * taxMultiplier;
-
-  const newGrossYield = currentGrossYield + (totalMoved * targetRate / 100);
-  const newNetYield = newGrossYield * taxMultiplier;
-  const yearlyGain = newNetYield - currentNetYield;
-  const monthlyGain = yearlyGain / 12;
-
-  document.getElementById('wiCurrentYield').textContent = `₱${fmtk(currentNetYield)}/yr`;
-  document.getElementById('wiNewYield').textContent = `₱${fmtk(newNetYield)}/yr`;
-  document.getElementById('wiGain').textContent = `+₱${monthlyGain.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}/mo`;
-  document.getElementById('wiGainYearly').textContent = `+₱${fmtk(yearlyGain)}/yr`;
 }
 
 function openYieldBreakdown() {

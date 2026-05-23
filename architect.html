@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>portfolio</title>
+<script src="https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f8f7f4;--surface:#fff;--border:#e2e0d8;--border-strong:#c8c5bb;
+  --text:#1a1917;--text-muted:#6b6860;--text-faint:#9c9a94;
+  --accent:#1a6b3c;--accent-bg:#eaf4ee;--accent-light:#d0e9d9;
+  --danger:#a32d2d;--danger-bg:#fcebeb;
+  --warning:#854f0b;--warning-bg:#faeeda;
+  --info:#185fa5;--info-bg:#e6f1fb;
+  --r:8px;--rl:12px;
+}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh;padding-bottom:120px}
+
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+header h1{font-size:17px;font-weight:600;letter-spacing:-.3px}
+
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border:1px solid var(--border-strong);border-radius:var(--r);background:var(--surface);color:var(--text);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .12s}
+.btn:hover{background:var(--bg)}
+.btn-primary{background:var(--text);color:#fff;border-color:var(--text)}
+.btn-sm{padding:4px 8px;font-size:11px}
+
+main{max-width:1000px;margin:0 auto;padding:24px 16px;display:grid;grid-template-columns:1fr 1.2fr;gap:24px}
+@media(max-width:768px){main{grid-template-columns:1fr}}
+
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;height:fit-content}
+.panel-h{padding:12px 16px;background:var(--bg);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.panel-title{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);font-weight:600}
+.panel-content{padding:16px;display:flex;flex-direction:column;gap:12px}
+
+.filters{display:flex;gap:5px;flex-wrap:wrap;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border)}
+.filter-chip{padding:3px 10px;border:1px solid var(--border-strong);border-radius:99px;font-size:11px;cursor:pointer;background:var(--surface);color:var(--text-muted);transition:all .12s;user-select:none}
+.filter-chip:hover{border-color:var(--text-muted)}
+.filter-chip.active{background:var(--text);color:#fff;border-color:var(--text)}
+.filter-chip.tag-td.active{background:var(--accent);border-color:var(--accent)}
+.filter-chip.tag-savings.active{background:#3b6d11;border-color:#3b6d11}
+.filter-chip.tag-buffer.active{background:var(--warning);border-color:var(--warning)}
+.filter-chip.tag-credit.active{background:var(--danger);border-color:var(--danger)}
+.filter-chip.tag-illiquid.active{background:#5f5e5a;border-color:#5f5e5a}
+.filter-chip.tag-cash.active{background:#444;border-color:#444}
+
+.source-item, .bucket-item{padding:12px;border:1px solid var(--border);border-radius:var(--r);display:flex;flex-direction:column;gap:8px}
+.source-meta{display:flex;justify-content:space-between;align-items:flex-start}
+.source-label{font-weight:600;font-size:13px}
+.source-bal{font-size:11px;color:var(--text-faint)}
+.move-row{display:flex;align-items:center;gap:10px}
+input[type="range"]{flex:1;accent-color:var(--text)}
+input[type="number"]{width:80px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:4px;font-size:12px}
+
+.bucket-item{border-style:dashed;background:var(--bg)}
+.bucket-item.active{border-style:solid;background:var(--surface)}
+.bucket-row{display:grid;grid-template-columns:1.5fr 1fr 1fr auto;gap:8px}
+.bucket-row label{font-size:9px;color:var(--text-faint);text-transform:uppercase;margin-bottom:2px;display:block}
+
+.impact-bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:min(940px,95vw);background:var(--text);color:#fff;border-radius:var(--rl);padding:16px 24px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 8px 32px rgba(0,0,0,0.2);z-index:200}
+.impact-stat{display:flex;flex-direction:column}
+.impact-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-faint)}
+.impact-val{font-size:18px;font-weight:600;font-family:monospace}
+.impact-sep{width:1px;height:30px;background:rgba(255,255,255,0.1)}
+.impact-gain{color:var(--accent-light)}
+
+.tag{display:inline-block;padding:1px 6px;border-radius:4px;font-size:9px;text-transform:uppercase}
+.tag-illiq{background:var(--warning-bg);color:var(--warning)}
+.tag-liquid{background:var(--accent-bg);color:var(--accent)}
+
+.empty{text-align:center;padding:24px;color:var(--text-faint);font-size:13px}
+</style>
+<meta name="theme-color" content="#f7f6f2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="imago">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/imago-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+</head>
+<body>
+
+<header>
+  <h1>portfolio</h1>
+  <div style="display:flex; gap:8px;">
+    <button class="btn" onclick="importSim()">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,10 3,13 13,13 13,10"/><polyline points="5,7 8,10 11,7"/><line x1="8" y1="3" x2="8" y2="10"/></svg>
+      Import
+    </button>
+    <button class="btn" onclick="exportSim()">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,6 3,3 13,3 13,6"/><polyline points="5,9 8,6 11,9"/><line x1="8" y1="13" x2="8" y2="6"/></svg>
+      Export
+    </button>
+    <button class="btn" onclick="location.href='finance.html'">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8h10M3 8l4-4M3 8l4 4"/></svg>
+      Dashboard
+    </button>
+  </div>
+</header>
+
+<main>
+  <!-- Sources -->
+  <section class="panel">
+    <div class="panel-h">
+      <span class="panel-title">Sources (Your Funds)</span>
+      <span id="sourceTotal" style="font-size:11px;color:var(--text-faint)">Available: ₱0</span>
+    </div>
+    <div class="filters" id="filterBar"></div>
+    <div class="panel-content" id="sourceList">
+      <div class="empty">Loading accounts…</div>
+    </div>
+  </section>
+
+  <!-- Targets -->
+  <section class="panel">
+    <div class="panel-h">
+      <span class="panel-title">Investment Targets</span>
+      <button class="btn btn-sm" onclick="addBucket()">+ Add Bucket</button>
+    </div>
+    <div class="panel-content" id="bucketList">
+      <!-- Generated -->
+    </div>
+    <div style="padding:12px 16px; border-top:1px solid var(--border); font-size:11px; color:var(--text-faint);">
+      Money not moved remains in its original account/rate.
+    </div>
+  </section>
+</main>
+
+<div class="impact-bar">
+  <div class="impact-stat">
+    <span class="impact-lbl">Current Yield</span>
+    <span class="impact-val" id="statCurrent">₱0/yr</span>
+  </div>
+  <div class="impact-sep"></div>
+  <div class="impact-stat">
+    <span class="impact-lbl">Simulated Yield</span>
+    <span class="impact-val" id="statNew">₱0/yr</span>
+  </div>
+  <div class="impact-sep"></div>
+  <div class="impact-stat">
+    <span class="impact-lbl">Yearly Gain</span>
+    <span class="impact-val impact-gain" id="statYearly">+₱0/yr</span>
+  </div>
+  <div class="impact-sep"></div>
+  <div class="impact-stat">
+    <span class="impact-lbl">Monthly Gain</span>
+    <span class="impact-val impact-gain" id="statGain">+₱0.00</span>
+  </div>
+  <div class="impact-sep"></div>
+  <div class="impact-stat">
+    <span class="impact-lbl">Simulated Liquidity</span>
+    <span class="impact-val" id="statLiquid">₱0</span>
+  </div>
+</div>
+
+<script>
+const db = new Dexie('FinanceTrackerV2');
+db.version(4).stores({ accounts:'id,key,label', history:'id,date', logs:'id,accountId,date' });
+
+const STORAGE_KEY = 'imago-architect-state';
+let _accounts = [];
+let _activeTag = 'all';
+let _buckets = [
+  { id: 'b1', name: 'PAG-IBIG MP2', rate: 7, tax: 0, tag: 'illiquid', allocated: 0 },
+  { id: 'b2', name: 'High Yield Savings', rate: 5, tax: 20, tag: 'liquid', allocated: 0 }
+];
+
+// Persistence
+function save() {
+  const moveMap = {};
+  _accounts.forEach(a => { if(a.moveAmount > 0) moveMap[a.id] = a.moveAmount; });
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ buckets: _buckets, moves: moveMap }));
+}
+
+function load() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (!saved) return;
+  try {
+    const parsed = JSON.parse(saved);
+    if (parsed.buckets) _buckets = parsed.buckets;
+    if (parsed.moves) {
+      _accounts.forEach(a => {
+        if (parsed.moves[a.id]) a.moveAmount = parsed.moves[a.id];
+      });
+    }
+  } catch(e) { console.error('Failed to load simulation', e); }
+}
+
+function exportSim() {
+  const moveMap = {};
+  _accounts.forEach(a => { if(a.moveAmount > 0) moveMap[a.id] = a.moveAmount; });
+  const data = { buckets: _buckets, moves: moveMap, exported_at: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `portfolio_architect_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importSim() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const parsed = JSON.parse(ev.target.result);
+        if (parsed.buckets) _buckets = parsed.buckets;
+        if (parsed.moves) {
+          _accounts.forEach(a => {
+            a.moveAmount = parsed.moves[a.id] || 0;
+          });
+        }
+        save();
+        renderSources();
+        renderBuckets();
+        updateImpact();
+      } catch(err) { alert('Invalid simulation file'); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+// Utility
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtk(v) {
+  const av = Math.abs(v);
+  if (av >= 1000000) return (v / 1000000).toFixed(2) + 'M';
+  if (av >= 1000) return (v / 1000).toFixed(1) + 'k';
+  return v.toFixed(0);
+}
+
+async function init() {
+  const accs = await db.accounts.toArray();
+  _accounts = accs.filter(a => a.balance > 0).map(a => ({
+    ...a,
+    moveAmount: 0
+  }));
+  
+  load();
+  distributePool();
+  renderFilterBar();
+  renderSources();
+  renderBuckets();
+  updateImpact();
+}
+
+function renderFilterBar() {
+  const tags = new Set(['all']);
+  _accounts.forEach(a => (a.tags||[]).forEach(t => tags.add(t)));
+  
+  const bar = document.getElementById('filterBar');
+  bar.innerHTML = [...tags].map(t => `
+    <div class="filter-chip ${t==='all'?'':'tag-'+t} ${_activeTag===t?'active':''}" onclick="setFilter('${t}')">
+      ${t}
+    </div>
+  `).join('');
+}
+
+function setFilter(tag) {
+  _activeTag = tag;
+  renderFilterBar();
+  renderSources();
+}
+
+function renderSources() {
+  const list = document.getElementById('sourceList');
+  const filtered = _accounts.filter(a => _activeTag === 'all' || (a.tags||[]).includes(_activeTag));
+  
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="empty">No accounts matching "${_activeTag}".</div>`;
+    return;
+  }
+  
+  list.innerHTML = filtered.map((a) => {
+    const idx = _accounts.indexOf(a);
+    return `
+    <div class="source-item">
+      <div class="source-meta">
+        <div>
+          <div class="source-label">${esc(a.label||a.key)}</div>
+          <div class="source-bal">Available: ₱${fmtk(a.balance)} · Rate: ${a.rate||0}%</div>
+        </div>
+        <div style="font-weight:600; font-family:monospace;">₱${fmtk(a.balance - a.moveAmount)} left</div>
+      </div>
+      <div class="move-row">
+        <input type="range" min="0" max="${a.balance}" step="1000" value="${a.moveAmount}" oninput="onMoveChange(${idx}, this.value)">
+        <input type="number" value="${a.moveAmount}" oninput="onMoveChange(${idx}, this.value)">
+      </div>
+    </div>
+  `}).join('');
+
+  const totalAvail = _accounts.reduce((s, a) => s + a.balance, 0);
+  document.getElementById('sourceTotal').textContent = `Available: ₱${fmtk(totalAvail)}`;
+}
+
+function onMoveChange(idx, val) {
+  val = parseFloat(val) || 0;
+  if (val > _accounts[idx].balance) val = _accounts[idx].balance;
+  if (val < 0) val = 0;
+  
+  _accounts[idx].moveAmount = val;
+  save();
+  renderSources();
+  distributePool();
+}
+
+function addBucket() {
+  _buckets.push({
+    id: 'b' + Date.now(),
+    name: 'New Bucket',
+    rate: 5,
+    tax: 20,
+    tag: 'liquid',
+    allocated: 0
+  });
+  save();
+  distributePool();
+}
+
+function removeBucket(id) {
+  _buckets = _buckets.filter(b => b.id !== id);
+  save();
+  distributePool();
+}
+
+function onBucketChange(id, field, val) {
+  const b = _buckets.find(x => x.id === id);
+  if (!b) return;
+  if (field === 'rate' || field === 'tax') b[field] = parseFloat(val) || 0;
+  else b[field] = val;
+  save();
+  updateImpact();
+}
+
+function renderBuckets() {
+  const list = document.getElementById('bucketList');
+  list.innerHTML = _buckets.map(b => `
+    <div class="bucket-item active">
+      <div class="bucket-row" style="margin-bottom:8px">
+        <div>
+          <label>Bucket Name</label>
+          <input type="text" value="${esc(b.name)}" style="width:100%; padding:4px; font-weight:600" oninput="onBucketChange('${b.id}', 'name', this.value)">
+        </div>
+        <div>
+          <label>Rate (%)</label>
+          <input type="number" step="0.1" value="${b.rate}" oninput="onBucketChange('${b.id}', 'rate', this.value)">
+        </div>
+        <div>
+          <label>Tax (%)</label>
+          <input type="number" step="1" value="${b.tax}" oninput="onBucketChange('${b.id}', 'tax', this.value)">
+        </div>
+        <button class="btn btn-sm" onclick="removeBucket('${b.id}')" style="color:var(--danger); border:none; margin-top:14px">×</button>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center">
+        <div>
+          <label>Liquidity</label>
+          <select onchange="onBucketChange('${b.id}', 'tag', this.value)" style="font-size:11px; padding:2px">
+            <option value="liquid" ${b.tag==='liquid'?'selected':''}>Liquid</option>
+            <option value="illiquid" ${b.tag==='illiquid'?'selected':''}>Illiquid</option>
+          </select>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:10px; color:var(--text-faint)">Allocated</div>
+          <div style="font-weight:600; font-family:monospace">₱${fmtk(b.allocated)}</div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function distributePool() {
+  const totalPool = _accounts.reduce((s, a) => s + a.moveAmount, 0);
+  
+  // Simple logic: First bucket gets everything for now
+  // In a more complex version, we could add sliders for targets too
+  _buckets.forEach((b, i) => {
+    b.allocated = (i === 0) ? totalPool : 0;
+  });
+  
+  renderBuckets();
+  updateImpact();
+}
+
+function updateImpact() {
+  // Current Yield Calculation
+  const currentGross = _accounts.reduce((s, a) => s + (a.balance * (a.rate || 0) / 100), 0);
+  const currentNet = currentGross * 0.8;
+  
+  // Simulated Yield Calculation
+  // 1. Yield from remaining source funds
+  const remainingNet = _accounts.reduce((s, a) => {
+    const remaining = a.balance - a.moveAmount;
+    return s + (remaining * (a.rate || 0) / 100 * 0.8);
+  }, 0);
+  
+  // 2. Yield from buckets
+  const bucketsNet = _buckets.reduce((s, b) => {
+    const taxMultiplier = (100 - b.tax) / 100;
+    return s + (b.allocated * (b.rate / 100) * taxMultiplier);
+  }, 0);
+  
+  const simulatedNet = remainingNet + bucketsNet;
+  const gain = simulatedNet - currentNet;
+  
+  // Liquidity Calculation
+  // We assume everything not illiquid/td is liquid.
+  const initialLiquid = _accounts.filter(a => !a.tags?.includes('illiquid') && !a.tags?.includes('td'))
+                                 .reduce((s, a) => s + a.balance, 0);
+  
+  const movedToIlliquid = _buckets.filter(b => b.tag === 'illiquid')
+                                  .reduce((s, b) => s + b.allocated, 0);
+                                  
+  const simulatedLiquid = initialLiquid - _accounts.filter(a => !a.tags?.includes('illiquid') && !a.tags?.includes('td'))
+                                                  .reduce((s, a) => s + a.moveAmount, 0)
+                                        + _buckets.filter(b => b.tag === 'liquid')
+                                                  .reduce((s, b) => s + b.allocated, 0);
+  // Simpler approach: initial - any reduction in liquid sources + any increase in liquid targets
+  
+  document.getElementById('statCurrent').textContent = `₱${fmtk(currentNet)}/yr`;
+  document.getElementById('statNew').textContent = `₱${fmtk(simulatedNet)}/yr`;
+  document.getElementById('statYearly').textContent = `${gain >= 0 ? '+' : ''}₱${fmtk(gain)}/yr`;
+  document.getElementById('statGain').textContent = `${gain >= 0 ? '+' : ''}₱${(gain/12).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}/mo`;
+  document.getElementById('statLiquid').textContent = `₱${fmtk(simulatedLiquid)}`;
+  document.getElementById('statLiquid').style.color = simulatedLiquid < initialLiquid ? 'var(--warning)' : 'var(--accent)';
+}
+
+init();
+</script>
+  <script src="pwa-register.js"></script>
+</body>
+</html>

@@ -2,6 +2,7 @@ const CACHE_NAME = 'imago-shell-v2';
 const APP_SHELL = [
   './',
   // BEGIN GENERATED HTML PAGES
+  './architect.html',
   './filling-up.html',
   './finance.html',
   './habits.html',
