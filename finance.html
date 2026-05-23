@@ -376,7 +376,20 @@ async function autoSnapshot() {
   const total    = accounts.reduce((s,a) => s + (a.balance||0), 0);
   const today    = new Date().toISOString().slice(0,10);
   const id       = 'h-' + today.replace(/-/g,'');
-  await db.history.put({ id, date:today, total, auto:true });
+
+  // Check the latest history entry
+  const lastEntry = await db.history.orderBy('date').last();
+  
+  // If we have a same-day entry, always update it to reflect the latest state
+  if (lastEntry && lastEntry.date === today) {
+    await db.history.put({ id, date:today, total, auto:true });
+    return;
+  }
+
+  // If it's a new day, only save if the total has changed
+  if (!lastEntry || Math.abs(lastEntry.total - total) > 0.001) {
+    await db.history.put({ id, date:today, total, auto:true });
+  }
 }
 
 // ── Main render ───────────────────────────────────────────────────────────────
