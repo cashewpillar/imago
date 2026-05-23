@@ -596,9 +596,37 @@ function fillBucket(id) {
   }
 }
 
-function distributePool() {
-  renderBuckets();
-  updateImpact();
+function distributePool(isSurgical = false) {
+  const totalPool = _accounts.reduce((s, a) => s + a.moveAmount, 0);
+  let totalAllocated = _buckets.reduce((s, b) => s + b.allocated, 0);
+
+  let bucketValuesChanged = false;
+  if (totalAllocated > totalPool) {
+    let excess = totalAllocated - totalPool;
+    for (let i = _buckets.length - 1; i >= 0; i--) {
+      if (excess <= 0) break;
+      const b = _buckets[i];
+      const shrink = Math.min(b.allocated, excess);
+      if (shrink > 0) {
+        b.allocated -= shrink;
+        excess -= shrink;
+        bucketValuesChanged = true;
+      }
+    }
+    if (bucketValuesChanged) save();
+  }
+
+  if (isSurgical && !bucketValuesChanged) {
+    updateUnallocatedUI();
+    updateImpact();
+    _buckets.forEach(b => {
+      const el = document.getElementById(`bucket-range-${b.id}`);
+      if (el) el.max = totalPool;
+    });
+  } else {
+    renderBuckets();
+    updateImpact();
+  }
 }
 function updateImpact() {
   // Current Yield Calculation
