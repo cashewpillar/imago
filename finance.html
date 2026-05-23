@@ -89,6 +89,18 @@ td.actions{text-align:right;white-space:nowrap}
 .maturity{font-size:12px;color:var(--text-faint)}
 .yield-micro{font-size:10px;color:var(--text-faint)}
 
+.mat-badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-top: 2px;
+  font-weight: 500;
+}
+.mat-urgent { background: var(--danger-bg); color: var(--danger); border: 1px solid #f7c1c1; }
+.mat-near { background: var(--warning-bg); color: var(--warning); border: 1px solid #f2dab3; }
+.mat-far { background: var(--bg); color: var(--text-faint); border: 1px solid var(--border); }
+
 .icon-btn{background:none;border:none;cursor:pointer;color:var(--text-faint);padding:3px 5px;border-radius:var(--r);display:inline-flex;align-items:center}
 .icon-btn:hover{background:var(--bg);color:var(--text)}
 .icon-btn svg{width:13px;height:13px}
@@ -625,7 +637,37 @@ function renderTable(allAccounts) {
     const balClass = bal>0 ? 'bal-pos' : bal<0 ? 'bal-neg' : 'bal-zero';
     const tag      = (a.tags||['savings'])[0];
     const yldAnn   = a.rate && bal>0 ? (bal*a.rate/100).toFixed(1) : null;
-    const matDisp  = a.maturity ? new Date(a.maturity).toLocaleDateString(undefined, {month:'short', year:'numeric', timeZone:'UTC'}) : '—';
+    
+    let matDisp = '—';
+    let matBadge = '';
+    if (a.maturity) {
+      const matDate = new Date(a.maturity);
+      matDisp = matDate.toLocaleDateString(undefined, {month:'short', year:'numeric', timeZone:'UTC'});
+      
+      const now = new Date();
+      const diffMs = matDate - now;
+      const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      
+      if (diffDays > 0) {
+        let label = '';
+        let cls = '';
+        if (diffDays < 7) {
+          label = `${diffDays}d`;
+          cls = 'mat-urgent';
+        } else if (diffDays < 30) {
+          label = `${diffDays}d`;
+          cls = 'mat-near';
+        } else {
+          const months = Math.floor(diffDays / 30);
+          label = `${months}mo`;
+          cls = months <= 2 ? 'mat-near' : 'mat-far';
+        }
+        matBadge = `<div class="mat-badge ${cls}">${label}</div>`;
+      } else if (diffDays <= 0) {
+        matBadge = `<div class="mat-badge mat-urgent">Matured</div>`;
+      }
+    }
+
     return `<tr>
       <td>
         <span style="font-weight:500">${esc(a.label||a.key)}</span>
@@ -636,7 +678,10 @@ function renderTable(allAccounts) {
         <span class="rate-badge">${a.rate!=null ? a.rate+'%' : '—'}</span>
         ${yldAnn ? `<div class="yield-micro">~₱${yldAnn}k/yr</div>` : ''}
       </td>
-      <td><span class="maturity">${matDisp}</span></td>
+      <td>
+        <div class="maturity">${matDisp}</div>
+        ${matBadge}
+      </td>
       <td class="num"><span class="${balClass}">₱${fmtk(bal)}</span></td>
       <td class="actions">
         <button class="icon-btn" onclick="editAccount('${esc(a.id)}')" title="Edit">
