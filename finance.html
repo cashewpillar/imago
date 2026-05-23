@@ -209,7 +209,7 @@ td.actions{text-align:right;white-space:nowrap}
       <div class="form-row"><label>Label</label><input type="text" id="fLabel" placeholder="Maya Savings"></div>
     </div>
     <div class="form-grid">
-      <div class="form-row"><label>Balance (₱k)</label><input type="number" id="fBalance" step="0.01" placeholder="0"></div>
+      <div class="form-row"><label>Balance</label><input type="number" id="fBalance" step="0.01" placeholder="0"></div>
       <div class="form-row"><label>Rate (%)</label><input type="number" id="fRate" step="0.01" placeholder="0"></div>
     </div>
     <div class="form-grid">
@@ -325,6 +325,15 @@ db.version(3).stores({ accounts:'id,key,label', history:'id,date', logs:'id,acco
     }
   });
 });
+db.version(4).stores({ accounts:'id,key,label', history:'id,date', logs:'id,accountId,date' }).upgrade(tx => {
+  // Migrate from "k" units to full pesos
+  tx.accounts.toCollection().modify(acc => { if(acc.balance) acc.balance *= 1000; });
+  tx.history.toCollection().modify(h => { if(h.total) h.total *= 1000; });
+  tx.logs.toCollection().modify(l => { 
+    if(l.balance) l.balance *= 1000;
+    if(l.change) l.change *= 1000;
+  });
+});
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let _editId   = null;
@@ -345,8 +354,9 @@ function esc(s) {
 }
 function fmtk(v) {
   const av = Math.abs(v);
-  if (av >= 1000) return (v / 1000).toFixed(2) + 'M';
-  return v.toFixed(0) + 'k';
+  if (av >= 1000000) return (v / 1000000).toFixed(2) + 'M';
+  if (av >= 1000) return (v / 1000).toFixed(1) + 'k';
+  return v.toFixed(0);
 }
 function sortBy(col) {
   if (_sortCol === col) {
@@ -466,7 +476,7 @@ function renderSummary(accounts) {
         <div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border-strong); padding-bottom:2px; margin-bottom:2px;"><span>Tax (20%)</span> <span class="col-neg">-₱${fmtk(grossYld * 0.2)}</span></div>
         <div style="display:flex; justify-content:space-between; font-weight:600; color:var(--warning);"><span>Net Annual</span> <span>₱${fmtk(netYld)}</span></div>
         <div style="display:flex; justify-content:space-between; margin-top:4px; opacity:0.8;"><span>Monthly</span> <span>₱${fmtk(netYld/12)}</span></div>
-        <div style="display:flex; justify-content:space-between; opacity:0.8;"><span>Daily</span> <span>₱${(netYld/365*1000).toFixed(0)}</span></div>
+        <div style="display:flex; justify-content:space-between; opacity:0.8;"><span>Daily</span> <span>₱${fmtk(netYld/365)}</span></div>
       </div>
     </div>
   `;
@@ -711,7 +721,7 @@ function renderTable(allAccounts) {
       <td><span class="tag ${tag}">${tag}</span></td>
       <td>
         <span class="rate-badge">${a.rate!=null ? a.rate+'%' : '—'}</span>
-        ${yldAnn ? `<div class="yield-micro">~₱${yldAnn}k/yr</div>` : ''}
+        ${yldAnn ? `<div class="yield-micro">~₱${fmtk(yldAnn)}/yr</div>` : ''}
       </td>
       <td>
         <div class="maturity">${matDisp}</div>
@@ -737,6 +747,7 @@ function openAddAccount() {
   ['fKey','fLabel','fBalance','fRate','fMaturity','fNote','fChangeNote'].forEach(id => document.getElementById(id).value='');
   document.getElementById('fTag').value = 'savings';
   document.getElementById('accountHistorySection').style.display = 'none';
+  document.getElementById('changeReasonRow').style.display = 'none';
   openModal('accountModal');
 }
 
@@ -753,6 +764,7 @@ async function editAccount(id) {
   document.getElementById('fNote').value     = a.note||'';
   document.getElementById('fChangeNote').value = '';
   document.getElementById('fTag').value      = (a.tags||['savings'])[0];
+  document.getElementById('changeReasonRow').style.display = 'block';
 
   // Render per-account history
   const history = await db.logs.where('accountId').equals(id).reverse().limit(10).toArray();
@@ -764,7 +776,7 @@ async function editAccount(id) {
     list.innerHTML = history.map(h => {
       const date = new Date(h.date).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit'});
       const diff = h.change || 0;
-      const diffStr = diff > 0 ? `+₱${diff.toFixed(1)}k` : diff < 0 ? `-₱${Math.abs(diff).toFixed(1)}k` : 'no change';
+      const diffStr = diff > 0 ? `+₱${fmtk(diff)}` : diff < 0 ? `-₱${fmtk(Math.abs(diff))}` : 'no change';
       const diffCls = diff > 0 ? 'col-pos' : diff < 0 ? 'col-neg' : '';
       return `
         <div class="history-item">
@@ -773,7 +785,7 @@ async function editAccount(id) {
             <span class="history-change ${diffCls}">${diffStr}</span>
           </div>
           ${h.note ? `<div class="history-note">${esc(h.note)}</div>` : ''}
-          <div style="font-size:10px;color:var(--text-faint)">New balance: ₱${(h.balance||0).toFixed(1)}k</div>
+          <div style="font-size:10px;color:var(--text-faint)">New balance: ₱${fmtk(h.balance||0)}</div>
         </div>
       `;
     }).join('');
@@ -974,7 +986,7 @@ function updateWhatIf() {
 
   document.getElementById('wiCurrentYield').textContent = `₱${fmtk(currentNetYield)}/yr`;
   document.getElementById('wiNewYield').textContent = `₱${fmtk(newNetYield)}/yr`;
-  document.getElementById('wiGain').textContent = `+₱${(monthlyGain * 1000).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}/mo`;
+  document.getElementById('wiGain').textContent = `+₱${monthlyGain.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}/mo`;
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
