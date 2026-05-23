@@ -161,10 +161,11 @@ db.version(4).stores({ accounts:'id,key,label', history:'id,date', logs:'id,acco
 
 const STORAGE_KEY = 'imago-architect-state';
 let _accounts = [];
+let _liabilitiesTotal = 0;
 let _activeTag = 'all';
 let _buckets = [
-  { id: 'b1', name: 'PAG-IBIG MP2', rate: 7, tax: 0, tag: 'illiquid', allocated: 0 },
-  { id: 'b2', name: 'High Yield Savings', rate: 5, tax: 20, tag: 'liquid', allocated: 0 }
+  { id: 'b1', name: 'PAG-IBIG MP2', rate: 7, tax: 0, tag: 'illiquid', allocated: 0, notes: '' },
+  { id: 'b2', name: 'High Yield Savings', rate: 5, tax: 20, tag: 'liquid', allocated: 0, notes: '' }
 ];
 
 // Persistence
@@ -240,6 +241,11 @@ function fmtk(v) {
 
 async function init() {
   const accs = await db.accounts.toArray();
+  
+  // Credit accounts are treated as liabilities in the dashboard
+  _liabilitiesTotal = accs.filter(a => a.tags?.includes('credit'))
+                          .reduce((s, a) => s + (a.balance || 0), 0);
+
   _accounts = accs.filter(a => a.balance > 0).map(a => ({
     ...a,
     moveAmount: 0
@@ -320,7 +326,8 @@ function addBucket() {
     rate: 5,
     tax: 20,
     tag: 'liquid',
-    allocated: 0
+    allocated: 0,
+    notes: ''
   });
   save();
   distributePool();
@@ -360,9 +367,9 @@ function renderBuckets() {
         </div>
         <button class="btn btn-sm" onclick="removeBucket('${b.id}')" style="color:var(--danger); border:none; margin-top:14px">×</button>
       </div>
-      <div style="display:flex; justify-content:space-between; align-items:center">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
         <div>
-          <label>Liquidity</label>
+          <label style="font-size:9px;color:var(--text-faint);text-transform:uppercase;margin-bottom:2px;display:block">Liquidity</label>
           <select onchange="onBucketChange('${b.id}', 'tag', this.value)" style="font-size:11px; padding:2px">
             <option value="liquid" ${b.tag==='liquid'?'selected':''}>Liquid</option>
             <option value="illiquid" ${b.tag==='illiquid'?'selected':''}>Illiquid</option>
@@ -372,6 +379,10 @@ function renderBuckets() {
           <div style="font-size:10px; color:var(--text-faint)">Allocated</div>
           <div style="font-weight:600; font-family:monospace">₱${fmtk(b.allocated)}</div>
         </div>
+      </div>
+      <div>
+        <label style="font-size:9px;color:var(--text-faint);text-transform:uppercase;margin-bottom:2px;display:block">Notes</label>
+        <input type="text" value="${esc(b.notes)}" placeholder="Add notes..." style="width:100%; padding:4px; font-size:11px; border:1px solid var(--border); border-radius:4px; background:var(--bg)" oninput="onBucketChange('${b.id}', 'notes', this.value)">
       </div>
     </div>
   `).join('');
@@ -413,8 +424,9 @@ function updateImpact() {
   
   // Liquidity Calculation
   // We assume everything not illiquid/td is liquid.
+  // We also subtract liabilities (credit) to match the dashboard's "Net Liquid"
   const initialLiquid = _accounts.filter(a => !a.tags?.includes('illiquid') && !a.tags?.includes('td'))
-                                 .reduce((s, a) => s + a.balance, 0);
+                                 .reduce((s, a) => s + a.balance, 0) + _liabilitiesTotal;
   
   const movedToIlliquid = _buckets.filter(b => b.tag === 'illiquid')
                                   .reduce((s, b) => s + b.allocated, 0);
