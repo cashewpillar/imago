@@ -70,6 +70,13 @@ input[type="number"]{width:80px;padding:4px 8px;border:1px solid var(--border-st
 .tag-liquid{background:var(--accent-bg);color:var(--accent)}
 
 .empty{text-align:center;padding:24px;color:var(--text-faint);font-size:13px}
+
+.chart-container{display:flex;flex-direction:row;align-items:center;gap:24px;padding:16px 20px}
+.chart-legend{display:flex;flex-direction:column;gap:6px;flex:3;min-width:0}
+canvas#allocationChart{flex:2;min-width:0;max-width:160px;height:auto}
+.legend-item{display:flex;align-items:center;gap:8px;font-size:11px;white-space:nowrap}
+.legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.legend-val{color:var(--text-faint);margin-left:auto;padding-left:12px;font-family:monospace}
 </style>
 <meta name="theme-color" content="#f7f6f2">
 <meta name="mobile-web-app-capable" content="yes">
@@ -113,19 +120,33 @@ input[type="number"]{width:80px;padding:4px 8px;border:1px solid var(--border-st
     </div>
   </section>
 
-  <!-- Targets -->
-  <section class="panel">
-    <div class="panel-h">
-      <span class="panel-title">Investment Targets</span>
-      <button class="btn btn-sm" onclick="addBucket()">+ Add Bucket</button>
-    </div>
-    <div class="panel-content" id="bucketList">
-      <!-- Generated -->
-    </div>
-    <div style="padding:12px 16px; border-top:1px solid var(--border); font-size:11px; color:var(--text-faint);">
-      Money not moved remains in its original account/rate.
-    </div>
-  </section>
+  <!-- Right Side: Chart and Targets -->
+  <div style="display:flex; flex-direction:column; gap:24px">
+    <!-- Allocation Chart -->
+    <section class="panel">
+      <div class="panel-h">
+        <span class="panel-title">Allocation Playground</span>
+      </div>
+      <div class="panel-content chart-container" id="chartContainer">
+        <canvas id="allocationChart"></canvas>
+        <div id="chartLegend" class="chart-legend"></div>
+      </div>
+    </section>
+
+    <!-- Targets -->
+    <section class="panel">
+      <div class="panel-h">
+        <span class="panel-title">Investment Targets</span>
+        <button class="btn btn-sm" onclick="addBucket()">+ Add Bucket</button>
+      </div>
+      <div class="panel-content" id="bucketList">
+        <!-- Generated -->
+      </div>
+      <div style="padding:12px 16px; border-top:1px solid var(--border); font-size:11px; color:var(--text-faint);">
+        Money not moved remains in its original account/rate.
+      </div>
+    </section>
+  </div>
 </main>
 
 <div class="impact-bar">
@@ -239,6 +260,107 @@ function fmtk(v) {
   return v.toFixed(0);
 }
 
+const TAG_COLORS = {
+  savings:  '#1a6b3c',
+  td:       '#2d8f5e',
+  buffer:   '#b87b1a',
+  cash:     '#5f5e5a',
+  illiquid: '#8a8780',
+  liquid:   '#4f8c6d',
+  credit:   '#a32d2d',
+};
+const BUCKET_COLORS = ['#6366f1', '#f43f5e', '#f59e0b', '#06b6d4', '#a855f7'];
+function tagColor(t) { return TAG_COLORS[t] || '#999'; }
+
+function renderChart() {
+  const canvas = document.getElementById('allocationChart');
+  const legend = document.getElementById('chartLegend');
+  if (!canvas) return;
+
+  const groups = {};
+  const groupColors = {};
+
+  _accounts.forEach(a => {
+    const remaining = a.balance - a.moveAmount;
+    if (remaining > 0) {
+      const tag = (a.tags && a.tags[0]) || 'savings';
+      groups[tag] = (groups[tag] || 0) + remaining;
+      groupColors[tag] = tagColor(tag);
+    }
+  });
+
+  _buckets.forEach((b, i) => {
+    if (b.allocated > 0) {
+      groups[b.name] = (groups[b.name] || 0) + b.allocated;
+      groupColors[b.name] = BUCKET_COLORS[i % BUCKET_COLORS.length];
+    }
+  });
+
+  const entries = Object.entries(groups).sort((a,b) => b[1]-a[1]);
+  const total = entries.reduce((s,[,v]) => s+v, 0);
+
+  if (total <= 0) {
+    canvas.style.display = 'none';
+    legend.innerHTML = '<div class="empty">No funds allocated.</div>';
+    return;
+  }
+
+  canvas.style.display = 'block';
+  const SIZE = 160;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = SIZE * dpr;
+  canvas.height = SIZE * dpr;
+  canvas.style.width = '100%';
+  canvas.style.maxWidth = SIZE + 'px';
+  canvas.style.height = 'auto';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0,0,SIZE,SIZE);
+
+  const cx = SIZE/2, cy = SIZE/2, R = SIZE/2 - 8, INNER = R * 0.55;
+  const GAP = entries.length > 1 ? 0.02 : 0;
+
+  let slices = [];
+  let angle = -Math.PI / 2;
+  for (const [name, val] of entries) {
+    const sweep = (val/total) * (Math.PI*2 - GAP * entries.length);
+    slices.push({ name, val, start: angle + GAP/2, sweep, color: groupColors[name] });
+    angle += sweep + GAP;
+  }
+
+  for (const s of slices) {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, R, s.start, s.start + s.sweep);
+    ctx.closePath();
+    ctx.fillStyle = s.color;
+    ctx.fill();
+  }
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, INNER, 0, Math.PI*2);
+  ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--surface') || '#fff';
+  ctx.fill();
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'var(--text)';
+  ctx.font = '600 13px system-ui';
+  ctx.fillText('₱' + fmtk(total), cx, cy - 6);
+  ctx.fillStyle = 'var(--text-faint)';
+  ctx.font = '10px system-ui';
+  ctx.fillText('total', cx, cy + 10);
+
+  legend.innerHTML = entries.map(([name, val]) => `
+    <div class="legend-item">
+      <div class="legend-dot" style="background:${groupColors[name]}"></div>
+      <span>${esc(name)}</span>
+      <span class="legend-val">₱${fmtk(val)}</span>
+    </div>
+  `).join('');
+}
+
 async function init() {
   const accs = await db.accounts.toArray();
   
@@ -350,8 +472,10 @@ function onBucketChange(id, field, val) {
 
 function renderBuckets() {
   const list = document.getElementById('bucketList');
-  list.innerHTML = _buckets.map(b => `
-    <div class="bucket-item active">
+  list.innerHTML = _buckets.map((b, i) => {
+    const color = BUCKET_COLORS[i % BUCKET_COLORS.length];
+    return `
+    <div class="bucket-item active" style="border-left: 3px solid ${color}">
       <div class="bucket-row" style="margin-bottom:8px">
         <div>
           <label>Bucket Name</label>
@@ -385,7 +509,7 @@ function renderBuckets() {
         <input type="text" value="${esc(b.notes)}" placeholder="Add notes..." style="width:100%; padding:4px; font-size:11px; border:1px solid var(--border); border-radius:4px; background:var(--bg)" oninput="onBucketChange('${b.id}', 'notes', this.value)">
       </div>
     </div>
-  `).join('');
+  `}).join('');
 }
 
 function distributePool() {
@@ -443,6 +567,8 @@ function updateImpact() {
   document.getElementById('statGain').textContent = `${gain >= 0 ? '+' : ''}₱${(gain/12).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}/mo`;
   document.getElementById('statLiquid').textContent = `₱${fmtk(simulatedLiquid)}`;
   document.getElementById('statLiquid').style.color = simulatedLiquid < initialLiquid ? 'var(--warning)' : 'var(--accent)';
+
+  renderChart();
 }
 
 init();
