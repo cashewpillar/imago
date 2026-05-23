@@ -112,25 +112,24 @@ canvas#allocationChart{flex:2;min-width:0;max-width:160px;height:auto}
 <main>
   <div class="impact-row">
     <div class="impact-card">
-      <span class="impact-lbl">Current Yield</span>
-      <span class="impact-val" id="statCurrent">₱0/yr</span>
-    </div>
-    <div class="impact-card">
       <span class="impact-lbl">Net Improvement</span>
       <span class="impact-val impact-gain" id="statYearly">+₱0/yr</span>
-      <div style="font-size:9px;color:var(--text-faint);margin-top:2px">vs. baseline</div>
+      <div id="baselineYearly" style="font-size:9px;color:var(--text-faint);margin-top:2px">vs. ₱0/yr baseline</div>
     </div>
     <div class="impact-card">
       <span class="impact-lbl">Monthly Impact</span>
       <span class="impact-val impact-gain" id="statGain">+₱0.00</span>
+      <div id="baselineMonthly" style="font-size:9px;color:var(--text-faint);margin-top:2px">vs. ₱0/mo baseline</div>
     </div>
     <div class="impact-card" style="border-color:var(--accent-light); background:var(--accent-bg)">
       <span class="impact-lbl" style="color:var(--accent)">New Total Yield</span>
       <span class="impact-val" id="statNew" style="color:var(--accent)">₱0/yr</span>
+      <div id="baselineNew" style="font-size:9px;color:var(--text-faint);margin-top:2px">vs. ₱0 baseline</div>
     </div>
     <div class="impact-card">
       <span class="impact-lbl">Simulated Liquidity</span>
       <span class="impact-val" id="statLiquid">₱0</span>
+      <div id="baselineLiquid" style="font-size:9px;color:var(--text-faint);margin-top:2px">vs. ₱0 baseline</div>
     </div>
   </div>
 
@@ -664,11 +663,18 @@ function updateImpact() {
                                                   .reduce((s, b) => s + b.allocated, 0);
   // Simpler approach: initial - any reduction in liquid sources + any increase in liquid targets
   
-  document.getElementById('statCurrent').textContent = `₱${fmtk(currentNet)}/yr`;
   document.getElementById('statNew').textContent = `₱${fmtk(simulatedNet)}/yr`;
+  document.getElementById('baselineNew').textContent = `Originally ₱${fmtk(currentNet)}/yr`;
+  
   document.getElementById('statYearly').textContent = `${gain >= 0 ? '+' : ''}₱${fmtk(gain)}/yr`;
+  document.getElementById('baselineYearly').textContent = `on ₱${fmtk(currentNet)}/yr baseline`;
+
   document.getElementById('statGain').textContent = `${gain >= 0 ? '+' : ''}₱${(gain/12).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}/mo`;
+  document.getElementById('baselineMonthly').textContent = `on ₱${fmtk(currentNet/12)}/mo baseline`;
+
   document.getElementById('statLiquid').textContent = `₱${fmtk(simulatedLiquid)}`;
+  const liqDiff = simulatedLiquid - initialLiquid;
+  document.getElementById('baselineLiquid').textContent = `Originally ₱${fmtk(initialLiquid)} (${liqDiff >= 0 ? '+' : ''}₱${fmtk(liqDiff)})`;
   document.getElementById('statLiquid').style.color = simulatedLiquid < initialLiquid ? 'var(--warning)' : 'var(--accent)';
 
   renderChart();
