@@ -668,7 +668,7 @@ function renderTable(allAccounts) {
     let matBadge = '';
     if (a.maturity) {
       const matDate = new Date(a.maturity);
-      matDisp = matDate.toLocaleDateString(undefined, {month:'short', year:'numeric', timeZone:'UTC'});
+      matDisp = matDate.toLocaleDateString(undefined, {day:'numeric', month:'short', year:'numeric', timeZone:'UTC'});
       
       const now = new Date();
       const diffMs = matDate - now;

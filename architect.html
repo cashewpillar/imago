@@ -77,6 +77,8 @@ canvas#allocationChart{flex:2;min-width:0;max-width:160px;height:auto}
 .legend-item{display:flex;align-items:center;gap:8px;font-size:11px;white-space:nowrap}
 .legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .legend-val{color:var(--text-faint);margin-left:auto;padding-left:12px;font-family:monospace}
+
+.notes-area{width:100%; padding:6px; font-size:11px; border:1px solid var(--border); border-radius:4px; background:var(--bg); resize:none; overflow:hidden; display:block; font-family:inherit; line-height:1.4}
 </style>
 <meta name="theme-color" content="#f7f6f2">
 <meta name="mobile-web-app-capable" content="yes">
@@ -483,21 +485,33 @@ function onBucketChange(id, field, val, isSurgical = false) {
   else b[field] = val;
   save();
 
-  if (field === 'allocated' && isSurgical) {
-    const range = document.getElementById(`bucket-range-${id}`);
-    const num = document.getElementById(`bucket-num-${id}`);
-    const yld = document.getElementById(`bucket-yield-${id}`);
-    if (range) range.value = val;
-    if (num) num.value = val;
-    if (yld) yld.textContent = `₱${fmtk(b.allocated * b.rate / 100 * (100-b.tax)/100)}/yr`;
-
-    // Only update the cross-cutting elements
-    updateUnallocatedUI();
-    updateImpact();
+  if (isSurgical || field === 'notes' || field === 'name') {
+    if (field === 'allocated') {
+      const range = document.getElementById(`bucket-range-${id}`);
+      const num = document.getElementById(`bucket-num-${id}`);
+      const yld = document.getElementById(`bucket-yield-${id}`);
+      if (range) range.value = val;
+      if (num) num.value = val;
+      if (yld) yld.textContent = `₱${fmtk(b.allocated * b.rate / 100 * (100-b.tax)/100)}/yr`;
+      updateUnallocatedUI();
+    }
+    if (field === 'notes') {
+      autoResize(document.getElementById(`bucket-notes-${id}`));
+    }
+    // Update chart if name or allocated changed
+    if (field === 'name' || field === 'allocated') {
+      updateImpact();
+    }
   } else {
     renderBuckets();
     updateImpact();
   }
+}
+
+function autoResize(el) {
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
 }
 
 function updateUnallocatedUI() {
@@ -524,7 +538,7 @@ function renderBuckets() {
       <div class="bucket-row" style="margin-bottom:8px">
         <div>
           <label>Bucket Name</label>
-          <input type="text" value="${esc(b.name)}" style="width:100%; padding:4px; font-weight:600" oninput="onBucketChange('${b.id}', 'name', this.value)">
+          <input type="text" id="bucket-name-${b.id}" value="${esc(b.name)}" style="width:100%; padding:4px; font-weight:600" oninput="onBucketChange('${b.id}', 'name', this.value)">
         </div>
         <div>
           <label>Rate (%)</label>
@@ -560,10 +574,13 @@ function renderBuckets() {
       </div>
       <div style="margin-top:8px">
         <label style="font-size:9px;color:var(--text-faint);text-transform:uppercase;margin-bottom:2px;display:block">Notes</label>
-        <input type="text" value="${esc(b.notes)}" placeholder="Add notes..." style="width:100%; padding:4px; font-size:11px; border:1px solid var(--border); border-radius:4px; background:var(--bg)" oninput="onBucketChange('${b.id}', 'notes', this.value)">
+        <textarea id="bucket-notes-${b.id}" placeholder="Add notes..." class="notes-area" oninput="onBucketChange('${b.id}', 'notes', this.value)">${esc(b.notes)}</textarea>
       </div>
     </div>
   `}).join('');
+
+  // Apply initial height
+  _buckets.forEach(b => autoResize(document.getElementById(`bucket-notes-${b.id}`)));
 }
 
 function fillBucket(id) {
