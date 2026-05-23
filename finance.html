@@ -384,15 +384,17 @@ function renderSummary(accounts) {
   const total  = accounts.reduce((s,a) => s + (a.balance||0), 0);
   const liab   = accounts.filter(a => a.balance < 0).reduce((s,a) => s + a.balance, 0);
   
-  const illiquid = accounts.filter(a => a.tags?.includes('illiquid'));
-  const illiqTotal = illiquid.reduce((s,a) => s + Math.max(0, a.balance||0), 0);
-  const illiqCount = illiquid.length;
+  const illiqOnly = accounts.filter(a => a.tags?.includes('illiquid'));
+  const illiqOnlyTotal = illiqOnly.reduce((s,a) => s + Math.max(0, a.balance||0), 0);
+  
+  const tdOnly = accounts.filter(a => a.tags?.includes('td'));
+  const tdOnlyTotal = tdOnly.reduce((s,a) => s + Math.max(0, a.balance||0), 0);
 
   const credit = accounts.filter(a => a.tags?.includes('credit'));
   const credTotal = credit.reduce((s,a) => s + (a.balance||0), 0);
   const credCount = credit.length;
 
-  const liquidAssets = accounts.filter(a => !a.tags?.includes('illiquid') && !a.tags?.includes('credit'))
+  const liquidAssets = accounts.filter(a => !a.tags?.includes('illiquid') && !a.tags?.includes('td') && !a.tags?.includes('credit'))
                                .reduce((s,a) => s + Math.max(0, a.balance||0), 0);
   const netLiquid = liquidAssets + credTotal;
 
@@ -409,7 +411,7 @@ function renderSummary(accounts) {
     <div class="sum-card">
       <div class="lbl">Net Liquid</div>
       <div class="val col-pos">₱${fmtk(netLiquid)}</div>
-      <div class="sub">excl. ${illiqCount} illiq (₱${fmtk(illiqTotal)}) · ${credCount} credit (₱${fmtk(Math.abs(credTotal))})</div>
+      <div class="sub">excl. ₱${fmtk(illiqOnlyTotal)} illiq · ₱${fmtk(tdOnlyTotal)} td · ₱${fmtk(Math.abs(credTotal))} credit</div>
     </div>
     <div class="sum-card">
       <div class="lbl">Liabilities</div>
