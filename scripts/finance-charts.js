@@ -315,19 +315,15 @@ class FinanceChart extends HTMLElement {
           ${(g.items || []).map(item => `
             <div class="legend-item">
               <div class="legend-dot" style="background:${g.color}"></div>
-              <div class="legend-label" title="${item.label}">${item.label}</div>
+              <div class="legend-label">${item.label}</div>
               <div class="legend-val">₱${this._fmtk(item.value)}</div>
             </div>
           `).join('')}
         </div>
       `).join('');
-      // No tooltips if we have a detailed legend
-      this.canvas.onmousemove = null;
-      this.canvas.onmouseleave = null;
-      return;
+    } else {
+      this.legend.innerHTML = '';
     }
-
-    this.legend.innerHTML = '';
 
     this.canvas.onmousemove = e => {
       const rect = this.canvas.getBoundingClientRect();
