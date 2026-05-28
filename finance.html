@@ -45,9 +45,7 @@ main{max-width:940px;margin:0 auto;padding:20px 16px}
 .chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .chart-title{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted)}
 #chartWrap{position:relative;height:160px}
-canvas#chart{display:block}
 .chart-empty{display:none;text-align:center;color:var(--text-faint);font-size:13px;padding:50px 0}
-.tooltip{position:absolute;background:var(--text);color:#fff;padding:6px 10px;border-radius:6px;font-size:11px;pointer-events:none;z-index:1000;transform:translateX(-50%);display:none;max-width:200px;line-height:1.4;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.15)}
 
 .section-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
 .section-title{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-right:4px}
@@ -188,14 +186,28 @@ td.actions{text-align:right;white-space:nowrap}
 
   <div class="chart-card">
     <div class="chart-header">
-      <span class="chart-title">Net worth over time</span>
+      <div class="filters" id="chartTypeFilters">
+        <span class="filter-chip" data-type="line" onclick="changeChartType('line', this)">History</span>
+        <span class="filter-chip" data-type="donut" onclick="changeChartType('donut', this)">Composition</span>
+      </div>
       <span id="chartPeriod" style="font-size:11px;color:var(--text-faint)"></span>
     </div>
     <div id="chartWrap">
       <div class="chart-empty" id="chartEmpty">No history yet — balances are auto-snapshotted each time you save changes.</div>
-      <canvas id="chart"></canvas>
+      <imago-chart id="mainChart"></imago-chart>
     </div>
   </div>
+
+  <script>
+    // Set initial active state for chart pills
+    document.addEventListener('DOMContentLoaded', () => {
+      const savedType = localStorage.getItem('imago-finance-chart-type') || 'line';
+      const pill = document.querySelector(`#chartTypeFilters .filter-chip[data-type="${savedType}"]`);
+      if (pill) pill.classList.add('active');
+      const chart = document.getElementById('mainChart');
+      if (chart) chart.setAttribute('type', savedType);
+    });
+  </script>
 
   <div class="section-header">
     <span class="section-title">Accounts</span>
@@ -341,7 +353,30 @@ let _activeTag = 'all';
 let _sortCol   = 'balance';
 let _sortDir   = 'desc';
 let _excludeTD = false;
+let _chartType = localStorage.getItem('imago-finance-chart-type') || 'line';
 window._allAccounts = [];
+
+const TAG_COLORS = {
+  savings:  '#1a6b3c',
+  td:       '#2d8f5e',
+  buffer:   '#b87b1a',
+  cash:     '#5f5e5a',
+  illiquid: '#8a8780',
+  liquid:   '#4f8c6d',
+  credit:   '#a32d2d',
+};
+
+function changeChartType(type, el) {
+  _chartType = type;
+  localStorage.setItem('imago-finance-chart-type', type);
+  
+  if (el) {
+    document.querySelectorAll('#chartTypeFilters .filter-chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+  }
+  
+  render();
+}
 
 // ── Util ──────────────────────────────────────────────────────────────────────
 function uuid() {
@@ -489,144 +524,52 @@ function renderSummary(accounts) {
   `;
 }
 
-function showTip(e, text, isHtml=false) {
-  const tip = document.getElementById('tooltip');
-  if (isHtml) tip.innerHTML = text;
-  else tip.textContent = text;
-  
-  tip.style.display = 'block';
-  tip.style.maxWidth = isHtml ? 'none' : '200px';
-  const rect = e.currentTarget.getBoundingClientRect();
-  const margin = 8;
-  const th = tip.offsetHeight;
-  
-  tip.style.left = (rect.left + rect.width/2 + window.scrollX) + 'px';
-  
-  // If showing it on top would clip, show it on bottom
-  if (rect.top - th - margin < 10) {
-    tip.style.top = (rect.bottom + window.scrollY + margin) + 'px';
-  } else {
-    tip.style.top = (rect.top + window.scrollY - th - margin) + 'px';
-  }
-}
-function hideTip() { document.getElementById('tooltip').style.display = 'none'; }
-
 // ── Line chart ────────────────────────────────────────────────────────────────
 function renderChart(history) {
-  const canvas = document.getElementById('chart');
+  const chart  = document.getElementById('mainChart');
   const empty  = document.getElementById('chartEmpty');
   const period = document.getElementById('chartPeriod');
 
-  if (history.length < 2) {
-    canvas.style.display = 'none';
-    empty.style.display  = 'block';
-    period.textContent   = '';
-    return;
-  }
-
-  empty.style.display  = 'none';
-  canvas.style.display = 'block';
-
-  const wrap = document.getElementById('chartWrap');
-  const W = wrap.clientWidth || 700;
-  const H = 160;
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width  = W * dpr;
-  canvas.height = H * dpr;
-  canvas.style.width  = W + 'px';
-  canvas.style.height = H + 'px';
-
-  const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-
-  const PAD = { top:14, right:16, bottom:28, left:50 };
-  const cW = W - PAD.left - PAD.right;
-  const cH = H - PAD.top  - PAD.bottom;
-
-  const totals = history.map(h => h.total);
-  const dates  = history.map(h => h.date);
-  const minV   = Math.min(...totals);
-  const maxV   = Math.max(...totals);
-  const rng    = maxV - minV || 1;
-
-  const xOf = i => PAD.left + (i / Math.max(history.length-1,1)) * cW;
-  const yOf = v => PAD.top  + cH - ((v-minV)/rng) * cH;
-
-  ctx.clearRect(0,0,W,H);
-
-  // Gridlines + y-axis labels
-  ctx.strokeStyle = '#e2e0d8';
-  ctx.lineWidth   = 0.5;
-  ctx.fillStyle   = '#9c9a94';
-  ctx.font        = '10px system-ui';
-  ctx.textAlign   = 'right';
-  for (let i=0; i<=4; i++) {
-    const y = PAD.top + (cH/4)*i;
-    ctx.beginPath(); ctx.moveTo(PAD.left,y); ctx.lineTo(W-PAD.right,y); ctx.stroke();
-    ctx.fillText('₱'+fmtk(maxV-(rng/4)*i), PAD.left-5, y+3);
-  }
-
-  // Fill
-  ctx.beginPath();
-  totals.forEach((v,i) => i===0 ? ctx.moveTo(xOf(0),yOf(v)) : ctx.lineTo(xOf(i),yOf(v)));
-  ctx.lineTo(xOf(totals.length-1), PAD.top+cH);
-  ctx.lineTo(xOf(0), PAD.top+cH);
-  ctx.closePath();
-  ctx.fillStyle = 'rgba(26,107,60,0.07)';
-  ctx.fill();
-
-  // Line
-  ctx.beginPath();
-  totals.forEach((v,i) => i===0 ? ctx.moveTo(xOf(0),yOf(v)) : ctx.lineTo(xOf(i),yOf(v)));
-  ctx.strokeStyle = '#1a6b3c';
-  ctx.lineWidth   = 1.8;
-  ctx.lineJoin    = 'round';
-  ctx.stroke();
-
-  // Dots
-  totals.forEach((v,i) => {
-    ctx.beginPath(); ctx.arc(xOf(i),yOf(v),3,0,Math.PI*2);
-    ctx.fillStyle='#1a6b3c'; ctx.fill();
-    ctx.beginPath(); ctx.arc(xOf(i),yOf(v),1.5,0,Math.PI*2);
-    ctx.fillStyle='#fff'; ctx.fill();
-  });
-
-  // X-axis date labels
-  ctx.fillStyle  = '#9c9a94';
-  ctx.font       = '10px system-ui';
-  ctx.textAlign  = 'center';
-  const labelIdxs = new Set([0, history.length-1]);
-  const step = Math.ceil(history.length/5);
-  for (let i=step; i<history.length-1; i+=step) labelIdxs.add(i);
-  labelIdxs.forEach(i => ctx.fillText(dates[i].slice(5), xOf(i), H-4));
-
-  period.textContent = dates[0] + ' → ' + dates[dates.length-1];
-
-  // Hover
-  const tip = document.getElementById('tooltip');
-  canvas.onmousemove = e => {
-    const rect = canvas.getBoundingClientRect();
-    const mx   = e.clientX - rect.left;
-    let ci=0, md=Infinity;
-    totals.forEach((_,i) => { const d=Math.abs(xOf(i)-mx); if(d<md){md=d;ci=i;} });
-    if (md > 44) { tip.style.display='none'; return; }
-    
-    tip.textContent = dates[ci] + ' · ₱' + fmtk(totals[ci]);
-    tip.style.display = 'block';
-    
-    const margin = 8;
-    const th = tip.offsetHeight;
-    const px = rect.left + xOf(ci) + window.scrollX;
-    const py = rect.top + yOf(totals[ci]); // Viewport Y
-    
-    tip.style.left = px + 'px';
-    if (py - th - margin < 10) {
-      tip.style.top = (py + window.scrollY + margin + 10) + 'px';
-    } else {
-      tip.style.top = (py + window.scrollY - th - margin) + 'px';
+  if (_chartType === 'line') {
+    if (history.length < 2) {
+      chart.style.display = 'none';
+      empty.style.display  = 'block';
+      period.textContent   = '';
+      return;
     }
-  };
-  canvas.onmouseleave = () => { tip.style.display='none'; };
+    empty.style.display  = 'none';
+    chart.style.display = 'block';
+    chart.setAttribute('type', 'line');
+    chart.data = history;
+    period.textContent = history[0].date + ' → ' + history[history.length-1].date;
+  } else {
+    // Donut chart - assets by tag
+    const accounts = window._allAccounts || [];
+    const groups = {};
+    accounts.forEach(a => {
+      if (a.balance > 0) {
+        const tag = (a.tags && a.tags[0]) || 'savings';
+        groups[tag] = (groups[tag] || 0) + a.balance;
+      }
+    });
+    
+    const data = Object.entries(groups).map(([label, value]) => ({
+      label, value, color: TAG_COLORS[label] || '#999'
+    })).sort((a,b) => b.value - a.value);
+
+    if (data.length === 0) {
+      chart.style.display = 'none';
+      empty.style.display = 'block';
+      period.textContent = '';
+      return;
+    }
+
+    empty.style.display = 'none';
+    chart.style.display = 'block';
+    chart.setAttribute('type', 'donut');
+    chart.data = data;
+    period.textContent = 'Current Allocation';
+  }
 }
 
 // ── Filter bar ────────────────────────────────────────────────────────────────
@@ -958,7 +901,7 @@ window.addEventListener('resize', () =>
   db.history.orderBy('date').toArray().then(renderChart)
 );
 </script>
+  <script src="scripts/finance-charts.js"></script>
   <script src="pwa-register.js"></script>
-  <div class="tooltip" id="tooltip"></div>
 </body>
 </html>
