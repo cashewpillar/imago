@@ -103,6 +103,15 @@ td.actions{text-align:right;white-space:nowrap}
 .icon-btn:hover{background:var(--bg);color:var(--text)}
 .icon-btn svg{width:13px;height:13px}
 
+.chart-sub{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
+.chart-sub-h{display:flex;justify-content:space-between;align-items:center}
+.chart-sub-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-faint);font-weight:600}
+
+.target-row{display:grid;grid-template-columns:70px 1fr 85px 75px;gap:10px;align-items:center;margin-bottom:12px}
+.target-row label{font-size:12px;font-weight:500;text-transform:capitalize}
+.target-row input[type="number"]{padding:4px 2px 4px 6px;font-size:11px;border:1px solid var(--border);border-radius:4px;width:100%;text-align:right;font-family:monospace}
+.target-amt{font-size:11px;color:var(--text-muted);text-align:right;font-family:monospace}
+
 .modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:100;align-items:center;justify-content:center}
 .modal-backdrop.open{display:flex}
 .modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:22px;width:min(480px,95vw);max-height:90vh;overflow-y:auto}
@@ -199,9 +208,23 @@ td.actions{text-align:right;white-space:nowrap}
       </div>
       <span id="chartPeriod" style="font-size:11px;color:var(--text-faint)"></span>
     </div>
-    <div id="chartWrap">
-      <div class="chart-empty" id="chartEmpty">No history yet — balances are auto-snapshotted each time you save changes.</div>
-      <imago-chart id="mainChart"></imago-chart>
+    <div id="chartWrap" style="display:flex; gap:20px; align-items:stretch;">
+      <div class="chart-empty" id="chartEmpty" style="flex:1">No history yet — balances are auto-snapshotted each time you save changes.</div>
+      
+      <div class="chart-sub" id="currentChartWrap" style="display:none">
+        <div class="chart-sub-h"><span class="chart-sub-lbl">Current</span></div>
+        <imago-chart id="mainChart"></imago-chart>
+      </div>
+
+      <div class="chart-sub" id="targetChartWrap" style="display:none; border-left:1px solid var(--border); padding-left:20px;">
+        <div class="chart-sub-h">
+          <span class="chart-sub-lbl">Target</span>
+          <button class="icon-btn" onclick="openTargetModal()" title="Configure Targets">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="3"/><path d="M12.5 12.5l-1.5-1.5M3.5 3.5l1.5 1.5M12.5 3.5l-1.5 1.5M3.5 12.5l1.5-1.5"/></svg>
+          </button>
+        </div>
+        <imago-chart id="targetChart"></imago-chart>
+      </div>
     </div>
   </div>
 
@@ -306,6 +329,22 @@ td.actions{text-align:right;white-space:nowrap}
   </div>
 </div>
 
+<!-- Target Config Modal -->
+<div class="modal-backdrop" id="targetModal">
+  <div class="modal">
+    <h2>Target Allocation (%)</h2>
+    <div id="targetInputs"></div>
+    <div style="margin-top:14px; padding-top:10px; border-top:1px solid var(--border); display:flex; justify-content:space-between; font-weight:600; font-size:12px;">
+      <span>Total</span>
+      <span id="targetTotalPct">0%</span>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('targetModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTargets()">Save</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -350,6 +389,7 @@ let _sortCol   = 'balance';
 let _sortDir   = 'desc';
 let _excludeTD = false;
 let _chartType = localStorage.getItem('imago-finance-chart-type') || 'line';
+let _targets   = JSON.parse(localStorage.getItem('imago-finance-targets') || '{"savings":40,"td":30,"buffer":10,"cash":10,"illiquid":10}');
 window._allAccounts = [];
 
 const TAG_COLORS = {
@@ -361,6 +401,105 @@ const TAG_COLORS = {
   liquid:   '#4f8c6d',
   credit:   '#a32d2d',
 };
+
+function openTargetModal() {
+  const container = document.getElementById('targetInputs');
+  const tags = ['savings', 'td', 'buffer', 'cash', 'illiquid'];
+  container.innerHTML = tags.map(t => `
+    <div class="target-row" data-tag="${t}">
+      <label>${t}</label>
+      <input type="range" min="0" max="100" step="0.1" value="${_targets[t]||0}" oninput="onTargetChange('${t}', this.value, 'range')">
+      <input type="number" min="0" max="100" step="0.1" value="${(_targets[t]||0).toFixed(1)}" oninput="onTargetChange('${t}', this.value, 'number')">
+      <span class="target-amt" id="amt-${t}">₱0</span>
+    </div>
+  `).join('');
+  updateTargetTotalDisplay();
+  openModal('targetModal');
+}
+
+function onTargetChange(tag, val, source) {
+  // If user is typing a decimal, don't parse it yet as it might be incomplete (e.g. "40.")
+  if (source === 'number' && (val.endsWith('.') || val.endsWith('.0'))) {
+    // Just update the range slider but don't re-format the number box
+    const row = document.querySelector(`.target-row[data-tag="${tag}"]`);
+    if (row) row.querySelector('input[type="range"]').value = val;
+    return;
+  }
+
+  const parsedVal = parseFloat(val) || 0;
+  if (parsedVal > 100) return;
+
+  const tags = ['savings', 'td', 'buffer', 'cash', 'illiquid'];
+  const others = tags.filter(t => t !== tag);
+  const otherSum = others.reduce((s, t) => s + (_targets[t] || 0), 0);
+  
+  const remaining = 100 - parsedVal;
+  if (otherSum > 0) {
+    others.forEach(t => {
+      _targets[t] = (_targets[t] / otherSum) * remaining;
+    });
+  } else if (others.length > 0) {
+    others.forEach(t => _targets[t] = remaining / others.length);
+  }
+  
+  _targets[tag] = parsedVal;
+  
+  const totalNW = window._allAccounts.reduce((s,a) => s + (a.balance||0), 0);
+  
+  tags.forEach(t => {
+    const row = document.querySelector(`.target-row[data-tag="${t}"]`);
+    if (row) {
+      const pct = _targets[t];
+      // Only update the range if it wasn't the source
+      if (!(t === tag && source === 'range')) {
+        row.querySelector('input[type="range"]').value = pct.toFixed(1);
+      }
+      // CRITICAL: Only update the number box if it wasn't the source
+      // This allows the user to type freely (including decimals)
+      if (!(t === tag && source === 'number')) {
+        row.querySelector('input[type="number"]').value = pct.toFixed(1);
+      }
+      document.getElementById(`amt-${t}`).textContent = '₱' + fmtk(totalNW * (pct / 100));
+    }
+  });
+  
+  updateTargetTotalDisplay();
+}
+
+function updateTargetTotalDisplay() {
+  let sum = 0;
+  Object.values(_targets).forEach(v => sum += v);
+  const el = document.getElementById('targetTotalPct');
+  el.textContent = sum.toFixed(1) + '%';
+  el.style.color = Math.abs(sum - 100) < 0.01 ? 'var(--accent)' : 'var(--danger)';
+  
+  // Refresh amounts on initial open too
+  const totalNW = window._allAccounts.reduce((s,a) => s + (a.balance||0), 0);
+  const tags = ['savings', 'td', 'buffer', 'cash', 'illiquid'];
+  tags.forEach(t => {
+    const amtEl = document.getElementById(`amt-${t}`);
+    if (amtEl) amtEl.textContent = '₱' + fmtk(totalNW * ((_targets[t]||0) / 100));
+  });
+}
+
+function saveTargets() {
+  // Snap to 1 decimal place and ensure 100%
+  const tags = Object.keys(_targets);
+  let sum = 0;
+  tags.forEach(t => {
+    _targets[t] = Math.round(_targets[t] * 10) / 10;
+    sum += _targets[t];
+  });
+  
+  // Adjust last item for rounding errors
+  if (Math.abs(sum - 100) > 0.01 && tags.length > 0) {
+    _targets[tags[tags.length-1]] = Math.round((_targets[tags[tags.length-1]] + (100 - sum)) * 10) / 10;
+  }
+  
+  localStorage.setItem('imago-finance-targets', JSON.stringify(_targets));
+  closeModal('targetModal');
+  render();
+}
 
 function changeChartType(type, el) {
   _chartType = type;
@@ -524,8 +663,13 @@ function renderSummary(accounts) {
 function renderChart(history) {
   try {
     const chart  = document.getElementById('mainChart');
+    const targetChart = document.getElementById('targetChart');
     const empty  = document.getElementById('chartEmpty');
     const period = document.getElementById('chartPeriod');
+    
+    const currentWrap = document.getElementById('currentChartWrap');
+    const targetWrap  = document.getElementById('targetChartWrap');
+
     if (!chart) return;
 
     // Update active pill state
@@ -533,14 +677,19 @@ function renderChart(history) {
       c.classList.toggle('active', c.dataset.type === _chartType);
     });
 
+    // Reset visibility
+    empty.style.display = 'none';
+    currentWrap.style.display = 'none';
+    targetWrap.style.display  = 'none';
+    chart.style.display = 'none';
+
     if (_chartType === 'line') {
       if (!history || history.length < 2) {
-        chart.style.display = 'none';
         empty.style.display  = 'block';
         period.textContent   = '';
         return;
       }
-      empty.style.display  = 'none';
+      currentWrap.style.display = 'flex';
       chart.style.display = 'block';
       chart.setAttribute('type', 'line');
       chart.data = history;
@@ -555,22 +704,35 @@ function renderChart(history) {
         }
       });
       
-      const data = Object.entries(groups).map(([label, value]) => ({
+      const currentData = Object.entries(groups).map(([label, value]) => ({
         label, value, color: TAG_COLORS[label] || '#999'
       })).sort((a,b) => b.value - a.value);
 
-      if (data.length === 0) {
-        chart.style.display = 'none';
+      if (currentData.length === 0) {
         empty.style.display = 'block';
         period.textContent = '';
         return;
       }
 
-      empty.style.display = 'none';
+      currentWrap.style.display = 'flex';
+      targetWrap.style.display  = 'flex';
       chart.style.display = 'block';
       chart.setAttribute('type', 'donut');
-      chart.data = data;
-      period.textContent = 'Current Allocation';
+      chart.data = currentData;
+
+      // Prepare target data (normalize to current total)
+      const totalBalance = currentData.reduce((s, d) => s + d.value, 0);
+      const targetData = Object.entries(_targets).map(([label, pct]) => ({
+        label,
+        value: totalBalance * (pct / 100),
+        color: TAG_COLORS[label] || '#999'
+      })).filter(d => d.value > 0).sort((a,b) => b.value - a.value);
+
+      targetChart.style.display = 'block';
+      targetChart.setAttribute('type', 'donut');
+      targetChart.data = targetData;
+      
+      period.textContent = 'Current vs Target';
     } else if (_chartType === 'liquidity') {
       const accounts = window._allAccounts || [];
       const liquid = { label: 'Liquid', color: TAG_COLORS.savings, value: 0, items: [] };
@@ -591,13 +753,12 @@ function renderChart(history) {
       const slices = [liquid, illiquid].filter(g => g.value > 0);
 
       if (slices.length === 0) {
-        chart.style.display = 'none';
         empty.style.display = 'block';
         period.textContent = '';
         return;
       }
 
-      empty.style.display = 'none';
+      currentWrap.style.display = 'flex';
       chart.style.display = 'block';
       chart.setAttribute('type', 'donut');
       chart.data = slices;
