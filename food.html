@@ -323,30 +323,33 @@ select.toolbar-select {
   margin: 10px auto 0;
 }
 .modal-header {
-  padding: 16px 18px 14px;
-  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px;
+  display: flex; align-items: center; gap: 10px;
   border-bottom: 1px solid var(--rule);
+  position: sticky; top: 0; background: var(--paper); z-index: 10;
 }
 .modal-title {
   font-family: var(--font-serif);
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   font-style: italic;
+  flex: 1;
+  text-align: center;
 }
-.modal-close {
-  background: var(--paper-2); border: none; cursor: pointer;
-  width: 30px; height: 30px;
-  border-radius: 50%;
-  font-size: 18px; color: var(--ink-3);
-  line-height: 1;
-  display: flex; align-items: center; justify-content: center;
+.btn-modal {
+  background: none; border: none; cursor: pointer;
+  font-size: 14px; font-weight: 600;
+  color: var(--blue);
+  padding: 8px 4px;
+  min-width: 60px;
+  -webkit-tap-highlight-color: transparent;
 }
+.btn-modal.left { text-align: left; color: var(--ink-3); }
+.btn-modal.right { text-align: right; }
+.btn-modal.bold { font-weight: 800; }
+
 .modal-body { padding: 16px 18px; }
-.modal-footer {
-  padding: 12px 18px 16px;
-  display: flex; gap: 10px; justify-content: flex-end;
-  border-top: 1px solid var(--rule);
-}
+.modal-footer { display: none; }
 
 /* ── FORM ── */
 .form-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
@@ -594,8 +597,9 @@ select.toolbar-select {
   <div class="modal">
     <div class="modal-handle"></div>
     <div class="modal-header">
+      <button class="btn-modal left" onclick="closeModal('entry-modal-bg')">Cancel</button>
       <div class="modal-title" id="modal-title">New Purchase</div>
-      <button class="modal-close" onclick="closeModal('entry-modal-bg')">×</button>
+      <button class="btn-modal right bold" onclick="saveEntry()">Save</button>
     </div>
     <div class="modal-body">
       <div class="form-field">
@@ -639,10 +643,6 @@ select.toolbar-select {
         <textarea id="f-notes" placeholder="Brand, quality, variety…"></textarea>
       </div>
     </div>
-    <div class="modal-footer">
-      <button class="btn-secondary" onclick="closeModal('entry-modal-bg')">Cancel</button>
-      <button class="btn-save" onclick="saveEntry()">Save</button>
-    </div>
   </div>
 </div>
 
@@ -652,7 +652,7 @@ select.toolbar-select {
     <div class="modal-handle"></div>
     <div class="modal-header">
       <div class="modal-title" id="history-title">History</div>
-      <button class="modal-close" onclick="closeModal('history-modal-bg')">×</button>
+      <button class="btn-modal right bold" onclick="closeModal('history-modal-bg')">Done</button>
     </div>
     <div class="modal-body" id="history-body"></div>
   </div>
@@ -663,16 +663,13 @@ select.toolbar-select {
   <div class="modal">
     <div class="modal-handle"></div>
     <div class="modal-header">
-      <div class="modal-title">Manage Categories</div>
-      <button class="modal-close" onclick="closeModal('cat-modal-bg')">×</button>
+      <button class="btn-modal left" onclick="closeModal('cat-modal-bg')">Cancel</button>
+      <div class="modal-title">Categories</div>
+      <button class="btn-modal right bold" onclick="saveCats()">Save</button>
     </div>
     <div class="modal-body">
       <div id="cat-edit-list"></div>
       <button class="btn-add-cat" onclick="addNewCatRow()">＋ Add category</button>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-secondary" onclick="closeModal('cat-modal-bg')">Cancel</button>
-      <button class="btn-save" onclick="saveCats()">Save</button>
     </div>
   </div>
 </div>
@@ -704,7 +701,7 @@ select.toolbar-select {
     <div class="modal-handle"></div>
     <div class="modal-header">
       <div class="modal-title" id="import-title">Import</div>
-      <button class="modal-close" onclick="closeModal('import-modal-bg')">×</button>
+      <button class="btn-modal right bold" onclick="closeModal('import-modal-bg')">Done</button>
     </div>
     <div class="modal-body">
       <p style="color:var(--ink-3);font-size:13px;margin-bottom:14px;" id="import-desc"></p>
@@ -719,9 +716,6 @@ select.toolbar-select {
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleFileSelect(event)">
       <div class="import-result" id="import-result"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-save" onclick="closeModal('import-modal-bg')">Done</button>
     </div>
   </div>
 </div>
@@ -1081,6 +1075,12 @@ async function saveCats() {
   const valid = pendingCats.filter(c=>c.name.trim());
   await db.categories.clear();
   await db.categories.bulkAdd(valid);
+  
+  // If active filter category was deleted, reset to all
+  if (S.filterCat && !valid.some(c => c.id === S.filterCat)) {
+    S.filterCat = null;
+  }
+  
   closeModal('cat-modal-bg');
   await loadData();
   toast('Categories saved', 'ok');
@@ -1115,13 +1115,15 @@ function openImportModal(isReset) {
     importResultEl.className = 'import-result';
     importResultEl.textContent = '';
   }
-  document.getElementById('import-file').value = '';
+  const importFileEl = document.getElementById('import-file');
+  if (importFileEl) importFileEl.value = '';
   openModal('import-modal-bg');
 }
 
 function handleDrop(e) {
   e.preventDefault();
-  document.getElementById('import-drop').classList.remove('drag');
+  const dropEl = document.getElementById('import-drop');
+  if (dropEl) dropEl.classList.remove('drag');
   if (e.dataTransfer.files[0]) processImportFile(e.dataTransfer.files[0]);
 }
 function handleFileSelect(e) { if (e.target.files[0]) processImportFile(e.target.files[0]); }
@@ -1142,18 +1144,41 @@ async function processImportFile(file) {
         res.textContent=`✓ Reset done. ${data.entries.length} entries, ${(data.categories||[]).length} categories.`;
       }
     } else {
-      const existing = await db.entries.toArray();
-      const map = {}; existing.forEach(e=>map[e.id]=e);
+      const existingEntries = await db.entries.toArray();
+      const entryMap = {}; existingEntries.forEach(e=>entryMap[e.id]=e);
+      
+      const localCats = await db.categories.toArray();
+      const catNameMap = {}; localCats.forEach(c => catNameMap[c.name.toLowerCase()] = c.id);
+      const catIdMap = {}; localCats.forEach(c => catIdMap[c.id] = c);
+
+      const importIdToLocalId = {};
+      if (data.categories) {
+        for (const c of data.categories) {
+          const lowerName = c.name.toLowerCase();
+          if (catIdMap[c.id]) {
+            importIdToLocalId[c.id] = c.id;
+          } else if (catNameMap[lowerName]) {
+            importIdToLocalId[c.id] = catNameMap[lowerName];
+          } else {
+            await db.categories.add(c);
+            importIdToLocalId[c.id] = c.id;
+            catNameMap[lowerName] = c.id;
+            catIdMap[c.id] = c;
+          }
+        }
+      }
+
       let added=0, updated=0, skipped=0;
       for (const e of data.entries) {
-        if (!map[e.id]) { await db.entries.add(e); added++; }
-        else if ((e.updatedAt||'') > (map[e.id].updatedAt||'')) { await db.entries.put(e); updated++; }
+        if (e.category && importIdToLocalId[e.category]) {
+          e.category = importIdToLocalId[e.category];
+        }
+        
+        if (!entryMap[e.id]) { await db.entries.add(e); added++; }
+        else if ((e.updatedAt||'') > (entryMap[e.id].updatedAt||'')) { await db.entries.put(e); updated++; }
         else skipped++;
       }
-      if (data.categories) {
-        const existIds = new Set((await db.categories.toArray()).map(c=>c.id));
-        for (const c of data.categories) if (!existIds.has(c.id)) await db.categories.add(c);
-      }
+      
       if (res) {
         res.className='import-result ok';
         res.textContent=`✓ Done: ${added} added, ${updated} updated, ${skipped} unchanged.`;
