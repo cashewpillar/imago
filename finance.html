@@ -525,6 +525,8 @@ function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 function fmtk(v) {
+  v = parseFloat(v);
+  if (isNaN(v)) return '0';
   const av = Math.abs(v);
   if (av >= 1000000) return (v / 1000000).toFixed(2) + 'M';
   if (av >= 1000) return (v / 1000).toFixed(1) + 'k';

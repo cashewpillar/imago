@@ -189,6 +189,7 @@ class FinanceChart extends HTMLElement {
   }
 
   _fmtk(v) {
+    v = parseFloat(v);
     if (isNaN(v)) return '0';
     const av = Math.abs(v);
     if (av >= 1000000) return (v / 1000000).toFixed(2) + 'M';
@@ -259,7 +260,10 @@ class FinanceChart extends HTMLElement {
     ctx.font = '10px system-ui';
     ctx.textAlign = 'center';
     const step = Math.ceil(data.length / 5);
-    for (let i = 0; i < data.length; i += step) ctx.fillText(dates[i].slice(5), xOf(i), H - 4);
+    for (let i = 0; i < data.length; i += step) {
+      const dStr = dates[i] || '';
+      ctx.fillText(dStr.length > 5 ? dStr.slice(5) : dStr, xOf(i), H - 4);
+    }
 
     this.canvas.onmousemove = e => {
       const rect = this.canvas.getBoundingClientRect();
