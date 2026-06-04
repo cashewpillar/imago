@@ -196,22 +196,28 @@ class FinanceChart extends HTMLElement {
     return v.toFixed(0);
   }
 
-  _renderLineChart(history, W, H) {
-    if (!Array.isArray(history) || history.length < 2) return;
+  _renderLineChart(data, W, H) {
+    if (!Array.isArray(data) || data.length === 0) return;
 
     const ctx = this.ctx;
     const PAD = { top: 14, right: 16, bottom: 28, left: 50 };
     const cW = W - PAD.left - PAD.right;
     const cH = H - PAD.top - PAD.bottom;
 
-    const totals = history.map(h => h.total);
-    const dates = history.map(h => h.date);
-    const minV = Math.min(...totals);
-    const maxV = Math.max(...totals);
+    const values = data.map(d => d.value);
+    const dates = data.map(d => d.date);
+    const minV = Math.min(...values);
+    const maxV = Math.max(...values);
     const rng = Math.max(maxV - minV, 1);
 
-    const xOf = i => PAD.left + (i / Math.max(history.length - 1, 1)) * cW;
-    const yOf = v => PAD.top + cH - ((v - minV) / rng) * cH;
+    const xOf = i => {
+      if (data.length === 1) return PAD.left + cW / 2;
+      return PAD.left + (i / (data.length - 1)) * cW;
+    };
+    const yOf = v => {
+      if (data.length === 1) return PAD.top + cH / 2;
+      return PAD.top + cH - ((v - minV) / rng) * cH;
+    };
 
     ctx.strokeStyle = '#e2e0d8';
     ctx.lineWidth = 0.5;
@@ -221,24 +227,28 @@ class FinanceChart extends HTMLElement {
     for (let i = 0; i <= 4; i++) {
       const y = PAD.top + (cH / 4) * i;
       ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
-      ctx.fillText('₱' + this._fmtk(maxV - (rng / 4) * i), PAD.left - 5, y + 3);
+      if (data.length > 1) {
+        ctx.fillText('₱' + this._fmtk(maxV - (rng / 4) * i), PAD.left - 5, y + 3);
+      }
     }
 
-    ctx.beginPath();
-    totals.forEach((v, i) => i === 0 ? ctx.moveTo(xOf(0), yOf(v)) : ctx.lineTo(xOf(i), yOf(v)));
-    ctx.lineTo(xOf(totals.length - 1), PAD.top + cH);
-    ctx.lineTo(xOf(0), PAD.top + cH);
-    ctx.fillStyle = 'rgba(26,107,60,0.07)';
-    ctx.fill();
+    if (data.length > 1) {
+      ctx.beginPath();
+      values.forEach((v, i) => i === 0 ? ctx.moveTo(xOf(0), yOf(v)) : ctx.lineTo(xOf(i), yOf(v)));
+      ctx.lineTo(xOf(values.length - 1), PAD.top + cH);
+      ctx.lineTo(xOf(0), PAD.top + cH);
+      ctx.fillStyle = 'rgba(26,107,60,0.07)';
+      ctx.fill();
 
-    ctx.beginPath();
-    totals.forEach((v, i) => i === 0 ? ctx.moveTo(xOf(0), yOf(v)) : ctx.lineTo(xOf(i), yOf(v)));
-    ctx.strokeStyle = '#1a6b3c';
-    ctx.lineWidth = 1.8;
-    ctx.lineJoin = 'round';
-    ctx.stroke();
+      ctx.beginPath();
+      values.forEach((v, i) => i === 0 ? ctx.moveTo(xOf(0), yOf(v)) : ctx.lineTo(xOf(i), yOf(v)));
+      ctx.strokeStyle = '#1a6b3c';
+      ctx.lineWidth = 1.8;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+    }
 
-    totals.forEach((v, i) => {
+    values.forEach((v, i) => {
       ctx.beginPath(); ctx.arc(xOf(i), yOf(v), 3, 0, Math.PI * 2);
       ctx.fillStyle = '#1a6b3c'; ctx.fill();
       ctx.beginPath(); ctx.arc(xOf(i), yOf(v), 1.5, 0, Math.PI * 2);
@@ -248,19 +258,19 @@ class FinanceChart extends HTMLElement {
     ctx.fillStyle = '#9c9a94';
     ctx.font = '10px system-ui';
     ctx.textAlign = 'center';
-    const step = Math.ceil(history.length / 5);
-    for (let i = 0; i < history.length; i += step) ctx.fillText(dates[i].slice(5), xOf(i), H - 4);
+    const step = Math.ceil(data.length / 5);
+    for (let i = 0; i < data.length; i += step) ctx.fillText(dates[i].slice(5), xOf(i), H - 4);
 
     this.canvas.onmousemove = e => {
       const rect = this.canvas.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       let ci = 0, md = Infinity;
-      totals.forEach((_, i) => { const d = Math.abs(xOf(i) - mx); if (d < md) { md = d; ci = i; } });
-      if (md > 44) { this.tooltip.style.display = 'none'; return; }
-      this.tooltip.textContent = dates[ci] + ' · ₱' + this._fmtk(totals[ci]);
+      values.forEach((_, i) => { const d = Math.abs(xOf(i) - mx); if (d < md) { md = d; ci = i; } });
+      if (md > (data.length === 1 ? 100 : 44)) { this.tooltip.style.display = 'none'; return; }
+      this.tooltip.textContent = dates[ci] + ' · ₱' + this._fmtk(values[ci]);
       this.tooltip.style.display = 'block';
       this.tooltip.style.left = (rect.left + xOf(ci)) + 'px';
-      const py = rect.top + yOf(totals[ci]);
+      const py = rect.top + yOf(values[ci]);
       this.tooltip.style.top = (py - this.tooltip.offsetHeight - 8 < 10) ? (py + 18) + 'px' : (py - this.tooltip.offsetHeight - 8) + 'px';
     };
     this.canvas.onmouseleave = () => { this.tooltip.style.display = 'none'; };

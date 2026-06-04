@@ -203,6 +203,7 @@ td.actions{text-align:right;white-space:nowrap}
     <div class="chart-header">
       <div class="filters" id="chartTypeFilters">
         <span class="filter-chip" data-type="line" onclick="changeChartType('line', this)">History</span>
+        <span class="filter-chip" data-type="yield" onclick="changeChartType('yield', this)">Yield</span>
         <span class="filter-chip" data-type="donut" onclick="changeChartType('donut', this)">Composition</span>
         <span class="filter-chip" data-type="liquidity" onclick="changeChartType('liquidity', this)">Liquidity</span>
       </div>
@@ -555,6 +556,11 @@ document.querySelectorAll('.modal-backdrop').forEach(bd =>
 async function autoSnapshot() {
   const accounts = await db.accounts.toArray();
   const total    = accounts.reduce((s,a) => s + (a.balance||0), 0);
+  
+  // Calculate yield (standard: includes everything, 20% tax)
+  const grossYld = accounts.reduce((s,a) => s + (a.balance>0 ? a.balance*(a.rate||0)/100 : 0), 0);
+  const netYld   = grossYld * 0.8;
+
   const today    = new Date().toISOString().slice(0,10);
   const id       = 'h-' + today.replace(/-/g,'');
 
@@ -563,13 +569,14 @@ async function autoSnapshot() {
   
   // If we have a same-day entry, always update it to reflect the latest state
   if (lastEntry && lastEntry.date === today) {
-    await db.history.put({ id, date:today, total, auto:true });
+    await db.history.put({ id, date:today, total, yield: netYld, auto:true });
     return;
   }
 
-  // If it's a new day, only save if the total has changed
-  if (!lastEntry || Math.abs(lastEntry.total - total) > 0.001) {
-    await db.history.put({ id, date:today, total, auto:true });
+  // If it's a new day, only save if the total OR yield has changed significantly
+  const yieldChanged = lastEntry && Math.abs((lastEntry.yield || 0) - netYld) > 1; // ₱1 difference
+  if (!lastEntry || Math.abs(lastEntry.total - total) > 0.001 || yieldChanged) {
+    await db.history.put({ id, date:today, total, yield: netYld, auto:true });
   }
 }
 
@@ -683,17 +690,34 @@ function renderChart(history) {
     targetWrap.style.display  = 'none';
     chart.style.display = 'none';
 
-    if (_chartType === 'line') {
-      if (!history || history.length < 2) {
+    if (_chartType === 'line' || _chartType === 'yield') {
+      if (!history || history.length < 1) {
         empty.style.display  = 'block';
         period.textContent   = '';
         return;
       }
+      
+      const filteredHistory = _chartType === 'yield' 
+        ? history.filter(h => h.yield != null) 
+        : history;
+
+      if (filteredHistory.length < 1) {
+        empty.innerHTML = _chartType === 'yield' 
+          ? 'Not enough yield history yet. Snapshots will start including yield from today.'
+          : 'No history yet — balances are auto-snapshotted each time you save changes.';
+        empty.style.display = 'block';
+        period.textContent = '';
+        return;
+      }
+
       currentWrap.style.display = 'flex';
       chart.style.display = 'block';
       chart.setAttribute('type', 'line');
-      chart.data = history;
-      period.textContent = history[0].date + ' → ' + history[history.length-1].date;
+      chart.data = filteredHistory.map(h => ({
+        date: h.date,
+        value: _chartType === 'yield' ? h.yield : h.total
+      }));
+      period.textContent = filteredHistory[0].date + ' → ' + filteredHistory[filteredHistory.length-1].date;
     } else if (_chartType === 'donut') {
       const accounts = window._allAccounts || [];
       const groups = {};
