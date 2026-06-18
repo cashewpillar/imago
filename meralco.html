@@ -289,7 +289,7 @@
 
   tbody td { padding: 9px 12px; vertical-align: middle; }
 
-  .cb-cell { width: 36px; }
+  .cb-cell { width: 36px; cursor: pointer; }
 
   input[type="checkbox"] {
     width: 14px; height: 14px;
@@ -421,7 +421,7 @@
   <!-- Paste zone -->
   <div class="paste-card">
     <div class="paste-label">Paste JSON data</div>
-    <textarea id="json-input" placeholder='Paste your JSON here — accepts full object {"result":[...]} or a bare array [...]'></textarea>
+    <textarea id="json-input" placeholder='Paste your JSON here — e.g. Meralco website > Network tab > filter "list/" > Copy Response'></textarea>
     <div class="parse-row">
       <button class="btn-primary" onclick="parseData()">Parse</button>
       <button onclick="clearAll()">Clear</button>
@@ -469,7 +469,9 @@
       <table>
         <thead>
           <tr>
-            <th class="cb-cell center"><input type="checkbox" id="check-all" onchange="toggleAll(this.checked)" title="Toggle all visible"></th>
+            <th class="cb-cell center" onclick="const cb=this.querySelector('input'); cb.checked=!cb.checked; toggleAll(cb.checked)">
+              <input type="checkbox" id="check-all" onclick="event.stopPropagation()" onchange="toggleAll(this.checked)" title="Toggle all visible">
+            </th>
             <th class="sortable" data-col="alias" onclick="sort('alias')">Account holder</th>
             <th class="sortable" data-col="cxe_can" onclick="sort('cxe_can')">CAN</th>
             <th class="sortable right" data-col="amount" onclick="sort('amount')">Amount</th>
@@ -600,11 +602,9 @@
   }
 
   function visibleRows() {
-    const filtered = rows.filter(r =>
+    return rows.filter(r =>
       activeFilter === 'all' || effectiveDue(r) === activeFilter
     );
-    const anySelected = filtered.some(r => r.selected);
-    return anySelected ? filtered.filter(r => r.selected) : filtered;
   }
 
   function sort(col) {
@@ -645,7 +645,9 @@
           : `<span class="due-badge due-sched">${due}</span>`;
         const rowIdx = rows.indexOf(r);
         return `<tr class="${r.selected ? 'selected' : ''} ${r.paid ? 'paid' : ''}">
-          <td class="cb-cell center"><input type="checkbox" ${r.selected ? 'checked' : ''} onchange="toggle(${rowIdx}, this.checked)" aria-label="Select ${r.alias || 'Unknown'}"></td>
+          <td class="cb-cell center" onclick="toggle(${rowIdx}, !rows[${rowIdx}].selected)">
+            <input type="checkbox" ${r.selected ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggle(${rowIdx}, this.checked)" aria-label="Select ${r.alias || 'Unknown'}">
+          </td>
           <td><span class="alias">${r.alias || '—'}</span></td>
           <td><span class="can">${r.cxe_can || '—'}</span></td>
           <td class="amount">₱${(r.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
@@ -726,8 +728,14 @@
   }
 
   /* ── Slideshow Logic ── */
-  function startSlideshow() {
+  function slideshowRows() {
     const vis = visibleRows();
+    const sel = vis.filter(r => r.selected);
+    return sel.length > 0 ? sel : vis;
+  }
+
+  function startSlideshow() {
+    const vis = slideshowRows();
     if (vis.length === 0) { alert('No accounts to show.'); return; }
     
     // Find first unpaid
@@ -743,7 +751,7 @@
   }
 
   function renderSS() {
-    const vis = visibleRows();
+    const vis = slideshowRows();
     const r = vis[ssIndex];
     if (!r) { closeSlideshow(); return; }
 
@@ -758,7 +766,7 @@
   }
 
   function ssNext() {
-    const vis = visibleRows();
+    const vis = slideshowRows();
     if (ssIndex < vis.length - 1) {
       ssIndex++;
       renderSS();
@@ -773,7 +781,7 @@
   }
 
   function ssTogglePaid() {
-    const vis = visibleRows();
+    const vis = slideshowRows();
     const r = vis[ssIndex];
     const rowIdx = rows.indexOf(r);
     togglePaid(rowIdx, !r.paid);
