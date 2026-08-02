@@ -275,7 +275,7 @@
   .stock-toggle-btn.active.low{ background:var(--accent-dim); color:var(--accent); font-weight:700; }
   .stock-toggle-btn.active.out{ background:var(--rust-dim); color:var(--rust); font-weight:700; }
 
-  /* ---------- Grocery & Pantry View ---------- */
+  /* ---------- Pantry View ---------- */
   .grocery-stats{
     display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:16px;
   }
@@ -480,12 +480,12 @@
   <div class="toolbar">
     <div class="search-wrap">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-      <input type="search" id="searchInput" placeholder="Search dishes or ingredients…">
+      <input type="search" id="searchInput" placeholder="Search dishes, pantry, or grocery…">
     </div>
     <div class="view-toggle">
       <button id="tabDishes" class="active">Dishes</button>
-      <button id="tabIngredients">Ingredients</button>
-      <button id="tabGrocery">Grocery &amp; Pantry <span class="badge-count" id="toBuyBadge">0</span></button>
+      <button id="tabIngredients">Pantry</button>
+      <button id="tabGrocery">Grocery <span class="badge-count" id="toBuyBadge">0</span></button>
     </div>
   </div>
 </header>
@@ -630,8 +630,8 @@
 
   /* ---------------- State ---------------- */
   let currentTab = 'dishes'; // 'dishes', 'ingredients', 'grocery'
-  let dishFilter = 'all'; // 'all', 'planned', 'dish', 'snack'
-  let grocerySubTab = 'all'; // 'all', 'to_buy', 'pantry'
+  let dishFilter = 'all'; // 'all', 'planned', 'dishes', 'snacks'
+  let pantryFilter = 'all'; // 'all', 'in_stock', 'low', 'out'
   let searchTerm = '';
   let editingItemId = null;
   let editingIngId = null;
@@ -1106,41 +1106,92 @@
     });
   }
 
-  /* ---------------- Render: Ingredients tab ---------------- */
+  /* ---------------- Render: Pantry Stock Tracker (Ingredients) tab ---------------- */
   async function renderIngredientsTab(container, openIngId){
     const { items, ingredients, itemIngredients } = await getAllData();
     const itemsById = Object.fromEntries(items.map(i => [i.id, i]));
+    const plannedDishes = items.filter(i => i.isPlanned);
+    const plannedDishIds = new Set(plannedDishes.map(i => i.id));
+
+    const plannedDemand = {};
     const usageByIngredient = {};
-    itemIngredients.forEach(j => { (usageByIngredient[j.ingredientId] ||= []).push(j); });
+    itemIngredients.forEach(j => {
+      (usageByIngredient[j.ingredientId] ||= []).push(j);
+      if(plannedDishIds.has(j.itemId)){
+        (plannedDemand[j.ingredientId] ||= []).push({
+          dishName: itemsById[j.itemId]?.name || 'Dish',
+          qty: j.quantity,
+          unit: j.unit
+        });
+      }
+    });
+
+    const totalCount = ingredients.length;
+    const plannedCount = ingredients.filter(i => !!plannedDemand[i.id]).length;
+    const inStockCount = ingredients.filter(i => i.stockStatus === 'in_stock').length;
+    const lowCount = ingredients.filter(i => i.stockStatus === 'low').length;
+    const outCount = ingredients.filter(i => (i.stockStatus || 'out') === 'out').length;
 
     let list = ingredients;
     if(searchTerm){
       const q = normalize(searchTerm);
       list = list.filter(i => normalize(i.name).includes(q));
     }
+    if(pantryFilter === 'planned'){
+      list = list.filter(i => !!plannedDemand[i.id]);
+    } else if(pantryFilter !== 'all'){
+      list = list.filter(i => (i.stockStatus || 'out') === pantryFilter);
+    }
+
     list = [...list].sort((a,b) => (usageByIngredient[b.id]?.length||0) - (usageByIngredient[a.id]?.length||0) || a.name.localeCompare(b.name));
 
-    if(list.length === 0){
-      container.innerHTML = `<div class="empty">
-        <span class="display">${ingredients.length === 0 ? 'No ingredients yet' : 'No matches'}</span>
-        <p>${ingredients.length === 0 ? 'Ingredients appear here once added or created.' : 'Try a different search term.'}</p>
+    const headerHtml = `
+      <div class="grocery-section" style="margin-bottom:14px; padding:14px 16px;">
+        <div class="grocery-section-title" style="margin-bottom:8px;">
+          <span>📦 Pantry Stock Tracker</span>
+          <span class="count-badge">${totalCount} total items</span>
+        </div>
+        <div class="filter-bar" style="margin:0;">
+          <button class="filter-pill ${pantryFilter==='all'?'active':''}" data-pfilter="all">All (${totalCount})</button>
+          <button class="filter-pill ${pantryFilter==='planned'?'active':''}" data-pfilter="planned">📋 Planned (${plannedCount})</button>
+          <button class="filter-pill ${pantryFilter==='in_stock'?'active':''}" data-pfilter="in_stock">In Stock (${inStockCount})</button>
+          <button class="filter-pill ${pantryFilter==='low'?'active':''}" data-pfilter="low">Low Stock (${lowCount})</button>
+          <button class="filter-pill ${pantryFilter==='out'?'active':''}" data-pfilter="out">Out of Stock (${outCount})</button>
+        </div>
       </div>`;
+
+    if(list.length === 0){
+      container.innerHTML = headerHtml + `<div class="empty">
+        <span class="display">${ingredients.length === 0 ? 'No ingredients yet' : 'No matching pantry items'}</span>
+        <p>${ingredients.length === 0 ? 'Click the + button to add your first pantry ingredient.' : 'Try adjusting your search or filter.'}</p>
+      </div>`;
+
+      container.querySelectorAll('.filter-pill[data-pfilter]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          pantryFilter = btn.dataset.pfilter;
+          render();
+        });
+      });
       return;
     }
 
-    container.innerHTML = `<div class="ing-list">${list.map(ing => {
+    const itemsListHtml = `<div class="ing-list">${list.map(ing => {
       const uses = (usageByIngredient[ing.id] || []).slice().sort((a,b) => {
         const an = itemsById[a.itemId]?.name || '', bn = itemsById[b.itemId]?.name || '';
         return an.localeCompare(bn);
       });
       const count = uses.length;
       const stock = ing.stockStatus || 'out';
+      const reqForPlan = plannedDemand[ing.id];
 
       return `<div class="ing-row${openIngId===ing.id ? ' open':''}" data-ing-id="${ing.id}">
         <div class="ing-row-top">
           <div class="ing-info">
             <span class="stock-dot ${stock}"></span>
-            <span class="ing-name">${escapeHtml(ing.name)}</span>
+            <div>
+              <span class="ing-name">${escapeHtml(ing.name)}</span>
+              ${reqForPlan ? `<div style="font-size:11px; color:var(--accent); font-weight:600; margin-top:2px;">Needed for: ${escapeHtml(reqForPlan.map(d=>d.dishName).join(', '))}</div>` : ''}
+            </div>
           </div>
           <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
             <div class="stock-toggle-group" onclick="event.stopPropagation();">
@@ -1172,6 +1223,15 @@
       </div>`;
     }).join('')}</div>`;
 
+    container.innerHTML = headerHtml + itemsListHtml;
+
+    container.querySelectorAll('.filter-pill[data-pfilter]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        pantryFilter = btn.dataset.pfilter;
+        render();
+      });
+    });
+
     container.querySelectorAll('.ing-row').forEach(row => {
       const id = row.dataset.ingId;
       row.addEventListener('click', () => row.classList.toggle('open'));
@@ -1186,11 +1246,14 @@
 
     if(openIngId){
       const target = container.querySelector(`.ing-row[data-ing-id="${openIngId}"]`);
-      if(target){ target.scrollIntoView({behavior:'smooth', block:'center'}); }
+      if(target){
+        target.classList.add('open');
+        target.scrollIntoView({behavior:'smooth', block:'center'});
+      }
     }
   }
 
-  /* ---------------- Render: Grocery & Inventory (Unified View) ---------------- */
+  /* ---------------- Render: Grocery Tab ---------------- */
   async function renderGroceryTab(container){
     const { items, ingredients, itemIngredients, customGrocery } = await getAllData();
     const itemsById = Object.fromEntries(items.map(i => [i.id, i]));
@@ -1225,14 +1288,16 @@
       }
     });
 
-    const activeCustomToBuy = customGrocery.filter(g => !g.bought);
-    const boughtCustomToBuy = customGrocery.filter(g => g.bought);
+    let activeCustomToBuy = customGrocery.filter(g => !g.bought);
+    if(searchTerm){
+      const q = normalize(searchTerm);
+      activeCustomToBuy = activeCustomToBuy.filter(g => normalize(g.name).includes(q));
+    }
 
     const totalToBuyCount = toBuyIngredients.length + activeCustomToBuy.length;
-    const totalInStockCount = ingredients.filter(i => i.stockStatus === 'in_stock').length;
 
     const navHtml = `
-      <div class="grocery-stats">
+      <div class="grocery-stats" style="grid-template-columns: repeat(2, 1fr);">
         <div class="stat-card highlight-plan">
           <div class="num">${plannedDishes.length}</div>
           <div class="label">Planned Meals</div>
@@ -1241,15 +1306,6 @@
           <div class="num">${totalToBuyCount}</div>
           <div class="label">Items to Buy</div>
         </div>
-        <div class="stat-card highlight-stock">
-          <div class="num">${totalInStockCount}</div>
-          <div class="label">In Stock</div>
-        </div>
-      </div>
-      <div class="filter-bar">
-        <button class="filter-pill ${grocerySubTab==='all'?'active':''}" data-gsub="all">Combined View</button>
-        <button class="filter-pill ${grocerySubTab==='to_buy'?'active':''}" data-gsub="to_buy">🛒 Shopping List (${totalToBuyCount})</button>
-        <button class="filter-pill ${grocerySubTab==='pantry'?'active':''}" data-gsub="pantry">📦 Pantry Inventory (${ingredients.length})</button>
       </div>`;
 
     const plannedStripHtml = plannedDishes.length > 0 ? `
@@ -1269,8 +1325,7 @@
         <div style="font-size:12px; color:var(--chalk-faint); margin-top:4px;">Mark dishes as "Planned" on the Dishes tab to generate your automatic grocery list!</div>
       </div>`;
 
-    const showShopping = grocerySubTab === 'all' || grocerySubTab === 'to_buy';
-    const shoppingListHtml = showShopping ? `
+    const shoppingListHtml = `
       <div class="grocery-section">
         <div class="grocery-section-title">
           <span>🛒 Grocery Shopping List</span>
@@ -1333,63 +1388,9 @@
               </div>`).join('')}
             </div>
           </details>` : ''}
-      </div>` : '';
+      </div>`;
 
-    const showPantry = grocerySubTab === 'all' || grocerySubTab === 'pantry';
-    let filteredIngredients = ingredients;
-    if(searchTerm){
-      const q = normalize(searchTerm);
-      filteredIngredients = filteredIngredients.filter(i => normalize(i.name).includes(q));
-    }
-    filteredIngredients.sort((a,b) => a.name.localeCompare(b.name));
-
-    const pantryHtml = showPantry ? `
-      <div class="grocery-section">
-        <div class="grocery-section-title">
-          <span>📦 Pantry Stock Tracker</span>
-          <span class="count-badge">${ingredients.length} total items</span>
-        </div>
-        <div class="pantry-grid">
-          ${filteredIngredients.map(ing => {
-            const stock = ing.stockStatus || 'out';
-            const reqForPlan = plannedDemand[ing.id];
-
-            return `<div class="pantry-row" data-ing-id="${ing.id}">
-              <div style="display:flex; align-items:center; gap:8px;">
-                <span class="stock-dot ${stock}"></span>
-                <div>
-                  <div style="font-weight:600; font-size:14px;">${escapeHtml(ing.name)}</div>
-                  ${reqForPlan ? `<div style="font-size:11px; color:var(--accent); font-weight:600;">Needed for: ${escapeHtml(reqForPlan.map(d=>d.dishName).join(', '))}</div>` : ''}
-                </div>
-              </div>
-              <div style="display:flex; align-items:center; gap:8px;">
-                <div class="stock-toggle-group">
-                  <button class="stock-toggle-btn ${stock==='in_stock'?'active in_stock':''}" data-status="in_stock">In Stock</button>
-                  <button class="stock-toggle-btn ${stock==='low'?'active low':''}" data-status="low">Low</button>
-                  <button class="stock-toggle-btn ${stock==='out'?'active out':''}" data-status="out">Out</button>
-                </div>
-                <div class="row-actions">
-                  <button class="edit-ing-btn" title="Edit ingredient" aria-label="Edit ingredient">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
-                  </button>
-                  <button class="delete-ing-btn danger" title="Delete ingredient" aria-label="Delete ingredient">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6"/></svg>
-                  </button>
-                </div>
-              </div>
-            </div>`;
-          }).join('')}
-        </div>
-      </div>` : '';
-
-    container.innerHTML = navHtml + plannedStripHtml + shoppingListHtml + pantryHtml;
-
-    container.querySelectorAll('.grocery-stats + .filter-bar .filter-pill').forEach(btn => {
-      btn.addEventListener('click', () => {
-        grocerySubTab = btn.dataset.gsub;
-        render();
-      });
-    });
+    container.innerHTML = navHtml + plannedStripHtml + shoppingListHtml;
 
     container.querySelectorAll('[data-unplan-id]').forEach(btn => {
       btn.addEventListener('click', e => toggleDishPlanned(btn.dataset.unplan-id, e));
@@ -1427,17 +1428,6 @@
         }
       });
     }
-
-    container.querySelectorAll('.pantry-row').forEach(row => {
-      const id = row.dataset.ingId;
-      row.querySelectorAll('.stock-toggle-btn').forEach(btn => {
-        btn.addEventListener('click', e => updateStockStatus(id, btn.dataset.status, e));
-      });
-      const editBtn = row.querySelector('.edit-ing-btn');
-      if(editBtn) editBtn.addEventListener('click', e => { e.stopPropagation(); openIngModal(id); });
-      const delBtn = row.querySelector('.delete-ing-btn');
-      if(delBtn) delBtn.addEventListener('click', e => deleteIngredient(id, e));
-    });
   }
 
   /* ---------------- Master render ---------------- */
