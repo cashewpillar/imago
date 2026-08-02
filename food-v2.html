@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Food</title>
+<title>Food - The Larder</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -65,9 +65,6 @@
     color:var(--chalk);
     position:relative;
   }
-  .brand h1 .underline{
-    position:absolute; left:0; bottom:-4px; width:100%; height:6px;
-  }
   .brand .tagline{
     font-size:11px;
     color:var(--chalk-faint);
@@ -86,10 +83,10 @@
   .icon-btn svg{ width:18px; height:18px; }
 
   .toolbar{
-    display:flex; gap:8px; margin-top:14px; align-items:center;
+    display:flex; gap:8px; margin-top:14px; align-items:center; flex-wrap:wrap;
   }
   .search-wrap{
-    flex:1; position:relative;
+    flex:1; min-width:180px; position:relative;
   }
   .search-wrap svg{
     position:absolute; left:11px; top:50%; transform:translateY(-50%);
@@ -113,17 +110,34 @@
 
   .view-toggle{
     display:flex; background:var(--bg-inset); border:1px solid var(--line);
-    border-radius:9px; padding:2px; flex:none;
+    border-radius:9px; padding:2px; flex:none; overflow-x:auto;
   }
   .view-toggle button{
     background:none; border:none; color:var(--chalk-faint);
     font-size:12.5px; font-weight:600; padding:7px 12px; border-radius:7px;
     cursor:pointer; transition:background .15s, color .15s;
-    font-family:'Work Sans',sans-serif;
+    font-family:'Work Sans',sans-serif; white-space:nowrap;
+    display:flex; align-items:center; gap:5px;
   }
   .view-toggle button.active{ background:var(--accent-dim); color:var(--chalk); }
+  .view-toggle button .badge-count{
+    background:var(--accent); color:var(--on-accent); font-size:10px; padding:1px 6px; border-radius:10px; font-weight:700;
+  }
 
-  main{ padding:16px; max-width:900px; margin:0 auto; }
+  main{ padding:16px; max-width:940px; margin:0 auto; }
+
+  /* ---------- Sub-filter bar ---------- */
+  .filter-bar{
+    display:flex; gap:6px; margin-bottom:14px; overflow-x:auto; padding-bottom:2px;
+  }
+  .filter-pill{
+    background:var(--bg-inset); border:1px solid var(--line); color:var(--chalk-dim);
+    font-size:12px; font-weight:600; padding:5px 12px; border-radius:20px;
+    cursor:pointer; transition:all .15s; font-family:'Work Sans',sans-serif; white-space:nowrap;
+    display:flex; align-items:center; gap:5px;
+  }
+  .filter-pill:hover{ border-color:var(--line-strong); color:var(--chalk); }
+  .filter-pill.active{ background:var(--chalk); color:var(--bg); border-color:var(--chalk); }
 
   /* ---------- Empty state ---------- */
   .empty{
@@ -140,7 +154,7 @@
     border-bottom:1px solid var(--line);
   }
   table.dishes tbody tr{
-    background:var(--bg-raised);
+    background:var(--bg-raised); transition:border-color .15s, background .15s;
   }
   table.dishes tbody tr:hover{ background:var(--bg-inset); }
   table.dishes td{
@@ -149,18 +163,28 @@
   table.dishes tbody tr td:first-child{ border-top-left-radius:10px; border-bottom-left-radius:10px; }
   table.dishes tbody tr td:last-child{ border-top-right-radius:10px; border-bottom-right-radius:10px; }
   table.dishes tbody tr{ box-shadow: inset 0 0 0 1px var(--line); }
+  table.dishes tbody tr.is-planned{ box-shadow: inset 0 0 0 1.5px var(--accent); background:rgba(185,129,46,0.03); }
   table.dishes tbody tr + tr{ margin-top:8px; }
   table.dishes tbody{ display:block; }
   table.dishes thead, table.dishes tbody tr{ display:table; width:100%; table-layout:fixed; }
   table.dishes tbody tr{ margin-bottom:8px; border-radius:10px; }
 
+  .dish-title-wrap{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   .dish-name{ font-weight:600; font-size:15px; color:var(--chalk); }
   .dish-type{
-    display:inline-block; margin-top:4px; font-size:10.5px; text-transform:uppercase;
+    display:inline-block; font-size:10.5px; text-transform:uppercase;
     letter-spacing:0.8px; padding:2px 7px; border-radius:20px; font-weight:600;
   }
   .dish-type.dish{ background:rgba(139,160,119,0.18); color:var(--sage); }
   .dish-type.snack{ background:rgba(217,164,65,0.18); color:var(--accent); }
+
+  .planned-badge{
+    display:inline-flex; align-items:center; gap:4px;
+    background:var(--accent-dim); color:var(--on-accent);
+    font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:12px;
+    letter-spacing:0.3px; text-transform:uppercase;
+  }
+  .planned-badge svg{ width:11px; height:11px; }
 
   .chips{ display:flex; flex-wrap:wrap; gap:6px; }
   .chip{
@@ -181,15 +205,24 @@
   .chip .tally i{ display:block; width:1.5px; height:9px; background:var(--accent); transform:rotate(8deg); }
   .chip .tally i.diag{ width:11px; height:1.5px; transform:rotate(-35deg) translate(1px,3px); }
 
+  /* stock pills on chips */
+  .stock-dot{ width:7px; height:7px; border-radius:50%; flex:none; }
+  .stock-dot.in_stock{ background:var(--sage); }
+  .stock-dot.low{ background:var(--accent); }
+  .stock-dot.out{ background:var(--rust); }
+
   .row-actions{ display:flex; gap:6px; justify-content:flex-end; }
   .row-actions button{
     background:none; border:1px solid var(--line); color:var(--chalk-faint);
-    width:30px; height:30px; border-radius:7px; cursor:pointer;
-    display:flex; align-items:center; justify-content:center;
+    width:32px; height:32px; border-radius:7px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; transition:all .15s;
   }
   .row-actions button:hover{ color:var(--chalk); border-color:var(--line-strong); }
+  .row-actions button.plan-btn.active{
+    background:var(--accent-dim); color:var(--chalk); border-color:var(--accent);
+  }
   .row-actions button.danger:hover{ color:var(--rust); border-color:var(--rust-dim); }
-  .row-actions svg{ width:14px; height:14px; }
+  .row-actions svg{ width:15px; height:15px; }
 
   /* mobile card-ified table */
   @media (max-width: 640px){
@@ -212,7 +245,8 @@
     background:var(--bg-raised); border:1px solid var(--line);
     border-radius:10px; padding:12px 14px; cursor:pointer;
   }
-  .ing-row-top{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .ing-row-top{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .ing-info{ display:flex; align-items:center; gap:8px; }
   .ing-name{ font-weight:600; font-size:14.5px; }
   .ing-count{ display:flex; align-items:center; gap:7px; color:var(--chalk-faint); font-size:12px; }
   .ing-uses{
@@ -222,10 +256,101 @@
   .ing-uses ul{ margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:6px; }
   .ing-uses li{
     display:flex; justify-content:space-between; font-size:13px; color:var(--chalk-dim);
-    border-top:1px dashed var(--line); padding-top:6px;
+    border-top:1px dashed var(--line); padding-top:6px; align-items:center;
   }
   .ing-uses li:first-child{ border-top:none; padding-top:0; }
   .ing-uses .qty{ font-family:'IBM Plex Mono', monospace; color:var(--chalk-faint); font-size:11.5px; }
+
+  /* Stock Status Selector Buttons */
+  .stock-toggle-group{
+    display:inline-flex; background:var(--bg-inset); border:1px solid var(--line);
+    border-radius:8px; padding:2px; gap:2px; flex:none;
+  }
+  .stock-toggle-btn{
+    background:none; border:none; color:var(--chalk-faint);
+    font-size:11px; font-weight:600; padding:4px 8px; border-radius:6px;
+    cursor:pointer; transition:all .15s; font-family:'Work Sans',sans-serif;
+  }
+  .stock-toggle-btn.active.in_stock{ background:var(--sage-dim); color:var(--sage); font-weight:700; }
+  .stock-toggle-btn.active.low{ background:var(--accent-dim); color:var(--accent); font-weight:700; }
+  .stock-toggle-btn.active.out{ background:var(--rust-dim); color:var(--rust); font-weight:700; }
+
+  /* ---------- Grocery & Pantry View ---------- */
+  .grocery-stats{
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:16px;
+  }
+  .stat-card{
+    background:var(--bg-raised); border:1px solid var(--line); border-radius:10px; padding:12px;
+    text-align:center;
+  }
+  .stat-card .num{ font-family:'Kalam', cursive; font-size:24px; font-weight:700; color:var(--chalk); line-height:1; }
+  .stat-card .label{ font-size:11px; text-transform:uppercase; letter-spacing:0.8px; color:var(--chalk-faint); margin-top:4px; font-weight:600; }
+  .stat-card.highlight-buy .num{ color:var(--rust); }
+  .stat-card.highlight-plan .num{ color:var(--accent); }
+  .stat-card.highlight-stock .num{ color:var(--sage); }
+
+  .grocery-section{
+    background:var(--bg-raised); border:1px solid var(--line); border-radius:12px;
+    padding:16px; margin-bottom:16px;
+  }
+  .grocery-section-title{
+    font-family:'Kalam', cursive; font-size:19px; font-weight:700; margin:0 0 12px;
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+  }
+  .grocery-section-title .count-badge{
+    font-family:'Work Sans', sans-serif; font-size:12px; font-weight:600;
+    background:var(--bg-inset); color:var(--chalk-dim); padding:2px 8px; border-radius:12px;
+  }
+
+  /* Planned meals horizontal strip */
+  .planned-strip{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+  .planned-chip{
+    display:inline-flex; align-items:center; gap:6px;
+    background:var(--accent-dim); border:1px solid var(--accent); color:var(--chalk);
+    font-size:12.5px; font-weight:600; padding:6px 12px; border-radius:20px;
+  }
+  .planned-chip button{
+    background:none; border:none; color:var(--chalk-dim); cursor:pointer; padding:0;
+    display:flex; align-items:center; font-size:14px; line-height:1;
+  }
+  .planned-chip button:hover{ color:var(--rust); }
+
+  /* Grocery shopping list items */
+  .buy-list{ display:flex; flex-direction:column; gap:8px; }
+  .buy-item-row{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    background:var(--bg-inset); border:1px solid var(--line); border-radius:10px;
+    padding:10px 14px; transition:all .15s;
+  }
+  .buy-item-row.is-bought{
+    opacity:0.55; background:var(--bg); border-style:dashed;
+  }
+  .buy-item-left{ display:flex; align-items:center; gap:10px; flex:1; min-width:0; }
+  .buy-item-check{
+    width:22px; height:22px; border-radius:6px; border:1.8px solid var(--line-strong);
+    background:var(--bg-raised); cursor:pointer; display:flex; align-items:center; justify-content:center;
+    color:transparent; flex:none; transition:all .15s;
+  }
+  .buy-item-row.is-bought .buy-item-check{
+    background:var(--sage); border-color:var(--sage); color:#fff;
+  }
+  .buy-item-check svg{ width:14px; height:14px; stroke-width:3; }
+  .buy-item-details{ flex:1; min-width:0; }
+  .buy-item-name{ font-weight:600; font-size:14.5px; color:var(--chalk); }
+  .buy-item-row.is-bought .buy-item-name{ text-decoration:line-through; }
+  .buy-item-meta{ font-size:12px; color:var(--chalk-faint); margin-top:2px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .buy-item-meta .needed-for{ color:var(--accent); font-weight:500; }
+
+  .add-custom-buy{ display:flex; gap:8px; margin-top:12px; }
+  .add-custom-buy input{ flex:1; }
+
+  /* Pantry inventory list */
+  .pantry-grid{ display:flex; flex-direction:column; gap:8px; }
+  .pantry-row{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    background:var(--bg-inset); border:1px solid var(--line); border-radius:10px;
+    padding:10px 14px; flex-wrap:wrap;
+  }
 
   /* ---------- FAB ---------- */
   .fab{
@@ -262,6 +387,13 @@
   .modal h2{ font-family:'Kalam',cursive; font-size:22px; margin:0 0 16px; }
   .field{ margin-bottom:14px; }
   .field label{ display:block; font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--chalk-faint); margin-bottom:6px; font-weight:600; }
+  
+  .checkbox-label{
+    display:flex; align-items:center; gap:8px; cursor:pointer; font-size:14px; font-weight:500;
+    user-select:none; background:var(--bg-inset); border:1px solid var(--line); padding:10px 12px; border-radius:9px;
+  }
+  .checkbox-label input[type="checkbox"]{ width:17px; height:17px; accent-color:var(--accent); cursor:pointer; }
+
   .segmented{ display:flex; gap:8px; }
   .segmented button{
     flex:1; padding:9px; border-radius:9px; border:1px solid var(--line-strong);
@@ -270,6 +402,9 @@
   }
   .segmented button.active.dish{ background:rgba(139,160,119,0.22); border-color:var(--sage); color:var(--sage); }
   .segmented button.active.snack{ background:rgba(217,164,65,0.22); border-color:var(--accent); color:var(--accent); }
+  .segmented button.active.in_stock{ background:var(--sage-dim); border-color:var(--sage); color:var(--sage); }
+  .segmented button.active.low{ background:var(--accent-dim); border-color:var(--accent); color:var(--accent); }
+  .segmented button.active.out{ background:var(--rust-dim); border-color:var(--rust); color:var(--rust); }
 
   .ing-rows{ display:flex; flex-direction:column; gap:8px; }
   .ing-input-row{ display:grid; grid-template-columns:1fr 68px 74px 32px; gap:6px; align-items:center; }
@@ -290,6 +425,7 @@
   .btn{
     flex:1; padding:11px; border-radius:10px; border:none; font-weight:600; font-size:14px;
     cursor:pointer; font-family:'Work Sans',sans-serif;
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
   }
   .btn.primary{ background:var(--accent); color:var(--on-accent); }
   .btn.primary:hover{ background:var(--accent); filter:brightness(1.1); }
@@ -335,7 +471,7 @@
   <div class="brand">
     <div>
       <h1>The Larder</h1>
-      <div class="tagline">Dish &amp; Snack Tracker </div>
+      <div class="tagline">Dish, Snack &amp; Inventory Tracker</div>
     </div>
     <button class="icon-btn" id="ioBtn" title="Import / Export" aria-label="Import or export data">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
@@ -349,13 +485,14 @@
     <div class="view-toggle">
       <button id="tabDishes" class="active">Dishes</button>
       <button id="tabIngredients">Ingredients</button>
+      <button id="tabGrocery">Grocery &amp; Pantry <span class="badge-count" id="toBuyBadge">0</span></button>
     </div>
   </div>
 </header>
 
 <main id="main"></main>
 
-<button class="fab" id="fabAdd" aria-label="Add dish">
+<button class="fab" id="fabAdd" aria-label="Add item">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
 </button>
 
@@ -375,6 +512,12 @@
       </div>
     </div>
     <div class="field">
+      <label class="checkbox-label">
+        <input type="checkbox" id="dishPlannedInput">
+        <span>📋 Mark as Planned Meal</span>
+      </label>
+    </div>
+    <div class="field">
       <label>Ingredients</label>
       <div class="ing-rows" id="ingRows"></div>
       <button type="button" class="add-ing-btn" id="addIngRowBtn">+ Add ingredient</button>
@@ -386,6 +529,29 @@
     <div class="modal-actions">
       <button class="btn ghost" id="cancelDishBtn">Cancel</button>
       <button class="btn primary" id="saveDishBtn">Save dish</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ingredient edit modal -->
+<div class="overlay" id="ingOverlay">
+  <div class="modal" style="max-width:420px;">
+    <h2 id="ingModalTitle">Edit ingredient</h2>
+    <div class="field">
+      <label>Ingredient Name</label>
+      <input type="text" id="ingNameInput" placeholder="e.g. Garlic">
+    </div>
+    <div class="field">
+      <label>Stock Status</label>
+      <div class="segmented" id="ingStockSegmented">
+        <button type="button" class="stock-opt active in_stock" data-status="in_stock">In Stock</button>
+        <button type="button" class="stock-opt low" data-status="low">Low</button>
+        <button type="button" class="stock-opt out" data-status="out">Out</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="cancelIngBtn">Cancel</button>
+      <button class="btn primary" id="saveIngBtn">Save ingredient</button>
     </div>
   </div>
 </div>
@@ -409,11 +575,11 @@
     <div class="io-row">
       <button class="io-btn" id="exportBtn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
-        <span>Export data<small>Download every dish and ingredient as JSON</small></span>
+        <span>Export data<small>Download every dish, ingredient, and stock status as JSON</small></span>
       </button>
       <button class="io-btn" id="importBtn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 21V9m0 0l-4 4m4-4l4 4M5 3h14"/></svg>
-        <span>Import data<small>Merge a JSON file — existing records are matched by ID and updated in place</small></span>
+        <span>Import data<small>Merge a JSON file — existing records are updated in place</small></span>
       </button>
       <input type="file" accept="application/json" class="hidden-file" id="importFile">
     </div>
@@ -430,12 +596,28 @@
 (function(){
   "use strict";
 
-  /* ---------------- DB ---------------- */
+  /* ---------------- DB Setup & Migration ---------------- */
   const db = new Dexie('LarderDB');
   db.version(1).stores({
     items: 'id, name, type, updatedAt',
     ingredients: 'id, &nameKey, updatedAt',
     itemIngredients: 'id, itemId, ingredientId, updatedAt'
+  });
+  
+  db.version(2).stores({
+    items: 'id, name, type, isPlanned, updatedAt',
+    ingredients: 'id, &nameKey, stockStatus, updatedAt',
+    itemIngredients: 'id, itemId, ingredientId, updatedAt',
+    customGrocery: 'id, name, bought, updatedAt'
+  }).upgrade(tx => {
+    return Promise.all([
+      tx.items.toCollection().modify(item => {
+        if(item.isPlanned === undefined) item.isPlanned = false;
+      }),
+      tx.ingredients.toCollection().modify(ing => {
+        if(!ing.stockStatus) ing.stockStatus = 'out';
+      })
+    ]);
   });
 
   const uuid = () => (crypto.randomUUID ? crypto.randomUUID() :
@@ -447,9 +629,12 @@
   const normalize = s => s.trim().toLowerCase().replace(/\s+/g,' ');
 
   /* ---------------- State ---------------- */
-  let currentTab = 'dishes';
+  let currentTab = 'dishes'; // 'dishes', 'ingredients', 'grocery'
+  let dishFilter = 'all'; // 'all', 'planned', 'dish', 'snack'
+  let grocerySubTab = 'all'; // 'all', 'to_buy', 'pantry'
   let searchTerm = '';
-  let editingItemId = null; // null = creating new
+  let editingItemId = null;
+  let editingIngId = null;
   let currentType = 'dish';
   let confirmAction = null;
 
@@ -467,7 +652,6 @@
   }
 
   function tallySVG(count){
-    // draws chalk-style tally marks for counts of shared ingredient usage
     let html = '<span class="tally">';
     const full = Math.floor(count/5), rem = count % 5;
     for(let g=0; g<full; g++){
@@ -480,10 +664,13 @@
 
   /* ---------------- Data access ---------------- */
   async function getAllData(){
-    const [items, ingredients, itemIngredients] = await Promise.all([
-      db.items.toArray(), db.ingredients.toArray(), db.itemIngredients.toArray()
+    const [items, ingredients, itemIngredients, customGrocery] = await Promise.all([
+      db.items.toArray(),
+      db.ingredients.toArray(),
+      db.itemIngredients.toArray(),
+      db.customGrocery ? db.customGrocery.toArray() : Promise.resolve([])
     ]);
-    return { items, ingredients, itemIngredients };
+    return { items, ingredients, itemIngredients, customGrocery };
   }
 
   async function findOrCreateIngredient(name){
@@ -491,15 +678,37 @@
     if(!key) return null;
     let existing = await db.ingredients.where('nameKey').equals(key).first();
     if(existing) return existing;
-    const rec = { id: uuid(), name: name.trim(), nameKey: key, createdAt: nowISO(), updatedAt: nowISO() };
+    const rec = { id: uuid(), name: name.trim(), nameKey: key, stockStatus: 'out', createdAt: nowISO(), updatedAt: nowISO() };
     await db.ingredients.put(rec);
     return rec;
+  }
+
+  async function toggleDishPlanned(itemId, e){
+    if(e) e.stopPropagation();
+    const item = await db.items.get(itemId);
+    if(!item) return;
+    const nextState = !item.isPlanned;
+    await db.items.update(itemId, { isPlanned: nextState, updatedAt: nowISO() });
+    toast(nextState ? `"${item.name}" added to meal plan` : `"${item.name}" removed from plan`);
+    updateHeaderBadge();
+    render();
+  }
+
+  async function updateStockStatus(ingredientId, newStatus, e){
+    if(e) e.stopPropagation();
+    await db.ingredients.update(ingredientId, { stockStatus: newStatus, updatedAt: nowISO() });
+    const ing = await db.ingredients.get(ingredientId);
+    const labelMap = { in_stock: 'In Stock', low: 'Low Stock', out: 'Out of Stock' };
+    toast(`${ing ? ing.name : 'Item'} marked as ${labelMap[newStatus] || newStatus}`);
+    updateHeaderBadge();
+    render();
   }
 
   async function saveDish(){
     const name = document.getElementById('dishNameInput').value.trim();
     if(!name){ toast('Give the dish a name'); return; }
     const notes = document.getElementById('dishNotesInput').value.trim();
+    const isPlanned = document.getElementById('dishPlannedInput').checked;
     const rows = Array.from(document.querySelectorAll('.ing-input-row')).map(row => ({
       name: row.querySelector('.ing-name-input').value.trim(),
       qty: row.querySelector('.ing-qty-input').value.trim(),
@@ -511,12 +720,11 @@
     const isNew = !editingItemId;
 
     await db.items.put({
-      id: itemId, name, type: currentType, notes,
+      id: itemId, name, type: currentType, notes, isPlanned: isPlanned ? 1 : 0,
       createdAt: isNew ? ts : (await db.items.get(itemId))?.createdAt || ts,
       updatedAt: ts
     });
 
-    // remove old join rows for this item, then re-add current set
     const oldJoins = await db.itemIngredients.where('itemId').equals(itemId).toArray();
     await db.itemIngredients.bulkDelete(oldJoins.map(j => j.id));
 
@@ -532,6 +740,7 @@
 
     closeDishModal();
     toast(isNew ? 'Dish added' : 'Dish updated');
+    updateHeaderBadge();
     render();
   }
 
@@ -540,7 +749,157 @@
     await db.itemIngredients.bulkDelete(joins.map(j => j.id));
     await db.items.delete(itemId);
     toast('Dish deleted');
+    updateHeaderBadge();
     render();
+  }
+
+  /* ---------------- Ingredient Edit / Delete ---------------- */
+  async function openIngModal(ingId){
+    editingIngId = ingId || null;
+    document.getElementById('ingModalTitle').textContent = ingId ? 'Edit ingredient' : 'New ingredient';
+    
+    if(ingId){
+      const ing = await db.ingredients.get(ingId);
+      if(ing){
+        document.getElementById('ingNameInput').value = ing.name;
+        setIngStockSegmented(ing.stockStatus || 'out');
+      }
+    } else {
+      document.getElementById('ingNameInput').value = '';
+      setIngStockSegmented('out');
+    }
+
+    document.getElementById('ingOverlay').classList.add('show');
+    document.getElementById('ingNameInput').focus();
+  }
+
+  function closeIngModal(){
+    document.getElementById('ingOverlay').classList.remove('show');
+    editingIngId = null;
+  }
+
+  function setIngStockSegmented(status){
+    document.querySelectorAll('#ingStockSegmented button').forEach(b => {
+      b.classList.toggle('active', b.dataset.status === status);
+    });
+  }
+
+  async function saveIngredient(){
+    const name = document.getElementById('ingNameInput').value.trim();
+    if(!name){ toast('Provide an ingredient name'); return; }
+
+    const activeBtn = document.querySelector('#ingStockSegmented button.active');
+    const stockStatus = activeBtn ? activeBtn.dataset.status : 'out';
+    const key = normalize(name);
+    const ts = nowISO();
+
+    if(!editingIngId){
+      // Creating brand new ingredient directly
+      let existing = await db.ingredients.where('nameKey').equals(key).first();
+      if(existing){
+        await db.ingredients.update(existing.id, { stockStatus, updatedAt: ts });
+        toast(`Updated stock for existing "${existing.name}"`);
+      } else {
+        await db.ingredients.put({
+          id: uuid(), name, nameKey: key, stockStatus, createdAt: ts, updatedAt: ts
+        });
+        toast('Ingredient added');
+      }
+    } else {
+      // Editing existing ingredient
+      const existing = await db.ingredients.where('nameKey').equals(key).first();
+      if(existing && existing.id !== editingIngId){
+        // Name collision: offer to merge
+        openConfirm('Merge ingredients?', `An ingredient named "${existing.name}" already exists. Merge "${name}" into "${existing.name}"?`, async () => {
+          const joins = await db.itemIngredients.where('ingredientId').equals(editingIngId).toArray();
+          for(const j of joins){
+            await db.itemIngredients.update(j.id, { ingredientId: existing.id, updatedAt: ts });
+          }
+          await db.ingredients.update(existing.id, { stockStatus, updatedAt: ts });
+          await db.ingredients.delete(editingIngId);
+          closeIngModal();
+          toast(`Merged into "${existing.name}"`);
+          updateHeaderBadge();
+          render();
+        });
+        return;
+      }
+
+      await db.ingredients.update(editingIngId, {
+        name, nameKey: key, stockStatus, updatedAt: ts
+      });
+      toast('Ingredient updated');
+    }
+
+    closeIngModal();
+    updateHeaderBadge();
+    render();
+  }
+
+  async function deleteIngredient(ingId, e){
+    if(e) e.stopPropagation();
+    const ing = await db.ingredients.get(ingId);
+    if(!ing) return;
+    const joins = await db.itemIngredients.where('ingredientId').equals(ingId).toArray();
+    const usageCount = joins.length;
+
+    openConfirm('Delete ingredient?', `"${ing.name}" will be removed. ${usageCount > 0 ? `It is used in ${usageCount} dish(es).` : ''}`, async () => {
+      await db.itemIngredients.bulkDelete(joins.map(j => j.id));
+      await db.ingredients.delete(ingId);
+      toast(`Deleted "${ing.name}"`);
+      updateHeaderBadge();
+      render();
+    });
+  }
+
+  /* ---------------- Custom Grocery Items ---------------- */
+  async function addCustomGrocery(name){
+    if(!name.trim()) return;
+    await db.customGrocery.put({
+      id: uuid(), name: name.trim(), bought: false, updatedAt: nowISO()
+    });
+    toast('Added to shopping list');
+    updateHeaderBadge();
+    render();
+  }
+
+  async function toggleCustomGrocery(id, currentBought){
+    await db.customGrocery.update(id, { bought: !currentBought, updatedAt: nowISO() });
+    updateHeaderBadge();
+    render();
+  }
+
+  async function deleteCustomGrocery(id){
+    await db.customGrocery.delete(id);
+    updateHeaderBadge();
+    render();
+  }
+
+  /* ---------------- Badge counter ---------------- */
+  async function updateHeaderBadge(){
+    const { items, ingredients, itemIngredients, customGrocery } = await getAllData();
+    const plannedItems = items.filter(i => i.isPlanned);
+    const plannedItemIds = new Set(plannedItems.map(i => i.id));
+    const ingById = Object.fromEntries(ingredients.map(i => [i.id, i]));
+    
+    const neededIngIds = new Set();
+    itemIngredients.forEach(j => {
+      if(plannedItemIds.has(j.itemId)){
+        const ing = ingById[j.ingredientId];
+        if(ing && ing.stockStatus !== 'in_stock'){
+          neededIngIds.add(ing.id);
+        }
+      }
+    });
+
+    const customToBuy = customGrocery.filter(g => !g.bought).length;
+    const totalToBuy = neededIngIds.size + customToBuy;
+
+    const badge = document.getElementById('toBuyBadge');
+    if(badge){
+      badge.textContent = totalToBuy;
+      badge.style.display = totalToBuy > 0 ? 'inline-block' : 'none';
+    }
   }
 
   /* ---------------- Modal: add/edit dish ---------------- */
@@ -567,6 +926,7 @@
     document.getElementById('dishModalTitle').textContent = itemId ? 'Edit dish' : 'New dish';
     document.getElementById('dishNameInput').value = '';
     document.getElementById('dishNotesInput').value = '';
+    document.getElementById('dishPlannedInput').checked = false;
     document.getElementById('ingRows').innerHTML = '';
     currentType = 'dish';
     setSegmented('dish');
@@ -578,6 +938,7 @@
       if(item){
         document.getElementById('dishNameInput').value = item.name;
         document.getElementById('dishNotesInput').value = item.notes || '';
+        document.getElementById('dishPlannedInput').checked = !!item.isPlanned;
         currentType = item.type || 'dish';
         setSegmented(currentType);
         const joins = await db.itemIngredients.where('itemId').equals(itemId).toArray();
@@ -629,12 +990,26 @@
     const usageCount = {};
     itemIngredients.forEach(j => { usageCount[j.ingredientId] = (usageCount[j.ingredientId]||0) + 1; });
 
+    const plannedCount = items.filter(i => i.isPlanned).length;
+
+    let filterHtml = `
+      <div class="filter-bar">
+        <button class="filter-pill ${dishFilter==='all'?'active':''}" data-filter="all">All (${items.length})</button>
+        <button class="filter-pill ${dishFilter==='planned'?'active':''}" data-filter="planned">📋 Planned (${plannedCount})</button>
+        <button class="filter-pill ${dishFilter==='dish'?'active':''}" data-filter="dish">Dishes</button>
+        <button class="filter-pill ${dishFilter==='snack'?'active':''}" data-filter="snack">Snacks</button>
+      </div>`;
+
     let filtered = items;
+    if(dishFilter === 'planned') filtered = filtered.filter(i => i.isPlanned);
+    else if(dishFilter === 'dish') filtered = filtered.filter(i => i.type === 'dish');
+    else if(dishFilter === 'snack') filtered = filtered.filter(i => i.type === 'snack');
+
     if(searchTerm){
       const q = normalize(searchTerm);
       const joinsByItem = {};
       itemIngredients.forEach(j => { (joinsByItem[j.itemId] ||= []).push(j); });
-      filtered = items.filter(item => {
+      filtered = filtered.filter(item => {
         if(normalize(item.name).includes(q)) return true;
         const joins = joinsByItem[item.id] || [];
         return joins.some(j => ingById[j.ingredientId] && normalize(ingById[j.ingredientId].name).includes(q));
@@ -643,10 +1018,11 @@
     filtered.sort((a,b) => a.name.localeCompare(b.name));
 
     if(filtered.length === 0){
-      container.innerHTML = `<div class="empty">
-        <span class="display">${items.length === 0 ? 'Nothing on the shelf yet' : 'No matches'}</span>
-        <p>${items.length === 0 ? 'Tap + to add your first dish or snack.' : 'Try a different search term.'}</p>
+      container.innerHTML = filterHtml + `<div class="empty">
+        <span class="display">${items.length === 0 ? 'Nothing on the shelf yet' : 'No matching dishes'}</span>
+        <p>${items.length === 0 ? 'Tap + to add your first dish or snack.' : 'Try changing your search or filter.'}</p>
       </div>`;
+      wireDishFilterEvents(container);
       return;
     }
 
@@ -660,21 +1036,33 @@
         if(!ing) return '';
         const count = usageCount[j.ingredientId] || 1;
         const shared = count > 1;
+        const stock = ing.stockStatus || 'out';
         const qtyStr = [j.quantity, j.unit].filter(Boolean).join(' ');
-        return `<span class="chip${shared ? ' shared':''}" data-ing-id="${ing.id}" title="${shared ? `Used in ${count} items` : 'Used in 1 item'}">
+        return `<span class="chip${shared ? ' shared':''}" data-ing-id="${ing.id}" title="${shared ? `Used in ${count} items` : 'Used in 1 item'} — Stock: ${stock.replace('_',' ')}">
+          <span class="stock-dot ${stock}"></span>
           ${escapeHtml(ing.name)}
           ${qtyStr ? `<span class="qty">${escapeHtml(qtyStr)}</span>` : ''}
           ${shared ? tallySVG(count) : ''}
         </span>`;
       }).join('');
-      return `<tr data-item-id="${item.id}">
+
+      const isPlanned = !!item.isPlanned;
+
+      return `<tr data-item-id="${item.id}" class="${isPlanned ? 'is-planned' : ''}">
         <td data-label="Dish">
-          <div class="dish-name">${escapeHtml(item.name)}</div>
-          <span class="dish-type ${item.type}">${item.type}</span>
+          <div class="dish-title-wrap">
+            <span class="dish-name">${escapeHtml(item.name)}</span>
+            <span class="dish-type ${item.type}">${item.type}</span>
+            ${isPlanned ? `<span class="planned-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Planned</span>` : ''}
+          </div>
+          ${item.notes ? `<div style="font-size:12px; color:var(--chalk-faint); margin-top:4px;">${escapeHtml(item.notes)}</div>` : ''}
         </td>
         <td data-label="Ingredients"><div class="chips">${chips || '<span style="color:var(--chalk-faint);font-size:12.5px;">No ingredients yet</span>'}</div></td>
         <td data-label="Actions">
           <div class="row-actions">
+            <button class="plan-btn ${isPlanned ? 'active':''}" title="${isPlanned ? 'Remove from plan':'Mark as planned meal'}" aria-label="Toggle Planned">
+              <svg viewBox="0 0 24 24" fill="${isPlanned?'currentColor':'none'}" stroke="currentColor" stroke-width="1.8"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            </button>
             <button class="edit-btn" aria-label="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
             <button class="delete-btn danger" aria-label="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6"/></svg></button>
           </div>
@@ -682,13 +1070,16 @@
       </tr>`;
     }).join('');
 
-    container.innerHTML = `<table class="dishes">
-      <thead><tr><th style="width:32%">Dish</th><th>Ingredients</th><th style="width:80px">Actions</th></tr></thead>
+    container.innerHTML = filterHtml + `<table class="dishes">
+      <thead><tr><th style="width:36%">Dish</th><th>Ingredients</th><th style="width:110px">Actions</th></tr></thead>
       <tbody>${rowsHtml}</tbody>
     </table>`;
 
+    wireDishFilterEvents(container);
+
     container.querySelectorAll('tr[data-item-id]').forEach(tr => {
       const id = tr.dataset.itemId;
+      tr.querySelector('.plan-btn').addEventListener('click', e => toggleDishPlanned(id, e));
       tr.querySelector('.edit-btn').addEventListener('click', () => openDishModal(id));
       tr.querySelector('.delete-btn').addEventListener('click', () => {
         const item = items.find(i => i.id === id);
@@ -702,6 +1093,15 @@
           document.getElementById('searchInput').value = '';
           render(chip.dataset.ingId);
         });
+      });
+    });
+  }
+
+  function wireDishFilterEvents(container){
+    container.querySelectorAll('.filter-bar .filter-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        dishFilter = btn.dataset.filter;
+        render();
       });
     });
   }
@@ -723,7 +1123,7 @@
     if(list.length === 0){
       container.innerHTML = `<div class="empty">
         <span class="display">${ingredients.length === 0 ? 'No ingredients yet' : 'No matches'}</span>
-        <p>${ingredients.length === 0 ? 'Ingredients appear here once you add them to a dish.' : 'Try a different search term.'}</p>
+        <p>${ingredients.length === 0 ? 'Ingredients appear here once added or created.' : 'Try a different search term.'}</p>
       </div>`;
       return;
     }
@@ -734,23 +1134,54 @@
         return an.localeCompare(bn);
       });
       const count = uses.length;
+      const stock = ing.stockStatus || 'out';
+
       return `<div class="ing-row${openIngId===ing.id ? ' open':''}" data-ing-id="${ing.id}">
         <div class="ing-row-top">
-          <span class="ing-name">${escapeHtml(ing.name)}</span>
-          <span class="ing-count">${count} ${count===1?'dish':'dishes'} ${count>1 ? tallySVG(count) : ''}</span>
+          <div class="ing-info">
+            <span class="stock-dot ${stock}"></span>
+            <span class="ing-name">${escapeHtml(ing.name)}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <div class="stock-toggle-group" onclick="event.stopPropagation();">
+              <button class="stock-toggle-btn ${stock==='in_stock'?'active in_stock':''}" data-status="in_stock" title="In Stock">In Stock</button>
+              <button class="stock-toggle-btn ${stock==='low'?'active low':''}" data-status="low" title="Low Stock">Low</button>
+              <button class="stock-toggle-btn ${stock==='out'?'active out':''}" data-status="out" title="Out of Stock">Out</button>
+            </div>
+            <span class="ing-count">${count} ${count===1?'dish':'dishes'} ${count>1 ? tallySVG(count) : ''}</span>
+            <div class="row-actions" onclick="event.stopPropagation();">
+              <button class="edit-ing-btn" title="Edit ingredient" aria-label="Edit ingredient">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+              </button>
+              <button class="delete-ing-btn danger" title="Delete ingredient" aria-label="Delete ingredient">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6"/></svg>
+              </button>
+            </div>
+          </div>
         </div>
         <div class="ing-uses"><ul>
           ${uses.map(j => {
             const it = itemsById[j.itemId];
             const qtyStr = [j.quantity, j.unit].filter(Boolean).join(' ');
-            return `<li><span>${escapeHtml(it ? it.name : 'Unknown dish')}</span>${qtyStr ? `<span class="qty">${escapeHtml(qtyStr)}</span>`:''}</li>`;
+            return `<li>
+              <span>${escapeHtml(it ? it.name : 'Unknown dish')} ${it?.isPlanned ? '<span class="planned-badge" style="font-size:9px; padding:1px 5px;">Planned</span>':''}</span>
+              ${qtyStr ? `<span class="qty">${escapeHtml(qtyStr)}</span>`:''}
+            </li>`;
           }).join('') || '<li>Not used in any dish</li>'}
         </ul></div>
       </div>`;
     }).join('')}</div>`;
 
     container.querySelectorAll('.ing-row').forEach(row => {
+      const id = row.dataset.ingId;
       row.addEventListener('click', () => row.classList.toggle('open'));
+      row.querySelectorAll('.stock-toggle-btn').forEach(btn => {
+        btn.addEventListener('click', e => updateStockStatus(id, btn.dataset.status, e));
+      });
+      const editBtn = row.querySelector('.edit-ing-btn');
+      if(editBtn) editBtn.addEventListener('click', e => { e.stopPropagation(); openIngModal(id); });
+      const delBtn = row.querySelector('.delete-ing-btn');
+      if(delBtn) delBtn.addEventListener('click', e => deleteIngredient(id, e));
     });
 
     if(openIngId){
@@ -759,16 +1190,269 @@
     }
   }
 
+  /* ---------------- Render: Grocery & Inventory (Unified View) ---------------- */
+  async function renderGroceryTab(container){
+    const { items, ingredients, itemIngredients, customGrocery } = await getAllData();
+    const itemsById = Object.fromEntries(items.map(i => [i.id, i]));
+    const ingById = Object.fromEntries(ingredients.map(i => [i.id, i]));
+
+    const plannedDishes = items.filter(i => i.isPlanned);
+    const plannedDishIds = new Set(plannedDishes.map(i => i.id));
+
+    const plannedDemand = {};
+    itemIngredients.forEach(j => {
+      if(plannedDishIds.has(j.itemId)){
+        (plannedDemand[j.ingredientId] ||= []).push({
+          dishName: itemsById[j.itemId]?.name || 'Dish',
+          qty: j.quantity,
+          unit: j.unit
+        });
+      }
+    });
+
+    const toBuyIngredients = [];
+    const inStockIngredientsForPlan = [];
+
+    Object.keys(plannedDemand).forEach(ingId => {
+      const ing = ingById[ingId];
+      if(!ing) return;
+      const demandList = plannedDemand[ingId];
+      const reqInfo = { ing, demandList };
+      if(ing.stockStatus === 'in_stock'){
+        inStockIngredientsForPlan.push(reqInfo);
+      } else {
+        toBuyIngredients.push(reqInfo);
+      }
+    });
+
+    const activeCustomToBuy = customGrocery.filter(g => !g.bought);
+    const boughtCustomToBuy = customGrocery.filter(g => g.bought);
+
+    const totalToBuyCount = toBuyIngredients.length + activeCustomToBuy.length;
+    const totalInStockCount = ingredients.filter(i => i.stockStatus === 'in_stock').length;
+
+    const navHtml = `
+      <div class="grocery-stats">
+        <div class="stat-card highlight-plan">
+          <div class="num">${plannedDishes.length}</div>
+          <div class="label">Planned Meals</div>
+        </div>
+        <div class="stat-card highlight-buy">
+          <div class="num">${totalToBuyCount}</div>
+          <div class="label">Items to Buy</div>
+        </div>
+        <div class="stat-card highlight-stock">
+          <div class="num">${totalInStockCount}</div>
+          <div class="label">In Stock</div>
+        </div>
+      </div>
+      <div class="filter-bar">
+        <button class="filter-pill ${grocerySubTab==='all'?'active':''}" data-gsub="all">Combined View</button>
+        <button class="filter-pill ${grocerySubTab==='to_buy'?'active':''}" data-gsub="to_buy">🛒 Shopping List (${totalToBuyCount})</button>
+        <button class="filter-pill ${grocerySubTab==='pantry'?'active':''}" data-gsub="pantry">📦 Pantry Inventory (${ingredients.length})</button>
+      </div>`;
+
+    const plannedStripHtml = plannedDishes.length > 0 ? `
+      <div class="grocery-section" style="padding:12px 16px;">
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--chalk-faint); font-weight:700; margin-bottom:8px;">
+          📋 Active Meal Plan (${plannedDishes.length})
+        </div>
+        <div class="planned-strip">
+          ${plannedDishes.map(d => `<span class="planned-chip">
+            ${escapeHtml(d.name)}
+            <button title="Remove from plan" data-unplan-id="${d.id}">&times;</button>
+          </span>`).join('')}
+        </div>
+      </div>` : `
+      <div class="grocery-section" style="text-align:center; padding:18px;">
+        <div style="font-size:14px; color:var(--chalk-dim);">No meals planned yet.</div>
+        <div style="font-size:12px; color:var(--chalk-faint); margin-top:4px;">Mark dishes as "Planned" on the Dishes tab to generate your automatic grocery list!</div>
+      </div>`;
+
+    const showShopping = grocerySubTab === 'all' || grocerySubTab === 'to_buy';
+    const shoppingListHtml = showShopping ? `
+      <div class="grocery-section">
+        <div class="grocery-section-title">
+          <span>🛒 Grocery Shopping List</span>
+          <span class="count-badge">${totalToBuyCount} items needed</span>
+        </div>
+
+        <div class="buy-list">
+          ${toBuyIngredients.map(item => {
+            const ing = item.ing;
+            const dishNames = item.demandList.map(d => d.dishName).join(', ');
+            const qtys = item.demandList.map(d => [d.qty, d.unit].filter(Boolean).join(' ')).filter(Boolean).join(' + ');
+
+            return `<div class="buy-item-row" data-ing-id="${ing.id}">
+              <div class="buy-item-left">
+                <button class="buy-item-check mark-bought-btn" title="Mark as bought (adds to pantry stock)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg>
+                </button>
+                <div class="buy-item-details">
+                  <div class="buy-item-name">${escapeHtml(ing.name)}</div>
+                  <div class="buy-item-meta">
+                    <span class="needed-for">Needed for: ${escapeHtml(dishNames)}</span>
+                    ${qtys ? `<span class="mono">(${escapeHtml(qtys)})</span>` : ''}
+                    <span class="stock-pill ${ing.stockStatus}" style="font-size:10.5px; padding:1px 6px; border-radius:10px; font-weight:600; text-transform:capitalize;">${ing.stockStatus.replace('_',' ')}</span>
+                  </div>
+                </div>
+              </div>
+            </div>`;
+          }).join('')}
+
+          ${activeCustomToBuy.map(g => `<div class="buy-item-row" data-custom-id="${g.id}">
+            <div class="buy-item-left">
+              <button class="buy-item-check toggle-custom-btn" title="Toggle bought">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg>
+              </button>
+              <div class="buy-item-details">
+                <div class="buy-item-name">${escapeHtml(g.name)}</div>
+                <div class="buy-item-meta"><span>Extra item</span></div>
+              </div>
+            </div>
+            <button class="delete-custom-btn" style="background:none; border:none; color:var(--chalk-faint); cursor:pointer;" title="Delete item">&times;</button>
+          </div>`).join('')}
+
+          ${totalToBuyCount === 0 ? `<div style="text-align:center; padding:14px; color:var(--sage); font-weight:600; font-size:14px;">
+            🎉 All ingredients for your planned meals are currently in stock!
+          </div>` : ''}
+        </div>
+
+        <form class="add-custom-buy" id="addCustomForm">
+          <input type="text" id="customBuyInput" placeholder="+ Add extra grocery item (e.g. Olive oil, Paper towels)">
+          <button type="submit" class="btn primary" style="flex:none; width:auto; padding:0 16px;">Add</button>
+        </form>
+
+        ${inStockIngredientsForPlan.length > 0 ? `
+          <details style="margin-top:16px; font-size:13px; color:var(--chalk-dim);">
+            <summary style="cursor:pointer; font-weight:600; padding:6px 0;">✓ Already in stock for planned meals (${inStockIngredientsForPlan.length})</summary>
+            <div style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
+              ${inStockIngredientsForPlan.map(item => `<div style="display:flex; justify-content:space-between; background:var(--bg-inset); padding:8px 12px; border-radius:6px; font-size:12.5px;">
+                <span>${escapeHtml(item.ing.name)} <small style="color:var(--chalk-faint);">(${escapeHtml(item.demandList.map(d=>d.dishName).join(', '))})</small></span>
+                <span class="stock-dot in_stock" title="In Stock"></span>
+              </div>`).join('')}
+            </div>
+          </details>` : ''}
+      </div>` : '';
+
+    const showPantry = grocerySubTab === 'all' || grocerySubTab === 'pantry';
+    let filteredIngredients = ingredients;
+    if(searchTerm){
+      const q = normalize(searchTerm);
+      filteredIngredients = filteredIngredients.filter(i => normalize(i.name).includes(q));
+    }
+    filteredIngredients.sort((a,b) => a.name.localeCompare(b.name));
+
+    const pantryHtml = showPantry ? `
+      <div class="grocery-section">
+        <div class="grocery-section-title">
+          <span>📦 Pantry Stock Tracker</span>
+          <span class="count-badge">${ingredients.length} total items</span>
+        </div>
+        <div class="pantry-grid">
+          ${filteredIngredients.map(ing => {
+            const stock = ing.stockStatus || 'out';
+            const reqForPlan = plannedDemand[ing.id];
+
+            return `<div class="pantry-row" data-ing-id="${ing.id}">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span class="stock-dot ${stock}"></span>
+                <div>
+                  <div style="font-weight:600; font-size:14px;">${escapeHtml(ing.name)}</div>
+                  ${reqForPlan ? `<div style="font-size:11px; color:var(--accent); font-weight:600;">Needed for: ${escapeHtml(reqForPlan.map(d=>d.dishName).join(', '))}</div>` : ''}
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <div class="stock-toggle-group">
+                  <button class="stock-toggle-btn ${stock==='in_stock'?'active in_stock':''}" data-status="in_stock">In Stock</button>
+                  <button class="stock-toggle-btn ${stock==='low'?'active low':''}" data-status="low">Low</button>
+                  <button class="stock-toggle-btn ${stock==='out'?'active out':''}" data-status="out">Out</button>
+                </div>
+                <div class="row-actions">
+                  <button class="edit-ing-btn" title="Edit ingredient" aria-label="Edit ingredient">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                  </button>
+                  <button class="delete-ing-btn danger" title="Delete ingredient" aria-label="Delete ingredient">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>` : '';
+
+    container.innerHTML = navHtml + plannedStripHtml + shoppingListHtml + pantryHtml;
+
+    container.querySelectorAll('.grocery-stats + .filter-bar .filter-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        grocerySubTab = btn.dataset.gsub;
+        render();
+      });
+    });
+
+    container.querySelectorAll('[data-unplan-id]').forEach(btn => {
+      btn.addEventListener('click', e => toggleDishPlanned(btn.dataset.unplan-id, e));
+    });
+
+    container.querySelectorAll('.mark-bought-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        const row = btn.closest('[data-ing-id]');
+        if(row) updateStockStatus(row.dataset.ingId, 'in_stock', e);
+      });
+    });
+
+    container.querySelectorAll('.toggle-custom-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const row = btn.closest('[data-custom-id]');
+        const item = customGrocery.find(g => g.id === row.dataset.customId);
+        if(item) toggleCustomGrocery(item.id, item.bought);
+      });
+    });
+
+    container.querySelectorAll('.delete-custom-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const row = btn.closest('[data-custom-id]');
+        if(row) deleteCustomGrocery(row.dataset.customId);
+      });
+    });
+
+    const addForm = container.querySelector('#addCustomForm');
+    if(addForm){
+      addForm.addEventListener('submit', e => {
+        e.preventDefault();
+        const input = container.querySelector('#customBuyInput');
+        if(input && input.value.trim()){
+          addCustomGrocery(input.value.trim());
+        }
+      });
+    }
+
+    container.querySelectorAll('.pantry-row').forEach(row => {
+      const id = row.dataset.ingId;
+      row.querySelectorAll('.stock-toggle-btn').forEach(btn => {
+        btn.addEventListener('click', e => updateStockStatus(id, btn.dataset.status, e));
+      });
+      const editBtn = row.querySelector('.edit-ing-btn');
+      if(editBtn) editBtn.addEventListener('click', e => { e.stopPropagation(); openIngModal(id); });
+      const delBtn = row.querySelector('.delete-ing-btn');
+      if(delBtn) delBtn.addEventListener('click', e => deleteIngredient(id, e));
+    });
+  }
+
   /* ---------------- Master render ---------------- */
   async function render(openIngId){
     const container = document.getElementById('main');
     if(currentTab === 'dishes') await renderDishesTab(container);
-    else await renderIngredientsTab(container, openIngId);
+    else if(currentTab === 'ingredients') await renderIngredientsTab(container, openIngId);
+    else if(currentTab === 'grocery') await renderGroceryTab(container);
+    await updateHeaderBadge();
   }
 
   function updateTabUI(){
     document.getElementById('tabDishes').classList.toggle('active', currentTab === 'dishes');
     document.getElementById('tabIngredients').classList.toggle('active', currentTab === 'ingredients');
+    document.getElementById('tabGrocery').classList.toggle('active', currentTab === 'grocery');
   }
 
   /* ---------------- Import / Export ---------------- */
@@ -776,11 +1460,12 @@
     const data = await getAllData();
     const payload = {
       app: 'the-larder',
-      version: 1,
+      version: 2,
       exportedAt: nowISO(),
       items: data.items,
       ingredients: data.ingredients,
-      itemIngredients: data.itemIngredients
+      itemIngredients: data.itemIngredients,
+      customGrocery: data.customGrocery
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -803,14 +1488,15 @@
       const items = Array.isArray(data.items) ? data.items : [];
       const ingredients = Array.isArray(data.ingredients) ? data.ingredients : [];
       const itemIngredients = Array.isArray(data.itemIngredients) ? data.itemIngredients : [];
+      const customGrocery = Array.isArray(data.customGrocery) ? data.customGrocery : [];
 
-      // idempotent upsert keyed by id (put overwrites existing record with same primary key)
       const cleanItems = items.filter(i => i && i.id && i.name).map(i => ({
         id: i.id, name: i.name, type: i.type === 'snack' ? 'snack' : 'dish',
-        notes: i.notes || '', createdAt: i.createdAt || nowISO(), updatedAt: i.updatedAt || nowISO()
+        isPlanned: i.isPlanned ? 1 : 0, notes: i.notes || '', createdAt: i.createdAt || nowISO(), updatedAt: i.updatedAt || nowISO()
       }));
       const cleanIngredients = ingredients.filter(i => i && i.id && i.name).map(i => ({
         id: i.id, name: i.name, nameKey: i.nameKey || normalize(i.name),
+        stockStatus: i.stockStatus || 'out',
         createdAt: i.createdAt || nowISO(), updatedAt: i.updatedAt || nowISO()
       }));
       const cleanJoins = itemIngredients.filter(j => j && j.id && j.itemId && j.ingredientId).map(j => ({
@@ -818,22 +1504,25 @@
         quantity: j.quantity || '', unit: j.unit || '',
         createdAt: j.createdAt || nowISO(), updatedAt: j.updatedAt || nowISO()
       }));
+      const cleanCustom = customGrocery.filter(g => g && g.id && g.name).map(g => ({
+        id: g.id, name: g.name, bought: !!g.bought, updatedAt: g.updatedAt || nowISO()
+      }));
 
-      // dedupe ingredients by nameKey against existing records to avoid duplicate ingredient rows
       for(const ing of cleanIngredients){
         const existingByKey = await db.ingredients.where('nameKey').equals(ing.nameKey).first();
         if(existingByKey && existingByKey.id !== ing.id){
-          // remap any incoming joins pointing at the duplicate id to the existing one
           cleanJoins.forEach(j => { if(j.ingredientId === ing.id) j.ingredientId = existingByKey.id; });
-          continue; // skip inserting the duplicate ingredient record
+          continue;
         }
         await db.ingredients.put(ing);
       }
       await db.items.bulkPut(cleanItems);
       await db.itemIngredients.bulkPut(cleanJoins);
+      if(db.customGrocery && cleanCustom.length > 0) await db.customGrocery.bulkPut(cleanCustom);
 
       toast(`Imported ${cleanItems.length} dish(es), ${cleanIngredients.length} ingredient(s)`);
       closeIo();
+      updateHeaderBadge();
       render();
     }catch(err){
       console.error(err);
@@ -847,13 +1536,24 @@
   /* ---------------- Wire up events ---------------- */
   document.getElementById('tabDishes').addEventListener('click', () => { currentTab='dishes'; updateTabUI(); render(); });
   document.getElementById('tabIngredients').addEventListener('click', () => { currentTab='ingredients'; updateTabUI(); render(); });
+  document.getElementById('tabGrocery').addEventListener('click', () => { currentTab='grocery'; updateTabUI(); render(); });
   document.getElementById('searchInput').addEventListener('input', e => { searchTerm = e.target.value; render(); });
 
-  document.getElementById('fabAdd').addEventListener('click', () => openDishModal(null));
+  document.getElementById('fabAdd').addEventListener('click', () => {
+    if(currentTab === 'ingredients') openIngModal(null);
+    else openDishModal(null);
+  });
+
   document.getElementById('cancelDishBtn').addEventListener('click', closeDishModal);
   document.getElementById('saveDishBtn').addEventListener('click', saveDish);
   document.getElementById('addIngRowBtn').addEventListener('click', () => addIngRow());
   document.querySelectorAll('.segmented button').forEach(b => b.addEventListener('click', () => setSegmented(b.dataset.type)));
+
+  document.getElementById('cancelIngBtn').addEventListener('click', closeIngModal);
+  document.getElementById('saveIngBtn').addEventListener('click', saveIngredient);
+  document.querySelectorAll('#ingStockSegmented button').forEach(b => {
+    b.addEventListener('click', () => setIngStockSegmented(b.dataset.status));
+  });
 
   document.getElementById('confirmCancelBtn').addEventListener('click', closeConfirm);
   document.getElementById('confirmOkBtn').addEventListener('click', () => { const fn = confirmAction; closeConfirm(); if(fn) fn(); });
@@ -868,11 +1568,12 @@
     e.target.value = '';
   });
 
-  [document.getElementById('dishOverlay'), document.getElementById('confirmOverlay'), document.getElementById('ioOverlay')].forEach(ov => {
+  [document.getElementById('dishOverlay'), document.getElementById('ingOverlay'), document.getElementById('confirmOverlay'), document.getElementById('ioOverlay')].forEach(ov => {
     ov.addEventListener('click', e => { if(e.target === ov){ ov.classList.remove('show'); } });
   });
 
   /* ---------------- Init ---------------- */
+  updateHeaderBadge();
   render();
 })();
 </script>

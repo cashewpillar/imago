@@ -21,3 +21,4 @@ node scripts/register-html.js
 1. Light mode only
 1. Core features
     - Import/export (UUID, idempotent records)
+    - Reset and import
