@@ -147,30 +147,71 @@
   .empty p{ font-size:13.5px; margin:0; }
 
   /* ---------- Dish table ---------- */
-  table.dishes{ width:100%; border-collapse:collapse; }
+  table.dishes{
+    width:100%;
+    border-collapse:separate;
+    border-spacing:0 6px;
+  }
   table.dishes thead th{
-    text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:1px;
-    color:var(--chalk-faint); font-weight:600; padding:0 12px 8px;
-    border-bottom:1px solid var(--line);
+    text-align:left;
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:1.1px;
+    color:var(--chalk-faint);
+    font-weight:700;
+    padding:4px 14px 10px;
+    border-bottom:2px solid var(--line);
+    white-space:nowrap;
+  }
+  table.dishes thead th:not(:last-child){
+    border-right:1px solid var(--line);
   }
   table.dishes tbody tr{
-    background:var(--bg-raised); transition:border-color .15s, background .15s;
+    background:var(--bg-raised);
+    transition:background .15s;
   }
-  table.dishes tbody tr:hover{ background:var(--bg-inset); }
+  table.dishes tbody tr:hover{
+    background:var(--bg-inset);
+  }
+  /* Row outline via td borders */
+  table.dishes tbody td{
+    border-top:1px solid var(--line);
+    border-bottom:1px solid var(--line);
+  }
+  table.dishes tbody td:first-child{
+    border-left:1px solid var(--line);
+  }
+  table.dishes tbody td:last-child{
+    border-right:1px solid var(--line);
+  }
+  /* Planned rows: amber border on all sides, no inner column dividers */
+  table.dishes tbody tr.is-planned{
+    background:rgba(185,129,46,0.04);
+  }
+  table.dishes tbody tr.is-planned td{
+    border-top:1.5px solid var(--accent);
+    border-bottom:1.5px solid var(--accent);
+    border-right:none;
+  }
+  table.dishes tbody tr.is-planned td:first-child{
+    border-left:1.5px solid var(--accent);
+  }
+  table.dishes tbody tr.is-planned td:last-child{
+    border-right:1.5px solid var(--accent);
+  }
   table.dishes td{
-    padding:14px 12px; vertical-align:top; border-bottom:1px solid var(--bg);
+    padding:13px 14px;
+    vertical-align:middle;
   }
-  table.dishes tbody tr td:first-child{ border-top-left-radius:10px; border-bottom-left-radius:10px; }
-  table.dishes tbody tr td:last-child{ border-top-right-radius:10px; border-bottom-right-radius:10px; }
-  table.dishes tbody tr{ box-shadow: inset 0 0 0 1px var(--line); }
-  table.dishes tbody tr.is-planned{ box-shadow: inset 0 0 0 1.5px var(--accent); background:rgba(185,129,46,0.03); }
-  table.dishes tbody tr + tr{ margin-top:8px; }
-  table.dishes tbody{ display:block; }
-  table.dishes thead, table.dishes tbody tr{ display:table; width:100%; table-layout:fixed; }
-  table.dishes tbody tr{ margin-bottom:8px; border-radius:10px; }
+  table.dishes td:not(:last-child){
+    border-right:1px solid var(--line);
+  }
+  table.dishes tbody tr td:first-child{ border-radius:10px 0 0 10px; }
+  table.dishes tbody tr td:last-child{ border-radius:0 10px 10px 0; }
 
-  .dish-title-wrap{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-  .dish-name{ font-weight:600; font-size:15px; color:var(--chalk); }
+  .dish-title-wrap{ display:flex; flex-direction:column; gap:4px; }
+  .dish-name{ font-weight:600; font-size:15px; color:var(--chalk); line-height:1.3; }
+  .dish-pills{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
   .dish-type{
     display:inline-block; font-size:10.5px; text-transform:uppercase;
     letter-spacing:0.8px; padding:2px 7px; border-radius:20px; font-weight:600;
@@ -226,11 +267,12 @@
 
   /* mobile card-ified table */
   @media (max-width: 640px){
+    table.dishes{ border-spacing:0; }
     table.dishes thead{ display:none; }
     table.dishes, table.dishes tbody, table.dishes tbody tr, table.dishes td{ display:block; width:100%; }
-    table.dishes tbody tr{ padding:14px 12px 12px; margin-bottom:10px; }
-    table.dishes td{ border:none; padding:0; }
-    table.dishes td + td{ margin-top:10px; }
+    table.dishes tbody tr{ padding:18px 14px 16px; border-radius:10px; margin-bottom:14px; }
+    table.dishes td{ border:none !important; padding:0; }
+    table.dishes td + td{ margin-top:14px; }
     table.dishes td[data-label]::before{
       content: attr(data-label);
       display:block; font-size:10px; text-transform:uppercase; letter-spacing:1px;
@@ -1075,10 +1117,12 @@
         <td data-label="Dish">
           <div class="dish-title-wrap">
             <span class="dish-name">${escapeHtml(item.name)}</span>
-            <span class="dish-type ${item.type}">${item.type}</span>
-            ${isPlanned ? `<span class="planned-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Planned</span>` : ''}
+            <div class="dish-pills">
+              <span class="dish-type ${item.type}">${item.type}</span>
+              ${isPlanned ? `<span class="planned-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Planned</span>` : ''}
+            </div>
+            ${item.notes ? `<div style="font-size:12px; color:var(--chalk-faint); margin-top:2px;">${escapeHtml(item.notes)}</div>` : ''}
           </div>
-          ${item.notes ? `<div style="font-size:12px; color:var(--chalk-faint); margin-top:4px;">${escapeHtml(item.notes)}</div>` : ''}
         </td>
         <td data-label="Ingredients"><div class="chips">${chips || '<span style="color:var(--chalk-faint);font-size:12.5px;">No ingredients yet</span>'}</div></td>
         <td data-label="Actions">
