@@ -642,7 +642,9 @@
   let currentTab = 'dishes'; // 'dishes', 'ingredients', 'grocery'
   let dishFilter = 'all'; // 'all', 'planned', 'dishes', 'snacks'
   let pantryFilter = 'all'; // 'all', 'planned', 'in_stock', 'low', 'out'
-  let groupByTag = false;
+  let groupByTag = true;
+  const collapsedTags = new Set();
+  const collapsedGroceryTags = new Set();
   let searchTerm = '';
   let editingItemId = null;
   let editingIngId = null;
@@ -1237,6 +1239,14 @@
       </div>`;
     }
 
+    if(openIngId){
+      const targetIng = ingredients.find(i => i.id === openIngId);
+      if(targetIng){
+        const tName = targetIng.tag ? targetIng.tag.trim() : 'Untagged';
+        collapsedTags.delete(tName);
+      }
+    }
+
     let itemsListHtml = '';
     if(!groupByTag){
       itemsListHtml = `<div class="ing-list">${list.map(renderIngRow).join('')}</div>`;
@@ -1255,12 +1265,16 @@
 
       itemsListHtml = sortedTagNames.map(tagName => {
         const itemsInGroup = groups[tagName];
-        return `<div class="tag-group" data-tag="${escapeHtml(tagName)}" style="margin-bottom:18px;">
-          <div class="tag-group-title" style="font-family:'Kalam', cursive; font-size:16px; font-weight:700; color:var(--chalk); margin:10px 0 8px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px dashed var(--line); padding-bottom:4px;">
-            <span>🏷️ ${escapeHtml(tagName)}</span>
+        const isCollapsed = collapsedTags.has(tagName);
+        return `<div class="tag-group ${isCollapsed ? 'collapsed' : ''}" data-tag="${escapeHtml(tagName)}" style="margin-bottom:14px;">
+          <div class="tag-group-title" data-tag-title="${escapeHtml(tagName)}" style="font-family:'Kalam', cursive; font-size:16px; font-weight:700; color:var(--chalk); margin:10px 0 8px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px dashed var(--line); padding-bottom:4px; cursor:pointer; user-select:none;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span class="chevron" style="font-size:11px; font-family:'Work Sans',sans-serif; color:var(--chalk-faint); font-weight:600; width:12px; display:inline-block;">${isCollapsed ? '▶' : '▼'}</span>
+              <span>🏷️ ${escapeHtml(tagName)}</span>
+            </div>
             <span style="font-family:'Work Sans',sans-serif; font-size:11px; color:var(--chalk-faint); font-weight:600;">${itemsInGroup.length} ${itemsInGroup.length===1?'item':'items'}</span>
           </div>
-          <div class="ing-list">${itemsInGroup.map(renderIngRow).join('')}</div>
+          <div class="ing-list" style="${isCollapsed ? 'display:none;' : ''}">${itemsInGroup.map(renderIngRow).join('')}</div>
         </div>`;
       }).join('');
     }
@@ -1281,6 +1295,15 @@
         render();
       });
     }
+
+    container.querySelectorAll('.tag-group-title').forEach(title => {
+      title.addEventListener('click', () => {
+        const tag = title.dataset.tagTitle;
+        if(collapsedTags.has(tag)) collapsedTags.delete(tag);
+        else collapsedTags.add(tag);
+        render();
+      });
+    });
 
     container.querySelectorAll('.ing-row').forEach(row => {
       const id = row.dataset.ingId;
@@ -1331,6 +1354,7 @@
 
           if(ing && (ing.tag || '') !== targetTag){
             await db.ingredients.update(ingId, { tag: targetTag, updatedAt: nowISO() });
+            collapsedTags.delete(group.dataset.tag);
             toast(`Moved "${ing.name}" to ${targetTag || 'Untagged'}`);
             render();
           }
@@ -1391,34 +1415,80 @@
 
     const totalToBuyCount = toBuyIngredients.length + activeCustomToBuy.length;
 
-    const navHtml = `
-      <div class="grocery-stats" style="grid-template-columns: repeat(2, 1fr);">
-        <div class="stat-card highlight-plan">
-          <div class="num">${plannedDishes.length}</div>
-          <div class="label">Planned Meals</div>
-        </div>
-        <div class="stat-card highlight-buy">
-          <div class="num">${totalToBuyCount}</div>
-          <div class="label">Items to Buy</div>
-        </div>
-      </div>`;
+    const groceryGroups = {};
 
-    const plannedStripHtml = plannedDishes.length > 0 ? `
-      <div class="grocery-section" style="padding:12px 16px;">
-        <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--chalk-faint); font-weight:700; margin-bottom:8px;">
-          📋 Active Meal Plan (${plannedDishes.length})
-        </div>
-        <div class="planned-strip">
-          ${plannedDishes.map(d => `<span class="planned-chip">
-            ${escapeHtml(d.name)}
-            <button title="Remove from plan" data-unplan-id="${d.id}">&times;</button>
-          </span>`).join('')}
-        </div>
-      </div>` : `
-      <div class="grocery-section" style="text-align:center; padding:18px;">
-        <div style="font-size:14px; color:var(--chalk-dim);">No meals planned yet.</div>
-        <div style="font-size:12px; color:var(--chalk-faint); margin-top:4px;">Mark dishes as "Planned" on the Dishes tab to generate your automatic grocery list!</div>
-      </div>`;
+    toBuyIngredients.forEach(item => {
+      const t = item.ing.tag ? item.ing.tag.trim() : 'Untagged';
+      const dishNames = item.demandList.map(d => d.dishName).join(', ');
+      const qtys = item.demandList.map(d => [d.qty, d.unit].filter(Boolean).join(' ')).filter(Boolean).join(' + ');
+
+      (groceryGroups[t] ||= []).push({
+        html: `<div class="buy-item-row" data-ing-id="${item.ing.id}">
+          <div class="buy-item-left">
+            <button class="buy-item-check mark-bought-btn" title="Mark as bought (adds to pantry stock)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg>
+            </button>
+            <div class="buy-item-details">
+              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                <span class="buy-item-name">${escapeHtml(item.ing.name)}</span>
+                ${item.ing.tag ? `<span class="ing-tag-chip" style="font-size:10px; font-weight:600; padding:1px 6px; border-radius:10px; background:var(--bg-inset); border:1px solid var(--line); color:var(--chalk-dim);">🏷️ ${escapeHtml(item.ing.tag)}</span>` : ''}
+              </div>
+              <div class="buy-item-meta">
+                <span class="needed-for">Needed for: ${escapeHtml(dishNames)}</span>
+                ${qtys ? `<span class="mono">(${escapeHtml(qtys)})</span>` : ''}
+                <span class="stock-pill ${item.ing.stockStatus}" style="font-size:10.5px; padding:1px 6px; border-radius:10px; font-weight:600; text-transform:capitalize;">${item.ing.stockStatus.replace('_',' ')}</span>
+              </div>
+            </div>
+          </div>
+        </div>`
+      });
+    });
+
+    activeCustomToBuy.forEach(g => {
+      const t = 'Extra Grocery Items';
+      (groceryGroups[t] ||= []).push({
+        html: `<div class="buy-item-row" data-custom-id="${g.id}">
+          <div class="buy-item-left">
+            <button class="buy-item-check toggle-custom-btn" title="Toggle bought">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg>
+            </button>
+            <div class="buy-item-details">
+              <div class="buy-item-name">${escapeHtml(g.name)}</div>
+              <div class="buy-item-meta"><span>Extra item</span></div>
+            </div>
+          </div>
+          <button class="delete-custom-btn" style="background:none; border:none; color:var(--chalk-faint); cursor:pointer;" title="Delete item">&times;</button>
+        </div>`
+      });
+    });
+
+    const sortedGroceryTags = Object.keys(groceryGroups).sort((a,b) => {
+      if(a === 'Extra Grocery Items') return 1;
+      if(b === 'Extra Grocery Items') return -1;
+      if(a === 'Untagged') return 1;
+      if(b === 'Untagged') return -1;
+      return a.localeCompare(b);
+    });
+
+    const shoppingListItemsHtml = totalToBuyCount === 0 ? `
+      <div style="text-align:center; padding:14px; color:var(--sage); font-weight:600; font-size:14px;">
+        🎉 All ingredients for your planned meals are currently in stock!
+      </div>` : sortedGroceryTags.map(tagName => {
+        const itemsInGroup = groceryGroups[tagName];
+        const isCollapsed = collapsedGroceryTags.has(tagName);
+        return `<div class="grocery-tag-group ${isCollapsed ? 'collapsed' : ''}" style="margin-bottom:14px;">
+          <div class="grocery-tag-title" data-grocery-tag="${escapeHtml(tagName)}" style="font-family:'Kalam', cursive; font-size:15px; font-weight:700; color:var(--chalk); margin:10px 0 6px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px dashed var(--line); padding-bottom:4px; cursor:pointer; user-select:none;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span class="chevron" style="font-size:11px; font-family:'Work Sans',sans-serif; color:var(--chalk-faint); font-weight:600; width:12px; display:inline-block;">${isCollapsed ? '▶' : '▼'}</span>
+              <span>🏷️ ${escapeHtml(tagName)}</span>
+            </div>
+            <span style="font-family:'Work Sans',sans-serif; font-size:11px; color:var(--chalk-faint); font-weight:600;">${itemsInGroup.length} ${itemsInGroup.length===1?'item':'items'}</span>
+          </div>
+          <div class="buy-list" style="${isCollapsed ? 'display:none;' : ''}">
+            ${itemsInGroup.map(i => i.html).join('')}
+          </div>
+        </div>`;
+      }).join('');
 
     const shoppingListHtml = `
       <div class="grocery-section">
@@ -1427,46 +1497,7 @@
           <span class="count-badge">${totalToBuyCount} items needed</span>
         </div>
 
-        <div class="buy-list">
-          ${toBuyIngredients.map(item => {
-            const ing = item.ing;
-            const dishNames = item.demandList.map(d => d.dishName).join(', ');
-            const qtys = item.demandList.map(d => [d.qty, d.unit].filter(Boolean).join(' ')).filter(Boolean).join(' + ');
-
-            return `<div class="buy-item-row" data-ing-id="${ing.id}">
-              <div class="buy-item-left">
-                <button class="buy-item-check mark-bought-btn" title="Mark as bought (adds to pantry stock)">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg>
-                </button>
-                <div class="buy-item-details">
-                  <div class="buy-item-name">${escapeHtml(ing.name)}</div>
-                  <div class="buy-item-meta">
-                    <span class="needed-for">Needed for: ${escapeHtml(dishNames)}</span>
-                    ${qtys ? `<span class="mono">(${escapeHtml(qtys)})</span>` : ''}
-                    <span class="stock-pill ${ing.stockStatus}" style="font-size:10.5px; padding:1px 6px; border-radius:10px; font-weight:600; text-transform:capitalize;">${ing.stockStatus.replace('_',' ')}</span>
-                  </div>
-                </div>
-              </div>
-            </div>`;
-          }).join('')}
-
-          ${activeCustomToBuy.map(g => `<div class="buy-item-row" data-custom-id="${g.id}">
-            <div class="buy-item-left">
-              <button class="buy-item-check toggle-custom-btn" title="Toggle bought">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg>
-              </button>
-              <div class="buy-item-details">
-                <div class="buy-item-name">${escapeHtml(g.name)}</div>
-                <div class="buy-item-meta"><span>Extra item</span></div>
-              </div>
-            </div>
-            <button class="delete-custom-btn" style="background:none; border:none; color:var(--chalk-faint); cursor:pointer;" title="Delete item">&times;</button>
-          </div>`).join('')}
-
-          ${totalToBuyCount === 0 ? `<div style="text-align:center; padding:14px; color:var(--sage); font-weight:600; font-size:14px;">
-            🎉 All ingredients for your planned meals are currently in stock!
-          </div>` : ''}
-        </div>
+        ${shoppingListItemsHtml}
 
         <form class="add-custom-buy" id="addCustomForm">
           <input type="text" id="customBuyInput" placeholder="+ Add extra grocery item (e.g. Olive oil, Paper towels)">
@@ -1485,7 +1516,16 @@
           </details>` : ''}
       </div>`;
 
-    container.innerHTML = navHtml + plannedStripHtml + shoppingListHtml;
+    container.innerHTML = shoppingListHtml;
+
+    container.querySelectorAll('.grocery-tag-title').forEach(title => {
+      title.addEventListener('click', () => {
+        const tag = title.dataset.groceryTag;
+        if(collapsedGroceryTags.has(tag)) collapsedGroceryTags.delete(tag);
+        else collapsedGroceryTags.add(tag);
+        render();
+      });
+    });
 
     container.querySelectorAll('[data-unplan-id]').forEach(btn => {
       btn.addEventListener('click', e => toggleDishPlanned(btn.dataset.unplan-id, e));
