@@ -1168,7 +1168,7 @@
 
     list = [...list].sort((a,b) => (usageByIngredient[b.id]?.length||0) - (usageByIngredient[a.id]?.length||0) || a.name.localeCompare(b.name));
 
-    const headerHtml = `
+    const headerOpen = `
       <div class="grocery-section" style="margin-bottom:14px; padding:14px 16px;">
         <div class="grocery-section-title" style="margin-bottom:8px;">
           <div style="display:flex; align-items:center; gap:8px;">
@@ -1177,20 +1177,21 @@
           </div>
           <button class="filter-pill ${groupByTag ? 'active' : ''}" id="toggleGroupTagBtn" style="font-size:12px; height:auto; padding:4px 10px; cursor:pointer;">🏷️ Group by Tag</button>
         </div>
-        <div class="filter-bar" style="margin:0;">
+        <div class="filter-bar" style="margin:0 0 12px;">
           <button class="filter-pill ${pantryFilter==='all'?'active':''}" data-pfilter="all">All (${totalCount})</button>
           <button class="filter-pill ${pantryFilter==='planned'?'active':''}" data-pfilter="planned">📋 Planned (${plannedCount})</button>
           <button class="filter-pill ${pantryFilter==='in_stock'?'active':''}" data-pfilter="in_stock">In Stock (${inStockCount})</button>
           <button class="filter-pill ${pantryFilter==='low'?'active':''}" data-pfilter="low">Low Stock (${lowCount})</button>
           <button class="filter-pill ${pantryFilter==='out'?'active':''}" data-pfilter="out">Out of Stock (${outCount})</button>
-        </div>
-      </div>`;
+        </div>`;
+    const headerClose = `</div>`;
 
     if(list.length === 0){
-      container.innerHTML = headerHtml + `<div class="empty">
-        <span class="display">${ingredients.length === 0 ? 'No ingredients yet' : 'No matching pantry items'}</span>
-        <p>${ingredients.length === 0 ? 'Click the + button to add your first pantry ingredient.' : 'Try adjusting your search or filter.'}</p>
-      </div>`;
+      container.innerHTML = headerOpen + `
+        <div class="empty" style="margin:0;">
+          <span class="display">${ingredients.length === 0 ? 'No ingredients yet' : 'No matching pantry items'}</span>
+          <p>${ingredients.length === 0 ? 'Click the + button to add your first pantry ingredient.' : 'Try adjusting your search or filter.'}</p>
+        </div>` + headerClose;
 
       container.querySelectorAll('.filter-pill[data-pfilter]').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -1279,7 +1280,7 @@
       }).join('');
     }
 
-    container.innerHTML = headerHtml + itemsListHtml;
+    container.innerHTML = headerOpen + itemsListHtml + headerClose;
 
     container.querySelectorAll('.filter-pill[data-pfilter]').forEach(btn => {
       btn.addEventListener('click', () => {
