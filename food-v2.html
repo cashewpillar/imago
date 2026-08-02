@@ -239,27 +239,21 @@
     .row-actions{ justify-content:flex-start; margin-top:2px; }
   }
 
-  /* ---------- Ingredients view ---------- */
+  /* ---------- Ingredients / Pantry View ---------- */
   .ing-list{ display:flex; flex-direction:column; gap:8px; }
   .ing-row{
     background:var(--bg-raised); border:1px solid var(--line);
-    border-radius:10px; padding:12px 14px; cursor:pointer;
+    border-radius:10px; padding:12px 14px; transition:all .15s ease;
   }
+  .ing-row.is-draggable{ cursor:grab; }
+  .ing-row.is-draggable:active{ cursor:grabbing; }
+  .ing-row.dragging{ opacity:0.4; transform:scale(0.98); }
+  .drag-handle{ color:var(--chalk-faint); margin-right:4px; font-weight:bold; cursor:grab; user-select:none; font-size:14px; }
+  .tag-group{ border:2px dashed transparent; border-radius:12px; padding:4px; transition:all .15s ease; }
+  .tag-group.drag-over{ border-color:var(--accent); background:var(--accent-dim); }
   .ing-row-top{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
   .ing-info{ display:flex; align-items:center; gap:8px; }
   .ing-name{ font-weight:600; font-size:14.5px; }
-  .ing-count{ display:flex; align-items:center; gap:7px; color:var(--chalk-faint); font-size:12px; }
-  .ing-uses{
-    max-height:0; overflow:hidden; transition:max-height .2s ease;
-  }
-  .ing-row.open .ing-uses{ max-height:300px; margin-top:10px; }
-  .ing-uses ul{ margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:6px; }
-  .ing-uses li{
-    display:flex; justify-content:space-between; font-size:13px; color:var(--chalk-dim);
-    border-top:1px dashed var(--line); padding-top:6px; align-items:center;
-  }
-  .ing-uses li:first-child{ border-top:none; padding-top:0; }
-  .ing-uses .qty{ font-family:'IBM Plex Mono', monospace; color:var(--chalk-faint); font-size:11.5px; }
 
   /* Stock Status Selector Buttons */
   .stock-toggle-group{
@@ -549,6 +543,11 @@
         <button type="button" class="stock-opt out" data-status="out">Out</button>
       </div>
     </div>
+    <div class="field">
+      <label>Tag / Category <span style="text-transform:none;letter-spacing:0;color:var(--chalk-faint);">(optional)</span></label>
+      <input type="text" id="ingTagInput" list="pantryTagList" placeholder="e.g. Produce, Spices, Dairy, Staples">
+      <datalist id="pantryTagList"></datalist>
+    </div>
     <div class="modal-actions">
       <button class="btn ghost" id="cancelIngBtn">Cancel</button>
       <button class="btn primary" id="saveIngBtn">Save ingredient</button>
@@ -620,6 +619,17 @@
     ]);
   });
 
+  db.version(3).stores({
+    items: 'id, name, type, isPlanned, updatedAt',
+    ingredients: 'id, &nameKey, stockStatus, tag, updatedAt',
+    itemIngredients: 'id, itemId, ingredientId, updatedAt',
+    customGrocery: 'id, name, bought, updatedAt'
+  }).upgrade(tx => {
+    return tx.ingredients.toCollection().modify(ing => {
+      if(ing.tag === undefined) ing.tag = '';
+    });
+  });
+
   const uuid = () => (crypto.randomUUID ? crypto.randomUUID() :
     'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
       const r = Math.random()*16|0, v = c === 'x' ? r : (r&0x3|0x8);
@@ -631,7 +641,8 @@
   /* ---------------- State ---------------- */
   let currentTab = 'dishes'; // 'dishes', 'ingredients', 'grocery'
   let dishFilter = 'all'; // 'all', 'planned', 'dishes', 'snacks'
-  let pantryFilter = 'all'; // 'all', 'in_stock', 'low', 'out'
+  let pantryFilter = 'all'; // 'all', 'planned', 'in_stock', 'low', 'out'
+  let groupByTag = false;
   let searchTerm = '';
   let editingItemId = null;
   let editingIngId = null;
@@ -757,15 +768,24 @@
   async function openIngModal(ingId){
     editingIngId = ingId || null;
     document.getElementById('ingModalTitle').textContent = ingId ? 'Edit ingredient' : 'New ingredient';
+
+    const allIngs = await db.ingredients.toArray();
+    const uniqueTags = Array.from(new Set(allIngs.map(i => i.tag).filter(Boolean))).sort();
+    const datalist = document.getElementById('pantryTagList');
+    if(datalist){
+      datalist.innerHTML = uniqueTags.map(t => `<option value="${escapeHtml(t)}">`).join('');
+    }
     
     if(ingId){
       const ing = await db.ingredients.get(ingId);
       if(ing){
         document.getElementById('ingNameInput').value = ing.name;
+        document.getElementById('ingTagInput').value = ing.tag || '';
         setIngStockSegmented(ing.stockStatus || 'out');
       }
     } else {
       document.getElementById('ingNameInput').value = '';
+      document.getElementById('ingTagInput').value = '';
       setIngStockSegmented('out');
     }
 
@@ -788,6 +808,7 @@
     const name = document.getElementById('ingNameInput').value.trim();
     if(!name){ toast('Provide an ingredient name'); return; }
 
+    const tag = document.getElementById('ingTagInput').value.trim();
     const activeBtn = document.querySelector('#ingStockSegmented button.active');
     const stockStatus = activeBtn ? activeBtn.dataset.status : 'out';
     const key = normalize(name);
@@ -797,11 +818,11 @@
       // Creating brand new ingredient directly
       let existing = await db.ingredients.where('nameKey').equals(key).first();
       if(existing){
-        await db.ingredients.update(existing.id, { stockStatus, updatedAt: ts });
-        toast(`Updated stock for existing "${existing.name}"`);
+        await db.ingredients.update(existing.id, { stockStatus, tag, updatedAt: ts });
+        toast(`Updated existing "${existing.name}"`);
       } else {
         await db.ingredients.put({
-          id: uuid(), name, nameKey: key, stockStatus, createdAt: ts, updatedAt: ts
+          id: uuid(), name, nameKey: key, stockStatus, tag, createdAt: ts, updatedAt: ts
         });
         toast('Ingredient added');
       }
@@ -815,7 +836,7 @@
           for(const j of joins){
             await db.itemIngredients.update(j.id, { ingredientId: existing.id, updatedAt: ts });
           }
-          await db.ingredients.update(existing.id, { stockStatus, updatedAt: ts });
+          await db.ingredients.update(existing.id, { stockStatus, tag: tag || existing.tag || '', updatedAt: ts });
           await db.ingredients.delete(editingIngId);
           closeIngModal();
           toast(`Merged into "${existing.name}"`);
@@ -826,7 +847,7 @@
       }
 
       await db.ingredients.update(editingIngId, {
-        name, nameKey: key, stockStatus, updatedAt: ts
+        name, nameKey: key, stockStatus, tag, updatedAt: ts
       });
       toast('Ingredient updated');
     }
@@ -1148,8 +1169,11 @@
     const headerHtml = `
       <div class="grocery-section" style="margin-bottom:14px; padding:14px 16px;">
         <div class="grocery-section-title" style="margin-bottom:8px;">
-          <span>📦 Pantry Stock Tracker</span>
-          <span class="count-badge">${totalCount} total items</span>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span>📦 Pantry Stock Tracker</span>
+            <span class="count-badge">${totalCount} total items</span>
+          </div>
+          <button class="filter-pill ${groupByTag ? 'active' : ''}" id="toggleGroupTagBtn" style="font-size:12px; height:auto; padding:4px 10px; cursor:pointer;">🏷️ Group by Tag</button>
         </div>
         <div class="filter-bar" style="margin:0;">
           <button class="filter-pill ${pantryFilter==='all'?'active':''}" data-pfilter="all">All (${totalCount})</button>
@@ -1172,35 +1196,35 @@
           render();
         });
       });
+      const groupBtn = container.querySelector('#toggleGroupTagBtn');
+      if(groupBtn){ groupBtn.addEventListener('click', () => { groupByTag = !groupByTag; render(); }); }
       return;
     }
 
-    const itemsListHtml = `<div class="ing-list">${list.map(ing => {
-      const uses = (usageByIngredient[ing.id] || []).slice().sort((a,b) => {
-        const an = itemsById[a.itemId]?.name || '', bn = itemsById[b.itemId]?.name || '';
-        return an.localeCompare(bn);
-      });
-      const count = uses.length;
+    function renderIngRow(ing){
       const stock = ing.stockStatus || 'out';
       const reqForPlan = plannedDemand[ing.id];
 
-      return `<div class="ing-row${openIngId===ing.id ? ' open':''}" data-ing-id="${ing.id}">
+      return `<div class="ing-row ${groupByTag ? 'is-draggable' : ''}" data-ing-id="${ing.id}" ${groupByTag ? 'draggable="true"' : ''}>
         <div class="ing-row-top">
           <div class="ing-info">
+            ${groupByTag ? `<span class="drag-handle" title="Drag to reorder tag">⋮⋮</span>` : ''}
             <span class="stock-dot ${stock}"></span>
             <div>
-              <span class="ing-name">${escapeHtml(ing.name)}</span>
+              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                <span class="ing-name">${escapeHtml(ing.name)}</span>
+                ${ing.tag ? `<span class="ing-tag-chip" style="font-size:10px; font-weight:600; padding:1px 6px; border-radius:10px; background:var(--bg-inset); border:1px solid var(--line); color:var(--chalk-dim);">🏷️ ${escapeHtml(ing.tag)}</span>` : ''}
+              </div>
               ${reqForPlan ? `<div style="font-size:11px; color:var(--accent); font-weight:600; margin-top:2px;">Needed for: ${escapeHtml(reqForPlan.map(d=>d.dishName).join(', '))}</div>` : ''}
             </div>
           </div>
           <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <div class="stock-toggle-group" onclick="event.stopPropagation();">
+            <div class="stock-toggle-group">
               <button class="stock-toggle-btn ${stock==='in_stock'?'active in_stock':''}" data-status="in_stock" title="In Stock">In Stock</button>
               <button class="stock-toggle-btn ${stock==='low'?'active low':''}" data-status="low" title="Low Stock">Low</button>
               <button class="stock-toggle-btn ${stock==='out'?'active out':''}" data-status="out" title="Out of Stock">Out</button>
             </div>
-            <span class="ing-count">${count} ${count===1?'dish':'dishes'} ${count>1 ? tallySVG(count) : ''}</span>
-            <div class="row-actions" onclick="event.stopPropagation();">
+            <div class="row-actions">
               <button class="edit-ing-btn" title="Edit ingredient" aria-label="Edit ingredient">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
               </button>
@@ -1210,18 +1234,36 @@
             </div>
           </div>
         </div>
-        <div class="ing-uses"><ul>
-          ${uses.map(j => {
-            const it = itemsById[j.itemId];
-            const qtyStr = [j.quantity, j.unit].filter(Boolean).join(' ');
-            return `<li>
-              <span>${escapeHtml(it ? it.name : 'Unknown dish')} ${it?.isPlanned ? '<span class="planned-badge" style="font-size:9px; padding:1px 5px;">Planned</span>':''}</span>
-              ${qtyStr ? `<span class="qty">${escapeHtml(qtyStr)}</span>`:''}
-            </li>`;
-          }).join('') || '<li>Not used in any dish</li>'}
-        </ul></div>
       </div>`;
-    }).join('')}</div>`;
+    }
+
+    let itemsListHtml = '';
+    if(!groupByTag){
+      itemsListHtml = `<div class="ing-list">${list.map(renderIngRow).join('')}</div>`;
+    } else {
+      const groups = {};
+      list.forEach(ing => {
+        const t = ing.tag ? ing.tag.trim() : 'Untagged';
+        (groups[t] ||= []).push(ing);
+      });
+
+      const sortedTagNames = Object.keys(groups).sort((a,b) => {
+        if(a === 'Untagged') return 1;
+        if(b === 'Untagged') return -1;
+        return a.localeCompare(b);
+      });
+
+      itemsListHtml = sortedTagNames.map(tagName => {
+        const itemsInGroup = groups[tagName];
+        return `<div class="tag-group" data-tag="${escapeHtml(tagName)}" style="margin-bottom:18px;">
+          <div class="tag-group-title" style="font-family:'Kalam', cursive; font-size:16px; font-weight:700; color:var(--chalk); margin:10px 0 8px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px dashed var(--line); padding-bottom:4px;">
+            <span>🏷️ ${escapeHtml(tagName)}</span>
+            <span style="font-family:'Work Sans',sans-serif; font-size:11px; color:var(--chalk-faint); font-weight:600;">${itemsInGroup.length} ${itemsInGroup.length===1?'item':'items'}</span>
+          </div>
+          <div class="ing-list">${itemsInGroup.map(renderIngRow).join('')}</div>
+        </div>`;
+      }).join('');
+    }
 
     container.innerHTML = headerHtml + itemsListHtml;
 
@@ -1232,9 +1274,16 @@
       });
     });
 
+    const groupBtn = container.querySelector('#toggleGroupTagBtn');
+    if(groupBtn){
+      groupBtn.addEventListener('click', () => {
+        groupByTag = !groupByTag;
+        render();
+      });
+    }
+
     container.querySelectorAll('.ing-row').forEach(row => {
       const id = row.dataset.ingId;
-      row.addEventListener('click', () => row.classList.toggle('open'));
       row.querySelectorAll('.stock-toggle-btn').forEach(btn => {
         btn.addEventListener('click', e => updateStockStatus(id, btn.dataset.status, e));
       });
@@ -1244,11 +1293,57 @@
       if(delBtn) delBtn.addEventListener('click', e => deleteIngredient(id, e));
     });
 
+    if(groupByTag){
+      container.querySelectorAll('.ing-row[draggable="true"]').forEach(row => {
+        row.addEventListener('dragstart', e => {
+          e.dataTransfer.setData('text/plain', row.dataset.ingId);
+          e.dataTransfer.effectAllowed = 'move';
+          row.classList.add('dragging');
+        });
+
+        row.addEventListener('dragend', () => {
+          row.classList.remove('dragging');
+          container.querySelectorAll('.tag-group').forEach(g => g.classList.remove('drag-over'));
+        });
+      });
+
+      container.querySelectorAll('.tag-group').forEach(group => {
+        group.addEventListener('dragover', e => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          group.classList.add('drag-over');
+        });
+
+        group.addEventListener('dragleave', e => {
+          if(!group.contains(e.relatedTarget)){
+            group.classList.remove('drag-over');
+          }
+        });
+
+        group.addEventListener('drop', async e => {
+          e.preventDefault();
+          group.classList.remove('drag-over');
+          const ingId = e.dataTransfer.getData('text/plain');
+          if(!ingId) return;
+
+          const targetTag = group.dataset.tag === 'Untagged' ? '' : group.dataset.tag;
+          const ing = ingredients.find(i => i.id === ingId);
+
+          if(ing && (ing.tag || '') !== targetTag){
+            await db.ingredients.update(ingId, { tag: targetTag, updatedAt: nowISO() });
+            toast(`Moved "${ing.name}" to ${targetTag || 'Untagged'}`);
+            render();
+          }
+        });
+      });
+    }
+
     if(openIngId){
       const target = container.querySelector(`.ing-row[data-ing-id="${openIngId}"]`);
       if(target){
-        target.classList.add('open');
         target.scrollIntoView({behavior:'smooth', block:'center'});
+        target.style.borderColor = 'var(--accent)';
+        setTimeout(() => { target.style.borderColor = ''; }, 2000);
       }
     }
   }
@@ -1487,6 +1582,7 @@
       const cleanIngredients = ingredients.filter(i => i && i.id && i.name).map(i => ({
         id: i.id, name: i.name, nameKey: i.nameKey || normalize(i.name),
         stockStatus: i.stockStatus || 'out',
+        tag: i.tag || '',
         createdAt: i.createdAt || nowISO(), updatedAt: i.updatedAt || nowISO()
       }));
       const cleanJoins = itemIngredients.filter(j => j && j.id && j.itemId && j.ingredientId).map(j => ({
