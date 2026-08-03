@@ -397,8 +397,9 @@
   .buy-item-row{
     display:flex; align-items:center; justify-content:space-between; gap:12px;
     background:var(--bg-inset); border:1px solid var(--line); border-radius:10px;
-    padding:10px 14px; transition:all .15s;
+    padding:10px 14px; transition:all .15s; cursor:pointer;
   }
+  .buy-item-row:hover{ border-color:var(--sage); background:var(--sage-dim); }
   .buy-item-row.is-bought{
     opacity:0.55; background:var(--bg); border-style:dashed;
   }
@@ -1705,16 +1706,32 @@
           <button type="submit" class="btn primary" style="flex:none; width:auto; padding:0 16px;">Add</button>
         </form>
 
-        ${inStockIngredientsForPlan.length > 0 ? `
-          <details style="margin-top:16px; font-size:13px; color:var(--chalk-dim);">
-            <summary style="cursor:pointer; font-weight:600; padding:6px 0;">✓ Already in stock for planned meals (${inStockIngredientsForPlan.length})</summary>
-            <div style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
-              ${inStockIngredientsForPlan.map(item => `<div style="display:flex; justify-content:space-between; background:var(--bg-inset); padding:8px 12px; border-radius:6px; font-size:12.5px;">
-                <span>${escapeHtml(item.ing.name)} <small style="color:var(--chalk-faint);">(${escapeHtml(item.demandList.map(d=>d.dishName).join(', '))})</small></span>
-                <span class="stock-dot in_stock" title="In Stock"></span>
+        ${inStockIngredientsForPlan.length > 0 ? (() => {
+          const tagName = '✓ In Stock for Planned Meals';
+          const isCollapsed = collapsedGroceryTags.has(tagName);
+          return `<div class="grocery-tag-group ${isCollapsed ? 'collapsed' : ''}" style="margin-bottom:14px;">
+            <div class="grocery-tag-title" data-grocery-tag="${escapeHtml(tagName)}" style="font-family:'Kalam', cursive; font-size:15px; font-weight:700; color:var(--chalk); margin:10px 0 6px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px dashed var(--line); padding-bottom:4px; cursor:pointer; user-select:none;">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span class="chevron" style="font-size:11px; font-family:'Work Sans',sans-serif; color:var(--chalk-faint); font-weight:600; width:12px; display:inline-block;">${isCollapsed ? '▶' : '▼'}</span>
+                <span>✓ In Stock for Planned Meals</span>
+              </div>
+              <span style="font-family:'Work Sans',sans-serif; font-size:11px; color:var(--chalk-faint); font-weight:600;">${inStockIngredientsForPlan.length} ${inStockIngredientsForPlan.length===1?'item':'items'}</span>
+            </div>
+            <div class="buy-list" style="${isCollapsed ? 'display:none;' : ''}">
+              ${inStockIngredientsForPlan.map(item => `<div class="buy-item-row" data-ing-id="${item.ing.id}">
+                <div class="buy-item-left">
+                  <button class="buy-item-check unmark-stock-btn" style="background:var(--sage-dim); border-color:var(--sage); color:var(--sage);" title="Uncheck — mark as no longer in stock">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg>
+                  </button>
+                  <div class="buy-item-details">
+                    <span class="buy-item-name">${escapeHtml(item.ing.name)}</span>
+                    <div class="buy-item-meta"><span class="needed-for">For: ${escapeHtml(item.demandList.map(d=>d.dishName).join(', '))}</span></div>
+                  </div>
+                </div>
               </div>`).join('')}
             </div>
-          </details>` : ''}
+          </div>`;
+        })() : ''}
       </div>`;
 
     container.innerHTML = shoppingListHtml;
@@ -1744,6 +1761,24 @@
         const row = btn.closest('[data-custom-id]');
         const item = customGrocery.find(g => g.id === row.dataset.customId);
         if(item) toggleCustomGrocery(item.id, item.bought);
+      });
+    });
+
+    container.querySelectorAll('.unmark-stock-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        const row = btn.closest('[data-ing-id]');
+        if(row) updateStockStatus(row.dataset.ingId, 'out', e);
+      });
+    });
+
+    // Whole-row click — delegates to the action button inside the card
+    container.querySelectorAll('.buy-item-row').forEach(row => {
+      row.addEventListener('click', e => {
+        if(e.target.closest('.delete-custom-btn')) return; // let delete handle itself
+        const btn = row.querySelector('.mark-bought-btn, .unmark-stock-btn, .toggle-custom-btn');
+        if(btn && !e.target.closest(btn.tagName + '.mark-bought-btn, ' + btn.tagName + '.unmark-stock-btn, ' + btn.tagName + '.toggle-custom-btn')){
+          btn.click();
+        }
       });
     });
 
