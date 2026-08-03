@@ -251,6 +251,15 @@
   .dish-type.dish{ background:rgba(139,160,119,0.18); color:var(--sage); }
   .dish-type.snack{ background:rgba(217,164,65,0.18); color:var(--accent); }
 
+  .stock-pill{
+    display:inline-flex; align-items:center; gap:4px;
+    font-size:10.5px; text-transform:capitalize; letter-spacing:0.3px;
+    padding:2px 7px; border-radius:20px; font-weight:600;
+  }
+  .stock-pill.in_stock{ background:var(--sage-dim); color:var(--sage); }
+  .stock-pill.low{ background:var(--accent-dim); color:var(--accent); }
+  .stock-pill.out{ background:var(--rust-dim); color:var(--rust); }
+
   .planned-badge{
     display:inline-flex; align-items:center; gap:4px;
     background:var(--accent-dim); color:var(--on-accent);
@@ -574,9 +583,17 @@
     </div>
     <div class="field">
       <label>Type</label>
-      <div class="segmented">
+      <div class="segmented" id="dishTypeSegmented">
         <button type="button" class="dish active" data-type="dish">Dish</button>
         <button type="button" class="snack" data-type="snack">Snack</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Stock Status</label>
+      <div class="segmented" id="dishStockSegmented">
+        <button type="button" class="stock-opt active in_stock" data-status="in_stock">In Stock</button>
+        <button type="button" class="stock-opt low" data-status="low">Low</button>
+        <button type="button" class="stock-opt out" data-status="out">Out</button>
       </div>
     </div>
     <div class="field">
@@ -722,6 +739,17 @@
     });
   });
 
+  db.version(5).stores({
+    items: 'id, name, type, isPlanned, stockStatus, lastPrepared, updatedAt',
+    ingredients: 'id, &nameKey, stockStatus, tag, updatedAt',
+    itemIngredients: 'id, itemId, ingredientId, updatedAt',
+    customGrocery: 'id, name, bought, updatedAt'
+  }).upgrade(tx => {
+    return tx.items.toCollection().modify(item => {
+      if(!item.stockStatus) item.stockStatus = 'in_stock';
+    });
+  });
+
   const uuid = () => (crypto.randomUUID ? crypto.randomUUID() :
     'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
       const r = Math.random()*16|0, v = c === 'x' ? r : (r&0x3|0x8);
@@ -810,12 +838,25 @@
     render();
   }
 
+  async function updateDishStockStatus(itemId, newStatus, e){
+    if(e) e.stopPropagation();
+    const item = await db.items.get(itemId);
+    // clicking the already-active status toggles back to in_stock
+    const resolved = (item && item.stockStatus === newStatus) ? 'in_stock' : newStatus;
+    await db.items.update(itemId, { stockStatus: resolved, updatedAt: nowISO() });
+    const labelMap = { in_stock: 'In Stock', low: 'Running Low', out: 'Out of Stock' };
+    toast(`"${item ? item.name : 'Dish'}" marked as ${labelMap[resolved] || resolved}`);
+    render();
+  }
+
   async function saveDish(){
     const name = document.getElementById('dishNameInput').value.trim();
     if(!name){ toast('Give the dish a name'); return; }
     const notes = document.getElementById('dishNotesInput').value.trim();
     const isPlanned = document.getElementById('dishPlannedInput').checked;
     const lastPrepared = document.getElementById('dishLastPreparedInput').value || '';
+    const activeStockBtn = document.querySelector('#dishStockSegmented button.active');
+    const stockStatus = activeStockBtn ? activeStockBtn.dataset.status : 'in_stock';
     const rows = Array.from(document.querySelectorAll('.ing-input-row')).map(row => ({
       name: row.querySelector('.ing-name-input').value.trim(),
       qty: row.querySelector('.ing-qty-input').value.trim(),
@@ -827,7 +868,7 @@
     const isNew = !editingItemId;
 
     await db.items.put({
-      id: itemId, name, type: currentType, notes, isPlanned: isPlanned ? 1 : 0,
+      id: itemId, name, type: currentType, stockStatus, notes, isPlanned: isPlanned ? 1 : 0,
       lastPrepared,
       createdAt: isNew ? ts : (await db.items.get(itemId))?.createdAt || ts,
       updatedAt: ts
@@ -1049,6 +1090,7 @@
     document.getElementById('ingRows').innerHTML = '';
     currentType = 'dish';
     setSegmented('dish');
+    setDishStockSegmented('in_stock');
 
     await refreshIngredientDatalist();
 
@@ -1061,6 +1103,7 @@
         document.getElementById('dishLastPreparedInput').value = item.lastPrepared || '';
         currentType = item.type || 'dish';
         setSegmented(currentType);
+        setDishStockSegmented(item.stockStatus || 'in_stock');
         const joins = await db.itemIngredients.where('itemId').equals(itemId).toArray();
         for(const j of joins){
           const ing = await db.ingredients.get(j.ingredientId);
@@ -1080,8 +1123,14 @@
 
   function setSegmented(type){
     currentType = type;
-    document.querySelectorAll('.segmented button').forEach(b => {
+    document.querySelectorAll('#dishTypeSegmented button').forEach(b => {
       b.classList.toggle('active', b.dataset.type === type);
+    });
+  }
+
+  function setDishStockSegmented(status){
+    document.querySelectorAll('#dishStockSegmented button').forEach(b => {
+      b.classList.toggle('active', b.dataset.status === status);
     });
   }
 
@@ -1109,19 +1158,29 @@
     const ingById = Object.fromEntries(ingredients.map(i => [i.id, i]));
     const usageCount = {};
     itemIngredients.forEach(j => { usageCount[j.ingredientId] = (usageCount[j.ingredientId]||0) + 1; });
-
     const plannedCount = items.filter(i => i.isPlanned).length;
+    const inStockCount = items.filter(i => (i.stockStatus || 'in_stock') === 'in_stock').length;
+    const lowCount = items.filter(i => i.stockStatus === 'low').length;
+    const outCount = items.filter(i => i.stockStatus === 'out').length;
+    const dishTypeCount = items.filter(i => i.type === 'dish').length;
+    const snackTypeCount = items.filter(i => i.type === 'snack').length;
 
     let filterHtml = `
       <div class="filter-bar">
         <button class="filter-pill ${dishFilter==='all'?'active':''}" data-filter="all">All (${items.length})</button>
         <button class="filter-pill ${dishFilter==='planned'?'active':''}" data-filter="planned">📋 Planned (${plannedCount})</button>
-        <button class="filter-pill ${dishFilter==='dish'?'active':''}" data-filter="dish">Dishes</button>
-        <button class="filter-pill ${dishFilter==='snack'?'active':''}" data-filter="snack">Snacks</button>
+        <button class="filter-pill ${dishFilter==='in_stock'?'active':''}" data-filter="in_stock">In Stock (${inStockCount})</button>
+        <button class="filter-pill ${dishFilter==='low'?'active':''}" data-filter="low">Low Stock (${lowCount})</button>
+        <button class="filter-pill ${dishFilter==='out'?'active':''}" data-filter="out">Out of Stock (${outCount})</button>
+        <button class="filter-pill ${dishFilter==='dish'?'active':''}" data-filter="dish">Dishes (${dishTypeCount})</button>
+        <button class="filter-pill ${dishFilter==='snack'?'active':''}" data-filter="snack">Snacks (${snackTypeCount})</button>
       </div>`;
 
     let filtered = items;
     if(dishFilter === 'planned') filtered = filtered.filter(i => i.isPlanned);
+    else if(dishFilter === 'in_stock') filtered = filtered.filter(i => (i.stockStatus || 'in_stock') === 'in_stock');
+    else if(dishFilter === 'low') filtered = filtered.filter(i => i.stockStatus === 'low');
+    else if(dishFilter === 'out') filtered = filtered.filter(i => i.stockStatus === 'out');
     else if(dishFilter === 'dish') filtered = filtered.filter(i => i.type === 'dish');
     else if(dishFilter === 'snack') filtered = filtered.filter(i => i.type === 'snack');
 
@@ -1167,6 +1226,9 @@
       }).join('');
 
       const isPlanned = !!item.isPlanned;
+      const dishStock = item.stockStatus || 'in_stock';
+      const stockLabelMap = { low: 'Low', out: 'Out' };
+      const isStockWarning = dishStock === 'low' || dishStock === 'out';
 
       const isExpanded = expandedDishRows.has(item.id);
       const ingCount = joins.length;
@@ -1184,7 +1246,6 @@
             <span class="dish-name">${escapeHtml(item.name)}</span>
             <div class="dish-pills">
               <span class="dish-type ${item.type}">${item.type}</span>
-              ${isPlanned ? `<span class="planned-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Planned</span>` : ''}
             </div>
             ${item.notes ? `<div style="font-size:12px; color:var(--chalk-faint); margin-top:2px;">${escapeHtml(item.notes)}</div>` : ''}
           </div>
@@ -1198,6 +1259,12 @@
             <svg class="expand-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg>
           </div>
           <div class="ing-cell-expanded"><div class="chips">${chips || '<span style="color:var(--chalk-faint);font-size:12.5px;">No ingredients yet</span>'}</div></div>
+        </td>
+        <td data-label="Stock">
+          <div class="stock-toggle-group">
+            <button class="dish-stock-btn stock-toggle-btn ${dishStock==='low'?'active low':''}" data-status="low" title="Running Low — click again to clear">Low</button>
+            <button class="dish-stock-btn stock-toggle-btn ${dishStock==='out'?'active out':''}" data-status="out" title="Out of Stock — click again to clear">Out</button>
+          </div>
         </td>
         <td data-label="Last Prepared">
           ${lastPreparedStr ? `<span style="font-size:12.5px; color:var(--chalk-dim); font-weight:500;">🍳 ${escapeHtml(lastPreparedStr)}</span>` : `<span style="font-size:12px; color:var(--chalk-faint);">Never</span>`}
@@ -1215,7 +1282,7 @@
     }).join('');
 
     container.innerHTML = filterHtml + `<table class="dishes">
-      <thead><tr><th style="width:30%">Dish</th><th>Ingredients</th><th style="width:130px">Last Prepared</th><th style="width:110px">Actions</th></tr></thead>
+      <thead><tr><th style="width:24%">Dish</th><th>Ingredients</th><th style="width:145px">Stock</th><th style="width:125px">Last Prepared</th><th style="width:110px">Actions</th></tr></thead>
       <tbody>${rowsHtml}</tbody>
     </table>`;
 
@@ -1223,6 +1290,9 @@
 
     container.querySelectorAll('tr[data-item-id]').forEach(tr => {
       const id = tr.dataset.itemId;
+      tr.querySelectorAll('.dish-stock-btn').forEach(btn => {
+        btn.addEventListener('click', e => { e.stopPropagation(); updateDishStockStatus(id, btn.dataset.status, e); });
+      });
       tr.querySelector('.plan-btn').addEventListener('click', e => { e.stopPropagation(); toggleDishPlanned(id, e); });
       tr.querySelector('.edit-btn').addEventListener('click', e => { e.stopPropagation(); openDishModal(id); });
       tr.querySelector('.delete-btn').addEventListener('click', e => {
@@ -1748,7 +1818,9 @@
 
       const cleanItems = items.filter(i => i && i.id && i.name).map(i => ({
         id: i.id, name: i.name, type: i.type === 'snack' ? 'snack' : 'dish',
-        isPlanned: i.isPlanned ? 1 : 0, notes: i.notes || '', createdAt: i.createdAt || nowISO(), updatedAt: i.updatedAt || nowISO()
+        stockStatus: i.stockStatus || 'out',
+        isPlanned: i.isPlanned ? 1 : 0, notes: i.notes || '', lastPrepared: i.lastPrepared || '',
+        createdAt: i.createdAt || nowISO(), updatedAt: i.updatedAt || nowISO()
       }));
       const cleanIngredients = ingredients.filter(i => i && i.id && i.name).map(i => ({
         id: i.id, name: i.name, nameKey: i.nameKey || normalize(i.name),
@@ -1808,7 +1880,8 @@
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('dishLastPreparedInput').value = today;
   });
-  document.querySelectorAll('.segmented button').forEach(b => b.addEventListener('click', () => setSegmented(b.dataset.type)));
+  document.querySelectorAll('#dishTypeSegmented button').forEach(b => b.addEventListener('click', () => setSegmented(b.dataset.type)));
+  document.querySelectorAll('#dishStockSegmented button').forEach(b => b.addEventListener('click', () => setDishStockSegmented(b.dataset.status)));
 
   document.getElementById('cancelIngBtn').addEventListener('click', closeIngModal);
   document.getElementById('saveIngBtn').addEventListener('click', saveIngredient);
