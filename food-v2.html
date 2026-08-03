@@ -1631,14 +1631,9 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg>
             </button>
             <div class="buy-item-details">
-              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                <span class="buy-item-name">${escapeHtml(item.ing.name)}</span>
-                ${item.ing.tag ? `<span class="ing-tag-chip" style="font-size:10px; font-weight:600; padding:1px 6px; border-radius:10px; background:var(--bg-inset); border:1px solid var(--line); color:var(--chalk-dim);">🏷️ ${escapeHtml(item.ing.tag)}</span>` : ''}
-              </div>
-              <div class="buy-item-meta">
-                <span class="needed-for">Needed for: ${escapeHtml(dishNames)}</span>
-                ${qtys ? `<span class="mono">(${escapeHtml(qtys)})</span>` : ''}
-                <span class="stock-pill ${item.ing.stockStatus}" style="font-size:10.5px; padding:1px 6px; border-radius:10px; font-weight:600; text-transform:capitalize;">${item.ing.stockStatus.replace('_',' ')}</span>
+              <span class="buy-item-name">${escapeHtml(item.ing.name)}${qtys ? ` <span style="font-size:11px; color:var(--chalk-faint); font-weight:400;">(${escapeHtml(qtys)})</span>` : ''}</span>
+              <div class="buy-item-meta" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:3px;">
+                ${item.demandList.map(d => `<span style="font-size:10.5px; font-weight:600; padding:1px 7px; border-radius:10px; background:var(--bg-inset); border:1px solid var(--line); color:var(--chalk-dim);">${escapeHtml(d.dishName)}</span>`).join('')}
               </div>
             </div>
           </div>
@@ -1695,8 +1690,7 @@
     const shoppingListHtml = `
       <div class="grocery-section">
         <div class="grocery-section-title">
-          <span>🛒 Grocery Shopping List</span>
-          <span class="count-badge">${totalToBuyCount} items needed</span>
+          <span>🛒 Shopping List</span>
         </div>
 
         ${shoppingListItemsHtml}
