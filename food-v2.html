@@ -306,20 +306,56 @@
   .row-actions button.danger:hover{ color:var(--rust); border-color:var(--rust-dim); }
   .row-actions svg{ width:15px; height:15px; }
 
-  /* mobile card-ified table */
+  /* mobile: compact list rows, not cards */
   @media (max-width: 640px){
-    table.dishes{ border-spacing:0; }
+    table.dishes{ border-spacing:0 4px; }
     table.dishes thead{ display:none; }
-    table.dishes, table.dishes tbody, table.dishes tbody tr, table.dishes td{ display:block; width:100%; }
-    table.dishes tbody tr{ padding:18px 14px 16px; border-radius:10px; margin-bottom:14px; }
-    table.dishes td{ border:none !important; padding:0; }
-    table.dishes td + td{ margin-top:14px; }
-    table.dishes td[data-label]::before{
-      content: attr(data-label);
-      display:block; font-size:10px; text-transform:uppercase; letter-spacing:1px;
-      color:var(--chalk-faint); margin-bottom:4px; font-weight:600;
+    /* collapse all columns except the first */
+    table.dishes td:not(:first-child){ display:none; }
+    table.dishes td:first-child{
+      border-radius:10px !important;
+      border:1px solid var(--line) !important;
+      padding:0 !important;
+      display:block; width:100%;
     }
-    .row-actions{ justify-content:flex-start; margin-top:2px; }
+    table.dishes tr.is-planned td:first-child{ border:1.5px solid var(--accent) !important; }
+    /* The one visible cell becomes the whole row */
+    .dish-mobile-row{
+      display:flex; align-items:center; gap:8px;
+      padding:10px 12px; min-height:44px;
+    }
+    .dish-mobile-name{
+      flex:1; min-width:0;
+      font-weight:600; font-size:14.5px; color:var(--chalk);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .dish-mobile-badges{ display:flex; align-items:center; gap:5px; flex:none; }
+    .dish-mobile-actions{ display:flex; align-items:center; gap:4px; flex:none; }
+    /* detail body */
+    .dish-mobile-body{
+      display:none;
+      padding:0 12px 11px;
+      border-top:1px dashed var(--line);
+      animation:fadeSlideIn .18s ease;
+    }
+    .dish-mobile-body.open{ display:block; }
+    .dish-mobile-section{ margin-top:9px; }
+    .dish-mobile-label{
+      font-size:10px; font-weight:700; text-transform:uppercase;
+      letter-spacing:.08em; color:var(--chalk-faint); margin-bottom:5px;
+    }
+    /* hide desktop-only wrapper on mobile */
+    .dish-title-wrap, .ing-cell, .stock-toggle-group-desktop{ display:none !important; }
+  }
+  /* show mobile row wrapper + body only on mobile */
+  .dish-mobile-row{ display:none; }
+  .dish-mobile-body{ display:none; }
+  .dish-mobile-section{ display:none; }
+  .dish-mobile-label{ display:none; }
+  @media (max-width:640px){
+    .dish-mobile-row{ display:flex; }
+    .dish-mobile-section{ display:block; }
+    .dish-mobile-label{ display:block; }
   }
 
   /* ---------- Ingredients / Pantry View ---------- */
@@ -1437,12 +1473,50 @@
 
       return `<tr data-item-id="${item.id}" class="dish-row ${isPlanned ? 'is-planned' : ''} ${isExpanded ? 'expanded' : ''}">
         <td data-label="Dish">
+          <!-- Desktop view -->
           <div class="dish-title-wrap">
             <span class="dish-name">${escapeHtml(item.name)}</span>
             <div class="dish-pills">
               <span class="dish-type ${item.type}">${item.type}</span>
             </div>
             ${item.notes ? `<div style="font-size:12px; color:var(--chalk-faint); margin-top:2px;">${escapeHtml(item.notes)}</div>` : ''}
+          </div>
+          <!-- Mobile compact row -->
+          <div class="dish-mobile-row" role="button" aria-expanded="false">
+            <span class="dish-mobile-name">${escapeHtml(item.name)}</span>
+            <div class="dish-mobile-badges">
+              <span class="dish-type ${item.type}" style="font-size:9.5px; padding:1px 6px;">${item.type}</span>
+              ${isStockWarning ? `<span class="stock-dot ${dishStock}" title="${dishStock === 'low' ? 'Low stock' : 'Out of stock'}"></span>` : ''}
+              ${isPlanned ? `<span title="Planned" style="font-size:11px;">📋</span>` : ''}
+            </div>
+            <div class="dish-mobile-actions">
+              <button class="plan-btn ${isPlanned ? 'active':''}" title="${isPlanned ? 'Remove from plan':'Add to plan'}" aria-label="Toggle Planned" style="width:30px;height:30px;">
+                <svg viewBox="0 0 24 24" fill="${isPlanned?'currentColor':'none'}" stroke="currentColor" stroke-width="1.8"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+              </button>
+              <button class="edit-btn" aria-label="Edit" style="width:30px;height:30px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
+              <button class="delete-btn danger" aria-label="Delete" style="width:30px;height:30px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6"/></svg></button>
+            </div>
+          </div>
+          <!-- Mobile detail body -->
+          <div class="dish-mobile-body">
+            ${ingCount > 0 ? `<div class="dish-mobile-section">
+              <div class="dish-mobile-label">Ingredients</div>
+              <div class="chips">${chips || ''}</div>
+            </div>` : ''}
+            <div class="dish-mobile-section">
+              <div class="dish-mobile-label">Dish stock</div>
+              <div class="stock-toggle-group">
+                <button class="dish-stock-btn stock-toggle-btn ${dishStock==='low'?'active low':''}" data-status="low">Low</button>
+                <button class="dish-stock-btn stock-toggle-btn ${dishStock==='out'?'active out':''}" data-status="out">Out</button>
+              </div>
+            </div>
+            <div class="dish-mobile-section" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <div>
+                <div class="dish-mobile-label">Last prepared</div>
+                ${lastPreparedStr ? `<span style="font-size:12.5px; color:var(--chalk-dim); font-weight:500;">🍳 ${escapeHtml(lastPreparedStr)}</span>` : `<span style="font-size:12px; color:var(--chalk-faint);">Never</span>`}
+              </div>
+              ${item.notes ? `<div style="flex:1;"><div class="dish-mobile-label">Notes</div><div style="font-size:12px; color:var(--chalk-faint);">${escapeHtml(item.notes)}</div></div>` : ''}
+            </div>
           </div>
         </td>
         <td data-label="Ingredients" class="ing-cell">
@@ -1488,12 +1562,18 @@
       tr.querySelectorAll('.dish-stock-btn').forEach(btn => {
         btn.addEventListener('click', e => { e.stopPropagation(); updateDishStockStatus(id, btn.dataset.status, e); });
       });
-      tr.querySelector('.plan-btn').addEventListener('click', e => { e.stopPropagation(); toggleDishPlanned(id, e); });
-      tr.querySelector('.edit-btn').addEventListener('click', e => { e.stopPropagation(); openDishModal(id); });
-      tr.querySelector('.delete-btn').addEventListener('click', e => {
-        e.stopPropagation();
-        const item = items.find(i => i.id === id);
-        openConfirm('Delete dish?', `"${item?.name || 'This dish'}" will be removed. Shared ingredients stay in your list.`, () => deleteDish(id));
+      tr.querySelectorAll('.plan-btn').forEach(btn => {
+        btn.addEventListener('click', e => { e.stopPropagation(); toggleDishPlanned(id, e); });
+      });
+      tr.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', e => { e.stopPropagation(); openDishModal(id); });
+      });
+      tr.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          const item = items.find(i => i.id === id);
+          openConfirm('Delete dish?', `"${item?.name || 'This dish'}" will be removed. Shared ingredients stay in your list.`, () => deleteDish(id));
+        });
       });
       tr.querySelectorAll('.chip').forEach(chip => {
         chip.addEventListener('click', e => {
@@ -1505,13 +1585,26 @@
           render(chip.dataset.ingId);
         });
       });
-      // Row click = toggle ingredients expand (desktop only via CSS, but state tracked for all)
+
+      // Desktop: row click toggles ingredient expand
       tr.addEventListener('click', e => {
-        if(e.target.closest('button') || e.target.closest('.chip')) return;
+        if(e.target.closest('button') || e.target.closest('.chip') || e.target.closest('.dish-mobile-row')) return;
         if(expandedDishRows.has(id)) expandedDishRows.delete(id);
         else expandedDishRows.add(id);
         render();
       });
+
+      // Mobile: tap the compact row line to toggle detail body
+      const mobileRow = tr.querySelector('.dish-mobile-row');
+      if(mobileRow){
+        mobileRow.addEventListener('click', e => {
+          if(e.target.closest('button')) return;
+          const body = tr.querySelector('.dish-mobile-body');
+          if(!body) return;
+          const open = body.classList.toggle('open');
+          mobileRow.setAttribute('aria-expanded', String(open));
+        });
+      }
     });
   }
 
