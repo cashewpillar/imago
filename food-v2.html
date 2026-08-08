@@ -873,6 +873,7 @@
   let currentType = 'dish';
   let confirmAction = null;
 
+
   /* ---------------- Helpers ---------------- */
   function toast(msg){
     const t = document.getElementById('toast');
@@ -1603,6 +1604,9 @@
           if(!body) return;
           const open = body.classList.toggle('open');
           mobileRow.setAttribute('aria-expanded', String(open));
+          if(open) expandedDishRows.add(id);
+          else expandedDishRows.delete(id);
+          saveUIState();
         });
       }
     });
@@ -1612,6 +1616,7 @@
     container.querySelectorAll('.filter-bar .filter-pill').forEach(btn => {
       btn.addEventListener('click', () => {
         dishFilter = btn.dataset.filter;
+        saveUIState();
         render();
       });
     });
@@ -1684,11 +1689,12 @@
       container.querySelectorAll('.filter-pill[data-pfilter]').forEach(btn => {
         btn.addEventListener('click', () => {
           pantryFilter = btn.dataset.pfilter;
+          saveUIState();
           render();
         });
       });
       const groupBtn = container.querySelector('#toggleGroupTagBtn');
-      if(groupBtn){ groupBtn.addEventListener('click', () => { groupByTag = !groupByTag; render(); }); }
+      if(groupBtn){ groupBtn.addEventListener('click', () => { groupByTag = !groupByTag; saveUIState(); render(); }); }
       return;
     }
 
@@ -1777,6 +1783,7 @@
     container.querySelectorAll('.filter-pill[data-pfilter]').forEach(btn => {
       btn.addEventListener('click', () => {
         pantryFilter = btn.dataset.pfilter;
+        saveUIState();
         render();
       });
     });
@@ -1785,6 +1792,7 @@
     if(groupBtn){
       groupBtn.addEventListener('click', () => {
         groupByTag = !groupByTag;
+        saveUIState();
         render();
       });
     }
@@ -1794,6 +1802,7 @@
         const tag = title.dataset.tagTitle;
         if(collapsedTags.has(tag)) collapsedTags.delete(tag);
         else collapsedTags.add(tag);
+        saveUIState();
         render();
       });
     });
@@ -1815,6 +1824,7 @@
           if(e.target.closest('.drag-handle')) return;
           if(expandedIngRows.has(id)) expandedIngRows.delete(id);
           else expandedIngRows.add(id);
+          saveUIState();
           row.classList.toggle('expanded', expandedIngRows.has(id));
           if(expandedIngRows.has(id)){
             await populateIngHistory(row, id);
@@ -1862,6 +1872,7 @@
           if(ing && (ing.tag || '') !== targetTag){
             await db.ingredients.update(ingId, { tag: targetTag, updatedAt: nowISO() });
             collapsedTags.delete(group.dataset.tag);
+            saveUIState();
             toast(`Moved "${ing.name}" to ${targetTag || 'Untagged'}`);
             render();
           }
@@ -2046,6 +2057,7 @@
         const tag = title.dataset.groceryTag;
         if(collapsedGroceryTags.has(tag)) collapsedGroceryTags.delete(tag);
         else collapsedGroceryTags.add(tag);
+        saveUIState();
         render();
       });
     });
@@ -2120,6 +2132,40 @@
     document.getElementById('tabDishes').classList.toggle('active', currentTab === 'dishes');
     document.getElementById('tabIngredients').classList.toggle('active', currentTab === 'ingredients');
     document.getElementById('tabGrocery').classList.toggle('active', currentTab === 'grocery');
+  }
+
+  /* ---------------- Persistence ---------------- */
+  function saveUIState(){
+    const state = {
+      currentTab,
+      dishFilter,
+      pantryFilter,
+      groupByTag,
+      expandedDishRows: Array.from(expandedDishRows),
+      expandedIngRows: Array.from(expandedIngRows),
+      collapsedTags: Array.from(collapsedTags),
+      collapsedGroceryTags: Array.from(collapsedGroceryTags),
+      searchTerm
+    };
+    localStorage.setItem('larderUIState', JSON.stringify(state));
+  }
+
+  function loadUIState(){
+    try {
+      const saved = localStorage.getItem('larderUIState');
+      if(!saved) return;
+      const s = JSON.parse(saved);
+      if(s.currentTab) currentTab = s.currentTab;
+      if(s.dishFilter) dishFilter = s.dishFilter;
+      if(s.pantryFilter) pantryFilter = s.pantryFilter;
+      if(typeof s.groupByTag === 'boolean') groupByTag = s.groupByTag;
+      if(Array.isArray(s.expandedDishRows)){ expandedDishRows.clear(); s.expandedDishRows.forEach(id => expandedDishRows.add(id)); }
+      if(Array.isArray(s.expandedIngRows)){ expandedIngRows.clear(); s.expandedIngRows.forEach(id => expandedIngRows.add(id)); }
+      if(Array.isArray(s.collapsedTags)){ collapsedTags.clear(); s.collapsedTags.forEach(t => collapsedTags.add(t)); }
+      if(Array.isArray(s.collapsedGroceryTags)){ collapsedGroceryTags.clear(); s.collapsedGroceryTags.forEach(t => collapsedGroceryTags.add(t)); }
+      if(s.searchTerm !== undefined) searchTerm = s.searchTerm;
+      document.getElementById('searchInput').value = searchTerm;
+    } catch(e) { console.error('Failed to load UI state', e); }
   }
 
   /* ---------------- Import / Export ---------------- */
@@ -2204,10 +2250,10 @@
   function closeIo(){ document.getElementById('ioOverlay').classList.remove('show'); }
 
   /* ---------------- Wire up events ---------------- */
-  document.getElementById('tabDishes').addEventListener('click', () => { currentTab='dishes'; updateTabUI(); render(); });
-  document.getElementById('tabIngredients').addEventListener('click', () => { currentTab='ingredients'; updateTabUI(); render(); });
-  document.getElementById('tabGrocery').addEventListener('click', () => { currentTab='grocery'; updateTabUI(); render(); });
-  document.getElementById('searchInput').addEventListener('input', e => { searchTerm = e.target.value; render(); });
+  document.getElementById('tabDishes').addEventListener('click', () => { currentTab='dishes'; saveUIState(); updateTabUI(); render(); });
+  document.getElementById('tabIngredients').addEventListener('click', () => { currentTab='ingredients'; saveUIState(); updateTabUI(); render(); });
+  document.getElementById('tabGrocery').addEventListener('click', () => { currentTab='grocery'; saveUIState(); updateTabUI(); render(); });
+  document.getElementById('searchInput').addEventListener('input', e => { searchTerm = e.target.value; saveUIState(); render(); });
 
   document.getElementById('fabAdd').addEventListener('click', () => {
     if(currentTab === 'ingredients') openIngModal(null);
@@ -2251,6 +2297,8 @@
   });
 
   /* ---------------- Init ---------------- */
+  loadUIState();
+  updateTabUI();
   updateHeaderBadge();
   render();
 })();
