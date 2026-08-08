@@ -335,7 +335,29 @@
   .tag-group{ border:2px dashed transparent; border-radius:12px; padding:4px; transition:all .15s ease; }
   .tag-group.drag-over{ border-color:var(--accent); background:var(--accent-dim); }
   .ing-row-top{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
-  .ing-info{ display:flex; align-items:center; gap:8px; }
+  .ing-row.expanded{ border-color:var(--accent); }
+  .ing-row-history{
+    display:none; margin-top:10px; padding-top:10px;
+    border-top:1px dashed var(--line);
+    animation:fadeSlideIn .18s ease;
+  }
+  .ing-row.expanded .ing-row-history{ display:block; }
+  @keyframes fadeSlideIn{
+    from{ opacity:0; transform:translateY(-4px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+  .ph-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  .ph-table th{ text-align:left; font-size:10.5px; font-weight:700; letter-spacing:.04em;
+    text-transform:uppercase; color:var(--chalk-faint); padding:0 8px 5px 0; }
+  .ph-table td{ padding:4px 8px 4px 0; color:var(--chalk-dim); vertical-align:top;
+    border-top:1px solid var(--line); }
+  .ph-table td:first-child{ color:var(--chalk); font-weight:500; white-space:nowrap; }
+  .ph-price{ color:var(--sage) !important; font-weight:700 !important; }
+  .ph-empty{ font-size:12px; color:var(--chalk-faint); font-style:italic; padding:4px 0; }
+  .ph-log-btn{ font-size:11.5px; font-weight:600; color:var(--accent); background:none; border:none;
+    cursor:pointer; padding:0; margin-top:8px; display:inline-flex; align-items:center; gap:4px; }
+  .ph-log-btn:hover{ text-decoration:underline; }
+  .ing-info{ cursor:pointer; display:flex; align-items:center; gap:8px; }
   .ing-name{ font-weight:600; font-size:14.5px; }
 
   /* Stock Status Selector Buttons */
@@ -500,6 +522,15 @@
   .add-ing-btn:hover{ color:var(--chalk); border-color:var(--accent); }
 
   .modal-actions{ display:flex; gap:10px; margin-top:20px; }
+
+  /* Purchase price pills */
+  .price-pill{
+    padding:4px 12px; border-radius:20px; font-size:12px; font-weight:700;
+    background:var(--bg-inset); border:1.5px solid var(--line); color:var(--chalk-dim);
+    cursor:pointer; transition:all .12s;
+  }
+  .price-pill:hover{ border-color:var(--sage); color:var(--sage); }
+  .price-pill.active{ background:var(--sage-dim); border-color:var(--sage); color:var(--sage); }
   .btn{
     flex:1; padding:11px; border-radius:10px; border:none; font-weight:600; font-size:14px;
     cursor:pointer; font-family:'Work Sans',sans-serif;
@@ -666,6 +697,31 @@
   </div>
 </div>
 
+<!-- Purchase log modal -->
+<div class="overlay" id="purchaseOverlay">
+  <div class="modal" style="max-width:420px;">
+    <h2 id="purchaseModalTitle">Log Purchase</h2>
+    <div class="field">
+      <label>Date</label>
+      <input type="date" id="purchaseDateInput">
+    </div>
+    <div class="field">
+      <label>Price <span style="text-transform:none;letter-spacing:0;color:var(--chalk-faint);">(optional)</span></label>
+      <div id="purchasePricePills" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
+      <input type="number" id="purchasePriceInput" placeholder="Custom price" min="0" step="0.01" style="padding-left:12px;">
+    </div>
+    <div class="field">
+      <label>Where <span style="text-transform:none;letter-spacing:0;color:var(--chalk-faint);">(optional)</span></label>
+      <input type="text" id="purchaseLocationInput" placeholder="e.g. SM Supermarket, Puregold" list="purchaseLocationList">
+      <datalist id="purchaseLocationList"></datalist>
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="cancelPurchaseBtn">Skip</button>
+      <button class="btn primary" id="savePurchaseBtn">✓ Mark in stock</button>
+    </div>
+  </div>
+</div>
+
 <!-- Import / export sheet -->
 <div class="overlay" id="ioOverlay">
   <div class="modal" style="max-width:420px;">
@@ -749,6 +805,14 @@
     return tx.items.toCollection().modify(item => {
       if(!item.stockStatus) item.stockStatus = 'in_stock';
     });
+  });
+
+  db.version(6).stores({
+    items: 'id, name, type, isPlanned, stockStatus, lastPrepared, updatedAt',
+    ingredients: 'id, &nameKey, stockStatus, tag, updatedAt',
+    itemIngredients: 'id, itemId, ingredientId, updatedAt',
+    customGrocery: 'id, name, bought, updatedAt',
+    purchaseHistory: 'id, ingredientId, date, updatedAt'
   });
 
   const uuid = () => (crypto.randomUUID ? crypto.randomUUID() :
@@ -837,6 +901,136 @@
     toast(`${ing ? ing.name : 'Item'} marked as ${labelMap[newStatus] || newStatus}`);
     updateHeaderBadge();
     render();
+  }
+
+  async function populateIngHistory(row, ingId){
+    const slot = row.querySelector('.ing-row-history');
+    if(!slot) return;
+    const history = db.purchaseHistory
+      ? await db.purchaseHistory.where('ingredientId').equals(ingId).sortBy('date')
+      : [];
+    const entries = history.reverse().slice(0, 8); // newest first, cap at 8
+
+    if(entries.length === 0){
+      slot.innerHTML = `<p class="ph-empty">No purchase history yet — log one when you tick this item on the shopping list.</p>
+        <button class="ph-log-btn" data-ph-log="${ingId}">+ Log a purchase</button>`;
+    } else {
+      // Summary stats
+      const prices = entries.map(h => h.price).filter(p => p != null);
+      const avgPrice = prices.length ? (prices.reduce((a,b)=>a+b,0)/prices.length) : null;
+      const lastEntry = entries[0];
+      const lastDateStr = lastEntry.date
+        ? new Date(lastEntry.date + 'T00:00:00').toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'})
+        : '—';
+
+      const statsHtml = `<div style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:8px;">
+        <span style="font-size:11.5px; color:var(--chalk-faint);">Last bought: <strong style="color:var(--chalk);">${lastDateStr}</strong>${lastEntry.location ? ` at <strong style="color:var(--chalk);">${escapeHtml(lastEntry.location)}</strong>` : ''}</span>
+        ${avgPrice != null ? `<span style="font-size:11.5px; color:var(--chalk-faint);">Avg price: <strong class="ph-price">₱${avgPrice.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2})}</strong></span>` : ''}
+      </div>`;
+
+      const rowsHtml = entries.map(h => {
+        const dateStr = h.date
+          ? new Date(h.date + 'T00:00:00').toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'})
+          : '—';
+        const priceStr = h.price != null
+          ? `<span class="ph-price">₱${Number(h.price).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2})}</span>`
+          : `<span style="color:var(--chalk-faint);">—</span>`;
+        const locStr = h.location ? escapeHtml(h.location) : `<span style="color:var(--chalk-faint);">—</span>`;
+        return `<tr><td>${dateStr}</td><td>${priceStr}</td><td>${locStr}</td></tr>`;
+      }).join('');
+
+      slot.innerHTML = `${statsHtml}
+        <table class="ph-table">
+          <thead><tr><th>Date</th><th>Price</th><th>Where</th></tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+        <button class="ph-log-btn" data-ph-log="${ingId}">+ Log another purchase</button>`;
+    }
+
+    slot.querySelector('[data-ph-log]')?.addEventListener('click', e => {
+      e.stopPropagation();
+      openPurchaseModal(ingId);
+    });
+  }
+
+  /* ---- Purchase modal ---- */
+  let _purchaseIngId = null;
+  const expandedIngRows = new Set();
+
+  async function openPurchaseModal(ingId, e){
+    if(e) e.stopPropagation();
+    _purchaseIngId = ingId;
+    const ing = await db.ingredients.get(ingId);
+    document.getElementById('purchaseModalTitle').textContent = `Bought: ${ing ? ing.name : 'Item'}`;
+
+    // Default date = today
+    const today = new Date().toISOString().slice(0, 10);
+    document.getElementById('purchaseDateInput').value = today;
+
+    // Load history for this ingredient
+    const history = db.purchaseHistory
+      ? await db.purchaseHistory.where('ingredientId').equals(ingId).sortBy('date')
+      : [];
+    const recent = history.slice(-10).reverse();
+
+    // Price pills — unique prices from recent history
+    const seenPrices = new Set();
+    const uniquePrices = recent.filter(h => h.price != null && !seenPrices.has(h.price) && seenPrices.add(h.price));
+    const pillsEl = document.getElementById('purchasePricePills');
+    pillsEl.innerHTML = uniquePrices.map(h =>
+      `<button type="button" class="price-pill" data-price="${h.price}">₱${Number(h.price).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2})}</button>`
+    ).join('');
+    pillsEl.querySelectorAll('.price-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        pillsEl.querySelectorAll('.price-pill').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('purchasePriceInput').value = btn.dataset.price;
+      });
+    });
+
+    // Pre-fill price from most recent purchase
+    const lastPrice = recent[0]?.price;
+    document.getElementById('purchasePriceInput').value = lastPrice != null ? lastPrice : '';
+    if(lastPrice != null){
+      pillsEl.querySelectorAll('.price-pill').forEach(b => {
+        if(Number(b.dataset.price) === lastPrice) b.classList.add('active');
+      });
+    }
+
+    // Pre-fill location from most recent purchase + populate datalist
+    const lastLocation = recent[0]?.location || '';
+    document.getElementById('purchaseLocationInput').value = lastLocation;
+    const allLocations = [...new Set(recent.map(h => h.location).filter(Boolean))];
+    document.getElementById('purchaseLocationList').innerHTML = allLocations.map(l => `<option value="${escapeHtml(l)}">`).join('');
+
+    // Clear custom price when user types (deselects pill)
+    document.getElementById('purchasePriceInput').oninput = () => {
+      pillsEl.querySelectorAll('.price-pill').forEach(b => b.classList.remove('active'));
+    };
+
+    document.getElementById('purchaseOverlay').classList.add('show');
+  }
+
+  async function savePurchase(){
+    const ingId = _purchaseIngId;
+    if(!ingId) return;
+    const date = document.getElementById('purchaseDateInput').value || new Date().toISOString().slice(0,10);
+    const priceRaw = document.getElementById('purchasePriceInput').value;
+    const price = priceRaw !== '' ? parseFloat(priceRaw) : null;
+    const location = document.getElementById('purchaseLocationInput').value.trim() || null;
+    if(db.purchaseHistory){
+      await db.purchaseHistory.put({ id: uuid(), ingredientId: ingId, date, price, location, updatedAt: nowISO() });
+    }
+    document.getElementById('purchaseOverlay').classList.remove('show');
+    _purchaseIngId = null;
+    await updateStockStatus(ingId, 'in_stock');
+  }
+
+  async function skipPurchase(){
+    const ingId = _purchaseIngId;
+    document.getElementById('purchaseOverlay').classList.remove('show');
+    _purchaseIngId = null;
+    if(ingId) await updateStockStatus(ingId, 'in_stock');
   }
 
   async function updateDishStockStatus(itemId, newStatus, e){
@@ -1409,9 +1603,10 @@
       const stock = ing.stockStatus || 'out';
       const reqForPlan = plannedDemand[ing.id];
 
-      return `<div class="ing-row ${groupByTag ? 'is-draggable' : ''}" data-ing-id="${ing.id}" ${groupByTag ? 'draggable="true"' : ''}>
+      const isExpanded = expandedIngRows.has(ing.id);
+      return `<div class="ing-row ${groupByTag ? 'is-draggable' : ''} ${isExpanded ? 'expanded' : ''}" data-ing-id="${ing.id}" ${groupByTag ? 'draggable="true"' : ''}>
         <div class="ing-row-top">
-          <div class="ing-info">
+          <div class="ing-info" title="Click to see purchase history">
             ${groupByTag ? `<span class="drag-handle" title="Drag to reorder tag">⋮⋮</span>` : ''}
             <span class="stock-dot ${stock}"></span>
             <div>
@@ -1437,6 +1632,9 @@
               </button>
             </div>
           </div>
+        </div>
+        <div class="ing-row-history" data-history-for="${ing.id}">
+          <span style="font-size:11.5px; color:var(--chalk-faint);">Loading…</span>
         </div>
       </div>`;
     }
@@ -1510,12 +1708,26 @@
     container.querySelectorAll('.ing-row').forEach(row => {
       const id = row.dataset.ingId;
       row.querySelectorAll('.stock-toggle-btn').forEach(btn => {
-        btn.addEventListener('click', e => updateStockStatus(id, btn.dataset.status, e));
+        btn.addEventListener('click', e => { e.stopPropagation(); updateStockStatus(id, btn.dataset.status, e); });
       });
       const editBtn = row.querySelector('.edit-ing-btn');
       if(editBtn) editBtn.addEventListener('click', e => { e.stopPropagation(); openIngModal(id); });
       const delBtn = row.querySelector('.delete-ing-btn');
-      if(delBtn) delBtn.addEventListener('click', e => deleteIngredient(id, e));
+      if(delBtn) delBtn.addEventListener('click', e => { e.stopPropagation(); deleteIngredient(id, e); });
+
+      // Click on the info area toggles purchase history
+      const infoArea = row.querySelector('.ing-info');
+      if(infoArea){
+        infoArea.addEventListener('click', async e => {
+          if(e.target.closest('.drag-handle')) return;
+          if(expandedIngRows.has(id)) expandedIngRows.delete(id);
+          else expandedIngRows.add(id);
+          row.classList.toggle('expanded', expandedIngRows.has(id));
+          if(expandedIngRows.has(id)){
+            await populateIngHistory(row, id);
+          }
+        });
+      }
     });
 
     if(groupByTag){
@@ -1571,6 +1783,12 @@
         target.style.borderColor = 'var(--accent)';
         setTimeout(() => { target.style.borderColor = ''; }, 2000);
       }
+    }
+
+    // Repopulate history for any already-expanded rows (after re-render)
+    for(const ingId of expandedIngRows){
+      const row = container.querySelector(`.ing-row[data-ing-id="${ingId}"]`);
+      if(row) await populateIngHistory(row, ingId);
     }
   }
 
@@ -1745,8 +1963,9 @@
 
     container.querySelectorAll('.mark-bought-btn').forEach(btn => {
       btn.addEventListener('click', e => {
+        e.stopPropagation();
         const row = btn.closest('[data-ing-id]');
-        if(row) updateStockStatus(row.dataset.ingId, 'in_stock', e);
+        if(row) openPurchaseModal(row.dataset.ingId);
       });
     });
 
@@ -1921,6 +2140,9 @@
   document.getElementById('confirmCancelBtn').addEventListener('click', closeConfirm);
   document.getElementById('confirmOkBtn').addEventListener('click', () => { const fn = confirmAction; closeConfirm(); if(fn) fn(); });
 
+  document.getElementById('savePurchaseBtn').addEventListener('click', savePurchase);
+  document.getElementById('cancelPurchaseBtn').addEventListener('click', skipPurchase);
+
   document.getElementById('ioBtn').addEventListener('click', openIo);
   document.getElementById('closeIoBtn').addEventListener('click', closeIo);
   document.getElementById('exportBtn').addEventListener('click', exportData);
@@ -1931,7 +2153,7 @@
     e.target.value = '';
   });
 
-  [document.getElementById('dishOverlay'), document.getElementById('ingOverlay'), document.getElementById('confirmOverlay'), document.getElementById('ioOverlay')].forEach(ov => {
+  [document.getElementById('dishOverlay'), document.getElementById('ingOverlay'), document.getElementById('confirmOverlay'), document.getElementById('ioOverlay'), document.getElementById('purchaseOverlay')].forEach(ov => {
     ov.addEventListener('click', e => { if(e.target === ov){ ov.classList.remove('show'); } });
   });
 
