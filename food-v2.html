@@ -378,6 +378,19 @@
     animation:fadeSlideIn .18s ease;
   }
   .ing-row.expanded .ing-row-history{ display:block; }
+  .ing-row-mobile-body{ display:none; }
+  .ing-row.expanded .ing-row-mobile-body{ display:block; }
+  
+  @media (max-width: 640px) {
+    .ing-row-top { flex-wrap: nowrap; }
+    .ing-row .stock-toggle-group-desktop { display: none !important; }
+    .ing-row-mobile-body {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--line);
+      animation: fadeSlideIn .18s ease;
+    }
+  }
   @keyframes fadeSlideIn{
     from{ opacity:0; transform:translateY(-4px); }
     to{ opacity:1; transform:translateY(0); }
@@ -1705,19 +1718,19 @@
       const isExpanded = expandedIngRows.has(ing.id);
       return `<div class="ing-row ${groupByTag ? 'is-draggable' : ''} ${isExpanded ? 'expanded' : ''}" data-ing-id="${ing.id}" ${groupByTag ? 'draggable="true"' : ''}>
         <div class="ing-row-top">
-          <div class="ing-info" title="Click to see purchase history">
+          <div class="ing-info" title="Click to see purchase history and status">
             ${groupByTag ? `<span class="drag-handle" title="Drag to reorder tag">⋮⋮</span>` : ''}
             <span class="stock-dot ${stock}"></span>
-            <div>
+            <div style="min-width: 0; flex: 1;">
               <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                 <span class="ing-name">${escapeHtml(ing.name)}</span>
-                ${ing.tag ? `<span class="ing-tag-chip" style="font-size:10px; font-weight:600; padding:1px 6px; border-radius:10px; background:var(--bg-inset); border:1px solid var(--line); color:var(--chalk-dim);">🏷️ ${escapeHtml(ing.tag)}</span>` : ''}
+                ${ing.tag && !groupByTag ? `<span class="ing-tag-chip" style="font-size:10px; font-weight:600; padding:1px 6px; border-radius:10px; background:var(--bg-inset); border:1px solid var(--line); color:var(--chalk-dim);">🏷️ ${escapeHtml(ing.tag)}</span>` : ''}
               </div>
-              ${reqForPlan ? `<div style="font-size:11px; color:var(--accent); font-weight:600; margin-top:2px;">Needed for: ${escapeHtml(reqForPlan.map(d=>d.dishName).join(', '))}</div>` : ''}
+              ${reqForPlan ? `<div style="font-size:11px; color:var(--accent); font-weight:600; margin-top:2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Needed for: ${escapeHtml(reqForPlan.map(d=>d.dishName).join(', '))}</div>` : ''}
             </div>
           </div>
-          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <div class="stock-toggle-group">
+          <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+            <div class="stock-toggle-group stock-toggle-group-desktop">
               <button class="stock-toggle-btn ${stock==='in_stock'?'active in_stock':''}" data-status="in_stock" title="In Stock">In Stock</button>
               <button class="stock-toggle-btn ${stock==='low'?'active low':''}" data-status="low" title="Low Stock">Low</button>
               <button class="stock-toggle-btn ${stock==='out'?'active out':''}" data-status="out" title="Out of Stock">Out</button>
@@ -1729,6 +1742,16 @@
               <button class="delete-ing-btn danger" title="Delete ingredient" aria-label="Delete ingredient">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6"/></svg>
               </button>
+            </div>
+          </div>
+        </div>
+        <div class="ing-row-mobile-body">
+          <div style="margin-bottom: 8px;">
+            <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--chalk-faint); margin-bottom:5px;">Stock Status</div>
+            <div class="stock-toggle-group">
+              <button class="stock-toggle-btn ${stock==='in_stock'?'active in_stock':''}" data-status="in_stock" title="In Stock">In Stock</button>
+              <button class="stock-toggle-btn ${stock==='low'?'active low':''}" data-status="low" title="Low Stock">Low</button>
+              <button class="stock-toggle-btn ${stock==='out'?'active out':''}" data-status="out" title="Out of Stock">Out</button>
             </div>
           </div>
         </div>
@@ -1817,7 +1840,7 @@
       const delBtn = row.querySelector('.delete-ing-btn');
       if(delBtn) delBtn.addEventListener('click', e => { e.stopPropagation(); deleteIngredient(id, e); });
 
-      // Click on the info area toggles purchase history
+      // Click on the info area toggles purchase history and mobile body
       const infoArea = row.querySelector('.ing-info');
       if(infoArea){
         infoArea.addEventListener('click', async e => {
