@@ -1871,7 +1871,6 @@
 
           if(ing && (ing.tag || '') !== targetTag){
             await db.ingredients.update(ingId, { tag: targetTag, updatedAt: nowISO() });
-            collapsedTags.delete(group.dataset.tag);
             saveUIState();
             toast(`Moved "${ing.name}" to ${targetTag || 'Untagged'}`);
             render();
