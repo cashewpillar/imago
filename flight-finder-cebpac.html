@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cheapest Flight Finder - CebPac</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1f2330; --border:#2a2f3d;
+    --text:#e7e9ee; --muted:#9aa2b1; --accent:#5b9dff; --good:#37c979;
+    --tier1:#37c979; --tier2:#5b9dff; --tier3:#b47bff;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:24px; background:var(--bg); color:var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  h1{font-size:20px; margin:0 0 4px;}
+  p.sub{color:var(--muted); margin:0 0 20px; font-size:13px;}
+  .layout{display:grid; grid-template-columns: 1fr 1fr; gap:16px; max-width:1100px; margin:0 auto;}
+  @media (max-width:800px){.layout{grid-template-columns:1fr;}}
+  .card{background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px;}
+  label{display:block; font-size:12px; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:.04em;}
+  textarea{
+    width:100%; height:160px; resize:vertical; background:var(--panel2); color:var(--text);
+    border:1px solid var(--border); border-radius:8px; padding:10px; font-family:monospace; font-size:12px;
+  }
+  .config{max-width:1100px; margin:16px auto; display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;}
+  .field{display:flex; flex-direction:column; gap:6px;}
+  input[type=number], input[type=text]{
+    background:var(--panel2); color:var(--text); border:1px solid var(--border);
+    border-radius:8px; padding:8px 10px; font-size:14px; width:140px;
+  }
+  button{
+    background:var(--accent); color:#08101f; border:none; border-radius:8px;
+    padding:10px 20px; font-weight:600; font-size:14px; cursor:pointer;
+  }
+  button:hover{filter:brightness(1.08);}
+  #error{max-width:1100px; margin:12px auto; color:#ff6b6b; font-size:13px; white-space:pre-wrap;}
+  #results{max-width:1100px; margin:24px auto;}
+  .tier{margin-bottom:24px;}
+  .tier-title{font-size:14px; font-weight:700; margin-bottom:8px; display:flex; align-items:center; gap:8px;}
+  .tier-dot{width:10px; height:10px; border-radius:50%;}
+  table{width:100%; border-collapse:collapse; background:var(--panel); border:1px solid var(--border); border-radius:8px; overflow:hidden;}
+  th, td{padding:10px 12px; text-align:left; font-size:13px; border-bottom:1px solid var(--border);}
+  th{background:var(--panel2); color:var(--muted); font-weight:600; text-transform:uppercase; font-size:11px; letter-spacing:.03em;}
+  tr:last-child td{border-bottom:none;}
+  .price{font-weight:700; color:var(--good);}
+  .muted{color:var(--muted);}
+  .rank{color:var(--muted); font-variant-numeric: tabular-nums;}
+</style>
+<meta name="theme-color" content="#f7f6f2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="imago">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/imago-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+</head>
+<body>
+
+<h1>Cheapest Flight Finder - CebPac</h1>
+<p class="sub">Paste the two fare JSON blobs (route keys like "DGTMNL|PHP"), set your trip preferences, and find the cheapest valid combinations.</p>
+
+<div class="layout">
+  <div class="card">
+    <label>Fare data — paste JSON blob 1</label>
+    <textarea id="json1" placeholder='{"DGTMNL|PHP": {"2026-08-09T00:00:00": "9.4K", ...}}'></textarea>
+  </div>
+  <div class="card">
+    <label>Fare data — paste JSON blob 2</label>
+    <textarea id="json2" placeholder='{"MNLDGT|PHP": {"2026-08-10T00:00:00": "3K", ...}}'></textarea>
+  </div>
+</div>
+
+<div class="config">
+  <div class="field">
+    <label>Source (3-letter code)</label>
+    <input type="text" id="source" maxlength="3" placeholder="e.g. MNL">
+  </div>
+  <div class="field">
+    <label>Min days away</label>
+    <input type="number" id="minDays" value="2" min="0">
+  </div>
+  <div class="field">
+    <label>Max days away</label>
+    <input type="number" id="maxDays" value="7" min="0">
+  </div>
+  <div class="field">
+    <button onclick="run()">Find cheapest flights</button>
+  </div>
+</div>
+
+<div id="error"></div>
+<div id="results"></div>
+
+<script>
+function parsePrice(str){
+  str = String(str).trim();
+  if(/k$/i.test(str)){
+    return parseFloat(str) * 1000;
+  }
+  return parseFloat(str);
+}
+
+function parseBlob(raw){
+  const obj = JSON.parse(raw);
+  const key = Object.keys(obj)[0];
+  if(!key) throw new Error("No key found in JSON blob.");
+  const [route, currency] = key.split('|');
+  if(!route || route.length !== 6) throw new Error(`Unexpected route key format: "${key}"`);
+  const from = route.slice(0,3).toUpperCase();
+  const to = route.slice(3,6).toUpperCase();
+  const dates = obj[key];
+  const entries = Object.keys(dates).map(dtStr => ({
+    date: new Date(dtStr),
+    dateStr: dtStr,
+    price: parsePrice(dates[dtStr])
+  })).filter(e => !isNaN(e.price) && !isNaN(e.date.getTime()));
+  return { from, to, currency, entries };
+}
+
+function fmtDate(d){
+  return d.toLocaleDateString(undefined, { weekday:'short', year:'numeric', month:'short', day:'numeric' });
+}
+
+function fmtPrice(n, currency){
+  return currency + ' ' + Math.round(n).toLocaleString();
+}
+
+function run(){
+  const errorEl = document.getElementById('error');
+  const resultsEl = document.getElementById('results');
+  errorEl.textContent = '';
+  resultsEl.innerHTML = '';
+
+  const source = document.getElementById('source').value.trim().toUpperCase();
+  const minDays = parseInt(document.getElementById('minDays').value, 10);
+  const maxDays = parseInt(document.getElementById('maxDays').value, 10);
+
+  if(!source || source.length !== 3){
+    errorEl.textContent = 'Please enter a valid 3-letter source code.';
+    return;
+  }
+  if(isNaN(minDays) || isNaN(maxDays) || minDays > maxDays){
+    errorEl.textContent = 'Please enter a valid min/max days range (min ≤ max).';
+    return;
+  }
+
+  let blob1, blob2;
+  try{
+    blob1 = parseBlob(document.getElementById('json1').value);
+    blob2 = parseBlob(document.getElementById('json2').value);
+  }catch(e){
+    errorEl.textContent = 'Could not parse fare data: ' + e.message;
+    return;
+  }
+
+  let outbound, inbound;
+  if(blob1.from === source && blob2.to === source){
+    outbound = blob1; inbound = blob2;
+  } else if(blob2.from === source && blob1.to === source){
+    outbound = blob2; inbound = blob1;
+  } else {
+    errorEl.textContent = `Could not match source "${source}" to either fare blob's route (found ${blob1.from}->${blob1.to} and ${blob2.from}->${blob2.to}).`;
+    return;
+  }
+
+  const currency = outbound.currency || inbound.currency || '';
+  const combos = [];
+  for(const out of outbound.entries){
+    for(const ret of inbound.entries){
+      const diffDays = Math.round((ret.date - out.date) / 86400000);
+      if(diffDays >= minDays && diffDays <= maxDays){
+        combos.push({
+          out, ret, diffDays,
+          total: out.price + ret.price
+        });
+      }
+    }
+  }
+
+  if(combos.length === 0){
+    resultsEl.innerHTML = '<p class="muted">No valid combinations found for that date range and day-length window.</p>';
+    return;
+  }
+
+  combos.sort((a,b) => a.total - b.total);
+  const top = combos.slice(0, 10);
+
+  // split top results into 3 price tiers (cheapest bucket first)
+  const tierCount = Math.min(3, top.length);
+  const baseSize = Math.floor(top.length / tierCount);
+  const remainder = top.length % tierCount;
+  const tiers = [];
+  let idx = 0;
+  for(let t = 0; t < tierCount; t++){
+    const size = baseSize + (t < remainder ? 1 : 0);
+    tiers.push(top.slice(idx, idx + size));
+    idx += size;
+  }
+
+  const tierMeta = [
+    { name: 'Best Deals', color: 'var(--tier1)' },
+    { name: 'Great Value', color: 'var(--tier2)' },
+    { name: 'Still Good', color: 'var(--tier3)' }
+  ];
+
+  let html = '';
+  let rank = 1;
+  tiers.forEach((tierRows, i) => {
+    if(tierRows.length === 0) return;
+    const minP = Math.min(...tierRows.map(r => r.total));
+    const maxP = Math.max(...tierRows.map(r => r.total));
+    const rangeLabel = minP === maxP ? fmtPrice(minP, currency) : `${fmtPrice(minP, currency)} – ${fmtPrice(maxP, currency)}`;
+    html += `<div class="tier">
+      <div class="tier-title"><span class="tier-dot" style="background:${tierMeta[i].color}"></span>${tierMeta[i].name} <span class="muted" style="font-weight:400;">(${rangeLabel})</span></div>
+      <table>
+        <thead><tr>
+          <th>#</th><th>Depart (${outbound.from} → ${outbound.to})</th><th>Return (${inbound.from} → ${inbound.to})</th><th>Trip Length</th><th>Total Fare</th>
+        </tr></thead>
+        <tbody>`;
+    tierRows.forEach(r => {
+      html += `<tr>
+        <td class="rank">${rank}</td>
+        <td>${fmtDate(r.out.date)}<br><span class="muted">${fmtPrice(r.out.price, currency)}</span></td>
+        <td>${fmtDate(r.ret.date)}<br><span class="muted">${fmtPrice(r.ret.price, currency)}</span></td>
+        <td>${r.diffDays} day${r.diffDays === 1 ? '' : 's'}</td>
+        <td class="price">${fmtPrice(r.total, currency)}</td>
+      </tr>`;
+      rank++;
+    });
+    html += `</tbody></table></div>`;
+  });
+
+  resultsEl.innerHTML = html;
+}
+</script>
+
+  <script src="pwa-register.js"></script>
+</body>
+</html>
