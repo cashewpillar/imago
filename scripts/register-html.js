@@ -7,52 +7,71 @@ const root = path.resolve(__dirname, '..');
 const swPath = path.join(root, 'sw.js');
 const indexPath = path.join(root, 'index.html');
 
-const htmlHeadRequirements = [
-  {
-    pattern: /<meta[^>]+name=["']theme-color["']/i,
-    tag: '<meta name="theme-color" content="#f7f6f2">'
-  },
-  {
-    pattern: /<meta[^>]+name=["']mobile-web-app-capable["']/i,
-    tag: '<meta name="mobile-web-app-capable" content="yes">'
-  },
-  {
-    pattern: /<meta[^>]+name=["']apple-mobile-web-app-capable["']/i,
-    tag: '<meta name="apple-mobile-web-app-capable" content="yes">'
-  },
-  {
-    pattern: /<meta[^>]+name=["']apple-mobile-web-app-status-bar-style["']/i,
-    tag: '<meta name="apple-mobile-web-app-status-bar-style" content="default">'
-  },
-  {
-    pattern: /<meta[^>]+name=["']apple-mobile-web-app-title["']/i,
-    tag: '<meta name="apple-mobile-web-app-title" content="imago">'
-  },
-  {
-    pattern: /<link[^>]+rel=["']manifest["']/i,
-    tag: '<link rel="manifest" href="manifest.webmanifest">'
-  },
-  {
-    pattern: /<link[^>]+rel=["']icon["'][^>]+imago-icon\.svg/i,
-    tag: '<link rel="icon" href="icons/imago-icon.svg" type="image/svg+xml">'
-  },
-  {
-    pattern: /<link[^>]+rel=["']apple-touch-icon["']/i,
-    tag: '<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">'
-  }
-];
-
-const htmlBodyScript = '<script src="pwa-register.js"></script>';
-const generatedIndexStart = '            <!-- BEGIN GENERATED PROTOTYPE LINKS -->';
-const generatedIndexEnd = '            <!-- END GENERATED PROTOTYPE LINKS -->';
-
 function getRootHtmlFiles() {
   return fs
     .readdirSync(root, { withFileTypes: true })
-    .filter(entry => entry.isFile() && entry.name.endsWith('.html'))
+    .filter(entry => entry.isFile() && entry.name.endsWith('.html') && entry.name !== 'index.html' && entry.name !== 'archive.html')
     .map(entry => entry.name)
     .sort((a, b) => a.localeCompare(b));
 }
+
+function getArchiveHtmlFiles() {
+  const archiveDir = path.join(root, 'archive');
+  if (!fs.existsSync(archiveDir)) return [];
+  return fs
+    .readdirSync(archiveDir, { withFileTypes: true })
+    .filter(entry => entry.isFile() && entry.name.endsWith('.html'))
+    .map(entry => `archive/${entry.name}`)
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function getHeadRequirementsForFile(file) {
+  const isNested = file.includes('/');
+  const prefix = isNested ? '../' : './';
+  return [
+    {
+      pattern: /<meta[^>]+name=["']theme-color["']/i,
+      tag: '<meta name="theme-color" content="#f7f6f2">'
+    },
+    {
+      pattern: /<meta[^>]+name=["']mobile-web-app-capable["']/i,
+      tag: '<meta name="mobile-web-app-capable" content="yes">'
+    },
+    {
+      pattern: /<meta[^>]+name=["']apple-mobile-web-app-capable["']/i,
+      tag: '<meta name="apple-mobile-web-app-capable" content="yes">'
+    },
+    {
+      pattern: /<meta[^>]+name=["']apple-mobile-web-app-status-bar-style["']/i,
+      tag: '<meta name="apple-mobile-web-app-status-bar-style" content="default">'
+    },
+    {
+      pattern: /<meta[^>]+name=["']apple-mobile-web-app-title["']/i,
+      tag: '<meta name="apple-mobile-web-app-title" content="imago">'
+    },
+    {
+      pattern: /<link[^>]+rel=["']manifest["']/i,
+      tag: `<link rel="manifest" href="${prefix}manifest.webmanifest">`
+    },
+    {
+      pattern: /<link[^>]+rel=["']icon["'][^>]+imago-icon\.svg/i,
+      tag: `<link rel="icon" href="${prefix}icons/imago-icon.svg" type="image/svg+xml">`
+    },
+    {
+      pattern: /<link[^>]+rel=["']apple-touch-icon["']/i,
+      tag: `<link rel="apple-touch-icon" href="${prefix}icons/apple-touch-icon.png">`
+    }
+  ];
+}
+
+function getBodyScriptForFile(file) {
+  const isNested = file.includes('/');
+  const prefix = isNested ? '../' : '';
+  return `<script src="${prefix}pwa-register.js"></script>`;
+}
+
+const generatedIndexStart = '            <!-- BEGIN GENERATED PROTOTYPE LINKS -->';
+const generatedIndexEnd = '            <!-- END GENERATED PROTOTYPE LINKS -->';
 
 function getHtmlTitle(content, file) {
   const match = content.match(/<title>([^<]+)<\/title>/i);
@@ -60,45 +79,11 @@ function getHtmlTitle(content, file) {
     return match[1].trim();
   }
 
-  return file.replace(/\.html$/i, '');
+  return file.replace(/^archive\//i, '').replace(/\.html$/i, '');
 }
 
 function getMetaLabel(file) {
-  return file.replace(/\.html$/i, '').replace(/-/g, ' ');
-}
-
-function ensureHeadTags(content, file) {
-  const missingTags = htmlHeadRequirements
-    .filter(requirement => !requirement.pattern.test(content))
-    .map(requirement => requirement.tag);
-
-  if (!missingTags.length) {
-    return { changed: false, content };
-  }
-
-  const block = `${missingTags.join('\n')}\n`;
-  const updated = content.replace(/<\/head>/i, `${block}</head>`);
-
-  if (updated === content) {
-    return { changed: false, content };
-  }
-
-  console.log(`Added PWA head tags to ${file}`);
-  return { changed: true, content: updated };
-}
-
-function ensureRegisterScript(content, file) {
-  if (content.includes(htmlBodyScript)) {
-    return { changed: false, content };
-  }
-
-  const updated = content.replace(/<\/body>/i, `  ${htmlBodyScript}\n</body>`);
-  if (updated === content) {
-    return { changed: false, content };
-  }
-
-  console.log(`Added service worker bootstrap to ${file}`);
-  return { changed: true, content: updated };
+  return file.replace(/^archive\//i, '').replace(/\.html$/i, '').replace(/-/g, ' ');
 }
 
 function updateHtmlFile(file) {
@@ -106,13 +91,24 @@ function updateHtmlFile(file) {
   let content = fs.readFileSync(filePath, 'utf8');
   let changed = false;
 
-  const headResult = ensureHeadTags(content, file);
-  content = headResult.content;
-  changed = changed || headResult.changed;
+  const requirements = getHeadRequirementsForFile(file);
+  const missingTags = requirements
+    .filter(req => !req.pattern.test(content))
+    .map(req => req.tag);
 
-  const scriptResult = ensureRegisterScript(content, file);
-  content = scriptResult.content;
-  changed = changed || scriptResult.changed;
+  if (missingTags.length) {
+    const block = `${missingTags.join('\n')}\n`;
+    content = content.replace(/<\/head>/i, `${block}</head>`);
+    changed = true;
+    console.log(`Added PWA head tags to ${file}`);
+  }
+
+  const scriptTag = getBodyScriptForFile(file);
+  if (!content.includes('pwa-register.js')) {
+    content = content.replace(/<\/body>/i, `  ${scriptTag}\n</body>`);
+    changed = true;
+    console.log(`Added service worker bootstrap to ${file}`);
+  }
 
   if (changed) {
     fs.writeFileSync(filePath, content);
@@ -141,59 +137,107 @@ function updateServiceWorker(htmlFiles) {
   }
 }
 
-function updateIndex(htmlFiles) {
+function updateLaunchers(rootFiles, archiveFiles) {
   const rawIndex = fs.readFileSync(indexPath, 'utf8');
   const generatedPattern = new RegExp(
     `\\n?\\s*<!-- BEGIN GENERATED PROTOTYPE LINKS -->[\\s\\S]*?<!-- END GENERATED PROTOTYPE LINKS -->`,
     'i'
   );
-  const withoutGenerated = rawIndex.replace(generatedPattern, '');
-  const linkedFiles = new Set(
-    [...withoutGenerated.matchAll(/<a\s+href="([^"]+\.html)"/gi)].map(match => match[1])
-  );
 
-  const generatedFiles = htmlFiles.filter(file => file !== 'index.html' && !linkedFiles.has(file));
-  const generatedItems = generatedFiles.map(file => {
-    const content = fs.readFileSync(path.join(root, file), 'utf8');
-    const title = getHtmlTitle(content, file);
-    const meta = getMetaLabel(file);
+  // Helper to generate the list items for a set of files
+  function generateListItems(files) {
+    const withoutGenerated = rawIndex.replace(generatedPattern, '');
+    const linkedFiles = new Set(
+      [...withoutGenerated.matchAll(/<a\s+href="([^"]+\.html)"/gi)].map(match => match[1])
+    );
 
-    return [
-      '            <li>',
-      `                <a href="${file}">`,
-      `                    <span>${title}</span>`,
-      `                    <span class="meta">${meta}</span>`,
-      '                </a>',
-      '            </li>'
-    ].join('\n');
-  });
+    const generatedFiles = files.filter(file => file !== 'index.html' && file !== 'archive.html' && !linkedFiles.has(file));
+    return generatedFiles.map(file => {
+      const diskPath = path.join(root, file);
+      const content = fs.readFileSync(diskPath, 'utf8');
+      const title = getHtmlTitle(content, file);
+      const meta = getMetaLabel(file);
 
-  const generatedBlock = [
+      return [
+        '            <li>',
+        `                <a href="${file}">`,
+        `                    <span>${title}</span>`,
+        `                    <span class="meta">${meta}</span>`,
+        '                </a>',
+        '            </li>'
+      ].join('\n');
+    });
+  }
+
+  const rootItems = generateListItems(rootFiles);
+  const archiveItems = generateListItems(archiveFiles);
+
+  // 1. Update index.html
+  const rootBlock = [
     generatedIndexStart,
-    ...generatedItems,
+    ...rootItems,
     generatedIndexEnd
   ].join('\n');
+  const rootReplacement = rootItems.length ? `\n${rootBlock}\n` : '\n';
+  let nextIndex = generatedPattern.test(rawIndex)
+    ? rawIndex.replace(generatedPattern, rootReplacement.trimEnd())
+    : rawIndex.replace(/(\s*<\/ul>)/i, `${rootReplacement}$1`);
 
-  const replacement = generatedItems.length ? `\n${generatedBlock}\n` : '\n';
-  const nextIndex = generatedPattern.test(rawIndex)
-    ? rawIndex.replace(generatedPattern, replacement.trimEnd())
-    : withoutGenerated.replace(/(\s*<\/ul>)/i, `${replacement}$1`);
+  // Ensure active tab class
+  nextIndex = nextIndex
+    .replace(/class="tab\s+active"/g, 'class="tab"')
+    .replace(/href="index\.html"\s+class="tab"/g, 'href="index.html" class="tab active"');
 
   if (nextIndex !== rawIndex) {
     fs.writeFileSync(indexPath, nextIndex);
-    console.log(`Updated index.html with ${generatedFiles.length} generated launcher links`);
+    console.log(`Updated index.html with ${rootItems.length} active launcher links`);
+  }
+
+  // 2. Update/create archive.html
+  const archiveBlock = [
+    generatedIndexStart,
+    ...archiveItems,
+    generatedIndexEnd
+  ].join('\n');
+  const archiveReplacement = archiveItems.length ? `\n${archiveBlock}\n` : '\n';
+  let nextArchive = generatedPattern.test(rawIndex)
+    ? rawIndex.replace(generatedPattern, archiveReplacement.trimEnd())
+    : rawIndex.replace(/(\s*<\/ul>)/i, `${archiveReplacement}$1`);
+
+  // Set archive tab as active, index as inactive
+  nextArchive = nextArchive
+    .replace(/class="tab\s+active"/g, 'class="tab"')
+    .replace(/href="archive\.html"\s+class="tab"/g, 'href="archive.html" class="tab active"');
+
+  const archivePath = path.join(root, 'archive.html');
+  const rawArchive = fs.existsSync(archivePath) ? fs.readFileSync(archivePath, 'utf8') : '';
+  if (nextArchive !== rawArchive) {
+    fs.writeFileSync(archivePath, nextArchive);
+    console.log(`Updated archive.html with ${archiveItems.length} archived launcher links`);
   }
 }
 
 function main() {
-  const htmlFiles = getRootHtmlFiles();
+  const rootFiles = getRootHtmlFiles();
+  const archiveFiles = getArchiveHtmlFiles();
+  const allFiles = [...rootFiles, ...archiveFiles];
 
-  htmlFiles.forEach(updateHtmlFile);
-  updateServiceWorker(htmlFiles);
-  updateIndex(htmlFiles);
+  // Process all files for PWA injection (including index.html and archive.html)
+  const allFilesToUpdate = ['index.html', 'archive.html', ...allFiles];
+  allFilesToUpdate.forEach(file => {
+    if (fs.existsSync(path.join(root, file))) {
+      updateHtmlFile(file);
+    }
+  });
+
+  updateServiceWorker(['index.html', 'archive.html', ...allFiles]);
+  updateLaunchers(rootFiles, archiveFiles);
 
   console.log('\nRegistered HTML pages:');
-  htmlFiles.forEach(file => console.log(`- ${file}`));
+  console.log('Root:');
+  rootFiles.forEach(file => console.log(`- ${file}`));
+  console.log('Archive:');
+  archiveFiles.forEach(file => console.log(`- ${file}`));
 }
 
 main();

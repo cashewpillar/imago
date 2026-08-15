@@ -200,6 +200,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 .tdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
 </style>
+<meta name="theme-color" content="#f7f6f2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="imago">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/imago-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
 </head>
 <body>
 
@@ -371,5 +379,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 <input type="file" id="snapshot-file-input" accept=".json,application/json" style="display:none;" onchange="handleSnapshotFile(event)">
 
 <script src="tablevault.js"></script>
+  <script src="../pwa-register.js"></script>
 </body>
 </html>

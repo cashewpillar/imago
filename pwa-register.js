@@ -1,3 +1,6 @@
+const scriptSrc = document.currentScript ? document.currentScript.src : window.location.href;
+const swUrl = new URL('sw.js', scriptSrc).pathname;
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     let refreshing = false;
@@ -8,7 +11,7 @@ if ('serviceWorker' in navigator) {
       window.location.reload();
     });
 
-    navigator.serviceWorker.register('./sw.js').then(registration => {
+    navigator.serviceWorker.register(swUrl).then(registration => {
       registration.update();
 
       if (registration.waiting) {
