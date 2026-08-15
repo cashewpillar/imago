@@ -379,7 +379,7 @@ td.actions{text-align:right;white-space:nowrap}
     </div>
     <div class="modal-actions">
       <button class="btn" onclick="copyTargetTable()">Copy Table</button>
-      <button class="btn" onclick="closeModal('targetModal')">Cancel</button>
+      <button class="btn" onclick="cancelTargets()">Cancel</button>
       <button class="btn btn-primary" onclick="saveTargets()">Save</button>
     </div>
   </div>
@@ -432,6 +432,7 @@ let _chartType   = localStorage.getItem('imago-finance-chart-type')   || 'line';
 let _chartPeriod = localStorage.getItem('imago-finance-chart-period') || '3M';
 const DEFAULT_TARGETS = {"savings":30,"equities":20,"td":20,"buffer":10,"cash":10,"illiquid":10};
 let _targets   = JSON.parse(localStorage.getItem('imago-finance-targets') || JSON.stringify(DEFAULT_TARGETS));
+let _targetsSnapshot = null;
 let _lockedTags = JSON.parse(localStorage.getItem('imago-finance-locked-tags') || '{}');
 window._allAccounts = [];
 
@@ -447,6 +448,7 @@ const TAG_COLORS = {
 };
 
 function openTargetModal() {
+  _targetsSnapshot = JSON.parse(JSON.stringify(_targets)); // snapshot for cancel
   const container = document.getElementById('targetInputs');
   const tags = ['equities', 'td', 'savings', 'buffer', 'cash', 'illiquid'];
   container.innerHTML = tags.map(t => `
@@ -577,6 +579,11 @@ function saveTargets() {
   localStorage.setItem('imago-finance-targets', JSON.stringify(_targets));
   closeModal('targetModal');
   render();
+}
+
+function cancelTargets() {
+  if (_targetsSnapshot) _targets = _targetsSnapshot;
+  closeModal('targetModal');
 }
 
 async function copyTargetTable() {
