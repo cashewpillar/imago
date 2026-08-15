@@ -258,14 +258,13 @@ td.actions{text-align:right;white-space:nowrap}
       <thead>
         <tr>
           <th data-col="label" onclick="sortBy('label')">Account</th>
-          <th data-col="tag" onclick="sortBy('tag')">Tag</th>
           <th data-col="rate" onclick="sortBy('rate')">Rate</th>
           <th data-col="maturity" onclick="sortBy('maturity')">Maturity</th>
           <th class="num" data-col="balance" onclick="sortBy('balance')">Balance</th>
           <th style="cursor:default"></th>
         </tr>
       </thead>
-      <tbody id="accountsTbody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+      <tbody id="accountsTbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
     </table>
   </div>
 </main>
@@ -951,7 +950,7 @@ function renderTable(allAccounts) {
 
   const tbody = document.getElementById('accountsTbody');
   if (accounts.length===0) {
-    tbody.innerHTML = `<tr><td colspan="6" class="empty">No accounts${_activeTag!=='all' ? ' tagged "'+esc(_activeTag)+'"' : ''}.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="empty">No accounts${_activeTag!=='all' ? ' tagged "'+esc(_activeTag)+'"' : ''}.</td></tr>`;
     return;
   }
   tbody.innerHTML = accounts.map(a => {
@@ -992,10 +991,12 @@ function renderTable(allAccounts) {
 
     return `<tr>
       <td>
-        <span style="font-weight:500">${esc(a.label||a.key)}</span>
-        ${a.note ? `<div class="note-text">${esc(a.note)}</div>` : ''}
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <span style="font-weight:500">${esc(a.label||a.key)}</span>
+          ${_activeTag === 'all' ? `<span class="tag ${tag}" style="font-size:10px; padding:1px 6px;">${tag}</span>` : ''}
+        </div>
+        ${a.note ? `<div class="note-text" style="margin-top:2px;">${esc(a.note)}</div>` : ''}
       </td>
-      <td><span class="tag ${tag}">${tag}</span></td>
       <td>
         <span class="rate-badge">${a.rate!=null ? a.rate+'%' : '—'}</span>
         ${yldAnn ? `<div class="yield-micro">~₱${fmtk(yldAnn)}/yr</div>` : ''}
