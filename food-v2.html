@@ -1605,6 +1605,7 @@
         if(e.target.closest('button') || e.target.closest('.chip') || e.target.closest('.dish-mobile-row')) return;
         if(expandedDishRows.has(id)) expandedDishRows.delete(id);
         else expandedDishRows.add(id);
+        saveUIState();
         render();
       });
 
