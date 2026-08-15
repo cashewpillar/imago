@@ -252,12 +252,18 @@ class FinanceChart extends HTMLElement {
     // Use a smaller threshold for mobile screens (narrow canvas width) to avoid clutter
     const threshold = W < 480 ? 15 : 25;
 
+    // Active hovered index to dynamically draw active point
+    if (this._hoverIdx === undefined) this._hoverIdx = null;
+
     values.forEach((v, i) => {
-      if (values.length > threshold && i !== 0 && i !== values.length - 1) return;
+      const isStaticNode = values.length <= threshold || i === 0 || i === values.length - 1;
+      const isHovered = this._hoverIdx === i;
       
-      ctx.beginPath(); ctx.arc(xOf(i), yOf(v), 3, 0, Math.PI * 2);
+      if (!isStaticNode && !isHovered) return;
+      
+      ctx.beginPath(); ctx.arc(xOf(i), yOf(v), isHovered ? 4 : 3, 0, Math.PI * 2);
       ctx.fillStyle = '#1a6b3c'; ctx.fill();
-      ctx.beginPath(); ctx.arc(xOf(i), yOf(v), 1.5, 0, Math.PI * 2);
+      ctx.beginPath(); ctx.arc(xOf(i), yOf(v), isHovered ? 2 : 1.5, 0, Math.PI * 2);
       ctx.fillStyle = '#fff'; ctx.fill();
     });
 
@@ -270,19 +276,49 @@ class FinanceChart extends HTMLElement {
       ctx.fillText(dStr.length > 5 ? dStr.slice(5) : dStr, xOf(i), H - 4);
     }
 
-    this.canvas.onmousemove = e => {
+    const handlePointer = e => {
       const rect = this.canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      let ci = 0, md = Infinity;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const mx = clientX - rect.left;
+      let ci = null, md = Infinity;
       values.forEach((_, i) => { const d = Math.abs(xOf(i) - mx); if (d < md) { md = d; ci = i; } });
-      if (md > (data.length === 1 ? 100 : 44)) { this.tooltip.style.display = 'none'; return; }
+      
+      if (md > (data.length === 1 ? 100 : 44)) {
+        if (this._hoverIdx !== null) {
+          this._hoverIdx = null;
+          this.render();
+        }
+        this.tooltip.style.display = 'none';
+        return;
+      }
+      
+      if (this._hoverIdx !== ci) {
+        this._hoverIdx = ci;
+        this.render();
+      }
+      
       this.tooltip.textContent = dates[ci] + ' · ₱' + this._fmtk(values[ci]);
       this.tooltip.style.display = 'block';
       this.tooltip.style.left = (rect.left + xOf(ci)) + 'px';
       const py = rect.top + yOf(values[ci]);
       this.tooltip.style.top = (py - this.tooltip.offsetHeight - 8 < 10) ? (py + 18) + 'px' : (py - this.tooltip.offsetHeight - 8) + 'px';
     };
-    this.canvas.onmouseleave = () => { this.tooltip.style.display = 'none'; };
+
+    this.canvas.onmousemove = handlePointer;
+    this.canvas.ontouchmove = handlePointer;
+    this.canvas.ontouchstart = handlePointer;
+    
+    const hideTooltip = () => {
+      if (this._hoverIdx !== null) {
+        this._hoverIdx = null;
+        this.render();
+      }
+      this.tooltip.style.display = 'none';
+    };
+    
+    this.canvas.onmouseleave = hideTooltip;
+    this.canvas.ontouchend = hideTooltip;
   }
 
   _renderDonutChart(slices, W, H) {
