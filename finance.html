@@ -71,19 +71,28 @@ main{max-width:940px;margin:0 auto;padding:20px 16px}
   background: var(--surface);
 }
 table {
-  width: 100%;
-  min-width: 600px;
+  width: auto;
+  min-width: 100%;
   border-collapse: collapse;
 }
+table th, table td {
+  width: 1%;
+  white-space: nowrap;
+}
+table td:nth-child(1) {
+  word-break: break-word;
+}
 th{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);font-weight:500;padding:9px 14px;text-align:left;border-bottom:1px solid var(--border);background:var(--bg);cursor:pointer;user-select:none;transition:background .12s}
+th:not(:first-child){padding-left:6px;padding-right:6px}
 th:hover{background:var(--surface)}
 th.sort-active{color:var(--text);background:var(--surface)}
 th.sort-active::after{content:attr(data-dir);margin-left:4px;font-size:10px;opacity:0.7}
-th.num{text-align:right}
+th.num{text-align:left}
 td{padding:9px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+td:not(:first-child){padding-left:6px;padding-right:6px}
 tr:last-child td{border-bottom:none}
 tr:hover td{background:#fafaf8}
-td.num{text-align:right;font-variant-numeric:tabular-nums}
+td.num{text-align:left;font-variant-numeric:tabular-nums}
 td.actions{text-align:right;white-space:nowrap}
 
 .tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px}
@@ -97,7 +106,7 @@ td.actions{text-align:right;white-space:nowrap}
 .bal-pos{font-weight:500}
 .bal-neg{color:var(--danger);font-weight:500}
 .bal-zero{color:var(--text-faint)}
-.note-text{font-size:11px;color:var(--text-faint);font-style:italic}
+.note-text{font-size:11px;color:var(--text-faint);font-style:italic;white-space:normal;word-break:break-word;max-width:125px}
 .rate-badge{font-size:12px;color:var(--text-muted)}
 .maturity{font-size:12px;color:var(--text-faint)}
 .yield-micro{font-size:10px;color:var(--text-faint)}
@@ -258,13 +267,12 @@ td.actions{text-align:right;white-space:nowrap}
       <thead>
         <tr>
           <th data-col="label" onclick="sortBy('label')">Account</th>
+          <th class="num" data-col="balance" onclick="sortBy('balance')">Balance</th>
           <th data-col="rate" onclick="sortBy('rate')">Rate</th>
           <th data-col="maturity" onclick="sortBy('maturity')">Maturity</th>
-          <th class="num" data-col="balance" onclick="sortBy('balance')">Balance</th>
-          <th style="cursor:default"></th>
         </tr>
       </thead>
-      <tbody id="accountsTbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+      <tbody id="accountsTbody"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
     </table>
   </div>
 </main>
@@ -307,6 +315,7 @@ td.actions{text-align:right;white-space:nowrap}
     </div>
 
     <div class="modal-actions">
+      <button class="btn btn-danger" id="btnDeleteAccount" onclick="deleteAccount(_editId)" style="margin-right:auto; display:none;">Delete</button>
       <button class="btn" onclick="closeModal('accountModal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveAccount()">Save</button>
     </div>
@@ -989,7 +998,7 @@ function renderTable(allAccounts) {
       }
     }
 
-    return `<tr>
+    return `<tr onclick="editAccount('${esc(a.id)}')" style="cursor:pointer">
       <td>
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <span style="font-weight:500">${esc(a.label||a.key)}</span>
@@ -997,6 +1006,7 @@ function renderTable(allAccounts) {
         </div>
         ${a.note ? `<div class="note-text" style="margin-top:2px;">${esc(a.note)}</div>` : ''}
       </td>
+      <td class="num"><span class="${balClass}">₱${fmtk(bal)}</span></td>
       <td>
         <span class="rate-badge">${a.rate!=null ? a.rate+'%' : '—'}</span>
         ${yldAnn ? `<div class="yield-micro">~₱${fmtk(yldAnn)}/yr</div>` : ''}
@@ -1004,15 +1014,6 @@ function renderTable(allAccounts) {
       <td>
         <div class="maturity">${matDisp}</div>
         ${matBadge}
-      </td>
-      <td class="num"><span class="${balClass}">₱${fmtk(bal)}</span></td>
-      <td class="actions">
-        <button class="icon-btn" onclick="editAccount('${esc(a.id)}')" title="Edit">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 2l3 3L5 14H2v-3z"/></svg>
-        </button>
-        <button class="icon-btn" onclick="deleteAccount('${esc(a.id)}')" title="Delete" style="color:var(--danger)">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="3,5 13,5"/><path d="M6,5V3h4v2"/><path d="M4,5l1,9h6l1-9"/></svg>
-        </button>
       </td>
     </tr>`;
   }).join('');
@@ -1026,6 +1027,7 @@ function openAddAccount() {
   document.getElementById('fTag').value = 'savings';
   document.getElementById('accountHistorySection').style.display = 'none';
   document.getElementById('changeReasonRow').style.display = 'none';
+  document.getElementById('btnDeleteAccount').style.display = 'none';
   openModal('accountModal');
 }
 
@@ -1043,6 +1045,7 @@ async function editAccount(id) {
   document.getElementById('fChangeNote').value = '';
   document.getElementById('fTag').value      = (a.tags||['savings'])[0];
   document.getElementById('changeReasonRow').style.display = 'block';
+  document.getElementById('btnDeleteAccount').style.display = 'inline-block';
 
   // Render per-account history
   const history = await db.logs.where('accountId').equals(id).reverse().limit(10).toArray();
@@ -1123,6 +1126,7 @@ async function deleteAccount(id) {
   if (!confirm('Delete this account?')) return;
   await db.accounts.delete(id);
   await autoSnapshot();
+  closeModal('accountModal');
   toast('Deleted.');
   render();
 }
