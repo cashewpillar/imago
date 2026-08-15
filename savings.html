@@ -20,7 +20,12 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
 
 header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 header h1{font-size:17px;font-weight:600;letter-spacing:-.3px}
-.header-actions{display:flex;gap:6px;flex-wrap:wrap}
+.header-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+
+.nav-links{display:flex;gap:4px;background:var(--bg);padding:3px;border-radius:var(--r);border:1px solid var(--border)}
+.nav-link{padding:4px 10px;font-size:12px;color:var(--text-muted);text-decoration:none;border-radius:6px;transition:all .12s}
+.nav-link:hover{color:var(--text)}
+.nav-link.active{background:var(--surface);color:var(--text);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,0.05)}
 
 .btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border:1px solid var(--border-strong);border-radius:var(--r);background:var(--surface);color:var(--text);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .12s}
 .btn:hover{background:var(--bg)}
@@ -196,13 +201,18 @@ td.actions{text-align:right;white-space:nowrap}
 <body>
 
 <header>
-  <h1>fin</h1>
+  <h1>savings</h1>
   <div class="header-actions">
     <button class="btn btn-primary" onclick="openAddAccount()">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
       Add account
     </button>
     
+    <div class="nav-links">
+      <a href="savings.html" class="nav-link active">Savings</a>
+      <a href="expenses.html" class="nav-link">Expenses</a>
+    </div>
+
     <div class="dropdown" id="settingsDropdown">
       <button class="btn" onclick="toggleDropdown('settingsDropdown')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/></svg>
@@ -211,14 +221,6 @@ td.actions{text-align:right;white-space:nowrap}
         <button class="btn-flat" onclick="openImport()">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,10 3,13 13,13 13,10"/><polyline points="5,7 8,10 11,7"/><line x1="8" y1="3" x2="8" y2="10"/></svg>
           Import
-        </button>
-        <button class="btn-flat" onclick="location.href='architect.html'">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 13l2 2 10-10L12 3 2 13zM9 5l2 2"/></svg>
-          Architect
-        </button>
-        <button class="btn-flat" onclick="location.href='expenses.html'">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="2" y1="5" x2="14" y2="5"/><rect x="2" y="3" width="12" height="10" rx="2"/><circle cx="5" cy="10" r="1"/></svg>
-          Expenses
         </button>
         <button class="btn-flat" onclick="exportData()">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,6 3,3 13,3 13,6"/><polyline points="5,9 8,6 11,9"/><line x1="8" y1="13" x2="8" y2="6"/></svg>

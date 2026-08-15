@@ -38,6 +38,7 @@ header h1{font-size:17px;font-weight:600;letter-spacing:-.3px}
 .btn svg{width:13px;height:13px;flex-shrink:0}
 
 main{max-width:940px;margin:0 auto;padding:20px 16px}
+.page-actions{display:flex;gap:8px;align-items:center;justify-content:flex-start;margin-bottom:16px;flex-wrap:wrap}
 
 .summary-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px}
 .sum-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px}
@@ -129,25 +130,18 @@ td.actions{text-align:right;white-space:nowrap}
 <body>
 
 <header>
-  <h1>exp</h1>
-  <div class="nav-links">
-    <a href="savings.html" class="nav-link">Savings</a>
-    <a href="expenses.html" class="nav-link active">Expenses</a>
-  </div>
+  <h1>expenses</h1>
   <div class="header-actions">
-    <button class="btn" onclick="openIncomeModal()">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
-      Incomes
-    </button>
-    <button class="btn" onclick="openExpenseTypesModal()">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="10" height="10" rx="2"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
-      Types
-    </button>
     <button class="btn btn-primary" onclick="openAddExpense()">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
       Add expense
     </button>
-    
+
+    <div class="nav-links">
+      <a href="savings.html" class="nav-link">Savings</a>
+      <a href="expenses.html" class="nav-link active">Expenses</a>
+    </div>
+
     <div class="dropdown" id="settingsDropdown">
       <button class="btn" onclick="toggleDropdown('settingsDropdown')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/></svg>
@@ -169,6 +163,18 @@ td.actions{text-align:right;white-space:nowrap}
 <main>
   <!-- Summary Cards -->
   <div class="summary-row" id="summaryRow"></div>
+
+  <!-- Page Actions -->
+  <div class="page-actions">
+    <button class="btn" onclick="openIncomeModal()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
+      Incomes
+    </button>
+    <button class="btn" onclick="openExpenseTypesModal()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="10" height="10" rx="2"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
+      Types
+    </button>
+  </div>
 
   <!-- Income vs Expenses Chart Card -->
   <div class="chart-card">
