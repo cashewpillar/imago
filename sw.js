@@ -2,11 +2,11 @@ const CACHE_NAME = 'imago-shell-v2';
 const APP_SHELL = [
   './',
   // BEGIN GENERATED HTML PAGES
+  './cebpac-flight-finder.html',
   './finance.html',
-  './flight-finder-cebpac.html',
   './food-v2.html',
   './index.html',
-  './meralco.html',
+  './meralco-multi-account.html',
   // END GENERATED HTML PAGES
   './imago-export.js',
   './pwa-register.js',
