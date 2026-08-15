@@ -782,12 +782,21 @@ function populateDropdowns() {
 function openAddExpense() {
   _editExpenseId = null;
   document.getElementById('expenseModalTitle').textContent = 'Add Expense';
-  document.getElementById('fExpName').value = '';
-  document.getElementById('fExpAmount').value = '';
   document.getElementById('fExpDate').value = new Date().toISOString().split('T')[0];
   document.getElementById('fExpNote').value = '';
   document.getElementById('btnDeleteExpense').style.display = 'none';
+  // Restore last session defaults
+  if (_lastExpenseDefaults) {
+    document.getElementById('fExpName').value = _lastExpenseDefaults.name || '';
+    document.getElementById('fExpAmount').value = _lastExpenseDefaults.amount || '';
+    document.getElementById('fExpType').value = _lastExpenseDefaults.typeId || '';
+    document.getElementById('fExpSource').value = _lastExpenseDefaults.accountId || '';
+  } else {
+    document.getElementById('fExpName').value = '';
+    document.getElementById('fExpAmount').value = '';
+  }
   openModal('expenseModal');
+  document.getElementById('fExpName').focus();
 }
 
 async function editExpense(id) {
@@ -889,6 +898,11 @@ async function saveExpense() {
     logId: newLogId,
     updated_at: new Date().toISOString()
   });
+
+  // Remember last-used fields for this session (Add only, not Edit)
+  if (!_editExpenseId) {
+    _lastExpenseDefaults = { name, amount, typeId, accountId };
+  }
 
   closeModal('expenseModal');
   toast(_editExpenseId ? 'Expense updated.' : 'Expense logged & deducted.');
