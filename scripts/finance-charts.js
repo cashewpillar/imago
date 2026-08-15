@@ -249,7 +249,12 @@ class FinanceChart extends HTMLElement {
       ctx.stroke();
     }
 
+    // Use a smaller threshold for mobile screens (narrow canvas width) to avoid clutter
+    const threshold = W < 480 ? 15 : 25;
+
     values.forEach((v, i) => {
+      if (values.length > threshold && i !== 0 && i !== values.length - 1) return;
+      
       ctx.beginPath(); ctx.arc(xOf(i), yOf(v), 3, 0, Math.PI * 2);
       ctx.fillStyle = '#1a6b3c'; ctx.fill();
       ctx.beginPath(); ctx.arc(xOf(i), yOf(v), 1.5, 0, Math.PI * 2);

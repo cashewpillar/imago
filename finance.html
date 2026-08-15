@@ -844,8 +844,8 @@ function renderChart(history) {
         : history;
       filteredHistory = applyPeriodFilter(filteredHistory);
 
-      if (filteredHistory.length < 1) {
-        empty.innerHTML = 'No data for this period.';
+      if (filteredHistory.length <= 1) {
+        empty.innerHTML = 'Add more snapshots to view history charts. Balances auto-snapshot on save.';
         empty.style.display = 'block';
         return;
       }
