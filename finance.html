@@ -61,7 +61,20 @@ main{max-width:940px;margin:0 auto;padding:20px 16px}
 .filter-chip.tag-illiquid.active{background:#5f5e5a;border-color:#5f5e5a}
 .filter-chip.tag-cash.active{background:#444;border-color:#444}
 
-table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;margin-bottom:20px}
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--rl);
+  background: var(--surface);
+}
+table {
+  width: 100%;
+  min-width: 600px;
+  border-collapse: collapse;
+}
 th{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);font-weight:500;padding:9px 14px;text-align:left;border-bottom:1px solid var(--border);background:var(--bg);cursor:pointer;user-select:none;transition:background .12s}
 th:hover{background:var(--surface)}
 th.sort-active{color:var(--text);background:var(--surface)}
@@ -240,19 +253,21 @@ td.actions{text-align:right;white-space:nowrap}
     <span class="section-title">Accounts</span>
     <div class="filters" id="filterBar"></div>
   </div>
-  <table>
-    <thead>
-      <tr>
-        <th data-col="label" onclick="sortBy('label')">Account</th>
-        <th data-col="tag" onclick="sortBy('tag')">Tag</th>
-        <th data-col="rate" onclick="sortBy('rate')">Rate</th>
-        <th data-col="maturity" onclick="sortBy('maturity')">Maturity</th>
-        <th class="num" data-col="balance" onclick="sortBy('balance')">Balance</th>
-        <th style="cursor:default"></th>
-      </tr>
-    </thead>
-    <tbody id="accountsTbody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
-  </table>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th data-col="label" onclick="sortBy('label')">Account</th>
+          <th data-col="tag" onclick="sortBy('tag')">Tag</th>
+          <th data-col="rate" onclick="sortBy('rate')">Rate</th>
+          <th data-col="maturity" onclick="sortBy('maturity')">Maturity</th>
+          <th class="num" data-col="balance" onclick="sortBy('balance')">Balance</th>
+          <th style="cursor:default"></th>
+        </tr>
+      </thead>
+      <tbody id="accountsTbody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
 </main>
 
 <!-- Account Modal -->
