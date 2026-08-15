@@ -293,12 +293,12 @@ td.actions{text-align:right;white-space:nowrap}
       <div class="form-row"><label>Label</label><input type="text" id="fLabel" placeholder="Maya Savings"></div>
     </div>
     <div class="form-grid">
-      <div class="form-row"><label>Balance</label><input type="number" id="fBalance" step="0.01" placeholder="0"></div>
+      <div class="form-row"><label>Balance</label><div style="display:flex;gap:6px;align-items:center"><button type="button" id="fBalanceSign" onclick="toggleBalanceSign()" style="flex-shrink:0;width:32px;height:32px;border:1px solid var(--border-strong);border-radius:var(--r);background:var(--surface);color:var(--text);font-size:15px;cursor:pointer;font-family:var(--mono);line-height:1;transition:background .15s,color .15s" title="Toggle sign">+</button><input type="number" id="fBalance" step="0.01" placeholder="0" min="0" style="flex:1"></div></div>
       <div class="form-row"><label>Rate (%)</label><input type="number" id="fRate" step="0.01" placeholder="0"></div>
     </div>
     <div class="form-grid">
       <div class="form-row"><label>Tag</label>
-        <select id="fTag">
+        <select id="fTag" onchange="syncBalanceSign(this.value==='credit')">
           <option value="savings">savings</option>
           <option value="equities">equities</option>
           <option value="td">td</option>
@@ -1072,6 +1072,20 @@ function renderTable(allAccounts) {
   }).join('');
 }
 
+// ── Balance sign toggle ───────────────────────────────────────────────────────
+function toggleBalanceSign() {
+  const btn = document.getElementById('fBalanceSign');
+  const isNeg = btn.textContent === '−';
+  syncBalanceSign(!isNeg);
+}
+function syncBalanceSign(negative) {
+  const btn = document.getElementById('fBalanceSign');
+  btn.textContent = negative ? '−' : '+';
+  btn.style.background = negative ? 'var(--danger, #a32d2d)' : 'var(--surface)';
+  btn.style.color       = negative ? '#fff' : 'var(--text)';
+  btn.style.borderColor = negative ? 'var(--danger, #a32d2d)' : 'var(--border-strong)';
+}
+
 // ── Account CRUD ──────────────────────────────────────────────────────────────
 function openAddAccount() {
   _editId = null;
@@ -1081,6 +1095,7 @@ function openAddAccount() {
   document.getElementById('accountHistorySection').style.display = 'none';
   document.getElementById('changeReasonRow').style.display = 'none';
   document.getElementById('btnDeleteAccount').style.display = 'none';
+  syncBalanceSign(false);
   openModal('accountModal');
 }
 
@@ -1091,7 +1106,7 @@ async function editAccount(id) {
   document.getElementById('accountModalTitle').textContent = 'Edit account';
   document.getElementById('fKey').value      = a.key||'';
   document.getElementById('fLabel').value    = a.label||'';
-  document.getElementById('fBalance').value  = a.balance??'';
+  document.getElementById('fBalance').value  = Math.abs(a.balance??0)||'';
   document.getElementById('fRate').value     = a.rate??'';
   document.getElementById('fMaturity').value = a.maturity||'';
   document.getElementById('fNote').value     = a.note||'';
@@ -1099,6 +1114,7 @@ async function editAccount(id) {
   document.getElementById('fTag').value      = (a.tags||['savings'])[0];
   document.getElementById('changeReasonRow').style.display = 'block';
   document.getElementById('btnDeleteAccount').style.display = 'inline-block';
+  syncBalanceSign((a.balance??0) < 0);
 
   // Render per-account history
   const history = await db.logs.where('accountId').equals(id).reverse().limit(10).toArray();
@@ -1133,7 +1149,9 @@ async function editAccount(id) {
 async function saveAccount() {
   const key   = document.getElementById('fKey').value.trim();
   const label = document.getElementById('fLabel').value.trim();
-  const bal   = parseFloat(document.getElementById('fBalance').value);
+  const balRaw  = parseFloat(document.getElementById('fBalance').value);
+  const balSign = document.getElementById('fBalanceSign').textContent === '−' ? -1 : 1;
+  const bal     = isNaN(balRaw) ? 0 : Math.abs(balRaw) * balSign;
   const rate  = parseFloat(document.getElementById('fRate').value);
   const tag   = document.getElementById('fTag').value;
   const mat   = document.getElementById('fMaturity').value.trim();
