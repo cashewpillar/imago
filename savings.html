@@ -435,6 +435,14 @@ db.version(5).stores({
   expenseTypes: 'id,name',
   incomes: 'id,name,frequency'
 });
+db.version(6).stores({ 
+  accounts: 'id,key,label', 
+  history: 'id,date', 
+  logs: 'id,accountId,date,expenseId',
+  expenses: 'id,date,typeId,accountId',
+  expenseTypes: 'id,name',
+  incomes: 'id,name,frequency'
+});
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let _editId   = null;
@@ -652,7 +660,10 @@ function applyPeriodFilter(history) {
   if (_chartPeriod === '6M')  { cutoff = new Date(now); cutoff.setMonth(cutoff.getMonth() - 6); }
   if (_chartPeriod === '1Y')  { cutoff = new Date(now); cutoff.setFullYear(cutoff.getFullYear() - 1); }
   if (_chartPeriod === 'YTD') { cutoff = new Date(now.getFullYear(), 0, 1); }
-  const cutStr = cutoff.toISOString().slice(0, 10);
+  const year = cutoff.getFullYear();
+  const month = String(cutoff.getMonth() + 1).padStart(2, '0');
+  const day = String(cutoff.getDate()).padStart(2, '0');
+  const cutStr = `${year}-${month}-${day}`;
   return history.filter(h => h.date >= cutStr);
 }
 
@@ -859,7 +870,7 @@ function renderChart(history) {
       filteredHistory = applyPeriodFilter(filteredHistory);
 
       if (filteredHistory.length <= 1) {
-        empty.innerHTML = 'Add more snapshots to view history charts. Balances auto-snapshot on save.';
+        empty.innerHTML = 'Add more snapshots to view history charts. <br> Balances auto-snapshot on save.';
         empty.style.display = 'block';
         return;
       }
