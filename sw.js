@@ -1,13 +1,14 @@
-const CACHE_NAME = 'imago-shell-v2';
+const CACHE_NAME = 'imago-shell-v3';
 const APP_SHELL = [
   './',
   // BEGIN GENERATED HTML PAGES
   './index.html',
   './archive.html',
   './cebpac-flight-finder.html',
-  './finance.html',
+  './expenses.html',
   './food-v2.html',
   './meralco-multi-account.html',
+  './savings.html',
   './archive/architect.html',
   './archive/commonplace.html',
   './archive/day.html',
@@ -24,6 +25,8 @@ const APP_SHELL = [
   './archive/thoughtgraph.html',
   './archive/thoughtweb.html',
   // END GENERATED HTML PAGES
+  './scripts/dexie.min.js',
+  './scripts/finance-charts.js',
   './imago-export.js',
   './pwa-register.js',
   './manifest.webmanifest',

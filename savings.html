@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Finance</title>
-<script src="https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js"></script>
+<title>Savings</title>
+<script src="scripts/dexie.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -216,6 +216,10 @@ td.actions{text-align:right;white-space:nowrap}
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 13l2 2 10-10L12 3 2 13zM9 5l2 2"/></svg>
           Architect
         </button>
+        <button class="btn-flat" onclick="location.href='expenses.html'">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="2" y1="5" x2="14" y2="5"/><rect x="2" y="3" width="12" height="10" rx="2"/><circle cx="5" cy="10" r="1"/></svg>
+          Expenses
+        </button>
         <button class="btn-flat" onclick="exportData()">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,6 3,3 13,3 13,6"/><polyline points="5,9 8,6 11,9"/><line x1="8" y1="13" x2="8" y2="6"/></svg>
           Export
@@ -420,6 +424,14 @@ db.version(4).stores({ accounts:'id,key,label', history:'id,date', logs:'id,acco
     if(l.balance) l.balance *= 1000;
     if(l.change) l.change *= 1000;
   });
+});
+db.version(5).stores({ 
+  accounts: 'id,key,label', 
+  history: 'id,date', 
+  logs: 'id,accountId,date',
+  expenses: 'id,date,typeId,accountId',
+  expenseTypes: 'id,name',
+  incomes: 'id,name,frequency'
 });
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -1226,6 +1238,9 @@ async function doImport(reset) {
     await db.accounts.clear();
     await db.history.clear();
     await db.logs.clear();
+    await db.expenses.clear();
+    await db.expenseTypes.clear();
+    await db.incomes.clear();
   }
 
   const accs = raw.accounts || raw.snapshots?.[0]?.accounts || [];
@@ -1248,6 +1263,26 @@ async function doImport(reset) {
     if (!ex) await db.logs.put(l);
   }
 
+  for (const t of (raw.expenseTypes||[])) {
+    if (!t.id) t.id = 'type-'+uuid();
+    const ex = await db.expenseTypes.get(t.id);
+    if (!ex) await db.expenseTypes.put(t);
+  }
+
+  for (const e of (raw.expenses||[])) {
+    if (!e.id) e.id = 'exp-'+uuid();
+    const ex = await db.expenses.get(e.id);
+    if (!ex || (e.updated_at && ex.updated_at && e.updated_at > ex.updated_at) || !ex.updated_at)
+      await db.expenses.put(e);
+  }
+
+  for (const inc of (raw.incomes||[])) {
+    if (!inc.id) inc.id = 'inc-'+uuid();
+    const ex = await db.incomes.get(inc.id);
+    if (!ex || (inc.updated_at && ex.updated_at && inc.updated_at > ex.updated_at) || !ex.updated_at)
+      await db.incomes.put(inc);
+  }
+
   if (raw.targets) {
     _targets = { ...DEFAULT_TARGETS, ...raw.targets };
     localStorage.setItem('imago-finance-targets', JSON.stringify(_targets));
@@ -1263,15 +1298,21 @@ async function doImport(reset) {
 }
 
 async function exportData() {
-  const accounts = await db.accounts.toArray();
-  const history  = await db.history.orderBy('date').toArray();
-  const logs     = await db.logs.toArray();
+  const accounts     = await db.accounts.toArray();
+  const history      = await db.history.orderBy('date').toArray();
+  const logs         = await db.logs.toArray();
+  const expenses     = await db.expenses.toArray();
+  const expenseTypes = await db.expenseTypes.toArray();
+  const incomes      = await db.incomes.toArray();
   const out = { 
-    version: 2, 
+    version: 3, 
     exported_at: new Date().toISOString(), 
     accounts, 
     history, 
     logs,
+    expenses,
+    expenseTypes,
+    incomes,
     targets: _targets,
     lockedTags: _lockedTags
   };

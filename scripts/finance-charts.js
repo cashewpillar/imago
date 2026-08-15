@@ -170,6 +170,8 @@ class FinanceChart extends HTMLElement {
           this._renderLineChart(data, W, H);
         } else if (this._type === 'donut') {
           this._renderDonutChart(data, W, H);
+        } else if (this._type === 'bar') {
+          this._renderBarChart(data, W, H);
         }
       } catch (e) {
         console.error('Chart render error:', e);
@@ -397,6 +399,131 @@ class FinanceChart extends HTMLElement {
       } else { this.tooltip.style.display = 'none'; }
     };
     this.canvas.onmouseleave = () => { this.tooltip.style.display = 'none'; };
+  }
+
+  _renderBarChart(items, W, H) {
+    if (!Array.isArray(items) || items.length === 0) {
+      this._drawMessage('No data');
+      return;
+    }
+
+    const ctx = this.ctx;
+    const PAD = { top: 20, right: 16, bottom: 28, left: 50 };
+    const cW = W - PAD.left - PAD.right;
+    const cH = H - PAD.top - PAD.bottom;
+
+    const maxVal = Math.max(...items.flatMap(d => [d.income || 0, d.expense || 0, d.value || 0]), 100);
+    const rng = maxVal * 1.15; // small headroom
+
+    // Y-axis Grid lines & labels
+    ctx.strokeStyle = '#e2e0d8';
+    ctx.lineWidth = 0.5;
+    ctx.fillStyle = '#9c9a94';
+    ctx.font = '10px system-ui';
+    ctx.textAlign = 'right';
+    for (let i = 0; i <= 4; i++) {
+      const y = PAD.top + (cH / 4) * i;
+      ctx.beginPath();
+      ctx.moveTo(PAD.left, y);
+      ctx.lineTo(W - PAD.right, y);
+      ctx.stroke();
+      ctx.fillText('₱' + this._fmtk(rng - (rng / 4) * i), PAD.left - 5, y + 3);
+    }
+
+    const count = items.length;
+    const groupW = cW / count;
+    const barWidth = Math.min(Math.max(groupW * 0.28, 12), 40);
+    const radius = 3;
+
+    const drawnBars = [];
+
+    items.forEach((item, idx) => {
+      const groupX = PAD.left + idx * groupW;
+      const midX = groupX + groupW / 2;
+
+      // Group X-axis label
+      ctx.fillStyle = '#6b6860';
+      ctx.font = '10px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText(item.label || '', midX, H - 8);
+
+      const incomeVal = item.income || (item.type === 'income' ? item.value : 0) || 0;
+      const expenseVal = item.expense || (item.type === 'expense' ? item.value : 0) || 0;
+
+      // Draw Income Bar (Green #1a6b3c)
+      if (incomeVal > 0) {
+        const barH = (incomeVal / rng) * cH;
+        const x = midX - barWidth - 2;
+        const y = PAD.top + cH - barH;
+
+        ctx.fillStyle = '#1a6b3c';
+        ctx.beginPath();
+        if (ctx.roundRect) {
+          ctx.roundRect(x, y, barWidth, barH, [radius, radius, 0, 0]);
+        } else {
+          ctx.rect(x, y, barWidth, barH);
+        }
+        ctx.fill();
+
+        drawnBars.push({
+          x, y, w: barWidth, h: barH,
+          label: `${item.label || ''} Income`,
+          value: incomeVal,
+          color: '#1a6b3c'
+        });
+      }
+
+      // Draw Expense Bar (Red #a32d2d)
+      if (expenseVal > 0) {
+        const barH = (expenseVal / rng) * cH;
+        const x = midX + 2;
+        const y = PAD.top + cH - barH;
+
+        ctx.fillStyle = '#a32d2d';
+        ctx.beginPath();
+        if (ctx.roundRect) {
+          ctx.roundRect(x, y, barWidth, barH, [radius, radius, 0, 0]);
+        } else {
+          ctx.rect(x, y, barWidth, barH);
+        }
+        ctx.fill();
+
+        drawnBars.push({
+          x, y, w: barWidth, h: barH,
+          label: `${item.label || ''} Expenses`,
+          value: expenseVal,
+          color: '#a32d2d'
+        });
+      }
+    });
+
+    const handlePointer = e => {
+      const rect = this.canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const mx = clientX - rect.left;
+      const my = clientY - rect.top;
+
+      const hovered = drawnBars.find(b => mx >= b.x && mx <= b.x + b.w && my >= b.y - 10 && my <= b.y + b.h);
+
+      if (hovered) {
+        this.tooltip.textContent = `${hovered.label} · ₱${this._fmtk(hovered.value)}`;
+        this.tooltip.style.display = 'block';
+        this.tooltip.style.left = (rect.left + hovered.x + hovered.w / 2) + 'px';
+        const py = rect.top + hovered.y;
+        this.tooltip.style.top = (py - this.tooltip.offsetHeight - 8 < 10) ? (py + hovered.h + 10) + 'px' : (py - this.tooltip.offsetHeight - 8) + 'px';
+      } else {
+        this.tooltip.style.display = 'none';
+      }
+    };
+
+    this.canvas.onmousemove = handlePointer;
+    this.canvas.ontouchmove = handlePointer;
+    this.canvas.ontouchstart = handlePointer;
+
+    const hideTooltip = () => { this.tooltip.style.display = 'none'; };
+    this.canvas.onmouseleave = hideTooltip;
+    this.canvas.ontouchend = hideTooltip;
   }
 }
 
