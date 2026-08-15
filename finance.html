@@ -759,13 +759,15 @@ function renderSummary(accounts) {
       </div>
     </div>
     <div class="sum-card">
-      <div class="lbl">Net Liquid</div>
-      <div class="val col-pos">₱${fmtk(netLiquid)}</div>
+      <div class="lbl">Stable Liquid</div>
+      <div class="val col-pos">₱${fmtk(cashTotal + credTotal)}</div>
       <div style="margin-top:10px; padding-top:8px; border-top:1px dashed var(--border); font-family:var(--mono); font-size:10px; line-height:1.6; color:var(--text-muted);">
         <div style="display:flex; justify-content:space-between;"><span>Total NW</span> <span>₱${fmtk(total)}</span></div>
         <div style="display:flex; justify-content:space-between;"><span>- Illiquid</span> <span class="col-neg">-₱${fmtk(illiqOnlyTotal)}</span></div>
-        <div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border-strong); padding-bottom:2px; margin-bottom:2px;"><span>- TD</span> <span class="col-neg">-₱${fmtk(tdOnlyTotal)}</span></div>
-        <div style="display:flex; justify-content:space-between; font-weight:600; color:var(--accent);"><span>Liquid</span> <span>₱${fmtk(netLiquid)}</span></div>
+        <div style="display:flex; justify-content:space-between;"><span>- TD</span> <span class="col-neg">-₱${fmtk(tdOnlyTotal)}</span></div>
+        <div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border-strong); padding-bottom:2px; margin-bottom:2px;"><span>- Equities</span> <span class="col-neg">-₱${fmtk(equitiesTotal)}</span></div>
+        <div style="display:flex; justify-content:space-between; font-weight:600; color:var(--accent);"><span>Stable</span> <span>₱${fmtk(cashTotal + credTotal)}</span></div>
+        <div style="display:flex; justify-content:space-between; opacity:0.65;"><span>incl.<br>equities</span> <span>₱${fmtk(netLiquid)}</span></div>
       </div>
     </div>
     <div class="sum-card">
@@ -896,14 +898,16 @@ function renderChart(history) {
     } else if (_chartType === 'liquidity') {
       document.getElementById('chartPeriodFilters').style.display = 'none';
       const accounts = window._allAccounts || [];
-      const liquid = { label: 'Liquid', color: TAG_COLORS.savings, value: 0, items: [] };
+      const liquid   = { label: 'Liquid',   color: TAG_COLORS.savings,  value: 0, items: [] };
+      const equities = { label: 'Equities', color: TAG_COLORS.equities, value: 0, items: [] };
       const illiquid = { label: 'Illiquid', color: TAG_COLORS.illiquid, value: 0, items: [] };
       let credTotal = 0;
       
       accounts.forEach(a => {
         if (a.balance > 0) {
-          const isIlliq = (a.tags || []).some(t => t === 'illiquid' || t === 'td');
-          const target = isIlliq ? illiquid : liquid;
+          const isIlliq  = (a.tags || []).some(t => t === 'illiquid' || t === 'td');
+          const isEquity = (a.tags || []).includes('equities');
+          const target = isIlliq ? illiquid : isEquity ? equities : liquid;
           target.value += a.balance;
           target.items.push({ label: a.label || a.key, value: a.balance });
         } else if (a.tags?.includes('credit')) {
@@ -913,10 +917,11 @@ function renderChart(history) {
       
       liquid.value += credTotal;
       
-      liquid.items.sort((a,b) => b.value - a.value);
+      liquid.items.sort((a,b)   => b.value - a.value);
+      equities.items.sort((a,b) => b.value - a.value);
       illiquid.items.sort((a,b) => b.value - a.value);
 
-      const slices = [liquid, illiquid].filter(g => g.value > 0);
+      const slices = [liquid, equities, illiquid].filter(g => g.value > 0);
 
       if (slices.length === 0) {
         empty.style.display = 'block';
