@@ -425,8 +425,8 @@ db.version(4).stores({ accounts:'id,key,label', history:'id,date', logs:'id,acco
 // ── State ─────────────────────────────────────────────────────────────────────
 let _editId   = null;
 let _activeTag = localStorage.getItem('imago-finance-active-tag') || 'all';
-let _sortCol   = 'balance';
-let _sortDir   = 'desc';
+let _sortCol   = _activeTag === 'td' ? 'maturity' : 'balance';
+let _sortDir   = _activeTag === 'td' ? 'asc' : 'desc';
 let _excludeTD = false;
 let _chartType   = localStorage.getItem('imago-finance-chart-type')   || 'line';
 let _chartPeriod = localStorage.getItem('imago-finance-chart-period') || '3M';
@@ -950,9 +950,16 @@ function renderFilterBar(accounts) {
     return `<span class="filter-chip ${cls} ${active}" data-tag="${esc(t)}">${esc(t)}</span>`;
   }).join('');
   bar.querySelectorAll('.filter-chip').forEach(chip =>
-    chip.addEventListener('click', () => { 
-      _activeTag = chip.dataset.tag; 
+    chip.addEventListener('click', () => {
+      const prev = _activeTag;
+      _activeTag = chip.dataset.tag;
       localStorage.setItem('imago-finance-active-tag', _activeTag);
+      // Auto-sort by maturity when entering td, revert when leaving
+      if (_activeTag === 'td' && prev !== 'td') {
+        _sortCol = 'maturity'; _sortDir = 'asc';
+      } else if (_activeTag !== 'td' && prev === 'td') {
+        _sortCol = 'balance'; _sortDir = 'desc';
+      }
       render().then(() => {
         window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
       });
