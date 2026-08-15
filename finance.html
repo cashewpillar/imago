@@ -236,7 +236,6 @@ td.actions{text-align:right;white-space:nowrap}
         <span class="filter-chip" data-type="donut" onclick="changeChartType('donut', this)">Composition</span>
         <span class="filter-chip" data-type="liquidity" onclick="changeChartType('liquidity', this)">Liquidity</span>
       </div>
-      <span id="chartPeriod" style="font-size:11px;color:var(--text-faint)"></span>
     </div>
     <div id="chartWrap" style="display:flex; gap:20px; align-items:stretch;">
       <div class="chart-empty" id="chartEmpty" style="flex:1">No history yet — balances are auto-snapshotted each time you save changes.</div>
@@ -255,6 +254,14 @@ td.actions{text-align:right;white-space:nowrap}
         </div>
         <imago-chart id="targetChart"></imago-chart>
       </div>
+    </div>
+    <div class="filters" id="chartPeriodFilters" style="display:none; margin-top:10px;">
+      <span class="filter-chip" data-period="1M" onclick="changePeriod('1M', this)">1M</span>
+      <span class="filter-chip" data-period="3M" onclick="changePeriod('3M', this)">3M</span>
+      <span class="filter-chip" data-period="6M" onclick="changePeriod('6M', this)">6M</span>
+      <span class="filter-chip" data-period="YTD" onclick="changePeriod('YTD', this)">YTD</span>
+      <span class="filter-chip" data-period="1Y" onclick="changePeriod('1Y', this)">1Y</span>
+      <span class="filter-chip" data-period="ALL" onclick="changePeriod('ALL', this)">All</span>
     </div>
   </div>
 
@@ -421,7 +428,8 @@ let _activeTag = localStorage.getItem('imago-finance-active-tag') || 'all';
 let _sortCol   = 'balance';
 let _sortDir   = 'desc';
 let _excludeTD = false;
-let _chartType = localStorage.getItem('imago-finance-chart-type') || 'line';
+let _chartType   = localStorage.getItem('imago-finance-chart-type')   || 'line';
+let _chartPeriod = localStorage.getItem('imago-finance-chart-period') || '3M';
 const DEFAULT_TARGETS = {"savings":30,"equities":20,"td":20,"buffer":10,"cash":10,"illiquid":10};
 let _targets   = JSON.parse(localStorage.getItem('imago-finance-targets') || JSON.stringify(DEFAULT_TARGETS));
 let _lockedTags = JSON.parse(localStorage.getItem('imago-finance-locked-tags') || '{}');
@@ -596,13 +604,35 @@ async function copyTargetTable() {
 function changeChartType(type, el) {
   _chartType = type;
   localStorage.setItem('imago-finance-chart-type', type);
-  
   if (el) {
     document.querySelectorAll('#chartTypeFilters .filter-chip').forEach(c => c.classList.remove('active'));
     el.classList.add('active');
   }
-  
   render();
+}
+
+function changePeriod(period, el) {
+  _chartPeriod = period;
+  localStorage.setItem('imago-finance-chart-period', period);
+  if (el) {
+    document.querySelectorAll('#chartPeriodFilters .filter-chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+  }
+  render();
+}
+
+function applyPeriodFilter(history) {
+  if (!history || !history.length) return history;
+  if (_chartPeriod === 'ALL') return history;
+  const now = new Date();
+  let cutoff;
+  if (_chartPeriod === '1M')  { cutoff = new Date(now); cutoff.setMonth(cutoff.getMonth() - 1); }
+  if (_chartPeriod === '3M')  { cutoff = new Date(now); cutoff.setMonth(cutoff.getMonth() - 3); }
+  if (_chartPeriod === '6M')  { cutoff = new Date(now); cutoff.setMonth(cutoff.getMonth() - 6); }
+  if (_chartPeriod === '1Y')  { cutoff = new Date(now); cutoff.setFullYear(cutoff.getFullYear() - 1); }
+  if (_chartPeriod === 'YTD') { cutoff = new Date(now.getFullYear(), 0, 1); }
+  const cutStr = cutoff.toISOString().slice(0, 10);
+  return history.filter(h => h.date >= cutStr);
 }
 
 // ── Util ──────────────────────────────────────────────────────────────────────
@@ -788,22 +818,26 @@ function renderChart(history) {
     chart.style.display = 'none';
 
     if (_chartType === 'line' || _chartType === 'yield') {
+      // Show & sync period filter chips
+      const periodFilters = document.getElementById('chartPeriodFilters');
+      periodFilters.style.display = 'flex';
+      periodFilters.querySelectorAll('.filter-chip').forEach(c => {
+        c.classList.toggle('active', c.dataset.period === _chartPeriod);
+      });
+
       if (!history || history.length < 1) {
-        empty.style.display  = 'block';
-        period.textContent   = '';
+        empty.style.display = 'block';
         return;
       }
-      
-      const filteredHistory = _chartType === 'yield' 
-        ? history.filter(h => h.yield != null) 
+
+      let filteredHistory = _chartType === 'yield'
+        ? history.filter(h => h.yield != null)
         : history;
+      filteredHistory = applyPeriodFilter(filteredHistory);
 
       if (filteredHistory.length < 1) {
-        empty.innerHTML = _chartType === 'yield' 
-          ? 'Not enough yield history yet. Snapshots will start including yield from today.'
-          : 'No history yet — balances are auto-snapshotted each time you save changes.';
+        empty.innerHTML = 'No data for this period.';
         empty.style.display = 'block';
-        period.textContent = '';
         return;
       }
 
@@ -814,8 +848,8 @@ function renderChart(history) {
         date: h.date,
         value: _chartType === 'yield' ? h.yield : h.total
       }));
-      period.textContent = filteredHistory[0].date + ' → ' + filteredHistory[filteredHistory.length-1].date;
     } else if (_chartType === 'donut') {
+      document.getElementById('chartPeriodFilters').style.display = 'none';
       const accounts = window._allAccounts || [];
       const groups = {};
       let credTotal = 0;
@@ -837,7 +871,6 @@ function renderChart(history) {
 
       if (currentData.length === 0) {
         empty.style.display = 'block';
-        period.textContent = '';
         return;
       }
 
@@ -861,6 +894,7 @@ function renderChart(history) {
       
       period.textContent = 'Current vs Target';
     } else if (_chartType === 'liquidity') {
+      document.getElementById('chartPeriodFilters').style.display = 'none';
       const accounts = window._allAccounts || [];
       const liquid = { label: 'Liquid', color: TAG_COLORS.savings, value: 0, items: [] };
       const illiquid = { label: 'Illiquid', color: TAG_COLORS.illiquid, value: 0, items: [] };
