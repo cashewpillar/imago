@@ -224,7 +224,11 @@ td.actions{text-align:right;white-space:nowrap}
         </button>
         <button class="btn-flat" onclick="exportData()">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,6 3,3 13,3 13,6"/><polyline points="5,9 8,6 11,9"/><line x1="8" y1="13" x2="8" y2="6"/></svg>
-          Export
+          Export Full Backup
+        </button>
+        <button class="btn-flat" onclick="exportSavingsData()">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,6 3,3 13,3 13,6"/><polyline points="5,9 8,6 11,9"/><line x1="8" y1="13" x2="8" y2="6"/></svg>
+          Export Savings Only
         </button>
       </div>
     </div>
@@ -1335,6 +1339,27 @@ async function exportData() {
   a.href=url; a.download='finance_'+new Date().toISOString().slice(0,10)+'.json';
   a.click(); URL.revokeObjectURL(url);
   toast('Exported.');
+}
+
+async function exportSavingsData() {
+  const accounts = await db.accounts.toArray();
+  const history  = await db.history.orderBy('date').toArray();
+  const logs     = await db.logs.toArray();
+  const out = { 
+    version: 3, 
+    exported_at: new Date().toISOString(), 
+    accounts, 
+    history, 
+    logs,
+    targets: _targets,
+    lockedTags: _lockedTags
+  };
+  const blob = new Blob([JSON.stringify(out,null,2)], {type:'application/json'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href=url; a.download='savings_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click(); URL.revokeObjectURL(url);
+  toast('Savings data exported.');
 }
 
 function openYieldBreakdown() {
