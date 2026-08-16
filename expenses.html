@@ -153,7 +153,11 @@ td.actions{text-align:right;white-space:nowrap}
         </button>
         <button class="btn-flat" onclick="exportData()">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,6 3,3 13,3 13,6"/><polyline points="5,9 8,6 11,9"/><line x1="8" y1="13" x2="8" y2="6"/></svg>
-          Export
+          Export Full Backup
+        </button>
+        <button class="btn-flat" onclick="exportExpensesData()">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,6 3,3 13,3 13,6"/><polyline points="5,9 8,6 11,9"/><line x1="8" y1="13" x2="8" y2="6"/></svg>
+          Export Expenses Only
         </button>
       </div>
     </div>
@@ -506,6 +510,25 @@ async function exportData() {
   a.href=url; a.download='finance_'+new Date().toISOString().slice(0,10)+'.json';
   a.click(); URL.revokeObjectURL(url);
   toast('Exported.');
+}
+
+async function exportExpensesData() {
+  const expenses     = await db.expenses.toArray();
+  const expenseTypes = await db.expenseTypes.toArray();
+  const incomes      = await db.incomes.toArray();
+  const out = { 
+    version: 3, 
+    exported_at: new Date().toISOString(), 
+    expenses,
+    expenseTypes,
+    incomes
+  };
+  const blob = new Blob([JSON.stringify(out,null,2)], {type:'application/json'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href=url; a.download='expenses_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click(); URL.revokeObjectURL(url);
+  toast('Expenses data exported.');
 }
 
 window.addEventListener('click', e => {
