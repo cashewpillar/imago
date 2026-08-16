@@ -100,6 +100,10 @@ td.actions{text-align:right;white-space:nowrap}
 .import-area{border:2px dashed var(--border-strong);border-radius:var(--r);padding:14px;margin-bottom:10px;font-size:13px;color:var(--text-muted);text-align:center;display:flex;flex-direction:column;gap:6px;align-items:center;justify-content:center;cursor:pointer}
 .import-area:hover{border-color:var(--accent);color:var(--accent)}
 
+.history-item {display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px dashed var(--border);font-size:13px}
+.history-item:last-child {border-bottom:none}
+.history-meta {display:flex;flex-direction:column;gap:2px}
+
 /* Dropdown Menu */
 .dropdown{position:relative;display:inline-block}
 .dropdown-content{display:none;position:absolute;right:0;top:100%;background:var(--surface);min-width:160px;box-shadow:0 4px 20px rgba(0,0,0,0.15);border:1px solid var(--border);border-radius:var(--r);z-index:1000;margin-top:8px;overflow:hidden;padding:4px 0}
@@ -1120,10 +1124,12 @@ function renderIncomesList() {
       return `
         <div class="history-item">
           <div class="history-meta">
-            <strong>${esc(inc.name)}</strong>
-            <span class="col-pos" style="font-weight:600">₱${fmtMoney(inc.amount)} (${esc(inc.frequency)} · ${esc(suffix)})</span>
+            <span style="font-weight:500;color:var(--text)">${esc(inc.name)}</span>
+            <span style="font-size:12px;color:var(--text-muted)">
+              <span class="col-pos" style="font-weight:600">₱${fmtMoney(inc.amount)}</span> · ${esc(inc.frequency)} · ${esc(suffix)}
+            </span>
           </div>
-          <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px">
+          <div style="display:flex;gap:6px;align-items:center">
             <button class="btn btn-sm" onclick="editIncome('${inc.id}')">Edit</button>
             <button class="btn btn-sm btn-danger" onclick="deleteIncome('${inc.id}')">Delete</button>
           </div>
@@ -1138,10 +1144,12 @@ function renderIncomesList() {
       return `
         <div class="history-item">
           <div class="history-meta">
-            <strong>${esc(inc.name)}</strong>
-            <span class="col-pos" style="font-weight:600">₱${fmtMoney(inc.amount)} (One-time · ${esc(inc.payoutDays)})</span>
+            <span style="font-weight:500;color:var(--text)">${esc(inc.name)}</span>
+            <span style="font-size:12px;color:var(--text-muted)">
+              <span class="col-pos" style="font-weight:600">₱${fmtMoney(inc.amount)}</span> · One-time · ${esc(inc.payoutDays)}
+            </span>
           </div>
-          <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px">
+          <div style="display:flex;gap:6px;align-items:center">
             <button class="btn btn-sm" onclick="editIncome('${inc.id}')">Edit</button>
             <button class="btn btn-sm btn-danger" onclick="deleteIncome('${inc.id}')">Delete</button>
           </div>
