@@ -128,7 +128,7 @@
 
   /* ---------- Sub-filter bar ---------- */
   .filter-bar{
-    display:flex; gap:6px; margin-bottom:14px; overflow-x:auto; padding-bottom:2px;
+    display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; padding-bottom:2px;
   }
   .filter-pill{
     background:var(--bg-inset); border:1px solid var(--line); color:var(--chalk-dim);
@@ -457,6 +457,7 @@
   .grocery-section-title .count-badge{
     font-family:'Work Sans', sans-serif; font-size:12px; font-weight:600;
     background:var(--bg-inset); color:var(--chalk-dim); padding:2px 8px; border-radius:12px;
+    white-space: nowrap;
   }
 
   /* Planned meals horizontal strip */
@@ -1688,7 +1689,6 @@
       <div class="grocery-section" style="margin-bottom:14px; padding:14px 16px;">
         <div class="grocery-section-title" style="margin-bottom:8px;">
           <div style="display:flex; align-items:center; gap:8px;">
-            <span>📦 Pantry Stock Tracker</span>
             <span class="count-badge">${totalCount} total items</span>
           </div>
           <button class="filter-pill ${groupByTag ? 'active' : ''}" id="toggleGroupTagBtn" style="font-size:12px; height:auto; padding:4px 10px; cursor:pointer;">🏷️ Group by Tag</button>
