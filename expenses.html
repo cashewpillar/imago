@@ -163,6 +163,10 @@ td.actions{text-align:right;white-space:nowrap}
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,6 3,3 13,3 13,6"/><polyline points="5,9 8,6 11,9"/><line x1="8" y1="13" x2="8" y2="6"/></svg>
           Export Expenses Only
         </button>
+        <button class="btn-flat" onclick="triggerCsvImport()">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,10 3,13 13,13 13,10"/><polyline points="5,7 8,10 11,7"/><line x1="8" y1="3" x2="8" y2="10"/></svg>
+          Import Statement CSV
+        </button>
       </div>
     </div>
   </div>
@@ -341,6 +345,34 @@ td.actions{text-align:right;white-space:nowrap}
       <button class="btn btn-danger" onclick="doImport(true)">Reset &amp; import</button>
       <button class="btn" onclick="closeModal('importModal')">Cancel</button>
       <button class="btn btn-primary" onclick="doImport(false)">Merge import</button>
+    </div>
+  </div>
+</div>
+
+<!-- CSV Import Preview Modal -->
+<div class="modal-backdrop" id="csvPreviewModal">
+  <div class="modal" style="width: min(640px, 95vw)">
+    <h2>Preview Statement Import</h2>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Please review the transactions below to be imported. They will be logged with no category and no source account deduction.</p>
+    
+    <div style="max-height: 50vh; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--r); margin-bottom: 12px">
+      <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr style="background: var(--bg); border-bottom: 1px solid var(--border)">
+            <th style="padding: 8px; text-align: left; font-size: 11px; color: var(--text-muted); text-transform: uppercase">Date</th>
+            <th style="padding: 8px; text-align: left; font-size: 11px; color: var(--text-muted); text-transform: uppercase">Description</th>
+            <th style="padding: 8px; text-align: left; font-size: 11px; color: var(--text-muted); text-transform: uppercase">Type</th>
+            <th style="padding: 8px; text-align: left; font-size: 11px; color: var(--text-muted); text-transform: uppercase">Source</th>
+            <th style="padding: 8px; text-align: right; font-size: 11px; color: var(--text-muted); text-transform: uppercase">Amount</th>
+          </tr>
+        </thead>
+        <tbody id="csvPreviewTbody"></tbody>
+      </table>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('csvPreviewModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmCsvImport()">Confirm Import</button>
     </div>
   </div>
 </div>
@@ -533,6 +565,162 @@ async function exportExpensesData() {
   a.href=url; a.download='expenses_'+new Date().toISOString().slice(0,10)+'.json';
   a.click(); URL.revokeObjectURL(url);
   toast('Expenses data exported.');
+}
+
+let _tempCsvExpenses = [];
+
+function triggerCsvImport() {
+  let fileInput = document.getElementById('fCsvFileInput');
+  if (!fileInput) {
+    fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.id = 'fCsvFileInput';
+    fileInput.accept = '.csv';
+    fileInput.style.display = 'none';
+    fileInput.onchange = handleCsvFileInput;
+    document.body.appendChild(fileInput);
+  }
+  fileInput.click();
+}
+
+function handleCsvFileInput(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  let statementYear = new Date().getFullYear();
+  let statementMonth = new Date().getMonth() + 1;
+  const nameMatch = file.name.match(/BE(\d{4})(\d{2})(\d{2})/i);
+  if (nameMatch) {
+    statementYear = parseInt(nameMatch[1]);
+    statementMonth = parseInt(nameMatch[2]);
+  }
+
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const text = evt.target.result;
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    if (lines.length < 2) {
+      toast('Empty or invalid CSV file.', true);
+      return;
+    }
+
+    const headers = parseCsvLine(lines[0]).map(h => h.toLowerCase().trim());
+    const dateIdx = headers.indexOf('transaction date');
+    const descIdx = headers.indexOf('description');
+    const amtIdx = headers.indexOf('amount');
+
+    if (dateIdx === -1 || descIdx === -1 || amtIdx === -1) {
+      toast('Required CSV columns (Transaction Date, Description, Amount) not found.', true);
+      return;
+    }
+
+    _tempCsvExpenses = [];
+    for (let i = 1; i < lines.length; i++) {
+      const row = parseCsvLine(lines[i]);
+      if (row.length <= Math.max(dateIdx, descIdx, amtIdx)) continue;
+
+      const rawDate = row[dateIdx];
+      const name = row[descIdx];
+      const rawAmt = row[amtIdx].replace(/,/g, '');
+      
+      const parsedDate = parseCsvDate(rawDate, statementYear, statementMonth);
+      const amount = parseFloat(rawAmt);
+
+      if (!parsedDate || isNaN(amount) || !name) continue;
+
+      _tempCsvExpenses.push({
+        date: parsedDate,
+        name: name,
+        amount: amount
+      });
+    }
+
+    if (_tempCsvExpenses.length === 0) {
+      toast('No valid expense records found in CSV.', true);
+      return;
+    }
+
+    const previewTbody = document.getElementById('csvPreviewTbody');
+    previewTbody.innerHTML = _tempCsvExpenses.map(item => `
+      <tr style="border-bottom: 1px solid var(--border)">
+        <td style="padding: 8px; font-family: var(--mono); font-size: 12px; color: var(--text-muted)">${esc(item.date)}</td>
+        <td style="padding: 8px; font-weight: 500">${esc(item.name)}</td>
+        <td style="padding: 8px;"><span style="color: var(--text-faint); font-size: 11px">—</span></td>
+        <td style="padding: 8px;"><span style="color: var(--text-faint); font-size: 11px">—</span></td>
+        <td style="padding: 8px; text-align: right;" class="num col-neg">-₱${fmtMoney(item.amount)}</td>
+      </tr>
+    `).join('');
+
+    openModal('csvPreviewModal');
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+const monthNames = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+const shortMonthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+function parseCsvDate(dateStr, statementYear, statementMonth) {
+  const parts = dateStr.trim().split(/\s+/);
+  if (parts.length < 2) return null;
+  const monthStr = parts[0].toLowerCase();
+  const day = parseInt(parts[1]);
+  if (isNaN(day)) return null;
+
+  let monthIndex = monthNames.indexOf(monthStr);
+  if (monthIndex === -1) {
+    monthIndex = shortMonthNames.indexOf(monthStr.slice(0, 3));
+  }
+  if (monthIndex === -1) return null;
+
+  const month = monthIndex + 1;
+  let year = statementYear;
+
+  if (month > statementMonth) {
+    year = statementYear - 1;
+  }
+
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function parseCsvLine(text) {
+  const result = [];
+  let cell = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') {
+      inQuotes = !inQuotes;
+    } else if (c === ',' && !inQuotes) {
+      result.push(cell.trim());
+      cell = '';
+    } else {
+      cell += c;
+    }
+  }
+  result.push(cell.trim());
+  return result;
+}
+
+async function confirmCsvImport() {
+  if (_tempCsvExpenses.length === 0) return;
+  for (const item of _tempCsvExpenses) {
+    const id = 'exp-' + uuid();
+    await db.expenses.put({
+      id,
+      date: item.date,
+      name: item.name,
+      amount: item.amount,
+      typeId: '', 
+      accountId: '', 
+      note: 'Imported from statement',
+      updated_at: new Date().toISOString()
+    });
+  }
+  _tempCsvExpenses = [];
+  closeModal('csvPreviewModal');
+  toast('Expenses imported successfully.');
+  await render();
 }
 
 window.addEventListener('click', e => {
