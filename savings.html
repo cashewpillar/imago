@@ -140,6 +140,14 @@ td.actions{text-align:right;white-space:nowrap}
 .target-row label{font-size:12px;font-weight:500;text-transform:capitalize}
 .target-row input[type="number"]{padding:4px 2px 4px 6px;font-size:11px;border:1px solid var(--border);border-radius:4px;width:100%;text-align:right;font-family:monospace}
 .target-amt{font-size:11px;color:var(--text-muted);text-align:right;font-family:monospace}
+@media(max-width:480px){
+  .target-row{grid-template-columns:22px 1fr 64px 70px;grid-template-rows:auto auto;gap:6px 8px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+  .target-row .lock-btn{grid-column:1;grid-row:1}
+  .target-row label{grid-column:2;grid-row:1}
+  .target-row input[type="number"]{grid-column:3;grid-row:1;width:64px}
+  .target-amt{grid-column:4;grid-row:1}
+  .target-row input[type="range"]{grid-column:1/-1;grid-row:2;width:100%}
+}
 
 .lock-btn{background:none;border:none;cursor:pointer;color:var(--text-faint);padding:2px;display:inline-flex;align-items:center;justify-content:center}
 .lock-btn:hover{color:var(--text)}
