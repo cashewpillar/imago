@@ -469,7 +469,8 @@ class FinanceChart extends HTMLElement {
           x, y, w: barWidth, h: barH,
           label: `${item.label || ''} Income`,
           value: incomeVal,
-          color: '#1a6b3c'
+          color: '#1a6b3c',
+          item
         });
       }
 
@@ -492,7 +493,8 @@ class FinanceChart extends HTMLElement {
           x, y, w: barWidth, h: barH,
           label: `${item.label || ''} Expenses`,
           value: expenseVal,
-          color: '#a32d2d'
+          color: '#a32d2d',
+          item
         });
       }
     });
@@ -507,12 +509,14 @@ class FinanceChart extends HTMLElement {
       const hovered = drawnBars.find(b => mx >= b.x && mx <= b.x + b.w && my >= b.y - 10 && my <= b.y + b.h);
 
       if (hovered) {
+        this.canvas.style.cursor = 'pointer';
         this.tooltip.textContent = `${hovered.label} · ₱${this._fmtk(hovered.value)}`;
         this.tooltip.style.display = 'block';
         this.tooltip.style.left = (rect.left + hovered.x + hovered.w / 2) + 'px';
         const py = rect.top + hovered.y;
         this.tooltip.style.top = (py - this.tooltip.offsetHeight - 8 < 10) ? (py + hovered.h + 10) + 'px' : (py - this.tooltip.offsetHeight - 8) + 'px';
       } else {
+        this.canvas.style.cursor = 'default';
         this.tooltip.style.display = 'none';
       }
     };
@@ -521,7 +525,29 @@ class FinanceChart extends HTMLElement {
     this.canvas.ontouchmove = handlePointer;
     this.canvas.ontouchstart = handlePointer;
 
-    const hideTooltip = () => { this.tooltip.style.display = 'none'; };
+    this.canvas.onclick = e => {
+      const rect = this.canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+
+      const clickedBar = drawnBars.find(b => mx >= b.x && mx <= b.x + b.w && my >= b.y - 10 && my <= b.y + b.h);
+      if (clickedBar) {
+        this.dispatchEvent(new CustomEvent('bar-click', {
+          detail: {
+            label: clickedBar.label,
+            value: clickedBar.value,
+            item: clickedBar.item
+          },
+          bubbles: true,
+          composed: true
+        }));
+      }
+    };
+
+    const hideTooltip = () => { 
+      this.tooltip.style.display = 'none'; 
+      this.canvas.style.cursor = 'default';
+    };
     this.canvas.onmouseleave = hideTooltip;
     this.canvas.ontouchend = hideTooltip;
   }

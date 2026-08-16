@@ -396,6 +396,32 @@ select.tag.type{
     </div>
   </div>
 </div>
+<!-- Chart Drill-down Modal -->
+<div class="modal-backdrop" id="drillDownModal">
+  <div class="modal" style="width: min(640px, 95vw)">
+    <h2 id="drillDownTitle">Expenses</h2>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px" id="drillDownSubTitle"></p>
+    
+    <div style="max-height: 50vh; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--r); margin-bottom: 12px">
+      <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr style="background: var(--bg); border-bottom: 1px solid var(--border)">
+            <th style="padding: 8px; text-align: left; font-size: 11px; color: var(--text-muted); text-transform: uppercase">Date</th>
+            <th style="padding: 8px; text-align: left; font-size: 11px; color: var(--text-muted); text-transform: uppercase">Expense Name</th>
+            <th style="padding: 8px; text-align: left; font-size: 11px; color: var(--text-muted); text-transform: uppercase">Type</th>
+            <th style="padding: 8px; text-align: left; font-size: 11px; color: var(--text-muted); text-transform: uppercase">Source</th>
+            <th style="padding: 8px; text-align: right; font-size: 11px; color: var(--text-muted); text-transform: uppercase">Amount</th>
+          </tr>
+        </thead>
+        <tbody id="drillDownTbody"></tbody>
+      </table>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('drillDownModal')">Close</button>
+    </div>
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
 
@@ -1031,6 +1057,7 @@ function renderChart() {
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       const label = d.toLocaleDateString(undefined, { month: 'short' });
       monthMap[key] = {
+        key,
         label,
         income: isFiltered ? 0 : (recurringForMonth(key) + oneTimeForMonth(key)),
         expense: 0
@@ -1575,6 +1602,55 @@ async function deleteIncome(id) {
   await render();
   renderIncomesList();
 }
+
+document.getElementById('expenseChart').addEventListener('bar-click', e => {
+  const { label, value, item } = e.detail;
+  if (!label || label.toLowerCase().includes('income')) return;
+
+  const isFiltered = !_chartTypeFilter.includes('all');
+  let filtered = _allExpenses;
+
+  if (isFiltered) {
+    filtered = filtered.filter(exp => _chartTypeFilter.includes(exp.typeId));
+  }
+
+  if (_chartPeriod === 'MONTH') {
+    const now = new Date();
+    const curMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    filtered = filtered.filter(exp => {
+      if (!(exp.date || '').startsWith(curMonthKey)) return false;
+      const day = parseInt((exp.date || '').slice(8, 10)) || 1;
+      return day >= item.startDay && day <= item.endDay;
+    });
+  } else if (_chartPeriod === 'ALL') {
+    filtered = filtered.filter(exp => (exp.date || '').startsWith(item.label));
+  } else {
+    filtered = filtered.filter(exp => (exp.date || '').startsWith(item.key));
+  }
+
+  const tbody = document.getElementById('drillDownTbody');
+  const typeMap = Object.fromEntries(_allTypes.map(t => [t.id, t.name]));
+  const accMap = Object.fromEntries(_allAccounts.map(a => [a.id, a.label || a.key]));
+  
+  document.getElementById('drillDownTitle').textContent = label;
+  document.getElementById('drillDownSubTitle').textContent = `${filtered.length} expense(s) total: ₱${fmtMoney(value)}`;
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty">No expenses found for this period.</td></tr>`;
+  } else {
+    tbody.innerHTML = filtered.map(exp => `
+      <tr style="border-bottom: 1px solid var(--border)">
+        <td style="padding: 8px; font-family: var(--mono); font-size: 12px; color: var(--text-muted)">${esc(exp.date || '—')}</td>
+        <td style="padding: 8px; font-weight: 500">${esc(exp.name)}</td>
+        <td style="padding: 8px;"><span class="tag type" style="font-size: 10px">${esc(typeMap[exp.typeId] || 'General')}</span></td>
+        <td style="padding: 8px;">${exp.accountId ? `<span class="tag source" style="font-size: 10px">${esc(accMap[exp.accountId] || 'Account')}</span>` : '<span style="color:var(--text-faint);font-size:11px">—</span>'}</td>
+        <td style="padding: 8px; text-align: right;" class="num col-neg">-₱${fmtMoney(exp.amount)}</td>
+      </tr>
+    `).join('');
+  }
+
+  openModal('drillDownModal');
+});
 
 // Initial render
 render();
