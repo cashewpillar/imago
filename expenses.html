@@ -280,11 +280,10 @@ td.actions{text-align:right;white-space:nowrap}
   </div>
 </div>
 
-<!-- Manage Incomes Modal -->
 <div class="modal-backdrop" id="incomeModal">
   <div class="modal">
     <h2>Recurring Incomes</h2>
-    <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Define recurring income sources (e.g., Salary bimonthly, Freelance) to project onto monthly charts.</p>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Define recurring income sources (e.g., Salary, Freelance) to project onto monthly charts.</p>
     <div class="form-grid">
       <div class="form-row">
         <label>Income Source Name</label>
@@ -299,15 +298,16 @@ td.actions{text-align:right;white-space:nowrap}
       <div class="form-row">
         <label>Frequency</label>
         <select id="fIncFreq" onchange="onIncomeFreqChange()">
-          <option value="bimonthly">Bimonthly (Twice a month)</option>
           <option value="monthly">Monthly</option>
           <option value="quarterly">Quarterly</option>
           <option value="annual">Annual</option>
+          <option value="one-time">One-Time</option>
         </select>
       </div>
       <div class="form-row" id="payoutDayRow">
         <label id="payoutDayLabel">Payout Day(s) of Month</label>
         <input type="text" id="fIncPayoutDays" placeholder="e.g. 15, 30">
+        <input type="date" id="fIncDate" style="display:none">
       </div>
     </div>
     <div style="display:flex;justify-content:flex-end;margin-top:4px">
@@ -573,7 +573,7 @@ function renderSummary() {
   // Total recurring monthly income
   const monthlyIncome = _allIncomes.reduce((s, inc) => {
     const amt = Number(inc.amount) || 0;
-    if (inc.frequency === 'bimonthly') return s + (amt * 2);
+    if (inc.frequency === 'one-time') return s;
     if (inc.frequency === 'monthly') return s + amt;
     if (inc.frequency === 'quarterly') return s + (amt / 3);
     if (inc.frequency === 'annual') return s + (amt / 12);
@@ -613,10 +613,10 @@ function renderChart() {
   const chart = document.getElementById('expenseChart');
   const empty = document.getElementById('chartEmpty');
 
-  // Compute total monthly income estimate
+  // Compute total monthly income estimate (recurring only)
   const monthlyIncome = _allIncomes.reduce((s, inc) => {
     const amt = Number(inc.amount) || 0;
-    if (inc.frequency === 'bimonthly') return s + (amt * 2);
+    if (inc.frequency === 'one-time') return s;
     if (inc.frequency === 'monthly') return s + amt;
     if (inc.frequency === 'quarterly') return s + (amt / 3);
     if (inc.frequency === 'annual') return s + (amt / 12);
@@ -639,22 +639,49 @@ function renderChart() {
       { key: 'W4', label: 'W4 (22+)', startDay: 22, endDay: 31, income: 0, expense: 0 }
     ];
 
-    // Distribute income into the respective week based on payout days
+    // Distribute income into the respective week based on payout days/months/dates
     _allIncomes.forEach(inc => {
       const amt = Number(inc.amount) || 0;
-      const payoutDays = (inc.payoutDays || (inc.frequency === 'bimonthly' ? '15, 30' : '15'))
-        .split(',')
-        .map(s => parseInt(s.trim()))
-        .filter(n => !isNaN(n));
+      const curMonth = now.getMonth() + 1; // 1-12
 
-      payoutDays.forEach(day => {
-        const targetWeek = weeks.find(w => day >= w.startDay && day <= w.endDay);
-        if (targetWeek) {
-          targetWeek.income += amt;
-        } else if (weeks[3]) {
-          weeks[3].income += amt;
+      if (inc.frequency === 'monthly') {
+        const payoutDays = (inc.payoutDays || '15')
+          .split(',')
+          .map(s => parseInt(s.trim()))
+          .filter(n => !isNaN(n));
+
+        payoutDays.forEach(day => {
+          const targetWeek = weeks.find(w => day >= w.startDay && day <= w.endDay);
+          if (targetWeek) {
+            targetWeek.income += amt;
+          } else if (weeks[3]) {
+            weeks[3].income += amt;
+          }
+        });
+      } else if (inc.frequency === 'quarterly' || inc.frequency === 'annual') {
+        const payoutMonths = (inc.payoutDays || '')
+          .split(',')
+          .map(s => parseInt(s.trim()))
+          .filter(n => !isNaN(n));
+
+        if (payoutMonths.includes(curMonth)) {
+          if (weeks[2]) {
+            weeks[2].income += amt;
+          }
         }
-      });
+      } else if (inc.frequency === 'one-time') {
+        const dateStr = inc.payoutDays || '';
+        const curMonthStr = `${now.getFullYear()}-${String(curMonth).padStart(2, '0')}`; // YYYY-MM
+        if (dateStr.startsWith(curMonthStr)) {
+          const day = parseInt(dateStr.slice(8, 10)) || 15;
+          const targetWeek = weeks.find(w => day >= w.startDay && day <= w.endDay);
+          if (targetWeek) {
+            targetWeek.income += amt;
+          } else if (weeks[3]) {
+            weeks[3].income += amt;
+          }
+        }
+      }
     });
 
     // Sum expenses for current month across the 4 weeks
@@ -677,17 +704,24 @@ function renderChart() {
     const yearMap = {};
     const annualIncome = monthlyIncome * 12;
 
+    const getIncomeForYear = (yr) => {
+      const oneTimeInYear = _allIncomes
+        .filter(inc => inc.frequency === 'one-time' && (inc.payoutDays || '').startsWith(yr))
+        .reduce((sum, inc) => sum + (Number(inc.amount) || 0), 0);
+      return annualIncome + oneTimeInYear;
+    };
+
     _allExpenses.forEach(exp => {
       const year = (exp.date || '').slice(0, 4) || new Date().getFullYear().toString();
       if (!yearMap[year]) {
-        yearMap[year] = { label: year, income: annualIncome, expense: 0 };
+        yearMap[year] = { label: year, income: getIncomeForYear(year), expense: 0 };
       }
       yearMap[year].expense += (Number(exp.amount) || 0);
     });
 
     const currentYear = new Date().getFullYear().toString();
     if (!yearMap[currentYear]) {
-      yearMap[currentYear] = { label: currentYear, income: annualIncome, expense: 0 };
+      yearMap[currentYear] = { label: currentYear, income: getIncomeForYear(currentYear), expense: 0 };
     }
 
     chartData = Object.keys(yearMap).sort().map(y => yearMap[y]);
@@ -704,7 +738,12 @@ function renderChart() {
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const key = `${year}-${month}`;
       const label = d.toLocaleDateString(undefined, { month: 'short' });
-      monthMap[key] = { label, income: monthlyIncome, expense: 0 };
+      
+      const oneTimeInMonth = _allIncomes
+        .filter(inc => inc.frequency === 'one-time' && (inc.payoutDays || '').startsWith(key))
+        .reduce((sum, inc) => sum + (Number(inc.amount) || 0), 0);
+
+      monthMap[key] = { label, income: monthlyIncome + oneTimeInMonth, expense: 0 };
     }
 
     _allExpenses.forEach(exp => {
@@ -1025,17 +1064,30 @@ async function deleteExpenseType(id) {
 // ── Income CRUD ───────────────────────────────────────────────────────────────
 function onIncomeFreqChange() {
   const freq = document.getElementById('fIncFreq').value;
-  const input = document.getElementById('fIncPayoutDays');
+  const inputDays = document.getElementById('fIncPayoutDays');
+  const inputDate = document.getElementById('fIncDate');
   const label = document.getElementById('payoutDayLabel');
-  if (freq === 'bimonthly') {
-    label.textContent = 'Payout Days (e.g. 15, 30)';
-    input.placeholder = '15, 30';
-  } else if (freq === 'monthly') {
-    label.textContent = 'Payout Day (e.g. 15 or 30)';
-    input.placeholder = '15';
+  
+  if (freq === 'one-time') {
+    label.textContent = 'Payout Date';
+    inputDays.style.display = 'none';
+    inputDate.style.display = 'block';
+    if (!inputDate.value) {
+      inputDate.value = new Date().toISOString().slice(0, 10);
+    }
   } else {
-    label.textContent = 'Payout Day (Day of Month)';
-    input.placeholder = '15';
+    inputDays.style.display = 'block';
+    inputDate.style.display = 'none';
+    if (freq === 'monthly') {
+      label.textContent = 'Payout Day (e.g. 15 or 30)';
+      inputDays.placeholder = '15';
+    } else if (freq === 'quarterly') {
+      label.textContent = 'Payout Month(s) (1-12)';
+      inputDays.placeholder = 'e.g. 3, 6, 9, 12';
+    } else if (freq === 'annual') {
+      label.textContent = 'Payout Month (1-12)';
+      inputDays.placeholder = 'e.g. 12';
+    }
   }
 }
 
@@ -1047,24 +1099,58 @@ function openIncomeModal() {
 function renderIncomesList() {
   const list = document.getElementById('incomesList');
   if (_allIncomes.length === 0) {
-    list.innerHTML = '<div class="empty" style="padding:14px">No recurring income sources configured.</div>';
+    list.innerHTML = '<div class="empty" style="padding:14px">No income sources configured.</div>';
     return;
   }
-  list.innerHTML = _allIncomes.map(inc => {
-    const days = inc.payoutDays || (inc.frequency === 'bimonthly' ? '15, 30' : '15');
-    return `
-      <div class="history-item">
-        <div class="history-meta">
-          <strong>${esc(inc.name)}</strong>
-          <span class="col-pos" style="font-weight:600">₱${fmtMoney(inc.amount)} (${esc(inc.frequency)} · Day ${esc(days)})</span>
+
+  const recurring = _allIncomes.filter(i => i.frequency !== 'one-time');
+  const oneTime = _allIncomes.filter(i => i.frequency === 'one-time');
+
+  let html = '';
+
+  if (recurring.length > 0) {
+    html += `<h4 style="margin: 8px 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted)">Recurring Incomes</h4>`;
+    html += recurring.map(inc => {
+      const days = inc.payoutDays || '15';
+      let suffix = '';
+      if (inc.frequency === 'monthly') suffix = `Day ${days}`;
+      else if (inc.frequency === 'quarterly') suffix = `Months: ${days}`;
+      else if (inc.frequency === 'annual') suffix = `Month: ${days}`;
+
+      return `
+        <div class="history-item">
+          <div class="history-meta">
+            <strong>${esc(inc.name)}</strong>
+            <span class="col-pos" style="font-weight:600">₱${fmtMoney(inc.amount)} (${esc(inc.frequency)} · ${esc(suffix)})</span>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px">
+            <button class="btn btn-sm" onclick="editIncome('${inc.id}')">Edit</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteIncome('${inc.id}')">Delete</button>
+          </div>
         </div>
-        <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px">
-          <button class="btn btn-sm" onclick="editIncome('${inc.id}')">Edit</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteIncome('${inc.id}')">Delete</button>
+      `;
+    }).join('');
+  }
+
+  if (oneTime.length > 0) {
+    html += `<h4 style="margin: 16px 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted)">One-Time Incomes</h4>`;
+    html += oneTime.map(inc => {
+      return `
+        <div class="history-item">
+          <div class="history-meta">
+            <strong>${esc(inc.name)}</strong>
+            <span class="col-pos" style="font-weight:600">₱${fmtMoney(inc.amount)} (One-time · ${esc(inc.payoutDays)})</span>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px">
+            <button class="btn btn-sm" onclick="editIncome('${inc.id}')">Edit</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteIncome('${inc.id}')">Delete</button>
+          </div>
         </div>
-      </div>
-    `;
-  }).join('');
+      `;
+    }).join('');
+  }
+
+  list.innerHTML = html;
 }
 
 let _editingIncomeId = null;
@@ -1076,7 +1162,11 @@ function editIncome(id) {
   document.getElementById('fIncName').value = inc.name;
   document.getElementById('fIncAmount').value = inc.amount;
   document.getElementById('fIncFreq').value = inc.frequency;
-  document.getElementById('fIncPayoutDays').value = inc.payoutDays || (inc.frequency === 'bimonthly' ? '15, 30' : '15');
+  if (inc.frequency === 'one-time') {
+    document.getElementById('fIncDate').value = inc.payoutDays || new Date().toISOString().slice(0, 10);
+  } else {
+    document.getElementById('fIncPayoutDays').value = inc.payoutDays || '15';
+  }
   onIncomeFreqChange();
 }
 
@@ -1084,7 +1174,13 @@ async function saveIncome() {
   const name = document.getElementById('fIncName').value.trim();
   const amount = Math.round(parseFloat(document.getElementById('fIncAmount').value) || 0);
   const frequency = document.getElementById('fIncFreq').value;
-  const payoutDays = document.getElementById('fIncPayoutDays').value.trim() || (frequency === 'bimonthly' ? '15, 30' : '15');
+  let payoutDays = '';
+
+  if (frequency === 'one-time') {
+    payoutDays = document.getElementById('fIncDate').value || new Date().toISOString().slice(0, 10);
+  } else {
+    payoutDays = document.getElementById('fIncPayoutDays').value.trim() || '15';
+  }
 
   if (!name || isNaN(amount) || amount <= 0) {
     toast('Please enter income name and valid positive amount.', true);
@@ -1101,6 +1197,7 @@ async function saveIncome() {
   document.getElementById('fIncName').value = '';
   document.getElementById('fIncAmount').value = '';
   document.getElementById('fIncPayoutDays').value = '';
+  document.getElementById('fIncDate').value = '';
   toast('Income saved.');
   await render();
   renderIncomesList();
