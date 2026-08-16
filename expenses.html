@@ -327,6 +327,16 @@ select.tag.type{
         <input type="date" id="fIncDate" style="display:none">
       </div>
     </div>
+    <div class="form-grid">
+      <div class="form-row">
+        <label>Active From</label>
+        <input type="month" id="fIncStartDate" placeholder="YYYY-MM">
+      </div>
+      <div class="form-row">
+        <label>Active Until <span style="font-weight:400;color:var(--text-faint)">(leave blank if ongoing)</span></label>
+        <input type="month" id="fIncEndDate" placeholder="YYYY-MM">
+      </div>
+    </div>
     <div style="display:flex;justify-content:flex-end;margin-top:4px">
       <button class="btn btn-primary" onclick="saveIncome()">Add / Update Income</button>
     </div>
@@ -774,6 +784,28 @@ async function render() {
   populateDropdowns();
 }
 
+// ── Income date-range helpers ─────────────────────────────────────────────────
+// monthKey = 'YYYY-MM'. Returns true if the income was active during that month.
+function isIncomeActiveInMonth(inc, monthKey) {
+  const start = inc.startDate || null;  // 'YYYY-MM' or null (= always started)
+  const end   = inc.endDate   || null;  // 'YYYY-MM' or null (= ongoing)
+  if (start && monthKey < start) return false;
+  if (end   && monthKey > end)   return false;
+  return true;
+}
+
+// Monthly income contribution of one income record for a given YYYY-MM key.
+// Returns 0 if the income wasn't active that month.
+function incomeAmountForMonth(inc, monthKey) {
+  if (!isIncomeActiveInMonth(inc, monthKey)) return 0;
+  const amt = Number(inc.amount) || 0;
+  if (inc.frequency === 'one-time') return 0; // handled separately
+  if (inc.frequency === 'monthly')   return amt;
+  if (inc.frequency === 'quarterly') return amt / 3;
+  if (inc.frequency === 'annual')    return amt / 12;
+  return amt;
+}
+
 function renderSummary() {
   const now = new Date();
   const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`; // YYYY-MM
@@ -783,15 +815,11 @@ function renderSummary() {
     .filter(e => (e.date || '').startsWith(currentMonthStr))
     .reduce((s, e) => s + (Number(e.amount) || 0), 0);
 
-  // Total recurring monthly income
-  const monthlyIncome = _allIncomes.reduce((s, inc) => {
-    const amt = Number(inc.amount) || 0;
-    if (inc.frequency === 'one-time') return s;
-    if (inc.frequency === 'monthly') return s + amt;
-    if (inc.frequency === 'quarterly') return s + (amt / 3);
-    if (inc.frequency === 'annual') return s + (amt / 12);
-    return s + amt;
-  }, 0);
+  // Only count incomes that are active RIGHT NOW (today's month)
+  const activeIncomes = _allIncomes.filter(inc =>
+    inc.frequency !== 'one-time' && isIncomeActiveInMonth(inc, currentMonthStr)
+  );
+  const monthlyIncome = activeIncomes.reduce((s, inc) => s + incomeAmountForMonth(inc, currentMonthStr), 0);
 
   const netSavingsRate = monthlyIncome > 0 ? ((monthlyIncome - monthExpenses) / monthlyIncome * 100) : 0;
   const netMonthly = monthlyIncome - monthExpenses;
@@ -800,7 +828,7 @@ function renderSummary() {
     <div class="sum-card">
       <div class="lbl">Monthly Income</div>
       <div class="val col-pos">₱${fmtk(monthlyIncome)}</div>
-      <div class="sub">${_allIncomes.length} recurring source(s)</div>
+      <div class="sub">${activeIncomes.length} active source(s)</div>
     </div>
     <div class="sum-card">
       <div class="lbl">This Month's Spent</div>
@@ -827,15 +855,15 @@ function renderChart() {
   const chart = document.getElementById('expenseChart');
   const empty = document.getElementById('chartEmpty');
 
-  // Compute total monthly income estimate (recurring only)
-  const monthlyIncome = _allIncomes.reduce((s, inc) => {
-    const amt = Number(inc.amount) || 0;
-    if (inc.frequency === 'one-time') return s;
-    if (inc.frequency === 'monthly') return s + amt;
-    if (inc.frequency === 'quarterly') return s + (amt / 3);
-    if (inc.frequency === 'annual') return s + (amt / 12);
-    return s + amt;
-  }, 0);
+  // Helper: total recurring income for a given YYYY-MM key (respects date ranges)
+  const recurringForMonth = (monthKey) =>
+    _allIncomes.reduce((s, inc) => s + incomeAmountForMonth(inc, monthKey), 0);
+
+  // Helper: one-time income for a given YYYY-MM key
+  const oneTimeForMonth = (monthKey) =>
+    _allIncomes
+      .filter(inc => inc.frequency === 'one-time' && (inc.payoutDays || '').startsWith(monthKey))
+      .reduce((s, inc) => s + (Number(inc.amount) || 0), 0);
 
   let chartData = [];
   const titleEl = document.querySelector('.chart-card .chart-title');
@@ -845,126 +873,103 @@ function renderChart() {
     const curMonthName = now.toLocaleDateString(undefined, { month: 'short' });
     if (titleEl) titleEl.textContent = `Income vs Expenses (${curMonthName} · 4 Weeks)`;
 
-    // Define 4 Weeks of the current month
+    const curMonth = now.getMonth() + 1; // 1-12
+    const curMonthKey = `${now.getFullYear()}-${String(curMonth).padStart(2, '0')}`;
+
     const weeks = [
-      { key: 'W1', label: 'W1 (1-7)', startDay: 1, endDay: 7, income: 0, expense: 0 },
-      { key: 'W2', label: 'W2 (8-14)', startDay: 8, endDay: 14, income: 0, expense: 0 },
-      { key: 'W3', label: 'W3 (15-21)', startDay: 15, endDay: 21, income: 0, expense: 0 },
-      { key: 'W4', label: 'W4 (22+)', startDay: 22, endDay: 31, income: 0, expense: 0 }
+      { key: 'W1', label: 'W1 (1-7)',  startDay: 1,  endDay: 7,  income: 0, expense: 0 },
+      { key: 'W2', label: 'W2 (8-14)', startDay: 8,  endDay: 14, income: 0, expense: 0 },
+      { key: 'W3', label: 'W3 (15-21)',startDay: 15, endDay: 21, income: 0, expense: 0 },
+      { key: 'W4', label: 'W4 (22+)',  startDay: 22, endDay: 31, income: 0, expense: 0 }
     ];
 
-    // Distribute income into the respective week based on payout days/months/dates
+    // Distribute income into the respective week based on payout days — respecting date ranges
     _allIncomes.forEach(inc => {
+      if (!isIncomeActiveInMonth(inc, curMonthKey)) return;
       const amt = Number(inc.amount) || 0;
-      const curMonth = now.getMonth() + 1; // 1-12
 
       if (inc.frequency === 'monthly') {
         const payoutDays = (inc.payoutDays || '15')
-          .split(',')
-          .map(s => parseInt(s.trim()))
-          .filter(n => !isNaN(n));
-
+          .split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
         payoutDays.forEach(day => {
-          const targetWeek = weeks.find(w => day >= w.startDay && day <= w.endDay);
-          if (targetWeek) {
-            targetWeek.income += amt;
-          } else if (weeks[3]) {
-            weeks[3].income += amt;
-          }
+          const w = weeks.find(w => day >= w.startDay && day <= w.endDay) || weeks[3];
+          if (w) w.income += amt;
         });
       } else if (inc.frequency === 'quarterly' || inc.frequency === 'annual') {
         const payoutMonths = (inc.payoutDays || '')
-          .split(',')
-          .map(s => parseInt(s.trim()))
-          .filter(n => !isNaN(n));
-
-        if (payoutMonths.includes(curMonth)) {
-          if (weeks[2]) {
-            weeks[2].income += amt;
-          }
-        }
+          .split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+        if (payoutMonths.includes(curMonth) && weeks[2]) weeks[2].income += amt;
       } else if (inc.frequency === 'one-time') {
         const dateStr = inc.payoutDays || '';
-        const curMonthStr = `${now.getFullYear()}-${String(curMonth).padStart(2, '0')}`; // YYYY-MM
-        if (dateStr.startsWith(curMonthStr)) {
+        if (dateStr.startsWith(curMonthKey)) {
           const day = parseInt(dateStr.slice(8, 10)) || 15;
-          const targetWeek = weeks.find(w => day >= w.startDay && day <= w.endDay);
-          if (targetWeek) {
-            targetWeek.income += amt;
-          } else if (weeks[3]) {
-            weeks[3].income += amt;
-          }
+          const w = weeks.find(w => day >= w.startDay && day <= w.endDay) || weeks[3];
+          if (w) w.income += amt;
         }
       }
     });
 
-    // Sum expenses for current month across the 4 weeks
-    const curMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`; // YYYY-MM
     _allExpenses.forEach(exp => {
       if ((exp.date || '').startsWith(curMonthKey)) {
         const day = parseInt((exp.date || '').slice(8, 10)) || 1;
-        const targetWeek = weeks.find(w => day >= w.startDay && day <= w.endDay);
-        if (targetWeek) {
-          targetWeek.expense += (Number(exp.amount) || 0);
-        }
+        const w = weeks.find(w => day >= w.startDay && day <= w.endDay);
+        if (w) w.expense += (Number(exp.amount) || 0);
       }
     });
 
     chartData = weeks;
+
   } else if (_chartPeriod === 'ALL') {
     if (titleEl) titleEl.textContent = 'Income vs Expenses (Yearly / Lifetime)';
 
-    // Group by Year
     const yearMap = {};
-    const annualIncome = monthlyIncome * 12;
 
+    // Sum recurring income month-by-month within each year for accuracy
     const getIncomeForYear = (yr) => {
-      const oneTimeInYear = _allIncomes
+      let total = 0;
+      for (let m = 1; m <= 12; m++) {
+        const mKey = `${yr}-${String(m).padStart(2, '0')}`;
+        total += recurringForMonth(mKey);
+      }
+      // Add one-time incomes that occurred in this year
+      total += _allIncomes
         .filter(inc => inc.frequency === 'one-time' && (inc.payoutDays || '').startsWith(yr))
-        .reduce((sum, inc) => sum + (Number(inc.amount) || 0), 0);
-      return annualIncome + oneTimeInYear;
+        .reduce((s, inc) => s + (Number(inc.amount) || 0), 0);
+      return total;
     };
 
     _allExpenses.forEach(exp => {
       const year = (exp.date || '').slice(0, 4) || new Date().getFullYear().toString();
-      if (!yearMap[year]) {
-        yearMap[year] = { label: year, income: getIncomeForYear(year), expense: 0 };
-      }
+      if (!yearMap[year]) yearMap[year] = { label: year, income: getIncomeForYear(year), expense: 0 };
       yearMap[year].expense += (Number(exp.amount) || 0);
     });
 
     const currentYear = new Date().getFullYear().toString();
-    if (!yearMap[currentYear]) {
-      yearMap[currentYear] = { label: currentYear, income: getIncomeForYear(currentYear), expense: 0 };
-    }
+    if (!yearMap[currentYear]) yearMap[currentYear] = { label: currentYear, income: getIncomeForYear(currentYear), expense: 0 };
 
     chartData = Object.keys(yearMap).sort().map(y => yearMap[y]);
+
   } else {
     if (titleEl) titleEl.textContent = 'Income vs Expenses (Monthly)';
 
     const monthMap = {};
     const numMonths = _chartPeriod === '6M' ? 6 : 12;
-
     const now = new Date();
+
     for (let i = numMonths - 1; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const key = `${year}-${month}`;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       const label = d.toLocaleDateString(undefined, { month: 'short' });
-      
-      const oneTimeInMonth = _allIncomes
-        .filter(inc => inc.frequency === 'one-time' && (inc.payoutDays || '').startsWith(key))
-        .reduce((sum, inc) => sum + (Number(inc.amount) || 0), 0);
-
-      monthMap[key] = { label, income: monthlyIncome + oneTimeInMonth, expense: 0 };
+      monthMap[key] = {
+        label,
+        income: recurringForMonth(key) + oneTimeForMonth(key),
+        expense: 0
+      };
     }
 
     _allExpenses.forEach(exp => {
       const mKey = (exp.date || '').slice(0, 7);
-      if (monthMap[mKey]) {
-        monthMap[mKey].expense += (Number(exp.amount) || 0);
-      }
+      if (monthMap[mKey]) monthMap[mKey].expense += (Number(exp.amount) || 0);
     });
 
     chartData = Object.values(monthMap);
@@ -982,6 +987,7 @@ function renderChart() {
   chart.setAttribute('type', 'bar');
   chart.data = chartData;
 }
+
 
 function renderFilterBar() {
   const bar = document.getElementById('typeFilterBar');
@@ -1350,8 +1356,20 @@ function renderIncomesList() {
     return;
   }
 
+  const now = new Date();
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
   const recurring = _allIncomes.filter(i => i.frequency !== 'one-time');
-  const oneTime = _allIncomes.filter(i => i.frequency === 'one-time');
+  const oneTime   = _allIncomes.filter(i => i.frequency === 'one-time');
+
+  // Sort recurring: active first, ended last
+  recurring.sort((a, b) => {
+    const aActive = isIncomeActiveInMonth(a, currentMonthKey);
+    const bActive = isIncomeActiveInMonth(b, currentMonthKey);
+    if (aActive && !bActive) return -1;
+    if (!aActive && bActive) return 1;
+    return 0;
+  });
 
   let html = '';
 
@@ -1360,16 +1378,32 @@ function renderIncomesList() {
     html += recurring.map(inc => {
       const days = inc.payoutDays || '15';
       let suffix = '';
-      if (inc.frequency === 'monthly') suffix = `Day ${days}`;
+      if (inc.frequency === 'monthly')   suffix = `Day ${days}`;
       else if (inc.frequency === 'quarterly') suffix = `Months: ${days}`;
-      else if (inc.frequency === 'annual') suffix = `Month: ${days}`;
+      else if (inc.frequency === 'annual')    suffix = `Month: ${days}`;
+
+      const isActive = isIncomeActiveInMonth(inc, currentMonthKey);
+      const dateRange = (() => {
+        const parts = [];
+        if (inc.startDate) parts.push(`from ${inc.startDate}`);
+        if (inc.endDate)   parts.push(`until ${inc.endDate}`);
+        return parts.length ? parts.join(' ') : 'ongoing';
+      })();
+
+      const statusBadge = isActive
+        ? `<span style="font-size:10px;padding:1px 6px;border-radius:99px;background:var(--accent-bg);color:var(--accent);font-weight:600">active</span>`
+        : `<span style="font-size:10px;padding:1px 6px;border-radius:99px;background:var(--bg);color:var(--text-faint);border:1px solid var(--border)">ended</span>`;
 
       return `
-        <div class="history-item">
+        <div class="history-item" style="${!isActive ? 'opacity:0.55' : ''}">
           <div class="history-meta">
-            <span style="font-weight:500;color:var(--text)">${esc(inc.name)}</span>
+            <span style="font-weight:500;color:var(--text);display:flex;align-items:center;gap:6px">
+              ${esc(inc.name)} ${statusBadge}
+            </span>
             <span style="font-size:12px;color:var(--text-muted)">
-              <span class="col-pos" style="font-weight:600">₱${fmtMoney(inc.amount)}</span> · ${esc(inc.frequency)} · ${esc(suffix)}
+              <span class="col-pos" style="font-weight:600">₱${fmtMoney(inc.amount)}</span>
+              · ${esc(inc.frequency)} · ${esc(suffix)}
+              · <span style="color:var(--text-faint)">${esc(dateRange)}</span>
             </span>
           </div>
           <div style="display:flex;gap:6px;align-items:center">
@@ -1383,22 +1417,20 @@ function renderIncomesList() {
 
   if (oneTime.length > 0) {
     html += `<h4 style="margin: 16px 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted)">One-Time Incomes</h4>`;
-    html += oneTime.map(inc => {
-      return `
-        <div class="history-item">
-          <div class="history-meta">
-            <span style="font-weight:500;color:var(--text)">${esc(inc.name)}</span>
-            <span style="font-size:12px;color:var(--text-muted)">
-              <span class="col-pos" style="font-weight:600">₱${fmtMoney(inc.amount)}</span> · One-time · ${esc(inc.payoutDays)}
-            </span>
-          </div>
-          <div style="display:flex;gap:6px;align-items:center">
-            <button class="btn btn-sm" onclick="editIncome('${inc.id}')">Edit</button>
-            <button class="btn btn-sm btn-danger" onclick="deleteIncome('${inc.id}')">Delete</button>
-          </div>
+    html += oneTime.map(inc => `
+      <div class="history-item">
+        <div class="history-meta">
+          <span style="font-weight:500;color:var(--text)">${esc(inc.name)}</span>
+          <span style="font-size:12px;color:var(--text-muted)">
+            <span class="col-pos" style="font-weight:600">₱${fmtMoney(inc.amount)}</span> · One-time · ${esc(inc.payoutDays)}
+          </span>
         </div>
-      `;
-    }).join('');
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="btn btn-sm" onclick="editIncome('${inc.id}')">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteIncome('${inc.id}')">Delete</button>
+        </div>
+      </div>
+    `).join('');
   }
 
   list.innerHTML = html;
@@ -1418,14 +1450,18 @@ function editIncome(id) {
   } else {
     document.getElementById('fIncPayoutDays').value = inc.payoutDays || '15';
   }
+  document.getElementById('fIncStartDate').value = inc.startDate || '';
+  document.getElementById('fIncEndDate').value   = inc.endDate   || '';
   onIncomeFreqChange();
 }
 
 async function saveIncome() {
-  const name = document.getElementById('fIncName').value.trim();
-  const amount = Math.round(parseFloat(document.getElementById('fIncAmount').value) || 0);
+  const name      = document.getElementById('fIncName').value.trim();
+  const amount    = Math.round(parseFloat(document.getElementById('fIncAmount').value) || 0);
   const frequency = document.getElementById('fIncFreq').value;
-  let payoutDays = '';
+  const startDate = document.getElementById('fIncStartDate').value.trim() || null; // 'YYYY-MM' or null
+  const endDate   = document.getElementById('fIncEndDate').value.trim()   || null; // 'YYYY-MM' or null
+  let payoutDays  = '';
 
   if (frequency === 'one-time') {
     payoutDays = document.getElementById('fIncDate').value || new Date().toISOString().slice(0, 10);
@@ -1437,10 +1473,15 @@ async function saveIncome() {
     toast('Please enter income name and valid positive amount.', true);
     return;
   }
+  if (startDate && endDate && endDate < startDate) {
+    toast('"Active Until" cannot be before "Active From".', true);
+    return;
+  }
 
   const id = _editingIncomeId || 'inc-' + uuid();
   await db.incomes.put({
     id, name, amount, frequency, payoutDays,
+    startDate, endDate,
     updated_at: new Date().toISOString()
   });
 
@@ -1449,6 +1490,8 @@ async function saveIncome() {
   document.getElementById('fIncAmount').value = '';
   document.getElementById('fIncPayoutDays').value = '';
   document.getElementById('fIncDate').value = '';
+  document.getElementById('fIncStartDate').value = '';
+  document.getElementById('fIncEndDate').value = '';
   toast('Income saved.');
   await render();
   renderIncomesList();
