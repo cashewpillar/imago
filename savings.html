@@ -170,8 +170,8 @@ td.actions{text-align:right;white-space:nowrap}
 
 /* Dropdown Menu */
 .dropdown{position:relative;display:inline-block}
-.dropdown-content{display:none;position:absolute;right:0;top:100%;background:var(--surface);min-width:160px;box-shadow:0 4px 20px rgba(0,0,0,0.15);border:1px solid var(--border);border-radius:var(--r);z-index:1000;margin-top:8px;overflow:hidden;padding:4px 0}
-.dropdown-content .btn-flat{display:flex;align-items:center;gap:10px;width:100%;padding:10px 16px;border:none;background:none;color:var(--text);font-size:13px;cursor:pointer;text-align:left;text-decoration:none;font-family:inherit;transition:background .12s}
+.dropdown-content{display:none;position:absolute;right:0;top:100%;background:var(--surface);min-width:200px;box-shadow:0 4px 20px rgba(0,0,0,0.15);border:1px solid var(--border);border-radius:var(--r);z-index:1000;margin-top:8px;overflow:hidden;padding:4px 0}
+.dropdown-content .btn-flat{display:flex;align-items:center;gap:10px;width:100%;padding:10px 16px;border:none;background:none;color:var(--text);font-size:13px;cursor:pointer;text-align:left;text-decoration:none;font-family:inherit;transition:background .12s;white-space:nowrap}
 .dropdown-content .btn-flat:hover{background:var(--bg)}
 .dropdown-content svg{width:14px;height:14px;color:var(--text-muted)}
 .dropdown.open .dropdown-content{display:block}
@@ -241,10 +241,10 @@ td.actions{text-align:right;white-space:nowrap}
   <div class="chart-card">
     <div class="chart-header">
       <div class="filters" id="chartTypeFilters">
-        <span class="filter-chip" data-type="line" onclick="changeChartType('line', this)">History</span>
-        <span class="filter-chip" data-type="yield" onclick="changeChartType('yield', this)">Yield</span>
-        <span class="filter-chip" data-type="donut" onclick="changeChartType('donut', this)">Composition</span>
+        <span class="filter-chip" data-type="line" onclick="changeChartType('line', this)">Balance History</span>
+        <span class="filter-chip" data-type="donut" onclick="changeChartType('donut', this)">Asset Allocation</span>
         <span class="filter-chip" data-type="liquidity" onclick="changeChartType('liquidity', this)">Liquidity</span>
+        <span class="filter-chip" data-type="yield" onclick="changeChartType('yield', this)">Yield</span>
       </div>
     </div>
     <div id="chartWrap" style="display:flex; gap:20px; align-items:stretch;">
