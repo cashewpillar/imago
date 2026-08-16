@@ -74,7 +74,16 @@ td.num{text-align:left;font-variant-numeric:tabular-nums;font-family:var(--mono)
 td.actions{text-align:right;white-space:nowrap}
 
 .tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;background:var(--bg);color:var(--text-muted);border:1px solid var(--border)}
+select.tag{cursor:pointer;outline:none;font-family:inherit}
 .tag.type{background:var(--info-bg);color:var(--info);border-color:transparent}
+select.tag.type{
+  -webkit-appearance:none;-moz-appearance:none;appearance:none;
+  padding-right:16px;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23185fa5' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>");
+  background-repeat:no-repeat;
+  background-position:right 4px center;
+  background-size:8px;
+}
 .tag.source{background:var(--accent-bg);color:var(--accent);border-color:transparent}
 
 .icon-btn{background:none;border:none;cursor:pointer;color:var(--text-faint);padding:3px 5px;border-radius:var(--r);display:inline-flex;align-items:center}
@@ -993,23 +1002,44 @@ function renderTable() {
     return;
   }
 
-  const typeMap = Object.fromEntries(_allTypes.map(t => [t.id, t.name]));
   const accMap = Object.fromEntries(_allAccounts.map(a => [a.id, a.label || a.key]));
+  const sortedTypes = [..._allTypes].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
-  tbody.innerHTML = filtered.map(e => `
-    <tr>
-      <td style="font-family:var(--mono);font-size:12px;color:var(--text-muted)">${esc(e.date || '—')}</td>
-      <td><strong>${esc(e.name)}</strong>${e.note ? `<div style="font-size:11px;color:var(--text-faint);font-style:italic">${esc(e.note)}</div>` : ''}</td>
-      <td><span class="tag type">${esc(typeMap[e.typeId] || 'General')}</span></td>
-      <td>${e.accountId ? `<span class="tag source">${esc(accMap[e.accountId] || 'Account')}</span>` : '<span style="color:var(--text-faint);font-size:11px">—</span>'}</td>
-      <td class="num col-neg">-₱${fmtMoney(e.amount)}</td>
-      <td class="actions">
-        <button class="icon-btn" onclick="editExpense('${e.id}')" title="Edit">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 13l2 2 10-10L12 3 2 13zM9 5l2 2"/></svg>
-        </button>
-      </td>
-    </tr>
-  `).join('');
+  tbody.innerHTML = filtered.map(e => {
+    const typeOptions = `
+      <option value="">General</option>
+      ${sortedTypes.map(t => `<option value="${t.id}" ${t.id === e.typeId ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}
+    `;
+
+    return `
+      <tr>
+        <td style="font-family:var(--mono);font-size:12px;color:var(--text-muted)">${esc(e.date || '—')}</td>
+        <td><strong>${esc(e.name)}</strong>${e.note ? `<div style="font-size:11px;color:var(--text-faint);font-style:italic">${esc(e.note)}</div>` : ''}</td>
+        <td>
+          <select class="tag type" onchange="updateExpenseType('${e.id}', this.value)">
+            ${typeOptions}
+          </select>
+        </td>
+        <td>${e.accountId ? `<span class="tag source">${esc(accMap[e.accountId] || 'Account')}</span>` : '<span style="color:var(--text-faint);font-size:11px">—</span>'}</td>
+        <td class="num col-neg">-₱${fmtMoney(e.amount)}</td>
+        <td class="actions">
+          <button class="icon-btn" onclick="editExpense('${e.id}')" title="Edit">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 13l2 2 10-10L12 3 2 13zM9 5l2 2"/></svg>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function updateExpenseType(expenseId, typeId) {
+  const exp = await db.expenses.get(expenseId);
+  if (!exp) return;
+  exp.typeId = typeId || '';
+  exp.updated_at = new Date().toISOString();
+  await db.expenses.put(exp);
+  toast('Expense type updated.');
+  await render();
 }
 
 function populateDropdowns() {
