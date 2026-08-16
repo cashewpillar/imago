@@ -1146,7 +1146,9 @@ async function editAccount(id) {
   syncBalanceSign((a.balance??0) < 0);
 
   // Render per-account history
-  const history = await db.logs.where('accountId').equals(id).reverse().limit(10).toArray();
+  let history = await db.logs.where('accountId').equals(id).toArray();
+  history.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  history = history.slice(0, 10);
   const list = document.getElementById('accountHistoryList');
   const section = document.getElementById('accountHistorySection');
   
