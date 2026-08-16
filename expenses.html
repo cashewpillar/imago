@@ -212,6 +212,7 @@ select.tag.type{
       <span class="filter-chip" onclick="setChartPeriod('1Y', this)">1Y</span>
       <span class="filter-chip" onclick="setChartPeriod('ALL', this)">ALL</span>
     </div>
+    <div class="filters" id="chartTypeFilters" style="margin-top:6px"></div>
   </div>
 
   <!-- Expenses Table Section -->
@@ -426,6 +427,10 @@ db.version(6).stores({
 let _editExpenseId = null;
 let _activeTypeFilter = localStorage.getItem('imago-expenses-active-type-filter') || 'all';
 let _chartPeriod = localStorage.getItem('imago-expenses-chart-period') || 'MONTH';
+let _chartTypeFilter = (() => {
+  try { return JSON.parse(localStorage.getItem('imago-expenses-chart-type-filter-v2')) || ['all']; }
+  catch { return ['all']; }
+})();
 let _allAccounts = [];
 let _allTypes = [];
 let _allExpenses = [];
@@ -778,11 +783,64 @@ async function render() {
 
   await loadData();
   renderSummary();
+  renderChartTypeFilter();
   renderChart();
   renderFilterBar();
   renderTable();
   populateDropdowns();
 }
+
+function renderChartTypeFilter() {
+  const bar = document.getElementById('chartTypeFilters');
+  if (!bar) return;
+
+  // Validate saved filters still exist
+  const validIds = new Set(_allTypes.map(t => t.id));
+  let cleanFilters = _chartTypeFilter.filter(id => id === 'all' || validIds.has(id));
+  if (cleanFilters.length === 0) {
+    cleanFilters = ['all'];
+  }
+  _chartTypeFilter = cleanFilters;
+  localStorage.setItem('imago-expenses-chart-type-filter-v2', JSON.stringify(_chartTypeFilter));
+
+  const chips = [{ id: 'all', name: 'All types' }, ..._allTypes];
+  bar.innerHTML = chips.map(t => {
+    const isActive = _chartTypeFilter.includes(t.id);
+    return `
+      <span class="filter-chip ${isActive ? 'active' : ''}"
+            onclick="toggleChartTypeFilter('${t.id}')">
+        ${esc(t.name)}
+      </span>
+    `;
+  }).join('');
+}
+
+function toggleChartTypeFilter(typeId) {
+  if (typeId === 'all') {
+    _chartTypeFilter = ['all'];
+  } else {
+    // Remove 'all' if selected
+    _chartTypeFilter = _chartTypeFilter.filter(id => id !== 'all');
+    
+    if (_chartTypeFilter.includes(typeId)) {
+      // Toggle off
+      _chartTypeFilter = _chartTypeFilter.filter(id => id !== typeId);
+    } else {
+      // Toggle on
+      _chartTypeFilter.push(typeId);
+    }
+    
+    // If empty, fallback to 'all'
+    if (_chartTypeFilter.length === 0) {
+      _chartTypeFilter = ['all'];
+    }
+  }
+  
+  localStorage.setItem('imago-expenses-chart-type-filter-v2', JSON.stringify(_chartTypeFilter));
+  renderChartTypeFilter();
+  renderChart();
+}
+
 
 // ── Income date-range helpers ─────────────────────────────────────────────────
 // monthKey = 'YYYY-MM'. Returns true if the income was active during that month.
@@ -855,6 +913,15 @@ function renderChart() {
   const chart = document.getElementById('expenseChart');
   const empty = document.getElementById('chartEmpty');
 
+  const isFiltered = !_chartTypeFilter.includes('all');
+  const selectedTypeName = !isFiltered 
+    ? 'Expenses' 
+    : _chartTypeFilter.map(id => _allTypes.find(t => t.id === id)?.name).filter(Boolean).join(', ');
+
+  const filteredExpenses = !isFiltered
+    ? _allExpenses
+    : _allExpenses.filter(exp => _chartTypeFilter.includes(exp.typeId));
+
   // Helper: total recurring income for a given YYYY-MM key (respects date ranges)
   const recurringForMonth = (monthKey) =>
     _allIncomes.reduce((s, inc) => s + incomeAmountForMonth(inc, monthKey), 0);
@@ -871,7 +938,7 @@ function renderChart() {
   if (_chartPeriod === 'MONTH') {
     const now = new Date();
     const curMonthName = now.toLocaleDateString(undefined, { month: 'short' });
-    if (titleEl) titleEl.textContent = `Income vs Expenses (${curMonthName} · 4 Weeks)`;
+    if (titleEl) titleEl.textContent = `Income vs ${selectedTypeName} (${curMonthName} · 4 Weeks)`;
 
     const curMonth = now.getMonth() + 1; // 1-12
     const curMonthKey = `${now.getFullYear()}-${String(curMonth).padStart(2, '0')}`;
@@ -883,33 +950,35 @@ function renderChart() {
       { key: 'W4', label: 'W4 (22+)',  startDay: 22, endDay: 31, income: 0, expense: 0 }
     ];
 
-    // Distribute income into the respective week based on payout days — respecting date ranges
-    _allIncomes.forEach(inc => {
-      if (!isIncomeActiveInMonth(inc, curMonthKey)) return;
-      const amt = Number(inc.amount) || 0;
+    if (!isFiltered) {
+      // Distribute income into the respective week based on payout days — respecting date ranges
+      _allIncomes.forEach(inc => {
+        if (!isIncomeActiveInMonth(inc, curMonthKey)) return;
+        const amt = Number(inc.amount) || 0;
 
-      if (inc.frequency === 'monthly') {
-        const payoutDays = (inc.payoutDays || '15')
-          .split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
-        payoutDays.forEach(day => {
-          const w = weeks.find(w => day >= w.startDay && day <= w.endDay) || weeks[3];
-          if (w) w.income += amt;
-        });
-      } else if (inc.frequency === 'quarterly' || inc.frequency === 'annual') {
-        const payoutMonths = (inc.payoutDays || '')
-          .split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
-        if (payoutMonths.includes(curMonth) && weeks[2]) weeks[2].income += amt;
-      } else if (inc.frequency === 'one-time') {
-        const dateStr = inc.payoutDays || '';
-        if (dateStr.startsWith(curMonthKey)) {
-          const day = parseInt(dateStr.slice(8, 10)) || 15;
-          const w = weeks.find(w => day >= w.startDay && day <= w.endDay) || weeks[3];
-          if (w) w.income += amt;
+        if (inc.frequency === 'monthly') {
+          const payoutDays = (inc.payoutDays || '15')
+            .split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+          payoutDays.forEach(day => {
+            const w = weeks.find(w => day >= w.startDay && day <= w.endDay) || weeks[3];
+            if (w) w.income += amt;
+          });
+        } else if (inc.frequency === 'quarterly' || inc.frequency === 'annual') {
+          const payoutMonths = (inc.payoutDays || '')
+            .split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+          if (payoutMonths.includes(curMonth) && weeks[2]) weeks[2].income += amt;
+        } else if (inc.frequency === 'one-time') {
+          const dateStr = inc.payoutDays || '';
+          if (dateStr.startsWith(curMonthKey)) {
+            const day = parseInt(dateStr.slice(8, 10)) || 15;
+            const w = weeks.find(w => day >= w.startDay && day <= w.endDay) || weeks[3];
+            if (w) w.income += amt;
+          }
         }
-      }
-    });
+      });
+    }
 
-    _allExpenses.forEach(exp => {
+    filteredExpenses.forEach(exp => {
       if ((exp.date || '').startsWith(curMonthKey)) {
         const day = parseInt((exp.date || '').slice(8, 10)) || 1;
         const w = weeks.find(w => day >= w.startDay && day <= w.endDay);
@@ -920,12 +989,13 @@ function renderChart() {
     chartData = weeks;
 
   } else if (_chartPeriod === 'ALL') {
-    if (titleEl) titleEl.textContent = 'Income vs Expenses (Yearly / Lifetime)';
+    if (titleEl) titleEl.textContent = `Income vs ${selectedTypeName} (Yearly / Lifetime)`;
 
     const yearMap = {};
 
     // Sum recurring income month-by-month within each year for accuracy
     const getIncomeForYear = (yr) => {
+      if (isFiltered) return 0;
       let total = 0;
       for (let m = 1; m <= 12; m++) {
         const mKey = `${yr}-${String(m).padStart(2, '0')}`;
@@ -938,7 +1008,7 @@ function renderChart() {
       return total;
     };
 
-    _allExpenses.forEach(exp => {
+    filteredExpenses.forEach(exp => {
       const year = (exp.date || '').slice(0, 4) || new Date().getFullYear().toString();
       if (!yearMap[year]) yearMap[year] = { label: year, income: getIncomeForYear(year), expense: 0 };
       yearMap[year].expense += (Number(exp.amount) || 0);
@@ -950,7 +1020,7 @@ function renderChart() {
     chartData = Object.keys(yearMap).sort().map(y => yearMap[y]);
 
   } else {
-    if (titleEl) titleEl.textContent = 'Income vs Expenses (Monthly)';
+    if (titleEl) titleEl.textContent = `Income vs ${selectedTypeName} (Monthly)`;
 
     const monthMap = {};
     const numMonths = _chartPeriod === '6M' ? 6 : 12;
@@ -962,14 +1032,16 @@ function renderChart() {
       const label = d.toLocaleDateString(undefined, { month: 'short' });
       monthMap[key] = {
         label,
-        income: recurringForMonth(key) + oneTimeForMonth(key),
+        income: isFiltered ? 0 : (recurringForMonth(key) + oneTimeForMonth(key)),
         expense: 0
       };
     }
 
-    _allExpenses.forEach(exp => {
+    filteredExpenses.forEach(exp => {
       const mKey = (exp.date || '').slice(0, 7);
-      if (monthMap[mKey]) monthMap[mKey].expense += (Number(exp.amount) || 0);
+      if (monthMap[mKey]) {
+        monthMap[mKey].expense += (Number(exp.amount) || 0);
+      }
     });
 
     chartData = Object.values(monthMap);
