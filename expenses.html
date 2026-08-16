@@ -207,7 +207,7 @@ select.tag.type{
       <imago-chart id="expenseChart" style="display:none"></imago-chart>
     </div>
     <div class="filters" id="chartPeriodFilters" style="margin-top:12px">
-      <span class="filter-chip active" onclick="setChartPeriod('MONTH', this)">4W</span>
+      <span class="filter-chip" onclick="setChartPeriod('MONTH', this)">4W</span>
       <span class="filter-chip" onclick="setChartPeriod('6M', this)">6M</span>
       <span class="filter-chip" onclick="setChartPeriod('1Y', this)">1Y</span>
       <span class="filter-chip" onclick="setChartPeriod('ALL', this)">ALL</span>
@@ -414,8 +414,8 @@ db.version(6).stores({
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let _editExpenseId = null;
-let _activeTypeFilter = 'all';
-let _chartPeriod = 'MONTH';
+let _activeTypeFilter = localStorage.getItem('imago-expenses-active-type-filter') || 'all';
+let _chartPeriod = localStorage.getItem('imago-expenses-chart-period') || 'MONTH';
 let _allAccounts = [];
 let _allTypes = [];
 let _allExpenses = [];
@@ -754,6 +754,18 @@ async function loadData() {
 }
 
 async function render() {
+  // Adjust chart period visual filter state on load synchronously to avoid flickering
+  const savedPeriod = localStorage.getItem('imago-expenses-chart-period') || 'MONTH';
+  _chartPeriod = savedPeriod;
+  document.querySelectorAll('#chartPeriodFilters .filter-chip').forEach(c => {
+    const onclickAttr = c.getAttribute('onclick') || '';
+    if (onclickAttr.includes(`'${savedPeriod}'`)) {
+      c.classList.add('active');
+    } else {
+      c.classList.remove('active');
+    }
+  });
+
   await loadData();
   renderSummary();
   renderChart();
@@ -805,6 +817,7 @@ function renderSummary() {
 
 function setChartPeriod(period, el) {
   _chartPeriod = period;
+  localStorage.setItem('imago-expenses-chart-period', period);
   document.querySelectorAll('#chartPeriodFilters .filter-chip').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
   renderChart();
@@ -976,6 +989,12 @@ function renderFilterBar() {
   const types = [{ id: 'all', name: 'All' }];
   if (hasGeneral) types.push({ id: '__general__', name: 'General' });
   types.push(..._allTypes);
+
+  if (!types.some(t => t.id === _activeTypeFilter)) {
+    _activeTypeFilter = 'all';
+    localStorage.setItem('imago-expenses-active-type-filter', 'all');
+  }
+
   bar.innerHTML = types.map(t => `
     <span class="filter-chip ${_activeTypeFilter === t.id ? 'active' : ''}" onclick="setTypeFilter('${t.id}')">
       ${esc(t.name)}
@@ -985,6 +1004,7 @@ function renderFilterBar() {
 
 function setTypeFilter(typeId) {
   _activeTypeFilter = typeId;
+  localStorage.setItem('imago-expenses-active-type-filter', typeId);
   renderFilterBar();
   renderTable();
 }
