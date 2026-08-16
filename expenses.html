@@ -963,7 +963,10 @@ function renderChart() {
 
 function renderFilterBar() {
   const bar = document.getElementById('typeFilterBar');
-  const types = [{ id: 'all', name: 'All' }, ..._allTypes];
+  const hasGeneral = _allExpenses.some(e => !e.typeId);
+  const types = [{ id: 'all', name: 'All' }];
+  if (hasGeneral) types.push({ id: '__general__', name: 'General' });
+  types.push(..._allTypes);
   bar.innerHTML = types.map(t => `
     <span class="filter-chip ${_activeTypeFilter === t.id ? 'active' : ''}" onclick="setTypeFilter('${t.id}')">
       ${esc(t.name)}
@@ -979,9 +982,11 @@ function setTypeFilter(typeId) {
 
 function renderTable() {
   const tbody = document.getElementById('expensesTbody');
-  const filtered = _activeTypeFilter === 'all' 
-    ? _allExpenses 
-    : _allExpenses.filter(e => e.typeId === _activeTypeFilter);
+  const filtered = _activeTypeFilter === 'all'
+    ? _allExpenses
+    : _activeTypeFilter === '__general__'
+      ? _allExpenses.filter(e => !e.typeId)
+      : _allExpenses.filter(e => e.typeId === _activeTypeFilter);
 
   if (filtered.length === 0) {
     tbody.innerHTML = `<tr><td colspan="6" class="empty">No expenses logged yet.</td></tr>`;
