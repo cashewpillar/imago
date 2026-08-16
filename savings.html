@@ -140,11 +140,18 @@ td.actions{text-align:right;white-space:nowrap}
 .target-row label{font-size:12px;font-weight:500;text-transform:capitalize}
 .target-row input[type="number"]{padding:4px 2px 4px 6px;font-size:11px;border:1px solid var(--border);border-radius:4px;width:100%;text-align:right;font-family:monospace}
 .target-amt{font-size:11px;color:var(--text-muted);text-align:right;font-family:monospace}
+.target-num-wrap{display:flex;align-items:center;gap:3px}
+.step-btn{display:none;background:var(--bg);border:1px solid var(--border);border-radius:4px;width:26px;height:26px;font-size:14px;cursor:pointer;color:var(--text-muted);flex-shrink:0;align-items:center;justify-content:center;line-height:1;padding:0;user-select:none}
+.step-btn:active{background:var(--border-strong);color:var(--text)}
 @media(max-width:480px){
-  .target-row{grid-template-columns:22px 1fr 64px 70px;grid-template-rows:auto auto;gap:6px 8px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+  .target-row{grid-template-columns:22px 1fr auto 70px;grid-template-rows:auto auto;gap:6px 8px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)}
   .target-row .lock-btn{grid-column:1;grid-row:1}
   .target-row label{grid-column:2;grid-row:1}
-  .target-row input[type="number"]{grid-column:3;grid-row:1;width:64px}
+  .target-row .target-num-wrap{grid-column:3;grid-row:1}
+  .target-row input[type="number"]{width:42px;-moz-appearance:textfield}
+  .target-row input[type="number"]::-webkit-inner-spin-button,
+  .target-row input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+  .step-btn{display:flex}
   .target-amt{grid-column:4;grid-row:1}
   .target-row input[type="range"]{grid-column:1/-1;grid-row:2;width:100%}
 }
@@ -496,7 +503,11 @@ function openTargetModal() {
       </button>
       <label>${t}</label>
       <input type="range" min="0" max="100" step="0.1" value="${_targets[t]||0}" oninput="onTargetChange('${t}', this.value, 'range')">
-      <input type="number" min="0" max="100" step="0.1" value="${(_targets[t]||0).toFixed(1)}" oninput="onTargetChange('${t}', this.value, 'number')">
+      <div class="target-num-wrap">
+        <button class="step-btn" type="button" onclick="stepTarget('${t}', -0.1)" aria-label="Decrease">‹</button>
+        <input type="number" min="0" max="100" step="0.1" value="${(_targets[t]||0).toFixed(1)}" oninput="onTargetChange('${t}', this.value, 'number')">
+        <button class="step-btn" type="button" onclick="stepTarget('${t}', 0.1)" aria-label="Increase">›</button>
+      </div>
       <span class="target-amt" id="amt-${t}">₱0</span>
     </div>
   `).join('');
@@ -513,6 +524,12 @@ function toggleLock(tag, btn) {
       ? '<rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5 7V5a3 3 0 016 0v2"/>'
       : '<rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5 7V4.5a3 3 0 014.5-2.6"/>'}
   </svg>`;
+}
+
+function stepTarget(tag, delta) {
+  const cur = _targets[tag] || 0;
+  const next = Math.max(0, Math.min(100, +(cur + delta).toFixed(1)));
+  onTargetChange(tag, String(next), 'step');
 }
 
 function onTargetChange(tag, val, source) {
