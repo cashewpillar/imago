@@ -421,7 +421,7 @@
   <!-- Paste zone -->
   <div class="paste-card">
     <div class="paste-label">Paste JSON data</div>
-    <textarea id="json-input" placeholder='Paste your JSON here — e.g. Meralco website > Network tab > filter "list/" > Copy Response'></textarea>
+    <textarea id="json-input" placeholder='Paste your JSON here — e.g. Meralco website > Network tab > filter "v3" or "list/" > Copy Response'></textarea>
     <div class="parse-row">
       <button class="btn-primary" onclick="parseData()">Parse</button>
       <button onclick="clearAll()">Clear</button>
@@ -534,15 +534,94 @@
     }
   }
 
+  function parseMultipleJson(str) {
+    const objects = [];
+    let braceCount = 0;
+    let startIdx = -1;
+    let inString = false;
+    let escape = false;
+
+    for (let i = 0; i < str.length; i++) {
+      const char = str[i];
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (char === '\\') {
+        escape = true;
+        continue;
+      }
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (!inString) {
+        if (char === '{') {
+          if (braceCount === 0) {
+            startIdx = i;
+          }
+          braceCount++;
+        } else if (char === '}') {
+          braceCount--;
+          if (braceCount === 0 && startIdx !== -1) {
+            const subStr = str.substring(startIdx, i + 1);
+            try {
+              objects.push(JSON.parse(subStr));
+            } catch (e) {
+              // ignore invalid partial JSONs
+            }
+          }
+        }
+      }
+    }
+    return objects;
+  }
+
   function parseData() {
     const raw = document.getElementById('json-input').value.trim();
     if (!raw) return;
     try {
-      const parsed = JSON.parse(raw);
-      const arr = Array.isArray(parsed)
-        ? parsed
-        : (parsed.result || parsed.data || Object.values(parsed)[0]);
-      if (!Array.isArray(arr)) throw new Error('No array found in pasted data.');
+      let jsonObjects = [];
+      if (raw.startsWith('[') || raw.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(raw);
+          jsonObjects = [parsed];
+        } catch (e) {
+          jsonObjects = parseMultipleJson(raw);
+        }
+      } else {
+        jsonObjects = parseMultipleJson(raw);
+      }
+
+      if (jsonObjects.length === 0) {
+        throw new Error('No valid JSON objects found in pasted data.');
+      }
+
+      let arr = [];
+      for (const obj of jsonObjects) {
+        let items = [];
+        if (Array.isArray(obj)) {
+          items = obj;
+        } else if (obj && typeof obj === 'object') {
+          if (obj.pagination && Array.isArray(obj.pagination.result)) {
+            items = obj.pagination.result;
+          } else if (Array.isArray(obj.result)) {
+            items = obj.result;
+          } else if (Array.isArray(obj.data)) {
+            items = obj.data;
+          } else {
+            const arrayProp = Object.values(obj).find(val => Array.isArray(val));
+            if (arrayProp) {
+              items = arrayProp;
+            }
+          }
+        }
+        arr = arr.concat(items);
+      }
+
+      if (!arr.length) {
+        throw new Error('No array of records found in pasted data.');
+      }
 
       const parseAmt = val => {
         if (typeof val === 'number') return val;
