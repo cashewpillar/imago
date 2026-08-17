@@ -8,6 +8,7 @@ const APP_SHELL = [
   './expenses.html',
   './food-v2.html',
   './meralco-multi-account.html',
+  './prompt-track.html',
   './savings.html',
   './archive/architect.html',
   './archive/commonplace.html',

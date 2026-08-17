@@ -4,7 +4,7 @@
    (from the old "table of tables" version) is migrated in automatically the
    first time the app runs, so existing data isn't lost. */
 
-const db = new Dexie('TableVaultDB');
+const db = new Dexie('PromptTrackDB');
 db.version(1).stores({ vaults:'++id,name', entries:'++id,tableId,createdAt' });
 db.version(2).stores({ vaults:'++id,name,sourceTrackerId', entries:'++id,tableId,createdAt,sourceRowUid,sourceTrackerId' });
 db.version(3).stores({ vaults:'++id,name,sourceTrackerId', entries:'++id,tableId,createdAt,sourceRowUid,sourceTrackerId', records:'++id,createdAt' });
