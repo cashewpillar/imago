@@ -837,14 +837,14 @@ function renderSummary(accounts) {
       <div class="sub">credit / negative</div>
     </div>
     <div class="sum-card" onclick="openYieldBreakdown()" style="cursor:pointer" title="Click for breakdown">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-        <div class="lbl" style="margin-bottom:0">Est. yield (net)</div>
-        <label style="font-size:9px; color:var(--text-faint); display:flex; align-items:center; gap:3px; cursor:pointer;" onclick="event.stopPropagation()">
-          <input type="checkbox" ${_excludeTD ? 'checked' : ''} onchange="_excludeTD=this.checked; render();" style="width:10px; height:10px;">
-          Excl. TD
-        </label>
+      <div style="margin-bottom:4px;">
+        <div class="lbl" style="margin-bottom:2px">Est. yield (net)</div>
       </div>
       <div class="val col-warn">₱${fmtk(netYld)}</div>
+      <label style="font-size:9px; color:var(--text-faint); display:inline-flex; align-items:center; gap:3px; cursor:pointer;" onclick="event.stopPropagation()">
+        <input type="checkbox" ${_excludeTD ? 'checked' : ''} onchange="_excludeTD=this.checked; render();" style="width:10px; height:10px;">
+          Excl. TD
+      </label>
       <div style="margin-top:10px; padding-top:8px; border-top:1px dashed var(--border); font-family:var(--mono); font-size:10px; line-height:1.6; color:var(--text-muted);">
         <div style="display:flex; justify-content:space-between;"><span>Gross Yld</span> <span>+₱${fmtk(grossYld)}</span></div>
         <div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border-strong); padding-bottom:2px; margin-bottom:2px;"><span>Tax (20%)</span> <span class="col-neg">-₱${fmtk(grossYld * 0.2)}</span></div>

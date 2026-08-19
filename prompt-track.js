@@ -76,7 +76,7 @@ function saveConfig(patch){
 function renderTitle(){
   const el = document.getElementById('app-title');
   if(el) el.textContent = (config.icon||'')+' '+(config.name||'');
-  document.title = 'TableVault — '+(config.name||'My Table');
+  document.title = 'Prompt Track';
 }
 
 /* ── ONE-TIME MIGRATION FROM OLD MULTI-TABLE VERSION ── */
