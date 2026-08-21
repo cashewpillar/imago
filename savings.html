@@ -335,10 +335,11 @@ td.actions{text-align:right;white-space:nowrap}
           <th data-col="label" onclick="sortBy('label')">Account</th>
           <th class="num" data-col="balance" onclick="sortBy('balance')">Balance</th>
           <th data-col="rate" onclick="sortBy('rate')">Rate</th>
-          <th data-col="maturity" onclick="sortBy('maturity')">Maturity</th>
+          <th data-col="maturity" onclick="sortBy('maturity')" id="thMaturity">Maturity</th>
+          <th data-col="openDate" onclick="sortBy('openDate')">Open Date</th>
         </tr>
       </thead>
-      <tbody id="accountsTbody"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
+      <tbody id="accountsTbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
     </table>
   </div>
 
@@ -369,16 +370,19 @@ td.actions{text-align:right;white-space:nowrap}
       <div class="form-row"><label>Balance</label><div style="display:flex;gap:6px;align-items:center"><button type="button" id="fBalanceSign" onclick="toggleBalanceSign()" style="flex-shrink:0;width:32px;height:32px;border:1px solid var(--border-strong);border-radius:var(--r);background:var(--surface);color:var(--text);font-size:15px;cursor:pointer;font-family:var(--mono);line-height:1;transition:background .15s,color .15s" title="Toggle sign">+</button><input type="number" id="fBalance" step="0.01" placeholder="0" min="0" style="flex:1"></div></div>
       <div class="form-row"><label>Rate (%)</label><input type="number" id="fRate" step="0.01" placeholder="0"></div>
     </div>
-    <div class="form-row"><label>Tag</label>
-      <select id="fTag" onchange="syncBalanceSign(this.value==='credit'); onLabelInput(); onTagChange()">
-        <option value="savings">savings</option>
-        <option value="equities">equities</option>
-        <option value="td">time deposit</option>
-        <option value="buffer">buffer</option>
-        <option value="cash">cash</option>
-        <option value="credit">credit</option>
-        <option value="illiquid">illiquid</option>
-      </select>
+    <div class="form-grid">
+      <div class="form-row"><label>Tag</label>
+        <select id="fTag" onchange="syncBalanceSign(this.value==='credit'); onLabelInput(); onTagChange()">
+          <option value="savings">savings</option>
+          <option value="equities">equities</option>
+          <option value="td">time deposit</option>
+          <option value="buffer">buffer</option>
+          <option value="cash">cash</option>
+          <option value="credit">credit</option>
+          <option value="illiquid">illiquid</option>
+        </select>
+      </div>
+      <div class="form-row"><label>Open Date</label><input type="date" id="fOpenDate" oninput="onTermChange()"></div>
     </div>
     <div class="form-grid">
       <div class="form-row" id="tdTermRow" style="display:none">
@@ -554,6 +558,25 @@ realDb.version(7).stores({
   return tx.accounts.toCollection().modify(acc => {
     if (!acc.status) acc.status = 'open';
   });
+});
+realDb.version(8).stores({
+  accounts: 'id,key,label',
+  history: 'id,date',
+  logs: 'id,accountId,date,expenseId',
+  expenses: 'id,date,typeId,accountId',
+  expenseTypes: 'id,name',
+  incomes: 'id,name,frequency',
+  rateChanges: 'id,accountId,date'
+}).upgrade(async tx => {
+  const accounts = await tx.accounts.toArray();
+  for (const acc of accounts) {
+    if (acc.openDate) continue;
+    const accLogs = await tx.logs.where('accountId').equals(acc.id).toArray();
+    let earliest = null;
+    accLogs.forEach(l => { if (l.date && (!earliest || l.date < earliest)) earliest = l.date; });
+    const openDate = (earliest || acc.updated_at || new Date().toISOString()).slice(0, 10);
+    await tx.accounts.update(acc.id, { openDate });
+  }
 });
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -823,7 +846,7 @@ function sortBy(col) {
     _sortDir = _sortDir === 'asc' ? 'desc' : 'asc';
   } else {
     _sortCol = col;
-    _sortDir = col === 'label' || col === 'tag' || col === 'maturity' ? 'asc' : 'desc';
+    _sortDir = col === 'label' || col === 'tag' || col === 'maturity' || col === 'openDate' ? 'asc' : 'desc';
   }
   renderTable(window._allAccounts);
 }
@@ -1182,11 +1205,17 @@ function renderTable(allAccounts) {
     if (_sortCol === 'balance') { vA = a.balance || 0; vB = b.balance || 0; }
     else if (_sortCol === 'rate') { vA = a.rate || 0; vB = b.rate || 0; }
     else if (_sortCol === 'tag') { vA = (a.tags || [''])[0]; vB = (b.tags || [''])[0]; }
-    else if (_sortCol === 'maturity') { 
+    else if (_sortCol === 'maturity') {
       if (!a.maturity && !b.maturity) return 0;
       if (!a.maturity) return 1;
       if (!b.maturity) return -1;
-      vA = a.maturity; vB = b.maturity; 
+      vA = a.maturity; vB = b.maturity;
+    }
+    else if (_sortCol === 'openDate') {
+      if (!a.openDate && !b.openDate) return 0;
+      if (!a.openDate) return 1;
+      if (!b.openDate) return -1;
+      vA = a.openDate; vB = b.openDate;
     }
     else { vA = (a.label || a.key || '').toLowerCase(); vB = (b.label || b.key || '').toLowerCase(); }
 
@@ -1195,9 +1224,13 @@ function renderTable(allAccounts) {
     return 0;
   });
 
+  const showMaturityCol = _activeTag === 'all' || _activeTag === 'td' || _activeTag === 'equities';
+  document.getElementById('thMaturity').style.display = showMaturityCol ? '' : 'none';
+  const colCount = showMaturityCol ? 5 : 4;
+
   const tbody = document.getElementById('accountsTbody');
   if (accounts.length===0) {
-    tbody.innerHTML = `<tr><td colspan="5" class="empty">No accounts${_activeTag!=='all' ? ' tagged "'+esc(_activeTag)+'"' : ''}.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${colCount}" class="empty">No accounts${_activeTag!=='all' ? ' tagged "'+esc(_activeTag)+'"' : ''}.</td></tr>`;
     return;
   }
   tbody.innerHTML = accounts.map(a => {
@@ -1236,6 +1269,10 @@ function renderTable(allAccounts) {
       }
     }
 
+    const openDisp = a.openDate
+      ? new Date(a.openDate).toLocaleDateString(undefined, {day:'numeric', month:'short', year:'numeric', timeZone:'UTC'})
+      : '—';
+
     return `<tr onclick="editAccount('${esc(a.id)}')" style="cursor:pointer">
       <td>
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
@@ -1249,10 +1286,11 @@ function renderTable(allAccounts) {
         <span class="rate-badge">${a.rate!=null ? a.rate+'%' : '—'}</span>
         ${yldAnn ? `<div class="yield-micro">~₱${fmtk(yldAnn)}/yr</div>` : ''}
       </td>
-      <td>
+      ${showMaturityCol ? `<td>
         <div class="maturity">${matDisp}</div>
         ${matBadge}
-      </td>
+      </td>` : ''}
+      <td>${openDisp}</td>
     </tr>`;
   }).join('');
 }
@@ -1326,7 +1364,8 @@ function onTermChange() {
   if (_maturityManuallyEdited) return;
   const months = termToMonths(currentTermValue());
   if (months == null) return;
-  const d = new Date();
+  const openVal = document.getElementById('fOpenDate').value;
+  const d = openVal ? new Date(openVal + 'T00:00:00') : new Date();
   d.setMonth(d.getMonth() + months);
   document.getElementById('fMaturity').value = d.toISOString().slice(0,10);
 }
@@ -1339,6 +1378,7 @@ function openAddAccount() {
   document.getElementById('accountModalTitle').textContent = 'Add account';
   ['fKey','fLabel','fBalance','fRate','fMaturity','fNote','fChangeNote'].forEach(id => document.getElementById(id).value='');
   document.getElementById('fTag').value = 'savings';
+  document.getElementById('fOpenDate').value = new Date().toISOString().slice(0,10);
   applyTermValue(null);
   document.getElementById('accountHistorySection').style.display = 'none';
   document.getElementById('rateHistorySection').style.display = 'none';
@@ -1366,6 +1406,7 @@ async function editAccount(id) {
   document.getElementById('fNote').value     = a.note||'';
   document.getElementById('fChangeNote').value = '';
   document.getElementById('fTag').value      = (a.tags||['savings'])[0];
+  document.getElementById('fOpenDate').value = a.openDate || '';
   applyTermValue(a.term || null);
   document.getElementById('changeReasonRow').style.display = 'block';
   document.getElementById('btnDeleteAccount').style.display = 'inline-block';
@@ -1445,6 +1486,7 @@ async function saveAccount() {
   const showMaturity = tag === 'td' || tag === 'equities';
   const note  = document.getElementById('fNote').value.trim();
   const changeNote = document.getElementById('fChangeNote').value.trim();
+  const openDate = document.getElementById('fOpenDate').value.trim();
 
   if (!key||!label) { toast('Key and label required.', true); return; }
 
@@ -1466,6 +1508,7 @@ async function saveAccount() {
     tags:       [tag],
     term,
     maturity:   mat||null,
+    openDate:   openDate || existing?.openDate || null,
     note:       note||null,
     status:     existing?.status || 'open',
     updated_at: new Date().toISOString()

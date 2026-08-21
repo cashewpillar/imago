@@ -496,6 +496,25 @@ realDb.version(7).stores({
     if (!acc.status) acc.status = 'open';
   });
 });
+realDb.version(8).stores({
+  accounts: 'id,key,label',
+  history: 'id,date',
+  logs: 'id,accountId,date,expenseId',
+  expenses: 'id,date,typeId,accountId',
+  expenseTypes: 'id,name',
+  incomes: 'id,name,frequency',
+  rateChanges: 'id,accountId,date'
+}).upgrade(async tx => {
+  const accounts = await tx.accounts.toArray();
+  for (const acc of accounts) {
+    if (acc.openDate) continue;
+    const accLogs = await tx.logs.where('accountId').equals(acc.id).toArray();
+    let earliest = null;
+    accLogs.forEach(l => { if (l.date && (!earliest || l.date < earliest)) earliest = l.date; });
+    const openDate = (earliest || acc.updated_at || new Date().toISOString()).slice(0, 10);
+    await tx.accounts.update(acc.id, { openDate });
+  }
+});
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let _editExpenseId = null;
