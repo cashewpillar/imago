@@ -513,6 +513,7 @@ function toggleDropdown(id) {
 
 function openImport() {
   document.getElementById('importJson').value = '';
+  document.getElementById('settingsDropdown').classList.remove('open');
   openModal('importModal');
 }
 function handleDrop(e) { e.preventDefault(); readFile(e.dataTransfer.files[0]); }
