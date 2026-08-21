@@ -474,7 +474,7 @@ db.version(6).stores({
 // ── State ─────────────────────────────────────────────────────────────────────
 let _editExpenseId = null;
 let _activeTypeFilter = localStorage.getItem('imago-expenses-active-type-filter') || 'all';
-let _chartPeriod = localStorage.getItem('imago-expenses-chart-period') || 'MONTH';
+let _chartPeriod = localStorage.getItem('imago-expenses-chart-period') || '6M';
 let _chartTypeFilter = (() => {
   try { return JSON.parse(localStorage.getItem('imago-expenses-chart-type-filter-v2')) || ['all']; }
   catch { return ['all']; }
