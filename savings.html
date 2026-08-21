@@ -347,17 +347,14 @@ td.actions{text-align:right;white-space:nowrap}
 <div class="modal-backdrop" id="accountModal">
   <div class="modal">
     <h2 id="accountModalTitle">Add account</h2>
-    <div class="form-grid">
-      <div class="form-row"><label>Key</label><input type="text" id="fKey" placeholder="MAYA" maxlength="20"></div>
-      <div class="form-row"><label>Label</label><input type="text" id="fLabel" placeholder="Maya Savings"></div>
-    </div>
+    <div class="form-row"><label>Label</label><input type="text" id="fLabel" placeholder="Maya Savings" oninput="onLabelInput()"></div>
     <div class="form-grid">
       <div class="form-row"><label>Balance</label><div style="display:flex;gap:6px;align-items:center"><button type="button" id="fBalanceSign" onclick="toggleBalanceSign()" style="flex-shrink:0;width:32px;height:32px;border:1px solid var(--border-strong);border-radius:var(--r);background:var(--surface);color:var(--text);font-size:15px;cursor:pointer;font-family:var(--mono);line-height:1;transition:background .15s,color .15s" title="Toggle sign">+</button><input type="number" id="fBalance" step="0.01" placeholder="0" min="0" style="flex:1"></div></div>
       <div class="form-row"><label>Rate (%)</label><input type="number" id="fRate" step="0.01" placeholder="0"></div>
     </div>
     <div class="form-grid">
       <div class="form-row"><label>Tag</label>
-        <select id="fTag" onchange="syncBalanceSign(this.value==='credit')">
+        <select id="fTag" onchange="syncBalanceSign(this.value==='credit'); onLabelInput()">
           <option value="savings">savings</option>
           <option value="equities">equities</option>
           <option value="td">time deposit</option>
@@ -370,6 +367,10 @@ td.actions{text-align:right;white-space:nowrap}
       <div class="form-row"><label>Maturity</label><input type="date" id="fMaturity"></div>
     </div>
     <div class="form-row"><label>Note</label><input type="text" id="fNote" placeholder="General account notes"></div>
+    <div class="form-row">
+      <label style="font-size:10px;color:var(--text-faint)">Key (auto)</label>
+      <input type="text" id="fKey" placeholder="Auto-generated" maxlength="20" oninput="_keyManuallyEdited=true" style="font-size:12px;color:var(--text-faint);max-width:160px">
+    </div>
     <div class="form-row" id="changeReasonRow">
       <label>Update Reason / Change Note</label>
       <input type="text" id="fChangeNote" placeholder="e.g. Salary, Rent, Correction">
@@ -740,6 +741,17 @@ function uuid() {
 }
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function slugifyKey(label, opts) {
+  opts = opts || {};
+  let base = String(label||'').toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  if (opts.tag === 'td' && opts.term) base += '-' + String(opts.term).toUpperCase();
+  base = base.slice(0, 20) || 'ACCT';
+  const existing = new Set((window._allAccounts||[]).filter(a => a.id !== opts.excludeId).map(a => a.key));
+  if (!existing.has(base)) return base;
+  let n = 2, candidate;
+  do { candidate = (base.slice(0, 20 - String(n).length - 1) + '-' + n); n++; } while (existing.has(candidate));
+  return candidate;
 }
 function fmtk(v) {
   v = parseFloat(v);
@@ -1176,8 +1188,18 @@ function syncBalanceSign(negative) {
 }
 
 // ── Account CRUD ──────────────────────────────────────────────────────────────
+let _keyManuallyEdited = false;
+
+function onLabelInput() {
+  if (_keyManuallyEdited) return;
+  const label = document.getElementById('fLabel').value.trim();
+  const tag = document.getElementById('fTag').value;
+  document.getElementById('fKey').value = label ? slugifyKey(label, { tag, excludeId: _editId }) : '';
+}
+
 function openAddAccount() {
   _editId = null;
+  _keyManuallyEdited = false;
   document.getElementById('accountModalTitle').textContent = 'Add account';
   ['fKey','fLabel','fBalance','fRate','fMaturity','fNote','fChangeNote'].forEach(id => document.getElementById(id).value='');
   document.getElementById('fTag').value = 'savings';
@@ -1186,12 +1208,14 @@ function openAddAccount() {
   document.getElementById('btnDeleteAccount').style.display = 'none';
   syncBalanceSign(false);
   openModal('accountModal');
+  document.getElementById('fLabel').focus();
 }
 
 async function editAccount(id) {
   const a = await db.accounts.get(id);
   if (!a) return;
   _editId = id;
+  _keyManuallyEdited = true;
   document.getElementById('accountModalTitle').textContent = 'Edit account';
   document.getElementById('fKey').value      = a.key||'';
   document.getElementById('fLabel').value    = a.label||'';
