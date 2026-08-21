@@ -24,6 +24,15 @@ function getDemoDb() {
       expenseTypes: 'id,name',
       incomes: 'id,name,frequency'
     });
+    demoDb.version(2).stores({
+      accounts: 'id,key,label',
+      history: 'id,date',
+      logs: 'id,accountId,date,expenseId',
+      expenses: 'id,date,typeId,accountId',
+      expenseTypes: 'id,name',
+      incomes: 'id,name,frequency',
+      rateChanges: 'id,accountId,date'
+    });
   }
   return demoDb;
 }
@@ -37,6 +46,7 @@ async function clearAllData(targetDb = db) {
   await targetDb.expenses.clear();
   await targetDb.expenseTypes.clear();
   await targetDb.incomes.clear();
+  await targetDb.rateChanges.clear();
 }
 
 async function enterExploreMode() {

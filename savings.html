@@ -381,6 +381,11 @@ td.actions{text-align:right;white-space:nowrap}
       <div id="accountHistoryList"></div>
     </div>
 
+    <div class="history-section" id="rateHistorySection" style="display:none">
+      <h3>Rate History</h3>
+      <div id="rateHistoryList"></div>
+    </div>
+
     <div class="modal-actions">
       <button class="btn btn-danger" id="btnDeleteAccount" onclick="deleteAccount(_editId)" style="margin-right:auto; display:none;">Delete</button>
       <button class="btn" onclick="closeModal('accountModal')">Cancel</button>
@@ -411,8 +416,9 @@ td.actions{text-align:right;white-space:nowrap}
 <div class="modal-backdrop" id="yieldModal">
   <div class="modal" style="width:min(500px,95vw)">
     <h2>Gross Yield Breakdown</h2>
-    <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Annual interest contribution per account (before tax).</p>
-    
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:4px">Annual interest contribution per account (before tax).</p>
+    <p style="font-size:10px;color:var(--text-faint);margin-bottom:16px">Based on each account's current rate only — does not account for rate changes during the period.</p>
+
     <div style="font-family:var(--mono); font-size:11px; display:flex; flex-direction:column; gap:6px;" id="yieldBreakdownList">
       <!-- Generated rows -->
     </div>
@@ -497,6 +503,19 @@ realDb.version(6).stores({
   expenses: 'id,date,typeId,accountId',
   expenseTypes: 'id,name',
   incomes: 'id,name,frequency'
+});
+realDb.version(7).stores({
+  accounts: 'id,key,label',
+  history: 'id,date',
+  logs: 'id,accountId,date,expenseId',
+  expenses: 'id,date,typeId,accountId',
+  expenseTypes: 'id,name',
+  incomes: 'id,name,frequency',
+  rateChanges: 'id,accountId,date'
+}).upgrade(tx => {
+  return tx.accounts.toCollection().modify(acc => {
+    if (!acc.status) acc.status = 'open';
+  });
 });
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -1204,6 +1223,7 @@ function openAddAccount() {
   ['fKey','fLabel','fBalance','fRate','fMaturity','fNote','fChangeNote'].forEach(id => document.getElementById(id).value='');
   document.getElementById('fTag').value = 'savings';
   document.getElementById('accountHistorySection').style.display = 'none';
+  document.getElementById('rateHistorySection').style.display = 'none';
   document.getElementById('changeReasonRow').style.display = 'none';
   document.getElementById('btnDeleteAccount').style.display = 'none';
   syncBalanceSign(false);
@@ -1258,6 +1278,35 @@ async function editAccount(id) {
     section.style.display = 'none';
   }
 
+  // Render per-account rate history
+  let rateChanges = await db.rateChanges.where('accountId').equals(id).toArray();
+  rateChanges.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  rateChanges = rateChanges.slice(0, 10);
+  const rateList = document.getElementById('rateHistoryList');
+  const rateSection = document.getElementById('rateHistorySection');
+
+  const rateNote = `<div style="font-size:10px;color:var(--text-faint);margin-top:4px">Rate history starts tracking from now — earlier changes weren't recorded.</div>`;
+  if (rateChanges.length > 0) {
+    rateSection.style.display = 'block';
+    rateList.innerHTML = rateChanges.map(rc => {
+      const date = new Date(rc.date).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit'});
+      return `
+        <div class="history-item">
+          <div class="history-meta">
+            <span>${date}</span>
+            <span class="history-change">${rc.rate}%</span>
+          </div>
+          ${rc.note ? `<div class="history-note">${esc(rc.note)}</div>` : ''}
+        </div>
+      `;
+    }).join('') + rateNote;
+  } else if ((a.rate ?? null) !== null) {
+    rateSection.style.display = 'block';
+    rateList.innerHTML = rateNote;
+  } else {
+    rateSection.style.display = 'none';
+  }
+
   openModal('accountModal');
 }
 
@@ -1280,14 +1329,19 @@ async function saveAccount() {
   const newBal = isNaN(bal) ? 0 : bal;
   const oldBal = existing ? (existing.balance || 0) : 0;
   const balanceChanged = !existing || newBal !== oldBal;
+  const newRate = isNaN(rate) ? null : rate;
+  const oldRate = existing ? (existing.rate ?? null) : null;
+  const rateChanged = newRate !== null && newRate !== oldRate;
 
   await db.accounts.put({
+    ...(existing || {}),
     id, key, label,
     balance:    newBal,
-    rate:       isNaN(rate) ? null : rate,
+    rate:       newRate,
     tags:       [tag],
     maturity:   mat||null,
     note:       note||null,
+    status:     existing?.status || 'open',
     updated_at: new Date().toISOString()
   });
 
@@ -1299,6 +1353,16 @@ async function saveAccount() {
       balance: newBal,
       change: existing ? newBal - oldBal : newBal,
       note: changeNote || (existing ? 'Balance update' : 'Account created')
+    });
+  }
+
+  if (rateChanged) {
+    await db.rateChanges.add({
+      id: 'rc-'+uuid(),
+      accountId: id,
+      rate: newRate,
+      date: new Date().toISOString(),
+      note: changeNote || (existing ? 'Rate updated' : 'Initial rate')
     });
   }
 
@@ -1392,6 +1456,12 @@ async function doImport(reset) {
       await db.incomes.put(inc);
   }
 
+  for (const rc of (raw.rateChanges||[])) {
+    if (!rc.id) rc.id = 'rc-'+uuid();
+    const ex = await db.rateChanges.get(rc.id);
+    if (!ex) await db.rateChanges.put(rc);
+  }
+
   if (raw.targets) {
     _targets = { ...DEFAULT_TARGETS, ...raw.targets };
     localStorage.setItem('imago-finance-targets', JSON.stringify(_targets));
@@ -1413,15 +1483,17 @@ async function exportData() {
   const expenses     = await realDb.expenses.toArray();
   const expenseTypes = await realDb.expenseTypes.toArray();
   const incomes      = await realDb.incomes.toArray();
-  const out = { 
-    version: 3, 
-    exported_at: new Date().toISOString(), 
-    accounts, 
-    history, 
+  const rateChanges  = await realDb.rateChanges.toArray();
+  const out = {
+    version: 3,
+    exported_at: new Date().toISOString(),
+    accounts,
+    history,
     logs,
     expenses,
     expenseTypes,
     incomes,
+    rateChanges,
     targets: _targets,
     lockedTags: _lockedTags
   };

@@ -483,6 +483,19 @@ realDb.version(6).stores({
   expenseTypes: 'id,name',
   incomes: 'id,name,frequency'
 });
+realDb.version(7).stores({
+  accounts: 'id,key,label',
+  history: 'id,date',
+  logs: 'id,accountId,date,expenseId',
+  expenses: 'id,date,typeId,accountId',
+  expenseTypes: 'id,name',
+  incomes: 'id,name,frequency',
+  rateChanges: 'id,accountId,date'
+}).upgrade(tx => {
+  return tx.accounts.toCollection().modify(acc => {
+    if (!acc.status) acc.status = 'open';
+  });
+});
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let _editExpenseId = null;
@@ -609,6 +622,12 @@ async function doImport(reset) {
       await db.incomes.put(inc);
   }
 
+  for (const rc of (raw.rateChanges||[])) {
+    if (!rc.id) rc.id = 'rc-'+uuid();
+    const ex = await db.rateChanges.get(rc.id);
+    if (!ex) await db.rateChanges.put(rc);
+  }
+
   closeModal('importModal');
   toast(reset ? 'Reset & imported.' : 'Merged.');
   render();
@@ -621,15 +640,17 @@ async function exportData() {
   const expenses     = await realDb.expenses.toArray();
   const expenseTypes = await realDb.expenseTypes.toArray();
   const incomes      = await realDb.incomes.toArray();
-  const out = { 
-    version: 3, 
-    exported_at: new Date().toISOString(), 
-    accounts, 
-    history, 
+  const rateChanges  = await realDb.rateChanges.toArray();
+  const out = {
+    version: 3,
+    exported_at: new Date().toISOString(),
+    accounts,
+    history,
     logs,
     expenses,
     expenseTypes,
-    incomes
+    incomes,
+    rateChanges
   };
   const blob = new Blob([JSON.stringify(out,null,2)], {type:'application/json'});
   const url  = URL.createObjectURL(blob);
