@@ -515,6 +515,30 @@ class FinanceChart extends HTMLElement {
       ctx.fillText(this._fmtMonthLabel(dates[i]), xOf(i), H - 4);
     }
 
+    // Hover guide: a dashed vertical line at the hovered date, plus one
+    // pointer-callout tooltip per series showing its value at that point.
+    this.tooltip.style.display = 'none';
+    if (this._hoverIdx != null && this._hoverIdx >= 0 && this._hoverIdx < dates.length) {
+      const hi = this._hoverIdx;
+      const hx = xOf(hi);
+
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = '#c8c5bb';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(hx, PAD.top);
+      ctx.lineTo(hx, PAD.top + cH);
+      ctx.stroke();
+      ctx.restore();
+
+      plotted.forEach((p, si) => {
+        const v = maps[si].get(dates[hi]);
+        if (v == null) return;
+        this._drawCalloutTooltip(ctx, hx, yOf(v), `${p.s.label || ''}: ${this._formatVal(v, unit)}`, PAD, cH, W);
+      });
+    }
+
     const handlePointer = e => {
       const rect = this.canvas.getBoundingClientRect();
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -524,22 +548,10 @@ class FinanceChart extends HTMLElement {
 
       if (md > (dates.length === 1 ? 100 : 44)) {
         if (this._hoverIdx !== null) { this._hoverIdx = null; this.render(); }
-        this.tooltip.style.display = 'none';
         return;
       }
 
       if (this._hoverIdx !== ci) { this._hoverIdx = ci; this.render(); }
-
-      const lines = [dates[ci]];
-      plotted.forEach((p, si) => {
-        const v = maps[si].get(dates[ci]);
-        if (v != null) lines.push(`${p.s.label || ''}: ${this._formatVal(v, unit)}`);
-      });
-      this.tooltip.innerHTML = lines.join('<br>');
-      this.tooltip.style.display = 'block';
-      this.tooltip.style.left = (rect.left + xOf(ci)) + 'px';
-      const py = rect.top + PAD.top + cH / 2;
-      this.tooltip.style.top = (py - 40) + 'px';
     };
 
     this.canvas.onmousemove = handlePointer;
@@ -548,11 +560,62 @@ class FinanceChart extends HTMLElement {
 
     const hideTooltip = () => {
       if (this._hoverIdx !== null) { this._hoverIdx = null; this.render(); }
-      this.tooltip.style.display = 'none';
     };
 
     this.canvas.onmouseleave = hideTooltip;
     this.canvas.ontouchend = hideTooltip;
+  }
+
+  // Draws a dark rounded tooltip box to the LEFT of (px, py), with its
+  // pointer base centered on the box's edge. The pointer's tip always
+  // stretches to the actual point (px, py) -- so when the box gets clamped
+  // away from the point's height (near a chart edge), the pointer becomes a
+  // slanted dart reaching down/up to it, instead of a plain gap.
+  _drawCalloutTooltip(ctx, px, py, text, PAD, cH, W) {
+    const padX = 8, padY = 5, boxH = 22, gap = 7, pointer = 5, r = 4;
+    ctx.font = '11px system-ui';
+    const textW = ctx.measureText(text).width;
+    const boxW = textW + padX * 2;
+
+    let flip = false;
+    let boxRight = px - gap;
+    let boxLeft = boxRight - boxW;
+    if (boxLeft < PAD.left) {
+      flip = true;
+      boxLeft = px + gap;
+      boxRight = boxLeft + boxW;
+      if (boxRight > W - PAD.right) boxRight = W - PAD.right;
+      boxLeft = boxRight - boxW;
+    }
+
+    let boxTop = py - boxH / 2;
+    boxTop = Math.max(PAD.top, Math.min(boxTop, PAD.top + cH - boxH));
+    const boxCenterY = boxTop + boxH / 2;
+
+    ctx.fillStyle = '#1a1917';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(boxLeft, boxTop, boxW, boxH, r);
+    else ctx.rect(boxLeft, boxTop, boxW, boxH);
+    ctx.fill();
+
+    ctx.beginPath();
+    if (!flip) {
+      ctx.moveTo(boxRight, boxCenterY - pointer);
+      ctx.lineTo(px, py);
+      ctx.lineTo(boxRight, boxCenterY + pointer);
+    } else {
+      ctx.moveTo(boxLeft, boxCenterY - pointer);
+      ctx.lineTo(px, py);
+      ctx.lineTo(boxLeft, boxCenterY + pointer);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, boxLeft + padX, boxCenterY);
+    ctx.textBaseline = 'alphabetic';
   }
 
   _renderDonutChart(slices, W, H) {
