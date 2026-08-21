@@ -33,7 +33,25 @@ class FinanceChart extends HTMLElement {
           min-width: 0;
         }
         :host([has-legend]) .legend { display: flex; }
-        
+
+        :host([legend-bottom]) .chart-container { flex-direction: column; gap: 10px; }
+        :host([legend-bottom]) .canvas-wrap { flex: 1 1 auto; width: 100%; }
+        :host([legend-bottom]) .legend {
+          flex: 0 0 auto;
+          width: 100%;
+          flex-direction: row;
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: 6px 20px;
+          max-height: none;
+          overflow: visible;
+          border-left: none;
+          border-top: 1px solid #e2e0d8;
+          padding-left: 0;
+          padding-top: 10px;
+        }
+        :host([legend-bottom]) .legend-group { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 20px; margin-bottom: 0; }
+
         .legend-group { margin-bottom: 8px; }
         .legend-group-h {
           font-size: 10px;
@@ -134,14 +152,24 @@ class FinanceChart extends HTMLElement {
   render() {
     if (!this.isConnected) return;
 
+    // Multi-series line data: { series: [{label,color,points:[{date,value}]}], unit? }
+    const raw = this._data;
+    const isMultiSeries = !!(raw && !Array.isArray(raw) && Array.isArray(raw.series));
+
     // Determine layout: show legend if ANY item in the data array has an 'items' property
-    const data = Array.isArray(this._data) ? this._data : (this._data?.groups || []);
-    const hasLegend = data.some(d => d.items && d.items.length > 0);
-    
+    const data = isMultiSeries ? raw.series : (Array.isArray(raw) ? raw : (raw?.groups || []));
+    const hasLegend = isMultiSeries ? data.length > 0 : data.some(d => d.items && d.items.length > 0);
+
     if (hasLegend) {
       this.setAttribute('has-legend', '');
     } else {
       this.removeAttribute('has-legend');
+    }
+
+    if (isMultiSeries) {
+      this.setAttribute('legend-bottom', '');
+    } else {
+      this.removeAttribute('legend-bottom');
     }
 
     requestAnimationFrame(() => {
@@ -167,7 +195,11 @@ class FinanceChart extends HTMLElement {
 
       try {
         if (this._type === 'line') {
-          this._renderLineChart(data, W, H);
+          if (isMultiSeries) {
+            this._renderMultiLineChart(data, W, H, raw.unit);
+          } else {
+            this._renderLineChart(data, W, H);
+          }
         } else if (this._type === 'donut') {
           this._renderDonutChart(data, W, H);
         } else if (this._type === 'bar') {
@@ -319,6 +351,157 @@ class FinanceChart extends HTMLElement {
       this.tooltip.style.display = 'none';
     };
     
+    this.canvas.onmouseleave = hideTooltip;
+    this.canvas.ontouchend = hideTooltip;
+  }
+
+  _formatVal(v, unit) {
+    if (v == null || isNaN(v)) return '—';
+    if (unit === '%') return v.toFixed(2) + '%';
+    return '₱' + this._fmtk(v);
+  }
+
+  _fmtMonthLabel(dateStr) {
+    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const parts = String(dateStr || '').split('-');
+    if (parts.length < 2) return dateStr || '';
+    const idx = parseInt(parts[1], 10) - 1;
+    return (MONTHS[idx] || '') + ' ' + parts[0];
+  }
+
+  _renderMultiLineChart(seriesArr, W, H, unit) {
+    if (!Array.isArray(seriesArr) || seriesArr.length === 0) { this._drawMessage('No data available'); return; }
+
+    const ctx = this.ctx;
+    const PAD = { top: 14, right: 16, bottom: 28, left: 50 };
+    const cW = W - PAD.left - PAD.right;
+    const cH = H - PAD.top - PAD.bottom;
+    const PALETTE = ['#1a6b3c', '#185fa5', '#854f0b', '#a32d2d', '#5f5e5a'];
+
+    const dateSet = new Set();
+    seriesArr.forEach(s => (s.points || []).forEach(p => dateSet.add(p.date)));
+    const dates = Array.from(dateSet).sort();
+
+    if (dates.length === 0) { this._drawMessage('No data available'); return; }
+
+    const maps = seriesArr.map(s => {
+      const m = new Map();
+      (s.points || []).forEach(p => m.set(p.date, p.value));
+      return m;
+    });
+
+    const allValues = seriesArr.flatMap(s => (s.points || []).map(p => p.value));
+    const minV = Math.min(...allValues, 0);
+    const maxV = Math.max(...allValues, 0.01);
+    const rng = Math.max(maxV - minV, 0.01);
+
+    const xOf = i => dates.length === 1 ? PAD.left + cW / 2 : PAD.left + (i / (dates.length - 1)) * cW;
+    const yOf = v => PAD.top + cH - ((v - minV) / rng) * cH;
+
+    ctx.strokeStyle = '#e2e0d8';
+    ctx.lineWidth = 0.5;
+    ctx.fillStyle = '#9c9a94';
+    ctx.font = '10px system-ui';
+    ctx.textAlign = 'right';
+    for (let i = 0; i <= 4; i++) {
+      const y = PAD.top + (cH / 4) * i;
+      ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+      if (dates.length > 1) {
+        ctx.fillText(this._formatVal(maxV - (rng / 4) * i, unit), PAD.left - 5, y + 3);
+      }
+    }
+
+    const threshold = W < 480 ? 15 : 25;
+    if (this._hoverIdx === undefined) this._hoverIdx = null;
+
+    seriesArr.forEach((s, si) => {
+      const color = s.color || PALETTE[si % PALETTE.length];
+      const m = maps[si];
+
+      ctx.beginPath();
+      let started = false;
+      dates.forEach((d, i) => {
+        if (!m.has(d)) { started = false; return; }
+        const v = m.get(d);
+        if (!started) { ctx.moveTo(xOf(i), yOf(v)); started = true; }
+        else ctx.lineTo(xOf(i), yOf(v));
+      });
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.8;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+
+      dates.forEach((d, i) => {
+        if (!m.has(d)) return;
+        const v = m.get(d);
+        const isEdge = i === 0 || i === dates.length - 1;
+        const isHovered = this._hoverIdx === i;
+        if (dates.length > threshold && !isEdge && !isHovered) return;
+        ctx.beginPath(); ctx.arc(xOf(i), yOf(v), isHovered ? 4 : 3, 0, Math.PI * 2);
+        ctx.fillStyle = color; ctx.fill();
+        ctx.beginPath(); ctx.arc(xOf(i), yOf(v), isHovered ? 2 : 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff'; ctx.fill();
+      });
+    });
+
+    ctx.fillStyle = '#9c9a94';
+    ctx.font = '10px system-ui';
+    ctx.textAlign = 'center';
+    const step = Math.ceil(dates.length / 5);
+    for (let i = 0; i < dates.length; i += step) {
+      ctx.fillText(this._fmtMonthLabel(dates[i]), xOf(i), H - 4);
+    }
+
+    this.legend.innerHTML = `<div class="legend-group">${seriesArr.map((s, si) => {
+      const color = s.color || PALETTE[si % PALETTE.length];
+      const m = maps[si];
+      let lastVal = null;
+      for (let i = dates.length - 1; i >= 0; i--) { if (m.has(dates[i])) { lastVal = m.get(dates[i]); break; } }
+      return `
+        <div class="legend-item">
+          <div class="legend-dot" style="background:${color}"></div>
+          <div class="legend-label">${s.label || ''}</div>
+          <div class="legend-val">${this._formatVal(lastVal, unit)}</div>
+        </div>
+      `;
+    }).join('')}</div>`;
+
+    const handlePointer = e => {
+      const rect = this.canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const mx = clientX - rect.left;
+      let ci = null, md = Infinity;
+      dates.forEach((_, i) => { const d = Math.abs(xOf(i) - mx); if (d < md) { md = d; ci = i; } });
+
+      if (md > (dates.length === 1 ? 100 : 44)) {
+        if (this._hoverIdx !== null) { this._hoverIdx = null; this.render(); }
+        this.tooltip.style.display = 'none';
+        return;
+      }
+
+      if (this._hoverIdx !== ci) { this._hoverIdx = ci; this.render(); }
+
+      const lines = [dates[ci]];
+      seriesArr.forEach((s, si) => {
+        const v = maps[si].get(dates[ci]);
+        if (v != null) lines.push(`${s.label || ''}: ${this._formatVal(v, unit)}`);
+      });
+      this.tooltip.innerHTML = lines.join('<br>');
+      this.tooltip.style.display = 'block';
+      this.tooltip.style.left = (rect.left + xOf(ci)) + 'px';
+      const py = rect.top + PAD.top + cH / 2;
+      this.tooltip.style.top = (py - 40) + 'px';
+    };
+
+    this.canvas.onmousemove = handlePointer;
+    this.canvas.ontouchmove = handlePointer;
+    this.canvas.ontouchstart = handlePointer;
+
+    const hideTooltip = () => {
+      if (this._hoverIdx !== null) { this._hoverIdx = null; this.render(); }
+      this.tooltip.style.display = 'none';
+    };
+
     this.canvas.onmouseleave = hideTooltip;
     this.canvas.ontouchend = hideTooltip;
   }

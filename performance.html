@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Performance</title>
+<script src="scripts/dexie.min.js"></script>
+<script src="scripts/explore-mode.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f8f7f4;--surface:#fff;--border:#e2e0d8;--border-strong:#c8c5bb;
+  --text:#1a1917;--text-muted:#6b6860;--text-faint:#9c9a94;
+  --accent:#1a6b3c;--accent-bg:#eaf4ee;--accent-light:#d0e9d9;
+  --danger:#a32d2d;--danger-bg:#fcebeb;
+  --warning:#854f0b;--warning-bg:#faeeda;
+  --info:#185fa5;--info-bg:#e6f1fb;
+  --r:8px;--rl:12px;
+}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh}
+
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header h1{font-size:17px;font-weight:600;letter-spacing:-.3px}
+.header-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+
+.nav-links{display:flex;gap:4px;background:var(--bg);padding:3px;border-radius:var(--r);border:1px solid var(--border)}
+.nav-link{padding:4px 10px;font-size:12px;color:var(--text-muted);text-decoration:none;border-radius:6px;transition:all .12s}
+.nav-link:hover{color:var(--text)}
+.nav-link.active{background:var(--surface);color:var(--text);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,0.05)}
+
+main{max-width:940px;margin:0 auto;padding:20px 16px}
+
+.summary-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px}
+.sum-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px}
+.sum-card .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:4px}
+.sum-card .val{font-size:22px;font-weight:600;letter-spacing:-.5px}
+.sum-card .sub{font-size:11px;color:var(--text-faint);margin-top:2px}
+.col-pos{color:var(--accent)}
+
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:16px 18px;margin-bottom:18px}
+.chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.chart-title{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted)}
+#chartWrap{position:relative;height:280px}
+.chart-empty{display:none;text-align:center;color:var(--text-faint);font-size:13px;padding:50px 0}
+
+.filters{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.filter-chip{padding:3px 10px;border:1px solid var(--border-strong);border-radius:99px;font-size:11px;cursor:pointer;background:var(--surface);color:var(--text-muted);transition:all .12s;user-select:none}
+.filter-chip:hover{border-color:var(--text-muted)}
+.filter-chip.active{background:var(--text);color:#fff;border-color:var(--text)}
+
+.disclaimers{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:16px 18px}
+.disclaimers h3{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint);margin-bottom:10px}
+.disclaimers ul{list-style:none;display:flex;flex-direction:column;gap:8px}
+.disclaimers li{font-size:12px;color:var(--text-muted);padding-left:14px;position:relative}
+.disclaimers li::before{content:'—';position:absolute;left:0;color:var(--text-faint)}
+.disclaimers li strong{color:var(--text)}
+
+.empty{text-align:center;padding:36px;color:var(--text-faint);font-size:13px}
+</style>
+<meta name="theme-color" content="#f7f6f2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="imago">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/imago-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<script src="scripts/savings-demo.js"></script>
+<script src="scripts/expenses-demo.js"></script>
+<script>
+  // Cache-busting script load
+  const script = document.createElement('script');
+  script.src = 'scripts/finance-charts.js?v=' + Date.now();
+  document.head.appendChild(script);
+</script>
+</head>
+<body>
+
+<header>
+  <h1>fin</h1>
+  <div class="header-actions">
+    <div class="nav-links">
+      <a href="savings.html" class="nav-link">Savings</a>
+      <a href="expenses.html" class="nav-link">Expenses</a>
+      <a href="performance.html" class="nav-link active">Performance</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="summary-row" id="summaryRow"></div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <span class="chart-title">Net annualized yield, over time</span>
+      <div class="filters" id="chartPeriodFilters">
+        <span class="filter-chip" data-period="YTD" onclick="changePeriod('YTD', this)">YTD</span>
+        <span class="filter-chip" data-period="12M" onclick="changePeriod('12M', this)">12M</span>
+        <span class="filter-chip" data-period="2Y" onclick="changePeriod('2Y', this)">2Y</span>
+        <span class="filter-chip" data-period="3Y" onclick="changePeriod('3Y', this)">3Y</span>
+        <span class="filter-chip" data-period="4Y" onclick="changePeriod('4Y', this)">4Y</span>
+        <span class="filter-chip" data-period="5Y" onclick="changePeriod('5Y', this)">5Y</span>
+        <span class="filter-chip" data-period="ALL" onclick="changePeriod('ALL', this)">All</span>
+      </div>
+    </div>
+    <div id="chartWrap">
+      <div class="chart-empty" id="chartEmpty">No rate history yet — this chart starts once an account has at least one recorded rate.</div>
+      <imago-chart id="perfChart" style="display:none"></imago-chart>
+    </div>
+  </div>
+
+  <div class="disclaimers">
+    <h3>How this is computed &amp; what to keep in mind</h3>
+    <ul>
+      <li><strong>Analytical, not actual-credited:</strong> each line is <code>balance × stated rate</code>, net of a flat 20% withholding-tax assumption — not a reconstruction of amounts actually credited to the account.</li>
+      <li><strong>Manual tracking dependency:</strong> balances and rates are only as accurate and current as your last manual update in this app; gaps or lag in data entry directly skew the computed historical %.</li>
+      <li><strong>Sampled monthly:</strong> each point is the account data as of month-end (or today, for the current month) — balance history itself is only recorded when a balance actually changes during a save, not a guaranteed daily snapshot, so a month's sample can reflect a stale value if nothing was logged that month.</li>
+      <li><strong>Assumed constant where unrecorded:</strong> if an account has never had a rate change logged (common for accounts created before rate history existed, or never rate-edited since), its <em>current</em> rate is assumed to have applied since it was opened, rather than showing no data — real historical rate changes before you started logging them aren't captured.</li>
+      <li><strong>TD rollovers aren't linked:</strong> closing a time deposit and opening its replacement are unconnected records; the old account's contribution simply stops at its closure date and the new one picks up — any delay between closing and logging the new account shows as a dip.</li>
+      <li><strong>Flat 20% tax assumption:</strong> applied uniformly to all accounts regardless of any account-specific tax treatment.</li>
+    </ul>
+  </div>
+</main>
+
+<script>
+// ── DB (schema mirrors savings.html) ─────────────────────────────────────────
+realDb = new Dexie('FinanceTrackerV2');
+db = realDb;
+realDb.version(1).stores({ accounts:'id,key,label', history:'id,date' });
+realDb.version(2).stores({ accounts:'id,key,label', history:'id,date', logs:'id,accountId,date' });
+realDb.version(3).stores({ accounts:'id,key,label', history:'id,date', logs:'id,accountId,date' }).upgrade(tx => {
+  return tx.accounts.toCollection().modify(acc => {
+    if (acc.maturity && typeof acc.maturity === 'string' && acc.maturity.length > 4) {
+      const d = new Date(acc.maturity);
+      if (!isNaN(d.getTime())) {
+        acc.maturity = d.toISOString().split('T')[0];
+      }
+    }
+  });
+});
+realDb.version(4).stores({ accounts:'id,key,label', history:'id,date', logs:'id,accountId,date' }).upgrade(tx => {
+  tx.accounts.toCollection().modify(acc => { if(acc.balance) acc.balance *= 1000; });
+  tx.history.toCollection().modify(h => { if(h.total) h.total *= 1000; });
+  tx.logs.toCollection().modify(l => {
+    if(l.balance) l.balance *= 1000;
+    if(l.change) l.change *= 1000;
+  });
+});
+realDb.version(5).stores({
+  accounts: 'id,key,label',
+  history: 'id,date',
+  logs: 'id,accountId,date',
+  expenses: 'id,date,typeId,accountId',
+  expenseTypes: 'id,name',
+  incomes: 'id,name,frequency'
+});
+realDb.version(6).stores({
+  accounts: 'id,key,label',
+  history: 'id,date',
+  logs: 'id,accountId,date,expenseId',
+  expenses: 'id,date,typeId,accountId',
+  expenseTypes: 'id,name',
+  incomes: 'id,name,frequency'
+});
+realDb.version(7).stores({
+  accounts: 'id,key,label',
+  history: 'id,date',
+  logs: 'id,accountId,date,expenseId',
+  expenses: 'id,date,typeId,accountId',
+  expenseTypes: 'id,name',
+  incomes: 'id,name,frequency',
+  rateChanges: 'id,accountId,date'
+}).upgrade(tx => {
+  return tx.accounts.toCollection().modify(acc => {
+    if (!acc.status) acc.status = 'open';
+  });
+});
+realDb.version(8).stores({
+  accounts: 'id,key,label',
+  history: 'id,date',
+  logs: 'id,accountId,date,expenseId',
+  expenses: 'id,date,typeId,accountId',
+  expenseTypes: 'id,name',
+  incomes: 'id,name,frequency',
+  rateChanges: 'id,accountId,date'
+}).upgrade(async tx => {
+  const accounts = await tx.accounts.toArray();
+  for (const acc of accounts) {
+    if (acc.openDate) continue;
+    const accLogs = await tx.logs.where('accountId').equals(acc.id).toArray();
+    let earliest = null;
+    accLogs.forEach(l => { if (l.date && (!earliest || l.date < earliest)) earliest = l.date; });
+    const openDate = (earliest || acc.updated_at || new Date().toISOString()).slice(0, 10);
+    await tx.accounts.update(acc.id, { openDate });
+  }
+});
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let _chartPeriod = localStorage.getItem('imago-performance-chart-period') || 'ALL';
+
+const BUCKETS = { savings: { label: 'Savings', color: '#1a6b3c' }, td: { label: 'Time Deposit', color: '#185fa5' } };
+
+function dateOnly(s) { return String(s || '').slice(0, 10); }
+function todayStr() { return new Date().toISOString().slice(0, 10); }
+function fmtk(v) {
+  v = parseFloat(v);
+  if (isNaN(v)) return '0';
+  const av = Math.abs(v);
+  if (av >= 1000000) return (v / 1000000).toFixed(2) + 'M';
+  if (av >= 1000) return (v / 1000).toFixed(1) + 'k';
+  return v.toFixed(0);
+}
+
+function applyPeriodFilter(points) {
+  if (!points || !points.length) return points;
+  if (_chartPeriod === 'ALL') return points;
+  const now = new Date();
+  let cutoff;
+  if (_chartPeriod === 'YTD') { cutoff = new Date(now.getFullYear(), 0, 1); }
+  if (_chartPeriod === '12M') { cutoff = new Date(now); cutoff.setFullYear(cutoff.getFullYear() - 1); }
+  if (_chartPeriod === '2Y')  { cutoff = new Date(now); cutoff.setFullYear(cutoff.getFullYear() - 2); }
+  if (_chartPeriod === '3Y')  { cutoff = new Date(now); cutoff.setFullYear(cutoff.getFullYear() - 3); }
+  if (_chartPeriod === '4Y')  { cutoff = new Date(now); cutoff.setFullYear(cutoff.getFullYear() - 4); }
+  if (_chartPeriod === '5Y')  { cutoff = new Date(now); cutoff.setFullYear(cutoff.getFullYear() - 5); }
+  const cutStr = cutoff.toISOString().slice(0, 10);
+  return points.filter(p => p.date >= cutStr);
+}
+
+function changePeriod(period, el) {
+  _chartPeriod = period;
+  localStorage.setItem('imago-performance-chart-period', period);
+  if (el) {
+    document.querySelectorAll('#chartPeriodFilters .filter-chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+  }
+  render();
+}
+
+// ── Balance / rate step reconstruction ───────────────────────────────────────
+function buildBalanceSteps(acc, accLogs) {
+  const sorted = accLogs.slice().sort((a, b) => a.date.localeCompare(b.date));
+  const steps = sorted.map(l => ({ date: dateOnly(l.date), balance: l.balance }));
+  const openDate = acc.openDate ? dateOnly(acc.openDate) : null;
+  if (openDate && (!steps.length || openDate < steps[0].date)) {
+    steps.unshift({ date: openDate, balance: steps.length ? steps[0].balance : (acc.balance || 0) });
+  }
+  if (!steps.length) {
+    steps.push({ date: openDate || dateOnly(acc.updated_at) || todayStr(), balance: acc.balance || 0 });
+  }
+  return steps;
+}
+
+function buildRateSteps(acc, accRateChanges) {
+  const sorted = accRateChanges.slice().sort((a, b) => a.date.localeCompare(b.date))
+    .map(rc => ({ date: dateOnly(rc.date), rate: rc.rate }));
+  if (!sorted.length && acc.rate != null) {
+    // No rate change was ever logged for this account (common for accounts
+    // created before rate history existed, or never rate-edited since) —
+    // assume the current rate has held since the account was opened rather
+    // than showing no data at all. See disclaimers below the chart.
+    const start = acc.openDate ? dateOnly(acc.openDate) : (dateOnly(acc.updated_at) || todayStr());
+    return [{ date: start, rate: acc.rate }];
+  }
+  return sorted;
+}
+
+function stepValueAt(steps, key, date) {
+  let val = undefined;
+  for (const s of steps) {
+    if (s.date <= date) val = s[key]; else break;
+  }
+  return val;
+}
+
+// Monthly sample points from `start` through `end` (inclusive), each anchored
+// to the last day of its month (or `end` itself for the current, partial month).
+function monthlyTimeline(start, end) {
+  const startD = new Date(start + 'T00:00:00Z');
+  const endD = new Date(end + 'T00:00:00Z');
+  const out = [];
+  let cursor = new Date(Date.UTC(startD.getUTCFullYear(), startD.getUTCMonth(), 1));
+  while (cursor <= endD) {
+    const monthEnd = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 0));
+    const sample = monthEnd > endD ? endD : monthEnd;
+    out.push(sample.toISOString().slice(0, 10));
+    cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1));
+  }
+  return out;
+}
+
+async function computeBucketSeries() {
+  const [accounts, logs, rateChanges] = await Promise.all([
+    db.accounts.toArray(), db.logs.toArray(), db.rateChanges.toArray()
+  ]);
+  const today = todayStr();
+
+  const prepared = {};
+  Object.keys(BUCKETS).forEach(tag => {
+    const tagAccounts = accounts.filter(a => (a.tags || []).includes(tag));
+    prepared[tag] = tagAccounts.map(acc => ({
+      balanceSteps: buildBalanceSteps(acc, logs.filter(l => l.accountId === acc.id)),
+      rateSteps: buildRateSteps(acc, rateChanges.filter(rc => rc.accountId === acc.id)),
+      endDate: acc.status === 'closed' && acc.closedDate ? dateOnly(acc.closedDate) : today
+    }));
+  });
+
+  // Evaluate every bucket against one shared monthly timeline, so a month only
+  // relevant to the OTHER bucket still gets a correct value (or a genuine gap)
+  // for this bucket, instead of carrying forward a stale rate through a real
+  // gap (e.g. a TD closed with no immediate rollover).
+  const allStartDates = Object.values(prepared).flatMap(entries => entries.flatMap(e => [
+    ...e.balanceSteps.map(s => s.date), ...e.rateSteps.map(s => s.date)
+  ]));
+  if (!allStartDates.length) return Object.fromEntries(Object.keys(BUCKETS).map(t => [t, []]));
+  const earliest = allStartDates.sort()[0];
+  const dates = monthlyTimeline(earliest, today);
+
+  const result = {};
+  Object.keys(BUCKETS).forEach(tag => {
+    const entries = prepared[tag];
+    const points = [];
+    dates.forEach(d => {
+      let sumWeighted = 0, sumBalance = 0;
+      entries.forEach(e => {
+        if (d > e.endDate) return;
+        const bal = stepValueAt(e.balanceSteps, 'balance', d);
+        const rate = stepValueAt(e.rateSteps, 'rate', d);
+        if (bal == null || bal <= 0 || rate == null) return;
+        sumWeighted += bal * rate;
+        sumBalance += bal;
+      });
+      if (sumBalance > 0) points.push({ date: d, value: (sumWeighted / sumBalance) * 0.8 });
+    });
+    result[tag] = points;
+  });
+  return result;
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+async function render() {
+  document.querySelectorAll('#chartPeriodFilters .filter-chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.period === _chartPeriod);
+  });
+
+  const filled = await computeBucketSeries();
+  const chart = document.getElementById('perfChart');
+  const empty = document.getElementById('chartEmpty');
+
+  const series = Object.keys(BUCKETS)
+    .map(tag => ({ label: BUCKETS[tag].label, color: BUCKETS[tag].color, points: applyPeriodFilter(filled[tag]) }))
+    .filter(s => s.points.length > 0);
+
+  renderSummary(filled);
+
+  if (series.length === 0) {
+    chart.style.display = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+
+  empty.style.display = 'none';
+  chart.style.display = 'block';
+  chart.setAttribute('type', 'line');
+  chart.data = { series, unit: '%' };
+}
+
+function renderSummary(filled) {
+  const row = document.getElementById('summaryRow');
+  row.innerHTML = Object.keys(BUCKETS).map(tag => {
+    const pts = filled[tag];
+    const last = pts.length ? pts[pts.length - 1] : null;
+    return `
+      <div class="sum-card">
+        <div class="lbl">${BUCKETS[tag].label} (net, current)</div>
+        <div class="val col-pos">${last ? last.value.toFixed(2) + '%' : '—'}</div>
+        <div class="sub">${last ? 'as of ' + last.date : 'no rate history yet'}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+render();
+</script>
+<script src="pwa-register.js"></script>
+</body>
+</html>
