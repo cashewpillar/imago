@@ -190,6 +190,11 @@ select.tag.type{
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,10 3,13 13,13 13,10"/><polyline points="5,7 8,10 11,7"/><line x1="8" y1="3" x2="8" y2="10"/></svg>
           Import Statement CSV
         </button>
+        <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
+        <button class="btn-flat" onclick="clearAllDataPrompt()" style="color:var(--danger)">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,4 13,4"/><path d="M5,4 V3 a1,1 0 0 1 1,-1 h4 a1,1 0 0 1 1,1 v1"/><path d="M4,4 l0.6,9 a1,1 0 0 0 1,1 h4.8 a1,1 0 0 0 1,-1 l0.6,-9"/></svg>
+          Clear all data
+        </button>
       </div>
     </div>
   </div>
@@ -536,6 +541,25 @@ function readFile(f) {
   r.readAsText(f);
 }
 
+async function clearAllData() {
+  await db.accounts.clear();
+  await db.history.clear();
+  await db.logs.clear();
+  await db.expenses.clear();
+  await db.expenseTypes.clear();
+  await db.incomes.clear();
+}
+
+async function clearAllDataPrompt() {
+  if (!confirm('This will permanently delete all accounts, history, and expense data. Continue?')) return;
+  document.getElementById('settingsDropdown').classList.remove('open');
+  await clearAllData();
+  localStorage.removeItem(DEMO_FLAG);
+  updateDemoBanner();
+  toast('All data cleared.');
+  render();
+}
+
 async function doImport(reset) {
   let raw;
   try { raw = JSON.parse(document.getElementById('importJson').value.trim()); }
@@ -543,12 +567,7 @@ async function doImport(reset) {
 
   if (reset) {
     if (!confirm('This will overwrite all existing data. Continue?')) return;
-    await db.accounts.clear();
-    await db.history.clear();
-    await db.logs.clear();
-    await db.expenses.clear();
-    await db.expenseTypes.clear();
-    await db.incomes.clear();
+    await clearAllData();
   }
 
   const accs = raw.accounts || raw.snapshots?.[0]?.accounts || [];
@@ -1700,12 +1719,7 @@ function updateDemoBanner() {
 
 async function resetDemoData() {
   if (!confirm('This clears the demo accounts, expenses and income so you can start fresh. Continue?')) return;
-  await db.accounts.clear();
-  await db.history.clear();
-  await db.logs.clear();
-  await db.expenses.clear();
-  await db.expenseTypes.clear();
-  await db.incomes.clear();
+  await clearAllData();
   localStorage.removeItem(DEMO_FLAG);
   updateDemoBanner();
   toast('Demo data cleared.');
