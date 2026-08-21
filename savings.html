@@ -220,6 +220,7 @@ td.actions{text-align:right;white-space:nowrap}
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <script src="scripts/savings-demo.js"></script>
 <script src="scripts/expenses-demo.js"></script>
+<script src="scripts/benchmarks-data.js"></script>
 <script>
   // Cache-busting script load
   const script = document.createElement('script');
@@ -579,6 +580,31 @@ realDb.version(8).stores({
     await tx.accounts.update(acc.id, { openDate });
   }
 });
+realDb.version(9).stores({
+  accounts: 'id,key,label',
+  history: 'id,date',
+  logs: 'id,accountId,date,expenseId',
+  expenses: 'id,date,typeId,accountId',
+  expenseTypes: 'id,name',
+  incomes: 'id,name,frequency',
+  rateChanges: 'id,accountId,date',
+  benchmarks: 'id,source,date'
+});
+
+// One-time seed of the bundled static benchmark snapshot (scripts/benchmarks-data.js)
+// -- frozen reference series (USD/PHP, PH CPI), not user data. Done as a
+// count-check rather than a version .upgrade(), since upgrade() callbacks
+// never run for a brand-new database (nothing to upgrade from). See that
+// file for sources/licensing.
+async function seedBenchmarksIfNeeded() {
+  if (!window.BENCHMARKS_DATA) return;
+  if (await realDb.benchmarks.count() > 0) return;
+  const rows = [];
+  Object.entries(window.BENCHMARKS_DATA).forEach(([source, points]) => {
+    (points || []).forEach(p => rows.push({ id: `${source}-${p.date}`, source, date: p.date, value: p.value }));
+  });
+  if (rows.length) await realDb.benchmarks.bulkPut(rows);
+}
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let _editId   = null;
@@ -1757,6 +1783,7 @@ function openYieldBreakdown() {
 // enterExploreMode/exitExploreMode/toggleExploreMode/adoptDemoData/refreshMode
 // live in scripts/explore-mode.js (shared with expenses.html).
 refreshMode();
+seedBenchmarksIfNeeded();
 window.addEventListener('resize', () =>
   db.history.orderBy('date').toArray().then(renderChart)
 );
