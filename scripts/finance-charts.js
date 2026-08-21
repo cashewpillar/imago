@@ -71,7 +71,14 @@ class FinanceChart extends HTMLElement {
           font-size: 11px;
           padding: 3px 0;
         }
-        .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .legend-item[data-key] { cursor: pointer; user-select: none; }
+        .legend-dot {
+          width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+          box-sizing: border-box;
+        }
+        .legend-item.hidden .legend-dot { background: transparent !important; border: 1.5px solid var(--dot-color, #9c9a94); }
+        .legend-item.hidden .legend-label,
+        .legend-item.hidden .legend-val { color: #9c9a94; }
         .legend-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #1a1917; }
         .legend-val { color: #9c9a94; font-family: monospace; font-size: 10px; }
         
@@ -106,8 +113,18 @@ class FinanceChart extends HTMLElement {
     this.legend = this.shadowRoot.getElementById('legend');
     this.tooltip = this.shadowRoot.getElementById('tooltip');
     this.ctx = this.canvas.getContext('2d');
-    
+
     this._resizeObserver = new ResizeObserver(() => this.render());
+
+    this._hiddenSeries = new Set();
+    this.legend.addEventListener('click', e => {
+      const item = e.target.closest('.legend-item[data-key]');
+      if (!item) return;
+      const key = item.dataset.key;
+      if (this._hiddenSeries.has(key)) this._hiddenSeries.delete(key);
+      else this._hiddenSeries.add(key);
+      this.render();
+    });
   }
 
   connectedCallback() {
@@ -378,19 +395,65 @@ class FinanceChart extends HTMLElement {
     const cH = H - PAD.top - PAD.bottom;
     const PALETTE = ['#1a6b3c', '#185fa5', '#854f0b', '#a32d2d', '#5f5e5a'];
 
-    const dateSet = new Set();
-    seriesArr.forEach(s => (s.points || []).forEach(p => dateSet.add(p.date)));
-    const dates = Array.from(dateSet).sort();
+    const keyOf = (s, si) => s.label || ('series-' + si);
+    const isHidden = (s, si) => this._hiddenSeries.has(keyOf(s, si));
 
-    if (dates.length === 0) { this._drawMessage('No data available'); return; }
-
-    const maps = seriesArr.map(s => {
+    // Legend always lists every series (so a hidden one can be clicked back on),
+    // using each series' own last known value regardless of current visibility.
+    const allMaps = seriesArr.map(s => {
       const m = new Map();
       (s.points || []).forEach(p => m.set(p.date, p.value));
       return m;
     });
+    const allDatesSorted = Array.from(new Set(seriesArr.flatMap(s => (s.points || []).map(p => p.date)))).sort();
 
-    const allValues = seriesArr.flatMap(s => (s.points || []).map(p => p.value));
+    this.legend.innerHTML = `<div class="legend-group">${seriesArr.map((s, si) => {
+      const color = s.color || PALETTE[si % PALETTE.length];
+      const m = allMaps[si];
+      let lastVal = null;
+      for (let i = allDatesSorted.length - 1; i >= 0; i--) { if (m.has(allDatesSorted[i])) { lastVal = m.get(allDatesSorted[i]); break; } }
+      const hidden = isHidden(s, si);
+      const key = keyOf(s, si).replace(/"/g, '&quot;');
+      return `
+        <div class="legend-item${hidden ? ' hidden' : ''}" data-key="${key}" style="--dot-color:${color}">
+          <div class="legend-dot" style="${hidden ? '' : `background:${color}`}"></div>
+          <div class="legend-label">${s.label || ''}</div>
+          <div class="legend-val">${this._formatVal(lastVal, unit)}</div>
+        </div>
+      `;
+    }).join('')}</div>`;
+
+    const plotted = seriesArr
+      .map((s, si) => ({ s, color: s.color || PALETTE[si % PALETTE.length], hidden: isHidden(s, si) }))
+      .filter(p => !p.hidden);
+
+    if (plotted.length === 0) {
+      ctx.fillStyle = '#9c9a94';
+      ctx.font = '13px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText('All series hidden — click the legend to show them', W / 2, H / 2);
+      return;
+    }
+
+    const dateSet = new Set();
+    plotted.forEach(p => (p.s.points || []).forEach(pt => dateSet.add(pt.date)));
+    const dates = Array.from(dateSet).sort();
+
+    if (dates.length === 0) {
+      ctx.fillStyle = '#9c9a94';
+      ctx.font = '13px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText('No data available', W / 2, H / 2);
+      return;
+    }
+
+    const maps = plotted.map(p => {
+      const m = new Map();
+      (p.s.points || []).forEach(pt => m.set(pt.date, pt.value));
+      return m;
+    });
+
+    const allValues = plotted.flatMap(p => (p.s.points || []).map(pt => pt.value));
     const minV = Math.min(...allValues, 0);
     const maxV = Math.max(...allValues, 0.01);
     const rng = Math.max(maxV - minV, 0.01);
@@ -414,8 +477,8 @@ class FinanceChart extends HTMLElement {
     const threshold = W < 480 ? 15 : 25;
     if (this._hoverIdx === undefined) this._hoverIdx = null;
 
-    seriesArr.forEach((s, si) => {
-      const color = s.color || PALETTE[si % PALETTE.length];
+    plotted.forEach((p, si) => {
+      const color = p.color;
       const m = maps[si];
 
       ctx.beginPath();
@@ -452,20 +515,6 @@ class FinanceChart extends HTMLElement {
       ctx.fillText(this._fmtMonthLabel(dates[i]), xOf(i), H - 4);
     }
 
-    this.legend.innerHTML = `<div class="legend-group">${seriesArr.map((s, si) => {
-      const color = s.color || PALETTE[si % PALETTE.length];
-      const m = maps[si];
-      let lastVal = null;
-      for (let i = dates.length - 1; i >= 0; i--) { if (m.has(dates[i])) { lastVal = m.get(dates[i]); break; } }
-      return `
-        <div class="legend-item">
-          <div class="legend-dot" style="background:${color}"></div>
-          <div class="legend-label">${s.label || ''}</div>
-          <div class="legend-val">${this._formatVal(lastVal, unit)}</div>
-        </div>
-      `;
-    }).join('')}</div>`;
-
     const handlePointer = e => {
       const rect = this.canvas.getBoundingClientRect();
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -482,9 +531,9 @@ class FinanceChart extends HTMLElement {
       if (this._hoverIdx !== ci) { this._hoverIdx = ci; this.render(); }
 
       const lines = [dates[ci]];
-      seriesArr.forEach((s, si) => {
+      plotted.forEach((p, si) => {
         const v = maps[si].get(dates[ci]);
-        if (v != null) lines.push(`${s.label || ''}: ${this._formatVal(v, unit)}`);
+        if (v != null) lines.push(`${p.s.label || ''}: ${this._formatVal(v, unit)}`);
       });
       this.tooltip.innerHTML = lines.join('<br>');
       this.tooltip.style.display = 'block';
