@@ -202,6 +202,10 @@ td.actions{text-align:right;white-space:nowrap}
 .toast.show{opacity:1;transform:translateY(0)}
 .toast.error{background:var(--danger)}
 .empty{text-align:center;padding:36px;color:var(--text-faint);font-size:13px}
+
+.demo-banner{display:none;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;background:var(--warning-bg);color:var(--warning);border-bottom:1px solid var(--border);padding:9px 16px;font-size:12.5px;text-align:center}
+.demo-banner.show{display:flex}
+.demo-banner button{flex-shrink:0}
 .info-icon{display:inline-flex;align-items:center;margin-left:4px;color:var(--text-faint);vertical-align:middle;cursor:help}
 .info-icon svg{width:12px;height:12px}
 </style>
@@ -213,6 +217,7 @@ td.actions{text-align:right;white-space:nowrap}
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/imago-icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<script src="scripts/savings-demo.js"></script>
 <script>
   // Cache-busting script load
   const script = document.createElement('script');
@@ -257,6 +262,11 @@ td.actions{text-align:right;white-space:nowrap}
   </div>
 </header>
 
+<div class="demo-banner" id="demoBanner">
+  <span>You're viewing sample demo data.</span>
+  <button class="btn btn-sm" onclick="resetDemoData()">Clear demo data &amp; start fresh</button>
+</div>
+
 <button class="fab-add" onclick="openAddAccount()" aria-label="Add account">
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
 </button>
@@ -267,8 +277,8 @@ td.actions{text-align:right;white-space:nowrap}
   <div class="chart-card">
     <div class="chart-header">
       <div class="filters" id="chartTypeFilters">
-        <span class="filter-chip" data-type="line" onclick="changeChartType('line', this)">Balance History</span>
         <span class="filter-chip" data-type="donut" onclick="changeChartType('donut', this)">Asset Allocation</span>
+        <span class="filter-chip" data-type="line" onclick="changeChartType('line', this)">Balance History</span>
         <span class="filter-chip" data-type="liquidity" onclick="changeChartType('liquidity', this)">Liquidity</span>
         <span class="filter-chip" data-type="yield" onclick="changeChartType('yield', this)">Yield</span>
       </div>
@@ -480,9 +490,9 @@ let _activeTag = localStorage.getItem('imago-finance-active-tag') || 'all';
 let _sortCol   = _activeTag === 'td' ? 'maturity' : 'balance';
 let _sortDir   = _activeTag === 'td' ? 'asc' : 'desc';
 let _excludeTD = false;
-let _chartType   = localStorage.getItem('imago-finance-chart-type')   || 'line';
+let _chartType   = localStorage.getItem('imago-finance-chart-type')   || 'donut';
 let _chartPeriod = localStorage.getItem('imago-finance-chart-period') || '3M';
-const DEFAULT_TARGETS = {"savings":30,"equities":20,"td":20,"buffer":10,"cash":10,"illiquid":10};
+const DEFAULT_TARGETS = {"savings":11.2,"equities":44.5,"td":33.6,"buffer":3.4,"cash":4.0,"illiquid":3.3};
 let _targets   = JSON.parse(localStorage.getItem('imago-finance-targets') || JSON.stringify(DEFAULT_TARGETS));
 let _targetsSnapshot = null;
 let _lockedTags = JSON.parse(localStorage.getItem('imago-finance-locked-tags') || '{}');
@@ -940,7 +950,7 @@ function renderChart(history) {
       groups['savings'] = (groups['savings'] || 0) + credTotal;
       
       const currentData = Object.entries(groups).map(([label, value]) => ({
-        label, value, color: TAG_COLORS[label] || '#999'
+        label: label === 'td' ? 'time deposit' : label, value, color: TAG_COLORS[label] || '#999'
       })).filter(d => d.value > 0).sort((a,b) => b.value - a.value);
 
       if (currentData.length === 0) {
@@ -1433,8 +1443,37 @@ function openYieldBreakdown() {
   openModal('yieldModal');
 }
 
+// ── Demo data ─────────────────────────────────────────────────────────────────
+const DEMO_FLAG = 'imago-finance-demo-active';
+
+async function seedDemoDataIfEmpty() {
+  const count = await db.accounts.count();
+  if (count > 0 || !window.SAVINGS_DEMO_DATA) return;
+
+  const { accounts, history, logs } = window.SAVINGS_DEMO_DATA;
+  await db.accounts.bulkPut(accounts);
+  await db.history.bulkPut(history);
+  if (logs) await db.logs.bulkPut(logs);
+  localStorage.setItem(DEMO_FLAG, '1');
+}
+
+function updateDemoBanner() {
+  document.getElementById('demoBanner').classList.toggle('show', localStorage.getItem(DEMO_FLAG) === '1');
+}
+
+async function resetDemoData() {
+  if (!confirm('This clears the demo accounts and history so you can start fresh. Continue?')) return;
+  await db.accounts.clear();
+  await db.history.clear();
+  await db.logs.clear();
+  localStorage.removeItem(DEMO_FLAG);
+  updateDemoBanner();
+  toast('Demo data cleared.');
+  render();
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
-render();
+seedDemoDataIfEmpty().then(() => { updateDemoBanner(); render(); });
 window.addEventListener('resize', () =>
   db.history.orderBy('date').toArray().then(renderChart)
 );

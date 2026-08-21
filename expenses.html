@@ -133,9 +133,15 @@ select.tag.type{
 .toast.show{opacity:1;transform:translateY(0)}
 .toast.error{background:var(--danger)}
 .empty{text-align:center;padding:36px;color:var(--text-faint);font-size:13px}
+
+.demo-banner{display:none;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;background:var(--warning-bg);color:var(--warning);border-bottom:1px solid var(--border);padding:9px 16px;font-size:12.5px;text-align:center}
+.demo-banner.show{display:flex}
+.demo-banner button{flex-shrink:0}
 </style>
 <meta name="theme-color" content="#f7f6f2">
 <link rel="icon" href="icons/imago-icon.svg" type="image/svg+xml">
+<script src="scripts/savings-demo.js"></script>
+<script src="scripts/expenses-demo.js"></script>
 <script>
   const script = document.createElement('script');
   script.src = 'scripts/finance-charts.js?v=' + Date.now();
@@ -188,6 +194,11 @@ select.tag.type{
     </div>
   </div>
 </header>
+
+<div class="demo-banner" id="demoBanner">
+  <span>You're viewing sample demo data.</span>
+  <button class="btn btn-sm" onclick="resetDemoData()">Clear demo data &amp; start fresh</button>
+</div>
 
 <button class="fab-add" onclick="openAddExpense()" aria-label="Add expense">
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
@@ -1663,8 +1674,46 @@ document.getElementById('expenseChart').addEventListener('bar-click', e => {
   openModal('drillDownModal');
 });
 
+// ── Demo data ─────────────────────────────────────────────────────────────────
+const DEMO_FLAG = 'imago-finance-demo-active';
+
+async function seedDemoDataIfEmpty() {
+  if (window.SAVINGS_DEMO_DATA && await db.accounts.count() === 0) {
+    const { accounts, history, logs } = window.SAVINGS_DEMO_DATA;
+    await db.accounts.bulkPut(accounts);
+    await db.history.bulkPut(history);
+    if (logs) await db.logs.bulkPut(logs);
+    localStorage.setItem(DEMO_FLAG, '1');
+  }
+  if (window.EXPENSES_DEMO_DATA && await db.expenses.count() === 0) {
+    const { expenseTypes, expenses, incomes } = window.EXPENSES_DEMO_DATA;
+    await db.expenseTypes.bulkPut(expenseTypes);
+    await db.expenses.bulkPut(expenses);
+    await db.incomes.bulkPut(incomes);
+    localStorage.setItem(DEMO_FLAG, '1');
+  }
+}
+
+function updateDemoBanner() {
+  document.getElementById('demoBanner').classList.toggle('show', localStorage.getItem(DEMO_FLAG) === '1');
+}
+
+async function resetDemoData() {
+  if (!confirm('This clears the demo accounts, expenses and income so you can start fresh. Continue?')) return;
+  await db.accounts.clear();
+  await db.history.clear();
+  await db.logs.clear();
+  await db.expenses.clear();
+  await db.expenseTypes.clear();
+  await db.incomes.clear();
+  localStorage.removeItem(DEMO_FLAG);
+  updateDemoBanner();
+  toast('Demo data cleared.');
+  render();
+}
+
 // Initial render
-render();
+seedDemoDataIfEmpty().then(() => { updateDemoBanner(); render(); });
 </script>
   <script src="pwa-register.js"></script>
 </body>
