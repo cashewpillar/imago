@@ -391,7 +391,7 @@ class FinanceChart extends HTMLElement {
     if (!Array.isArray(seriesArr) || seriesArr.length === 0) { this._drawMessage('No data available'); return; }
 
     const ctx = this.ctx;
-    const PAD = { top: 14, right: 16, bottom: 28, left: 50 };
+    const PAD = { top: 24, right: 16, bottom: 28, left: 50 };
     const cW = W - PAD.left - PAD.right;
     const cH = H - PAD.top - PAD.bottom;
     const PALETTE = ['#1a6b3c', '#185fa5', '#854f0b', '#a32d2d', '#5f5e5a'];
@@ -516,8 +516,10 @@ class FinanceChart extends HTMLElement {
       ctx.fillText(this._fmtMonthLabel(dates[i]), xOf(i), H - 4);
     }
 
-    // Hover guide: a dashed vertical line at the hovered date, plus one
-    // pointer-callout tooltip per series showing its value at that point.
+    // Hover guide: a dashed vertical line at the hovered date, a floating
+    // MMM YYYY label above the chart that tracks it (the x-axis labels are
+    // too sparse over long periods to tell what month a point falls in), and
+    // one pointer-callout tooltip per series (color-matched to its line).
     this.tooltip.style.display = 'none';
     if (this._hoverIdx != null && this._hoverIdx >= 0 && this._hoverIdx < dates.length) {
       const hi = this._hoverIdx;
@@ -533,10 +535,12 @@ class FinanceChart extends HTMLElement {
       ctx.stroke();
       ctx.restore();
 
+      this._drawTopDateLabel(ctx, hx, this._fmtMonthLabel(dates[hi]), W);
+
       plotted.forEach((p, si) => {
         const v = maps[si].get(dates[hi]);
         if (v == null) return;
-        this._drawCalloutTooltip(ctx, hx, yOf(v), `${p.s.label || ''}: ${this._formatVal(v, unit)}`, PAD, cH, W);
+        this._drawCalloutTooltip(ctx, hx, yOf(v), `${p.s.label || ''}: ${this._formatVal(v, unit)}`, PAD, cH, W, p.color);
       });
     }
 
@@ -567,12 +571,13 @@ class FinanceChart extends HTMLElement {
     this.canvas.ontouchend = hideTooltip;
   }
 
-  // Draws a dark rounded tooltip box to the LEFT of (px, py), with its
-  // pointer base centered on the box's edge. The pointer's tip always
-  // stretches to the actual point (px, py) -- so when the box gets clamped
-  // away from the point's height (near a chart edge), the pointer becomes a
-  // slanted dart reaching down/up to it, instead of a plain gap.
-  _drawCalloutTooltip(ctx, px, py, text, PAD, cH, W) {
+  // Draws a rounded tooltip box (filled with the series' own color) to the
+  // LEFT of (px, py), with its pointer base centered on the box's edge. The
+  // pointer's tip always stretches to the actual point (px, py) -- so when
+  // the box gets clamped away from the point's height (near a chart edge),
+  // the pointer becomes a slanted dart reaching down/up to it, instead of a
+  // plain gap.
+  _drawCalloutTooltip(ctx, px, py, text, PAD, cH, W, color) {
     const padX = 8, padY = 5, boxH = 22, gap = 7, pointer = 5, r = 4;
     ctx.font = '11px system-ui';
     const textW = ctx.measureText(text).width;
@@ -593,7 +598,7 @@ class FinanceChart extends HTMLElement {
     boxTop = Math.max(PAD.top, Math.min(boxTop, PAD.top + cH - boxH));
     const boxCenterY = boxTop + boxH / 2;
 
-    ctx.fillStyle = '#1a1917';
+    ctx.fillStyle = color || '#1a1917';
     ctx.beginPath();
     if (ctx.roundRect) ctx.roundRect(boxLeft, boxTop, boxW, boxH, r);
     else ctx.rect(boxLeft, boxTop, boxW, boxH);
@@ -616,6 +621,31 @@ class FinanceChart extends HTMLElement {
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillText(text, boxLeft + padX, boxCenterY);
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  // A small floating pill above the plot area, centered on hx, showing the
+  // hovered date -- the x-axis's own labels are too sparse over long periods
+  // to tell which month a hovered point actually falls in.
+  _drawTopDateLabel(ctx, hx, text, W) {
+    const padX = 7, h = 16, r = 4;
+    ctx.font = '10px system-ui';
+    const textW = ctx.measureText(text).width;
+    const boxW = textW + padX * 2;
+    let boxLeft = hx - boxW / 2;
+    boxLeft = Math.max(0, Math.min(boxLeft, W - boxW));
+    const boxTop = 2;
+
+    ctx.fillStyle = '#1a1917';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(boxLeft, boxTop, boxW, h, r);
+    else ctx.rect(boxLeft, boxTop, boxW, h);
+    ctx.fill();
+
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, boxLeft + boxW / 2, boxTop + h / 2);
     ctx.textBaseline = 'alphabetic';
   }
 
