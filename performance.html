@@ -57,6 +57,27 @@ main{max-width:940px;margin:0 auto;padding:20px 16px}
 .disclaimers li strong{color:var(--text)}
 
 .empty{text-align:center;padding:36px;color:var(--text-faint);font-size:13px}
+
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border:1px solid var(--border-strong);border-radius:var(--r);background:var(--surface);color:var(--text);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .12s}
+.btn:hover{background:var(--bg)}
+
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:100;align-items:center;justify-content:center}
+.modal-backdrop.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:22px;width:min(520px,95vw);max-height:85vh;overflow-y:auto}
+.modal h2{font-size:17px;font-weight:600;margin-bottom:2px}
+.modal .modal-sub{font-size:12px;color:var(--text-faint);margin-bottom:16px}
+.modal-actions{display:flex;justify-content:flex-end;margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
+.breakdown-section{margin-bottom:16px;padding-bottom:14px;border-bottom:1px dashed var(--border)}
+.breakdown-section:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.breakdown-section h3{font-size:13px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.breakdown-section h3 .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.breakdown-row{display:flex;justify-content:space-between;font-size:12.5px;padding:2px 0;font-family:monospace}
+.breakdown-row .lbl{color:var(--text-muted);font-family:system-ui,-apple-system,sans-serif}
+.breakdown-note{font-size:11px;color:var(--text-faint);margin-top:6px;font-style:italic}
+.breakdown-table{width:100%;border-collapse:collapse;margin-top:4px;font-size:12px}
+.breakdown-table th{text-align:left;font-weight:500;color:var(--text-muted);padding:3px 8px 3px 0;border-bottom:1px solid var(--border);font-size:10px;text-transform:uppercase;letter-spacing:.04em}
+.breakdown-table td{padding:3px 8px 3px 0;border-bottom:1px dashed var(--border);font-family:monospace}
+.breakdown-table td:first-child{font-family:system-ui,-apple-system,sans-serif}
 </style>
 <meta name="theme-color" content="#f7f6f2">
 <meta name="mobile-web-app-capable" content="yes">
@@ -105,6 +126,7 @@ main{max-width:940px;margin:0 auto;padding:20px 16px}
         <span class="filter-chip" data-period="ALL" onclick="changePeriod('ALL', this)">All</span>
       </div>
     </div>
+    <div style="font-size:11px;color:var(--text-faint);margin-bottom:8px;">Click a point on the chart for a breakdown of how it was computed.</div>
     <div id="chartWrap">
       <div class="chart-empty" id="chartEmpty">No rate history yet — this chart starts once an account has at least one recorded rate.</div>
       <imago-chart id="perfChart" style="display:none"></imago-chart>
@@ -114,15 +136,12 @@ main{max-width:940px;margin:0 auto;padding:20px 16px}
   <div class="disclaimers">
     <h3>How this is computed &amp; what to keep in mind</h3>
     <ul>
-      <li><strong>Analytical, not actual-credited:</strong> each line is <code>balance × stated rate</code>, net of a flat 20% withholding-tax assumption — not a reconstruction of amounts actually credited to the account.</li>
+      <li><strong>Analytical, not actual-credited:</strong> these lines don't reconstruct amounts actually credited to the account — click a point for the exact formula.</li>
       <li><strong>Manual tracking dependency:</strong> balances and rates are only as accurate and current as your last manual update in this app; gaps or lag in data entry directly skew the computed historical %.</li>
       <li><strong>Sampled monthly:</strong> each point is the account data as of month-end (or today, for the current month) — balance history itself is only recorded when a balance actually changes during a save, not a guaranteed daily snapshot, so a month's sample can reflect a stale value if nothing was logged that month.</li>
       <li><strong>Assumed constant where unrecorded:</strong> if an account has never had a rate change logged (common for accounts created before rate history existed, or never rate-edited since), its <em>current</em> rate is assumed to have applied since it was opened, rather than showing no data — real historical rate changes before you started logging them aren't captured.</li>
       <li><strong>TD rollovers aren't linked:</strong> closing a time deposit and opening its replacement are unconnected records; the old account's contribution simply stops at its closure date and the new one picks up — any delay between closing and logging the new account shows as a dip.</li>
-      <li><strong>Flat 20% tax assumption:</strong> applied uniformly to all accounts regardless of any account-specific tax treatment.</li>
-      <li><strong>PH Inflation is shown as year-over-year % change:</strong> plotted as its YoY % change (not the raw CPI index level), so it sits on the same % scale as net yield and can be subtracted from it directly (that's Real Yield) — but the underlying index level itself isn't shown here.</li>
       <li><strong>Benchmark data is a frozen snapshot:</strong> fetched once and bundled into the app (see <code>scripts/benchmarks-data.js</code>) — it won't pick up new months automatically. PH CPI's underlying index only starts in 2010, so its YoY line can't begin until 2011.</li>
-      <li><strong>Real Yield</strong> is <code>blended Savings+TD net yield − PH Inflation (YoY)</code>, only plotted where both are known for the exact same month — positive means you gained purchasing power that month, negative means you lost it. It blends Savings and TD together (weighted by balance), so it won't match either individual line.</li>
     </ul>
   </div>
 
@@ -137,6 +156,7 @@ main{max-width:940px;margin:0 auto;padding:20px 16px}
         <span class="filter-chip" data-period="ALL" onclick="changeGrowthPeriod('ALL', this)">All</span>
       </div>
     </div>
+    <div style="font-size:11px;color:var(--text-faint);margin-bottom:8px;">Click a point on the chart for a breakdown of how it was computed.</div>
     <div id="growthChartWrap" style="position:relative;height:280px">
       <div class="chart-empty" id="growthEmpty">Not enough overlapping history yet to compare.</div>
       <imago-chart id="growthChart" style="display:none"></imago-chart>
@@ -148,13 +168,24 @@ main{max-width:940px;margin:0 auto;padding:20px 16px}
     <ul>
       <li><strong>This is compounded growth, not a rate</strong> — most lines start at 100 on the same date and show how they'd have grown since. It answers "which grew more, equities or the cost of living," not "is my rate healthy right now" (that's the Yield Trend chart above).</li>
       <li><strong>The chart's period is set by VWRA, not your accounts</strong> — it always spans VWRA's and PH CPI's full available history, never shrinking just because you've only tracked accounts for a short time.</li>
-      <li><strong>Savings+TD (simulated) is the one exception</strong> — it starts at 100 on YOUR account data's own start date, whatever that is, not on VWRA's 2019 start. So it may appear only partway through the chart, and its "100" isn't the same calendar date as the other lines' "100" — compare its slope and shape, not its absolute height, against the others. Same simulation logic as the Yield Trend chart: your blended yield % compounded forward, not your real (deposit/withdrawal-contaminated) balance history.</li>
+      <li><strong>Savings+TD (simulated) is the one exception</strong> — it starts at 100 on YOUR account data's own start date, whatever that is, not on VWRA's 2019 start. So it may appear only partway through the chart, and its "100" isn't the same calendar date as the other lines' "100" — compare its slope and shape, not its absolute height, against the others.</li>
       <li><strong>VWRA only goes back to July 2019</strong> — that's the ETF's actual inception, not a data limitation, so the two VWRA lines and CPI (rebased together) can't start earlier than that.</li>
-      <li><strong>Two VWRA lines show the currency effect directly:</strong> "VWRA (₱, incl. FX)" multiplies VWRA's USD price by the USD/PHP rate at each date before rebasing — the gap between it and "VWRA (USD)" is purely the peso's depreciation over that period, not a change in the fund's actual USD price.</li>
       <li><strong>This shows where each line ended up, not how bumpy the ride was:</strong> equities can swing far more month-to-month than fixed income along the way, even when the ending point looks better — this chart doesn't show that volatility, only the destination.</li>
     </ul>
   </div>
 </main>
+
+<!-- Point Breakdown Modal -->
+<div class="modal-backdrop" id="breakdownModal">
+  <div class="modal">
+    <h2 id="breakdownTitle">—</h2>
+    <div class="modal-sub">How this month's values were computed</div>
+    <div id="breakdownBody"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('breakdownModal')">Close</button>
+    </div>
+  </div>
+</div>
 
 <script>
 // ── DB (schema mirrors savings.html) ─────────────────────────────────────────
@@ -273,6 +304,20 @@ const BENCHMARKS = {
 
 function dateOnly(s) { return String(s || '').slice(0, 10); }
 function todayStr() { return new Date().toISOString().slice(0, 10); }
+function esc(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function fmtPct(v) { return v == null ? '—' : v.toFixed(2) + '%'; }
+function fmtMonthLabel(date) {
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const [y, m] = date.slice(0, 7).split('-').map(Number);
+  return `${MONTHS[m - 1] || ''} ${y}`;
+}
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+document.querySelectorAll('.modal-backdrop').forEach(bd =>
+  bd.addEventListener('click', e => { if (e.target === bd) bd.classList.remove('open'); })
+);
 function fmtk(v) {
   v = parseFloat(v);
   if (isNaN(v)) return '0';
@@ -532,15 +577,27 @@ async function computeGrowthSeries() {
 
   const fixedIncomePoints = [];
   if (fiStarts.length) {
+    // Computed using the REAL dates (today for the current month) so
+    // endDate/step lookups stay correct -- only the DISPLAY label of the
+    // final point gets rounded up to calendar month-end below, to match
+    // benchmarks-data.js's convention (it always labels its latest point
+    // with the theoretical month-end, even though it was actually fetched
+    // mid-month). Without this, the two conventions disagree on what
+    // "the current month" is called, and VWRA/CPI show a spurious gap.
     const fiDates = monthlyTimeline(fiStarts[0], today);
     const yieldPoints = weightedYieldAtDates(prepared, fiDates);
     const yieldByDate = new Map(yieldPoints.map(p => [p.date, p.value]));
     let sim = null, lastRate = null;
-    fiDates.forEach(d => {
+    fiDates.forEach((d, i) => {
       if (yieldByDate.has(d)) lastRate = yieldByDate.get(d);
       if (lastRate == null) return;
       sim = sim == null ? 100 : sim * (1 + lastRate / 100 / 12);
-      fixedIncomePoints.push({ date: d, value: sim });
+      let displayDate = d;
+      if (i === fiDates.length - 1) {
+        const dd = new Date(d + 'T00:00:00Z');
+        displayDate = new Date(Date.UTC(dd.getUTCFullYear(), dd.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+      }
+      fixedIncomePoints.push({ date: displayDate, value: sim });
     });
   }
 
@@ -641,6 +698,171 @@ function renderSummary(filled, benchmarks, realYield) {
   }).join('');
   row.innerHTML = realYieldCard + yieldCards + benchmarkCards;
 }
+
+// ── Point breakdown modal ────────────────────────────────────────────────────
+async function prepAccountsForTags(tags) {
+  const [accounts, logs, rateChanges] = await Promise.all([
+    db.accounts.toArray(), db.logs.toArray(), db.rateChanges.toArray()
+  ]);
+  const today = todayStr();
+  return accounts
+    .filter(a => (a.tags || []).some(t => tags.includes(t)))
+    .map(acc => ({
+      acc,
+      balanceSteps: buildBalanceSteps(acc, logs.filter(l => l.accountId === acc.id)),
+      rateSteps: buildRateSteps(acc, rateChanges.filter(rc => rc.accountId === acc.id)),
+      endDate: acc.status === 'closed' && acc.closedDate ? dateOnly(acc.closedDate) : today
+    }));
+}
+
+// Per-account weighted-yield detail at one date -- same math as
+// weightedYieldAtDates, but keeping each account's own row for display.
+function weightedDetailAt(entries, date) {
+  const rows = [];
+  let sumWeighted = 0, sumBalance = 0;
+  entries.forEach(e => {
+    if (date > e.endDate) return;
+    const balance = stepValueAt(e.balanceSteps, 'balance', date);
+    const rate = stepValueAt(e.rateSteps, 'rate', date);
+    if (balance == null || balance <= 0 || rate == null) return;
+    sumWeighted += balance * rate;
+    sumBalance += balance;
+    rows.push({ label: e.acc.label || e.acc.key, balance, rate });
+  });
+  const grossAvg = sumBalance > 0 ? sumWeighted / sumBalance : null;
+  return { rows, sumBalance, grossAvg, net: grossAvg != null ? grossAvg * 0.8 : null };
+}
+
+function accountRowsTable(rows) {
+  if (!rows.length) return '<div class="breakdown-note">No qualifying accounts as of this date.</div>';
+  return `<table class="breakdown-table"><thead><tr><th>Account</th><th>Balance</th><th>Rate</th></tr></thead><tbody>${
+    rows.map(r => `<tr><td>${esc(r.label)}</td><td>₱${fmtk(r.balance)}</td><td>${r.rate}%</td></tr>`).join('')
+  }</tbody></table>`;
+}
+
+function breakdownSection(color, title, valueLabel, bodyHtml, noteHtml) {
+  return `
+    <div class="breakdown-section">
+      <h3><span class="dot" style="background:${color}"></span>${esc(title)} — ${valueLabel}</h3>
+      ${bodyHtml}
+      ${noteHtml ? `<div class="breakdown-note">${noteHtml}</div>` : ''}
+    </div>
+  `;
+}
+
+function openBreakdownModal(date, sections) {
+  document.getElementById('breakdownTitle').textContent = fmtMonthLabel(date);
+  document.getElementById('breakdownBody').innerHTML = sections.length
+    ? sections.join('')
+    : '<div class="breakdown-note">No data available for this date.</div>';
+  openModal('breakdownModal');
+}
+
+async function openYieldBreakdown(date) {
+  const [savingsEntries, tdEntries, cpiRows] = await Promise.all([
+    prepAccountsForTags(['savings']),
+    prepAccountsForTags(['td']),
+    db.benchmarks.where('source').equals('phCpi').toArray()
+  ]);
+
+  const savingsDetail = weightedDetailAt(savingsEntries, date);
+  const tdDetail = weightedDetailAt(tdEntries, date);
+  const blendedDetail = weightedDetailAt(savingsEntries.concat(tdEntries), date);
+
+  const cpiByMonth = new Map(cpiRows.map(r => [r.date.slice(0, 7), r.value]));
+  const [y, m] = date.slice(0, 7).split('-').map(Number);
+  const priorYm = `${y - 1}-${String(m).padStart(2, '0')}`;
+  const curCpi = cpiByMonth.get(date.slice(0, 7));
+  const priorCpi = cpiByMonth.get(priorYm);
+  const inflation = (curCpi != null && priorCpi != null) ? ((curCpi / priorCpi) - 1) * 100 : null;
+  const realYield = (blendedDetail.net != null && inflation != null) ? blendedDetail.net - inflation : null;
+
+  const sections = [];
+  if (realYield != null) {
+    sections.push(breakdownSection('#5f5e5a', 'Real Yield', fmtPct(realYield), `
+      <div class="breakdown-row"><span class="lbl">Blended Savings+TD yield</span><span>${fmtPct(blendedDetail.net)}</span></div>
+      <div class="breakdown-row"><span class="lbl">− PH Inflation (YoY)</span><span>${fmtPct(inflation)}</span></div>
+    `, `${fmtPct(blendedDetail.net)} − ${fmtPct(inflation)} = ${fmtPct(realYield)}`));
+  }
+  if (savingsDetail.rows.length) {
+    sections.push(breakdownSection(BUCKETS.savings.color, 'Savings', fmtPct(savingsDetail.net),
+      accountRowsTable(savingsDetail.rows),
+      `Weighted avg gross rate ${savingsDetail.grossAvg.toFixed(2)}%, net of 20% tax = ${fmtPct(savingsDetail.net)}.`));
+  }
+  if (tdDetail.rows.length) {
+    sections.push(breakdownSection(BUCKETS.td.color, 'Time Deposit', fmtPct(tdDetail.net),
+      accountRowsTable(tdDetail.rows),
+      `Weighted avg gross rate ${tdDetail.grossAvg.toFixed(2)}%, net of 20% tax = ${fmtPct(tdDetail.net)}.`));
+  }
+  if (inflation != null) {
+    sections.push(breakdownSection(BENCHMARKS.phCpi.color, 'PH Inflation (YoY)', fmtPct(inflation), `
+      <div class="breakdown-row"><span class="lbl">CPI this month</span><span>${curCpi.toFixed(2)}</span></div>
+      <div class="breakdown-row"><span class="lbl">CPI 12 months earlier</span><span>${priorCpi.toFixed(2)}</span></div>
+    `, `(${curCpi.toFixed(2)} / ${priorCpi.toFixed(2)} − 1) × 100 = ${fmtPct(inflation)}`));
+  }
+
+  openBreakdownModal(date, sections);
+}
+
+async function openGrowthBreakdown(date) {
+  const [vwraRows, usdphpRows, cpiRows] = await Promise.all([
+    db.benchmarks.where('source').equals('vwra').toArray(),
+    db.benchmarks.where('source').equals('usdphp').toArray(),
+    db.benchmarks.where('source').equals('phCpi').toArray(),
+  ]);
+  const vwra = vwraRows.map(r => ({ date: r.date, value: r.value })).sort((a, b) => a.date.localeCompare(b.date));
+  const usdphp = usdphpRows.map(r => ({ date: r.date, value: r.value })).sort((a, b) => a.date.localeCompare(b.date));
+  const cpi = cpiRows.map(r => ({ date: r.date, value: r.value })).sort((a, b) => a.date.localeCompare(b.date));
+
+  const commonStart = vwra.length ? vwra[0].date : null;
+  const vwraBase = commonStart ? vwra.find(p => p.date >= commonStart) : null;
+  const vwraAtDate = vwra.find(p => p.date === date);
+  const fxAtDate = usdphp.find(p => p.date === date);
+  const cpiBase = commonStart ? cpi.find(p => p.date >= commonStart) : null;
+  const cpiAtDate = cpi.find(p => p.date === date);
+
+  const sections = [];
+
+  if (vwraAtDate && vwraBase) {
+    const idx = (vwraAtDate.value / vwraBase.value) * 100;
+    sections.push(breakdownSection('#185fa5', 'VWRA (USD)', idx.toFixed(1), `
+      <div class="breakdown-row"><span class="lbl">Price this month</span><span>$${vwraAtDate.value.toFixed(2)}</span></div>
+      <div class="breakdown-row"><span class="lbl">Price on ${vwraBase.date} (= 100)</span><span>$${vwraBase.value.toFixed(2)}</span></div>
+    `, `$${vwraAtDate.value.toFixed(2)} / $${vwraBase.value.toFixed(2)} × 100 = ${idx.toFixed(1)}`));
+
+    const fxBase = usdphp.find(p => p.date === vwraBase.date);
+    if (fxAtDate && fxBase) {
+      const phpAtDate = vwraAtDate.value * fxAtDate.value;
+      const phpBase = vwraBase.value * fxBase.value;
+      const idxPhp = (phpAtDate / phpBase) * 100;
+      sections.push(breakdownSection('#a32d2d', 'VWRA (₱, incl. FX)', idxPhp.toFixed(1), `
+        <div class="breakdown-row"><span class="lbl">VWRA price × USD/PHP this month</span><span>$${vwraAtDate.value.toFixed(2)} × ₱${fxAtDate.value.toFixed(2)} = ₱${phpAtDate.toFixed(2)}</span></div>
+        <div class="breakdown-row"><span class="lbl">Same, on ${vwraBase.date} (= 100)</span><span>₱${phpBase.toFixed(2)}</span></div>
+      `, `₱${phpAtDate.toFixed(2)} / ₱${phpBase.toFixed(2)} × 100 = ${idxPhp.toFixed(1)}`));
+    }
+  }
+
+  if (cpiAtDate && cpiBase) {
+    const idx = (cpiAtDate.value / cpiBase.value) * 100;
+    sections.push(breakdownSection('#854f0b', 'PH Cost of Living (CPI)', idx.toFixed(1), `
+      <div class="breakdown-row"><span class="lbl">CPI index this month</span><span>${cpiAtDate.value.toFixed(2)}</span></div>
+      <div class="breakdown-row"><span class="lbl">CPI index on ${cpiBase.date} (= 100)</span><span>${cpiBase.value.toFixed(2)}</span></div>
+    `, `${cpiAtDate.value.toFixed(2)} / ${cpiBase.value.toFixed(2)} × 100 = ${idx.toFixed(1)}`));
+  }
+
+  const prepared = await prepAccountsForTags(['savings', 'td']);
+  const detail = weightedDetailAt(prepared, date);
+  if (detail.rows.length) {
+    sections.push(breakdownSection('#1a6b3c', 'Savings+TD (simulated)', `${detail.grossAvg.toFixed(2)}% rate that month`,
+      accountRowsTable(detail.rows),
+      'This line compounds this weighted rate forward from 100 each month starting at your earliest account\'s data -- it is not the raw index value shown here, which is just the rate applied at this particular month.'));
+  }
+
+  openBreakdownModal(date, sections);
+}
+
+document.getElementById('perfChart').addEventListener('point-click', e => openYieldBreakdown(e.detail.date));
+document.getElementById('growthChart').addEventListener('point-click', e => openGrowthBreakdown(e.detail.date));
 
 (async function init() {
   await seedBenchmarksIfNeeded();

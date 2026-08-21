@@ -575,6 +575,15 @@ class FinanceChart extends HTMLElement {
 
     this.canvas.onmouseleave = hideTooltip;
     this.canvas.ontouchend = hideTooltip;
+
+    this.canvas.onclick = e => {
+      const rect = this.canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      let ci = null, md = Infinity;
+      dates.forEach((_, i) => { const d = Math.abs(xOf(i) - mx); if (d < md) { md = d; ci = i; } });
+      if (md > (dates.length === 1 ? 100 : 44)) return;
+      this.dispatchEvent(new CustomEvent('point-click', { detail: { date: dates[ci] }, bubbles: true, composed: true }));
+    };
   }
 
   // Resolves overlaps among several tooltip boxes stacked at the same x: sorts
