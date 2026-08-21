@@ -10,10 +10,26 @@
 //   Philippines, all-items index (COICOP_1999=_T), monthly. Only available
 //   from 2010-01 onward in this dataset -- earlier PH CPI history isn't
 //   published here. (c) International Monetary Fund -- see imf.org/external/terms.htm.
+// - vwra: VWRA.L (Vanguard FTSE All-World UCITS ETF, USD-accumulating share
+//   class), priced in USD, traded on the LSE. Fetched from Yahoo Finance's
+//   chart endpoint, resampled to one point per month. Only available from
+//   2019-07 onward -- that's the ETF's actual inception, not a data-source
+//   limitation. This is a raw price LEVEL (not a %), meant for a rebased/
+//   indexed cumulative-growth comparison -- see performance.html's Growth
+//   Comparison chart, not the Yield Trend chart (which is rate-based).
 //
 // To refresh: re-run the fetch (see scripts/fetch-benchmarks.md if present, or
-// re-derive from the same two endpoints) and replace this file wholesale --
+// re-derive from the same three sources) and replace this file wholesale --
 // values are a frozen snapshot, not a live feed.
+//
+// IMPORTANT: this file is loaded via a plain `<script src="scripts/benchmarks-data.js?v=N">`
+// tag (savings.html, expenses.html, performance.html) -- not the Date.now()
+// cache-buster finance-charts.js uses, because seedBenchmarksIfNeeded() needs
+// window.BENCHMARKS_DATA synchronously available, which a dynamically-injected
+// (async-by-default) script tag can't guarantee. Whenever this file's DATA
+// changes (new source, updated values), bump `?v=N` in all three <script> tags
+// -- otherwise browsers that already cached the old file may never see the
+// update, and new sources silently never get seeded for existing visitors.
 (function () {
   window.BENCHMARKS_DATA = {
     usdphp: [
@@ -549,6 +565,94 @@
     { date: '2026-04-30', value: 136.5 },
     { date: '2026-05-31', value: 135.8 },
     { date: '2026-06-30', value: 135.4 },
+    ],
+    vwra: [
+    { date: '2019-07-31', value: 77.415 },
+    { date: '2019-08-31', value: 77.11 },
+    { date: '2019-09-30', value: 77.875 },
+    { date: '2019-10-31', value: 81.88 },
+    { date: '2019-11-30', value: 83.345 },
+    { date: '2019-12-31', value: 86.375 },
+    { date: '2020-01-31', value: 85.115 },
+    { date: '2020-02-29', value: 77.2 },
+    { date: '2020-03-31', value: 65.145 },
+    { date: '2020-04-30', value: 72.85 },
+    { date: '2020-05-31', value: 83.45 },
+    { date: '2020-06-30', value: 81.715 },
+    { date: '2020-07-31', value: 84.46 },
+    { date: '2020-08-31', value: 87.135 },
+    { date: '2020-09-30', value: 87.37 },
+    { date: '2020-10-31', value: 85.05 },
+    { date: '2020-11-30', value: 97.875 },
+    { date: '2020-12-31', value: 99.85 },
+    { date: '2021-01-31', value: 99.84 },
+    { date: '2021-02-28', value: 102.02 },
+    { date: '2021-03-31', value: 105.82 },
+    { date: '2021-04-30', value: 109.24 },
+    { date: '2021-05-31', value: 111.72 },
+    { date: '2021-06-30', value: 112.82 },
+    { date: '2021-07-31', value: 113.06 },
+    { date: '2021-08-31', value: 116.77 },
+    { date: '2021-09-30', value: 110.82 },
+    { date: '2021-10-31', value: 116.34 },
+    { date: '2021-11-30', value: 113.24 },
+    { date: '2021-12-31', value: 118.28 },
+    { date: '2022-01-31', value: 112.48 },
+    { date: '2022-02-28', value: 105.82 },
+    { date: '2022-03-31', value: 112.04 },
+    { date: '2022-04-30', value: 104.74 },
+    { date: '2022-05-31', value: 102.22 },
+    { date: '2022-06-30', value: 94.65 },
+    { date: '2022-07-31', value: 100.94 },
+    { date: '2022-08-31', value: 97.96 },
+    { date: '2022-09-30', value: 89.55 },
+    { date: '2022-10-31', value: 92.26 },
+    { date: '2022-11-30', value: 101.02 },
+    { date: '2022-12-31', value: 96.86 },
+    { date: '2023-01-31', value: 105.62 },
+    { date: '2023-02-28', value: 102.1 },
+    { date: '2023-03-31', value: 103.54 },
+    { date: '2023-04-30', value: 104.9 },
+    { date: '2023-05-31', value: 107.16 },
+    { date: '2023-06-30', value: 110.2 },
+    { date: '2023-07-31', value: 112.22 },
+    { date: '2023-08-31', value: 111.36 },
+    { date: '2023-09-30', value: 106.92 },
+    { date: '2023-10-31', value: 108.1 },
+    { date: '2023-11-30', value: 113.26 },
+    { date: '2023-12-31', value: 118.44 },
+    { date: '2024-01-31', value: 120.14 },
+    { date: '2024-02-29', value: 124.56 },
+    { date: '2024-03-31', value: 126.5 },
+    { date: '2024-04-30', value: 125.66 },
+    { date: '2024-05-31', value: 127.46 },
+    { date: '2024-06-30', value: 133.66 },
+    { date: '2024-07-31', value: 128.24 },
+    { date: '2024-08-31', value: 136.0 },
+    { date: '2024-09-30', value: 138.74 },
+    { date: '2024-10-31', value: 138.04 },
+    { date: '2024-11-30', value: 141.98 },
+    { date: '2024-12-31', value: 139.22 },
+    { date: '2025-01-31', value: 144.4 },
+    { date: '2025-02-28', value: 141.26 },
+    { date: '2025-03-31', value: 127.34 },
+    { date: '2025-04-30', value: 140.76 },
+    { date: '2025-05-31', value: 145.78 },
+    { date: '2025-06-30', value: 153.48 },
+    { date: '2025-07-31', value: 152.5 },
+    { date: '2025-08-31', value: 159.16 },
+    { date: '2025-09-30', value: 166.3 },
+    { date: '2025-10-31', value: 167.88 },
+    { date: '2025-11-30', value: 167.92 },
+    { date: '2025-12-31', value: 170.52 },
+    { date: '2026-01-31', value: 174.7 },
+    { date: '2026-02-28', value: 177.18 },
+    { date: '2026-03-31', value: 167.08 },
+    { date: '2026-04-30', value: 182.46 },
+    { date: '2026-05-31', value: 187.36 },
+    { date: '2026-06-30', value: 189.82 },
+    { date: '2026-07-31', value: 187.42 },
+    { date: '2026-08-31', value: 193.98 },
     ],
   };
 })();

@@ -36,6 +36,7 @@ main{max-width:940px;margin:0 auto;padding:20px 16px}
 .sum-card .val{font-size:22px;font-weight:600;letter-spacing:-.5px}
 .sum-card .sub{font-size:11px;color:var(--text-faint);margin-top:2px}
 .col-pos{color:var(--accent)}
+.col-neg{color:var(--danger)}
 
 .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:16px 18px;margin-bottom:18px}
 .chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
@@ -67,7 +68,7 @@ main{max-width:940px;margin:0 auto;padding:20px 16px}
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <script src="scripts/savings-demo.js"></script>
 <script src="scripts/expenses-demo.js"></script>
-<script src="scripts/benchmarks-data.js"></script>
+<script src="scripts/benchmarks-data.js?v=2"></script>
 <script>
   // Cache-busting script load
   const script = document.createElement('script');
@@ -93,7 +94,7 @@ main{max-width:940px;margin:0 auto;padding:20px 16px}
 
   <div class="chart-card">
     <div class="chart-header">
-      <span class="chart-title">Yield vs. benchmarks, over time</span>
+      <span class="chart-title">Yield Trend vs. Benchmarks</span>
       <div class="filters" id="chartPeriodFilters">
         <span class="filter-chip" data-period="YTD" onclick="changePeriod('YTD', this)">YTD</span>
         <span class="filter-chip" data-period="12M" onclick="changePeriod('12M', this)">12M</span>
@@ -119,8 +120,37 @@ main{max-width:940px;margin:0 auto;padding:20px 16px}
       <li><strong>Assumed constant where unrecorded:</strong> if an account has never had a rate change logged (common for accounts created before rate history existed, or never rate-edited since), its <em>current</em> rate is assumed to have applied since it was opened, rather than showing no data — real historical rate changes before you started logging them aren't captured.</li>
       <li><strong>TD rollovers aren't linked:</strong> closing a time deposit and opening its replacement are unconnected records; the old account's contribution simply stops at its closure date and the new one picks up — any delay between closing and logging the new account shows as a dip.</li>
       <li><strong>Flat 20% tax assumption:</strong> applied uniformly to all accounts regardless of any account-specific tax treatment.</li>
-      <li><strong>Benchmarks are shown as year-over-year % change:</strong> PH Inflation and PHP Depreciation are plotted as their YoY % change (not the raw CPI index level or the raw ₱/$ rate), so they sit on the same % scale as net yield and can be compared directly — but the underlying absolute numbers (today's actual exchange rate, the index level) aren't shown here.</li>
-      <li><strong>Benchmark data is a frozen snapshot:</strong> USD/PHP and PH CPI were fetched once and bundled into the app (see <code>scripts/benchmarks-data.js</code>) — they won't pick up new months automatically. PH CPI's underlying index only starts in 2010, so its YoY line can't begin until 2011.</li>
+      <li><strong>PH Inflation is shown as year-over-year % change:</strong> plotted as its YoY % change (not the raw CPI index level), so it sits on the same % scale as net yield and can be subtracted from it directly (that's Real Yield) — but the underlying index level itself isn't shown here.</li>
+      <li><strong>Benchmark data is a frozen snapshot:</strong> fetched once and bundled into the app (see <code>scripts/benchmarks-data.js</code>) — it won't pick up new months automatically. PH CPI's underlying index only starts in 2010, so its YoY line can't begin until 2011.</li>
+      <li><strong>Real Yield</strong> is <code>blended Savings+TD net yield − PH Inflation (YoY)</code>, only plotted where both are known for the exact same month — positive means you gained purchasing power that month, negative means you lost it. It blends Savings and TD together (weighted by balance), so it won't match either individual line.</li>
+    </ul>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <span class="chart-title">Growth Comparison</span>
+      <div class="filters" id="growthPeriodFilters">
+        <span class="filter-chip" data-period="YTD" onclick="changeGrowthPeriod('YTD', this)">YTD</span>
+        <span class="filter-chip" data-period="12M" onclick="changeGrowthPeriod('12M', this)">12M</span>
+        <span class="filter-chip" data-period="2Y" onclick="changeGrowthPeriod('2Y', this)">2Y</span>
+        <span class="filter-chip" data-period="3Y" onclick="changeGrowthPeriod('3Y', this)">3Y</span>
+        <span class="filter-chip" data-period="ALL" onclick="changeGrowthPeriod('ALL', this)">All</span>
+      </div>
+    </div>
+    <div id="growthChartWrap" style="position:relative;height:280px">
+      <div class="chart-empty" id="growthEmpty">Not enough overlapping history yet to compare.</div>
+      <imago-chart id="growthChart" style="display:none"></imago-chart>
+    </div>
+  </div>
+
+  <div class="disclaimers">
+    <h3>About the Growth Comparison</h3>
+    <ul>
+      <li><strong>This is compounded growth, not a rate</strong> — each line starts at 100 on the same date and shows how it would have grown since. It answers "which grew more, equities or the cost of living," not "is my rate healthy right now" (that's the Yield Trend chart above).</li>
+      <li><strong>This chart is independent of your account data on purpose</strong> — it shows VWRA's and PH CPI's full available history, not bounded by how long you've tracked accounts in this app. (To see how your actual Savings+TD yield compares to inflation, see the Yield Trend chart and its Real Yield line above.)</li>
+      <li><strong>VWRA only goes back to July 2019</strong> — that's the ETF's actual inception, not a data limitation, so the comparison (both lines, rebased together) can't start earlier than that.</li>
+      <li><strong>Two VWRA lines show the currency effect directly:</strong> "VWRA (₱, incl. FX)" multiplies VWRA's USD price by the USD/PHP rate at each date before rebasing — the gap between it and "VWRA (USD)" is purely the peso's depreciation over that period, not a change in the fund's actual USD price.</li>
+      <li><strong>This shows where each line ended up, not how bumpy the ride was:</strong> equities can swing far more month-to-month than fixed income along the way, even when the ending point looks better — this chart doesn't show that volatility, only the destination.</li>
     </ul>
   </div>
 </main>
@@ -215,21 +245,29 @@ realDb.version(9).stores({
 // file for sources/licensing.
 async function seedBenchmarksIfNeeded() {
   if (!window.BENCHMARKS_DATA) return;
-  if (await realDb.benchmarks.count() > 0) return;
-  const rows = [];
-  Object.entries(window.BENCHMARKS_DATA).forEach(([source, points]) => {
-    (points || []).forEach(p => rows.push({ id: `${source}-${p.date}`, source, date: p.date, value: p.value }));
-  });
-  if (rows.length) await realDb.benchmarks.bulkPut(rows);
+  // Per-source check (not a single overall count) so adding a NEW source to
+  // the bundle later (e.g. vwra added after usdphp/phCpi already seeded) still
+  // gets backfilled for existing users, without re-seeding sources that are
+  // already present.
+  for (const [source, points] of Object.entries(window.BENCHMARKS_DATA)) {
+    const existing = await realDb.benchmarks.where('source').equals(source).count();
+    if (existing > 0) continue;
+    const rows = (points || []).map(p => ({ id: `${source}-${p.date}`, source, date: p.date, value: p.value }));
+    if (rows.length) await realDb.benchmarks.bulkPut(rows);
+  }
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let _chartPeriod = localStorage.getItem('imago-performance-chart-period') || 'ALL';
 
 const BUCKETS = { savings: { label: 'Savings', color: '#1a6b3c' }, td: { label: 'Time Deposit', color: '#185fa5' } };
+// Only inflation belongs on the rate-based Yield Trend chart -- it's directly
+// subtractable from a peso yield (that's what Real Yield does). PHP
+// depreciation is a different-currency figure that can't be cleanly
+// subtracted from a peso rate; it lives in the Growth Comparison chart below
+// instead, as an ingredient of VWRA's peso-denominated return.
 const BENCHMARKS = {
   phCpi: { label: 'PH Inflation (YoY)', color: '#854f0b' },
-  usdphp: { label: 'PHP Depreciation (YoY)', color: '#a32d2d' },
 };
 
 function dateOnly(s) { return String(s || '').slice(0, 10); }
@@ -320,6 +358,24 @@ function monthlyTimeline(start, end) {
   return out;
 }
 
+// Weighted-average net yield % across a set of prepared accounts, at each date.
+function weightedYieldAtDates(entries, dates) {
+  const points = [];
+  dates.forEach(d => {
+    let sumWeighted = 0, sumBalance = 0;
+    entries.forEach(e => {
+      if (d > e.endDate) return;
+      const bal = stepValueAt(e.balanceSteps, 'balance', d);
+      const rate = stepValueAt(e.rateSteps, 'rate', d);
+      if (bal == null || bal <= 0 || rate == null) return;
+      sumWeighted += bal * rate;
+      sumBalance += bal;
+    });
+    if (sumBalance > 0) points.push({ date: d, value: (sumWeighted / sumBalance) * 0.8 });
+  });
+  return points;
+}
+
 async function computeBucketSeries() {
   const [accounts, logs, rateChanges] = await Promise.all([
     db.accounts.toArray(), db.logs.toArray(), db.rateChanges.toArray()
@@ -343,28 +399,16 @@ async function computeBucketSeries() {
   const allStartDates = Object.values(prepared).flatMap(entries => entries.flatMap(e => [
     ...e.balanceSteps.map(s => s.date), ...e.rateSteps.map(s => s.date)
   ]));
-  if (!allStartDates.length) return Object.fromEntries(Object.keys(BUCKETS).map(t => [t, []]));
+  if (!allStartDates.length) return Object.fromEntries([...Object.keys(BUCKETS), 'blended'].map(t => [t, []]));
   const earliest = allStartDates.sort()[0];
   const dates = monthlyTimeline(earliest, today);
 
   const result = {};
   Object.keys(BUCKETS).forEach(tag => {
-    const entries = prepared[tag];
-    const points = [];
-    dates.forEach(d => {
-      let sumWeighted = 0, sumBalance = 0;
-      entries.forEach(e => {
-        if (d > e.endDate) return;
-        const bal = stepValueAt(e.balanceSteps, 'balance', d);
-        const rate = stepValueAt(e.rateSteps, 'rate', d);
-        if (bal == null || bal <= 0 || rate == null) return;
-        sumWeighted += bal * rate;
-        sumBalance += bal;
-      });
-      if (sumBalance > 0) points.push({ date: d, value: (sumWeighted / sumBalance) * 0.8 });
-    });
-    result[tag] = points;
+    result[tag] = weightedYieldAtDates(prepared[tag], dates);
   });
+  // Blended: Savings + TD together, weighted by balance, for the Real Yield line.
+  result.blended = weightedYieldAtDates(Object.values(prepared).flat(), dates);
   return result;
 }
 
@@ -397,6 +441,109 @@ async function computeBenchmarkSeries() {
   return result;
 }
 
+// Real Yield = blended Savings+TD net yield minus PH Inflation (YoY), only at
+// dates where both are known -- a positive value means you gained purchasing
+// power that month, negative means you lost it.
+function realYieldSeries(blendedYieldPoints, inflationPoints) {
+  const inflByDate = new Map(inflationPoints.map(p => [p.date, p.value]));
+  const out = [];
+  blendedYieldPoints.forEach(p => {
+    const infl = inflByDate.get(p.date);
+    if (infl != null) out.push({ date: p.date, value: p.value - infl });
+  });
+  return out;
+}
+
+// ── Growth Comparison ─────────────────────────────────────────────────────────
+// A different concept from the Yield Trend chart above: compounded growth
+// from a common starting point (rebased to 100), not a rate snapshot.
+let _growthPeriod = localStorage.getItem('imago-performance-growth-period') || 'ALL';
+
+function applyGrowthPeriodFilter(points) {
+  if (!points || !points.length) return points;
+  if (_growthPeriod === 'ALL') return points;
+  const now = new Date();
+  let cutoff;
+  if (_growthPeriod === 'YTD') { cutoff = new Date(now.getFullYear(), 0, 1); }
+  if (_growthPeriod === '12M') { cutoff = new Date(now); cutoff.setFullYear(cutoff.getFullYear() - 1); }
+  if (_growthPeriod === '2Y')  { cutoff = new Date(now); cutoff.setFullYear(cutoff.getFullYear() - 2); }
+  if (_growthPeriod === '3Y')  { cutoff = new Date(now); cutoff.setFullYear(cutoff.getFullYear() - 3); }
+  const cutStr = cutoff.toISOString().slice(0, 10);
+  return points.filter(p => p.date >= cutStr);
+}
+
+function changeGrowthPeriod(period, el) {
+  _growthPeriod = period;
+  localStorage.setItem('imago-performance-growth-period', period);
+  if (el) {
+    document.querySelectorAll('#growthPeriodFilters .filter-chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+  }
+  renderGrowth();
+}
+
+// Rebases a level series to 100 at the first point on/after `startDate`.
+function rebaseTo100(points, startDate) {
+  const base = points.find(p => p.date >= startDate);
+  if (!base || !base.value) return [];
+  return points.filter(p => p.date >= startDate).map(p => ({ date: p.date, value: (p.value / base.value) * 100 }));
+}
+
+async function computeGrowthSeries() {
+  const [vwraRows, usdphpRows, cpiRows] = await Promise.all([
+    db.benchmarks.where('source').equals('vwra').toArray(),
+    db.benchmarks.where('source').equals('usdphp').toArray(),
+    db.benchmarks.where('source').equals('phCpi').toArray(),
+  ]);
+  const vwra = vwraRows.map(r => ({ date: r.date, value: r.value })).sort((a, b) => a.date.localeCompare(b.date));
+  const usdphp = usdphpRows.map(r => ({ date: r.date, value: r.value })).sort((a, b) => a.date.localeCompare(b.date));
+  const cpi = cpiRows.map(r => ({ date: r.date, value: r.value })).sort((a, b) => a.date.localeCompare(b.date));
+
+  // Common start: VWRA's own start (its actual 2019 inception) -- CPI already
+  // covers back to 2010, so VWRA is always the binding constraint. Deliberately
+  // NOT tied to your account history, so this chart always shows VWRA's and
+  // CPI's full available lives, regardless of how long you've tracked accounts.
+  const commonStart = vwra.length ? vwra[0].date : null;
+  if (!commonStart) return { vwraUsd: [], vwraPhp: [], cpi: [] };
+
+  const vwraUsdRebased = rebaseTo100(vwra, commonStart);
+  const usdphpByDate = new Map(usdphp.map(p => [p.date, p.value]));
+  const vwraPhpRaw = vwra
+    .map(p => usdphpByDate.has(p.date) ? { date: p.date, value: p.value * usdphpByDate.get(p.date) } : null)
+    .filter(Boolean);
+  const vwraPhpRebased = rebaseTo100(vwraPhpRaw, commonStart);
+  const cpiRebased = rebaseTo100(cpi, commonStart);
+
+  return { vwraUsd: vwraUsdRebased, vwraPhp: vwraPhpRebased, cpi: cpiRebased };
+}
+
+async function renderGrowth() {
+  document.querySelectorAll('#growthPeriodFilters .filter-chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.period === _growthPeriod);
+  });
+
+  const growth = await computeGrowthSeries();
+  const chart = document.getElementById('growthChart');
+  const empty = document.getElementById('growthEmpty');
+
+  const series = [
+    { label: 'VWRA (USD)', color: '#185fa5', points: applyGrowthPeriodFilter(growth.vwraUsd) },
+    { label: 'VWRA (₱, incl. FX)', color: '#a32d2d', points: applyGrowthPeriodFilter(growth.vwraPhp) },
+    { label: 'PH Cost of Living (CPI)', color: '#854f0b', points: applyGrowthPeriodFilter(growth.cpi) },
+  ].filter(s => s.points.length > 0);
+
+  if (series.length === 0) {
+    chart.style.display = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+
+  empty.style.display = 'none';
+  chart.style.display = 'block';
+  chart.setAttribute('type', 'line');
+  chart.data = { series, unit: 'index' };
+}
+
 // ── Render ────────────────────────────────────────────────────────────────────
 async function render() {
   document.querySelectorAll('#chartPeriodFilters .filter-chip').forEach(c => {
@@ -407,12 +554,15 @@ async function render() {
   const chart = document.getElementById('perfChart');
   const empty = document.getElementById('chartEmpty');
 
+  const realYield = realYieldSeries(filled.blended, benchmarks.phCpi);
+
   const series = [
+    { label: 'Real Yield (Savings+TD − Inflation)', color: '#5f5e5a', points: applyPeriodFilter(realYield) },
     ...Object.keys(BUCKETS).map(tag => ({ label: BUCKETS[tag].label, color: BUCKETS[tag].color, points: applyPeriodFilter(filled[tag]) })),
     ...Object.keys(BENCHMARKS).map(key => ({ label: BENCHMARKS[key].label, color: BENCHMARKS[key].color, points: applyPeriodFilter(benchmarks[key]) })),
   ].filter(s => s.points.length > 0);
 
-  renderSummary(filled, benchmarks);
+  renderSummary(filled, benchmarks, realYield);
 
   if (series.length === 0) {
     chart.style.display = 'none';
@@ -426,8 +576,16 @@ async function render() {
   chart.data = { series, unit: '%' };
 }
 
-function renderSummary(filled, benchmarks) {
+function renderSummary(filled, benchmarks, realYield) {
   const row = document.getElementById('summaryRow');
+  const lastRealYield = realYield.length ? realYield[realYield.length - 1] : null;
+  const realYieldCard = `
+    <div class="sum-card">
+      <div class="lbl">Real Yield (Savings+TD − Inflation)</div>
+      <div class="val ${lastRealYield ? (lastRealYield.value >= 0 ? 'col-pos' : 'col-neg') : ''}">${lastRealYield ? lastRealYield.value.toFixed(2) + '%' : '—'}</div>
+      <div class="sub">${lastRealYield ? 'as of ' + lastRealYield.date : 'not enough history yet'}</div>
+    </div>
+  `;
   const yieldCards = Object.keys(BUCKETS).map(tag => {
     const pts = filled[tag];
     const last = pts.length ? pts[pts.length - 1] : null;
@@ -450,12 +608,13 @@ function renderSummary(filled, benchmarks) {
       </div>
     `;
   }).join('');
-  row.innerHTML = yieldCards + benchmarkCards;
+  row.innerHTML = realYieldCard + yieldCards + benchmarkCards;
 }
 
 (async function init() {
   await seedBenchmarksIfNeeded();
   render();
+  renderGrowth();
 })();
 </script>
 <script src="pwa-register.js"></script>

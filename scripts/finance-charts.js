@@ -375,6 +375,7 @@ class FinanceChart extends HTMLElement {
   _formatVal(v, unit) {
     if (v == null || isNaN(v)) return '—';
     if (unit === '%') return v.toFixed(2) + '%';
+    if (unit === 'index') return v.toFixed(1);
     return '₱' + this._fmtk(v);
   }
 

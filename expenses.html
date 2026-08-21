@@ -143,7 +143,7 @@ select.tag.type{
 <link rel="icon" href="icons/imago-icon.svg" type="image/svg+xml">
 <script src="scripts/savings-demo.js"></script>
 <script src="scripts/expenses-demo.js"></script>
-<script src="scripts/benchmarks-data.js"></script>
+<script src="scripts/benchmarks-data.js?v=2"></script>
 <script>
   const script = document.createElement('script');
   script.src = 'scripts/finance-charts.js?v=' + Date.now();
@@ -535,12 +535,16 @@ realDb.version(9).stores({
 // file for sources/licensing.
 async function seedBenchmarksIfNeeded() {
   if (!window.BENCHMARKS_DATA) return;
-  if (await realDb.benchmarks.count() > 0) return;
-  const rows = [];
-  Object.entries(window.BENCHMARKS_DATA).forEach(([source, points]) => {
-    (points || []).forEach(p => rows.push({ id: `${source}-${p.date}`, source, date: p.date, value: p.value }));
-  });
-  if (rows.length) await realDb.benchmarks.bulkPut(rows);
+  // Per-source check (not a single overall count) so adding a NEW source to
+  // the bundle later (e.g. vwra added after usdphp/phCpi already seeded) still
+  // gets backfilled for existing users, without re-seeding sources that are
+  // already present.
+  for (const [source, points] of Object.entries(window.BENCHMARKS_DATA)) {
+    const existing = await realDb.benchmarks.where('source').equals(source).count();
+    if (existing > 0) continue;
+    const rows = (points || []).map(p => ({ id: `${source}-${p.date}`, source, date: p.date, value: p.value }));
+    if (rows.length) await realDb.benchmarks.bulkPut(rows);
+  }
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────

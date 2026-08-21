@@ -1,4 +1,4 @@
-const CACHE_NAME = 'imago-shell-v3';
+const CACHE_NAME = 'imago-shell-v4';
 const APP_SHELL = [
   './',
   // BEGIN GENERATED HTML PAGES
@@ -8,6 +8,7 @@ const APP_SHELL = [
   './expenses.html',
   './food-v2.html',
   './meralco-multi-account.html',
+  './performance.html',
   './prompt-track.html',
   './savings.html',
   './archive/architect.html',
