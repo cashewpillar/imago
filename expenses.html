@@ -926,11 +926,7 @@ function incomeAmountForMonth(inc, monthKey) {
   if (!isIncomeActiveInMonth(inc, monthKey)) return 0;
   const amt = Number(inc.amount) || 0;
   if (inc.frequency === 'one-time') return 0; // handled separately
-  if (inc.frequency === 'monthly') {
-    const numPayoutDays = (inc.payoutDays || '15')
-      .split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n)).length || 1;
-    return amt * numPayoutDays;
-  }
+  if (inc.frequency === 'monthly')   return amt;
   if (inc.frequency === 'quarterly') return amt / 3;
   if (inc.frequency === 'annual')    return amt / 12;
   return amt;
@@ -1031,9 +1027,10 @@ function renderChart() {
         if (inc.frequency === 'monthly') {
           const payoutDays = (inc.payoutDays || '15')
             .split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+          const share = amt / (payoutDays.length || 1);
           payoutDays.forEach(day => {
             const w = weeks.find(w => day >= w.startDay && day <= w.endDay) || weeks[3];
-            if (w) w.income += amt;
+            if (w) w.income += share;
           });
         } else if (inc.frequency === 'quarterly' || inc.frequency === 'annual') {
           const payoutMonths = (inc.payoutDays || '')
