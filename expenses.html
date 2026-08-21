@@ -926,7 +926,11 @@ function incomeAmountForMonth(inc, monthKey) {
   if (!isIncomeActiveInMonth(inc, monthKey)) return 0;
   const amt = Number(inc.amount) || 0;
   if (inc.frequency === 'one-time') return 0; // handled separately
-  if (inc.frequency === 'monthly')   return amt;
+  if (inc.frequency === 'monthly') {
+    const numPayoutDays = (inc.payoutDays || '15')
+      .split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n)).length || 1;
+    return amt * numPayoutDays;
+  }
   if (inc.frequency === 'quarterly') return amt / 3;
   if (inc.frequency === 'annual')    return amt / 12;
   return amt;
