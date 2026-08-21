@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Savings</title>
 <script src="scripts/dexie.min.js"></script>
+<script src="scripts/explore-mode.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -218,6 +219,7 @@ td.actions{text-align:right;white-space:nowrap}
 <link rel="icon" href="icons/imago-icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <script src="scripts/savings-demo.js"></script>
+<script src="scripts/expenses-demo.js"></script>
 <script>
   // Cache-busting script load
   const script = document.createElement('script');
@@ -245,6 +247,11 @@ td.actions{text-align:right;white-space:nowrap}
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/></svg>
       </button>
       <div class="dropdown-content">
+        <button class="btn-flat" id="exploreToggleBtn" onclick="toggleExploreMode()">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>
+          <span id="exploreToggleLabel">Try demo data</span>
+        </button>
+        <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
         <button class="btn-flat" onclick="openImport()">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,10 3,13 13,13 13,10"/><polyline points="5,7 8,10 11,7"/><line x1="8" y1="3" x2="8" y2="10"/></svg>
           Import
@@ -268,8 +275,9 @@ td.actions{text-align:right;white-space:nowrap}
 </header>
 
 <div class="demo-banner" id="demoBanner">
-  <span>You're viewing sample demo data.</span>
-  <button class="btn btn-sm" onclick="resetDemoData()">Clear demo data &amp; start fresh</button>
+  <span>You're exploring with sample data — nothing here is saved yet.</span>
+  <button class="btn btn-sm btn-primary" onclick="adoptDemoData()">Use this data</button>
+  <button class="btn btn-sm" onclick="exitExploreMode()">Exit demo</button>
 </div>
 
 <button class="fab-add" onclick="openAddAccount()" aria-label="Add account">
@@ -450,10 +458,11 @@ window.addEventListener('click', e => {
 });
 
 // ── DB ────────────────────────────────────────────────────────────────────────
-const db = new Dexie('FinanceTrackerV2');
-db.version(1).stores({ accounts:'id,key,label', history:'id,date' });
-db.version(2).stores({ accounts:'id,key,label', history:'id,date', logs:'id,accountId,date' });
-db.version(3).stores({ accounts:'id,key,label', history:'id,date', logs:'id,accountId,date' }).upgrade(tx => {
+realDb = new Dexie('FinanceTrackerV2');
+db = realDb;
+realDb.version(1).stores({ accounts:'id,key,label', history:'id,date' });
+realDb.version(2).stores({ accounts:'id,key,label', history:'id,date', logs:'id,accountId,date' });
+realDb.version(3).stores({ accounts:'id,key,label', history:'id,date', logs:'id,accountId,date' }).upgrade(tx => {
   return tx.accounts.toCollection().modify(acc => {
     if (acc.maturity && typeof acc.maturity === 'string' && acc.maturity.length > 4) {
       const d = new Date(acc.maturity);
@@ -463,7 +472,7 @@ db.version(3).stores({ accounts:'id,key,label', history:'id,date', logs:'id,acco
     }
   });
 });
-db.version(4).stores({ accounts:'id,key,label', history:'id,date', logs:'id,accountId,date' }).upgrade(tx => {
+realDb.version(4).stores({ accounts:'id,key,label', history:'id,date', logs:'id,accountId,date' }).upgrade(tx => {
   // Migrate from "k" units to full pesos
   tx.accounts.toCollection().modify(acc => { if(acc.balance) acc.balance *= 1000; });
   tx.history.toCollection().modify(h => { if(h.total) h.total *= 1000; });
@@ -472,7 +481,7 @@ db.version(4).stores({ accounts:'id,key,label', history:'id,date', logs:'id,acco
     if(l.change) l.change *= 1000;
   });
 });
-db.version(5).stores({ 
+realDb.version(5).stores({ 
   accounts: 'id,key,label', 
   history: 'id,date', 
   logs: 'id,accountId,date',
@@ -480,9 +489,9 @@ db.version(5).stores({
   expenseTypes: 'id,name',
   incomes: 'id,name,frequency'
 });
-db.version(6).stores({ 
-  accounts: 'id,key,label', 
-  history: 'id,date', 
+realDb.version(6).stores({
+  accounts: 'id,key,label',
+  history: 'id,date',
   logs: 'id,accountId,date,expenseId',
   expenses: 'id,date,typeId,accountId',
   expenseTypes: 'id,name',
@@ -1285,7 +1294,8 @@ async function deleteAccount(id) {
 }
 
 // ── Import / Export ───────────────────────────────────────────────────────────
-function openImport() {
+async function openImport() {
+  if (isExploreMode()) await exitExploreMode();
   document.getElementById('importJson').value = '';
   document.getElementById('settingsDropdown').classList.remove('open');
   openModal('importModal');
@@ -1299,23 +1309,13 @@ function readFile(f) {
   r.readAsText(f);
 }
 
-async function clearAllData() {
-  await db.accounts.clear();
-  await db.history.clear();
-  await db.logs.clear();
-  await db.expenses.clear();
-  await db.expenseTypes.clear();
-  await db.incomes.clear();
-}
-
 async function clearAllDataPrompt() {
   if (!confirm('This will permanently delete all accounts, history, and expense data. Continue?')) return;
   document.getElementById('settingsDropdown').classList.remove('open');
-  await clearAllData();
-  localStorage.removeItem(DEMO_FLAG);
-  updateDemoBanner();
+  await clearAllData(realDb);
+  localStorage.removeItem(EXPLORE_DISMISSED_FLAG);
   toast('All data cleared.');
-  render();
+  await refreshMode();
 }
 
 async function doImport(reset) {
@@ -1383,12 +1383,12 @@ async function doImport(reset) {
 }
 
 async function exportData() {
-  const accounts     = await db.accounts.toArray();
-  const history      = await db.history.orderBy('date').toArray();
-  const logs         = await db.logs.toArray();
-  const expenses     = await db.expenses.toArray();
-  const expenseTypes = await db.expenseTypes.toArray();
-  const incomes      = await db.incomes.toArray();
+  const accounts     = await realDb.accounts.toArray();
+  const history      = await realDb.history.orderBy('date').toArray();
+  const logs         = await realDb.logs.toArray();
+  const expenses     = await realDb.expenses.toArray();
+  const expenseTypes = await realDb.expenseTypes.toArray();
+  const incomes      = await realDb.incomes.toArray();
   const out = { 
     version: 3, 
     exported_at: new Date().toISOString(), 
@@ -1410,9 +1410,9 @@ async function exportData() {
 }
 
 async function exportSavingsData() {
-  const accounts = await db.accounts.toArray();
-  const history  = await db.history.orderBy('date').toArray();
-  const logs     = await db.logs.toArray();
+  const accounts = await realDb.accounts.toArray();
+  const history  = await realDb.history.orderBy('date').toArray();
+  const logs     = await realDb.logs.toArray();
   const out = { 
     version: 3, 
     exported_at: new Date().toISOString(), 
@@ -1462,35 +1462,10 @@ function openYieldBreakdown() {
   openModal('yieldModal');
 }
 
-// ── Demo data ─────────────────────────────────────────────────────────────────
-const DEMO_FLAG = 'imago-finance-demo-active';
-
-async function seedDemoDataIfEmpty() {
-  const count = await db.accounts.count();
-  if (count > 0 || !window.SAVINGS_DEMO_DATA) return;
-
-  const { accounts, history, logs } = window.SAVINGS_DEMO_DATA;
-  await db.accounts.bulkPut(accounts);
-  await db.history.bulkPut(history);
-  if (logs) await db.logs.bulkPut(logs);
-  localStorage.setItem(DEMO_FLAG, '1');
-}
-
-function updateDemoBanner() {
-  document.getElementById('demoBanner').classList.toggle('show', localStorage.getItem(DEMO_FLAG) === '1');
-}
-
-async function resetDemoData() {
-  if (!confirm('This clears the demo accounts and history so you can start fresh. Continue?')) return;
-  await clearAllData();
-  localStorage.removeItem(DEMO_FLAG);
-  updateDemoBanner();
-  toast('Demo data cleared.');
-  render();
-}
-
 // ── Init ──────────────────────────────────────────────────────────────────────
-seedDemoDataIfEmpty().then(() => { updateDemoBanner(); render(); });
+// enterExploreMode/exitExploreMode/toggleExploreMode/adoptDemoData/refreshMode
+// live in scripts/explore-mode.js (shared with expenses.html).
+refreshMode();
 window.addEventListener('resize', () =>
   db.history.orderBy('date').toArray().then(renderChart)
 );

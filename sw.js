@@ -18,6 +18,7 @@ const APP_SHELL = [
   './archive/habit-triggers.html',
   './archive/habits.html',
   './archive/journal.html',
+  './archive/mobile-database.html',
   './archive/no-rituals.html',
   './archive/pollination.html',
   './archive/story.html',
