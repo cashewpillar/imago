@@ -537,10 +537,16 @@ class FinanceChart extends HTMLElement {
 
       this._drawTopDateLabel(ctx, hx, this._fmtMonthLabel(dates[hi]), W);
 
+      const items = [];
       plotted.forEach((p, si) => {
         const v = maps[si].get(dates[hi]);
         if (v == null) return;
-        this._drawCalloutTooltip(ctx, hx, yOf(v), `${p.s.label || ''}: ${this._formatVal(v, unit)}`, PAD, cH, W, p.color);
+        items.push({ py: yOf(v), text: `${p.s.label || ''}: ${this._formatVal(v, unit)}`, color: p.color });
+      });
+      // 22 must match the boxH used inside _drawCalloutTooltip.
+      const tops = this._stackTooltipTops(items.map(it => it.py), 22, PAD.top, PAD.top + cH);
+      items.forEach((it, i) => {
+        this._drawCalloutTooltip(ctx, hx, it.py, it.text, PAD, cH, W, it.color, tops[i]);
       });
     }
 
@@ -571,13 +577,38 @@ class FinanceChart extends HTMLElement {
     this.canvas.ontouchend = hideTooltip;
   }
 
+  // Resolves overlaps among several tooltip boxes stacked at the same x: sorts
+  // by their ideal (unclamped) y, pushes each down to keep a minimum gap from
+  // the one above, then shifts the whole stack to fit within [top, bottom] --
+  // shifting up first to fix bottom overflow, then down to fix top overflow.
+  // Returns box-top positions in the SAME order as the input `centers` array.
+  _stackTooltipTops(centers, boxH, top, bottom, minGap = 4) {
+    const n = centers.length;
+    const order = centers.map((_, i) => i).sort((a, b) => centers[a] - centers[b]);
+    const tops = order.map(i => centers[i] - boxH / 2);
+    for (let k = 1; k < n; k++) {
+      const prevBottom = tops[k - 1] + boxH;
+      if (tops[k] < prevBottom + minGap) tops[k] = prevBottom + minGap;
+    }
+    if (n) {
+      const overflowBottom = (tops[n - 1] + boxH) - bottom;
+      if (overflowBottom > 0) for (let k = 0; k < n; k++) tops[k] -= overflowBottom;
+      const overflowTop = top - tops[0];
+      if (overflowTop > 0) for (let k = 0; k < n; k++) tops[k] += overflowTop;
+    }
+    const result = new Array(n);
+    order.forEach((origIdx, k) => { result[origIdx] = tops[k]; });
+    return result;
+  }
+
   // Draws a rounded tooltip box (filled with the series' own color) to the
   // LEFT of (px, py), with its pointer base centered on the box's edge. The
   // pointer's tip always stretches to the actual point (px, py) -- so when
-  // the box gets clamped away from the point's height (near a chart edge),
-  // the pointer becomes a slanted dart reaching down/up to it, instead of a
-  // plain gap.
-  _drawCalloutTooltip(ctx, px, py, text, PAD, cH, W, color) {
+  // the box gets placed away from the point's height (near a chart edge, or
+  // dodging another tooltip), the pointer becomes a slanted dart reaching
+  // down/up to it, instead of a plain gap. Pass `forcedBoxTop` when the
+  // caller has already resolved overlaps against sibling tooltips.
+  _drawCalloutTooltip(ctx, px, py, text, PAD, cH, W, color, forcedBoxTop) {
     const padX = 8, padY = 5, boxH = 22, gap = 7, pointer = 5, r = 4;
     ctx.font = '11px system-ui';
     const textW = ctx.measureText(text).width;
@@ -594,8 +625,11 @@ class FinanceChart extends HTMLElement {
       boxLeft = boxRight - boxW;
     }
 
-    let boxTop = py - boxH / 2;
-    boxTop = Math.max(PAD.top, Math.min(boxTop, PAD.top + cH - boxH));
+    let boxTop = forcedBoxTop;
+    if (boxTop == null) {
+      boxTop = py - boxH / 2;
+      boxTop = Math.max(PAD.top, Math.min(boxTop, PAD.top + cH - boxH));
+    }
     const boxCenterY = boxTop + boxH / 2;
 
     ctx.fillStyle = color || '#1a1917';
