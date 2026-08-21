@@ -93,7 +93,7 @@ main{max-width:940px;margin:0 auto;padding:20px 16px}
 
   <div class="chart-card">
     <div class="chart-header">
-      <span class="chart-title">Net annualized yield, over time</span>
+      <span class="chart-title">Yield vs. benchmarks, over time</span>
       <div class="filters" id="chartPeriodFilters">
         <span class="filter-chip" data-period="YTD" onclick="changePeriod('YTD', this)">YTD</span>
         <span class="filter-chip" data-period="12M" onclick="changePeriod('12M', this)">12M</span>
@@ -119,6 +119,8 @@ main{max-width:940px;margin:0 auto;padding:20px 16px}
       <li><strong>Assumed constant where unrecorded:</strong> if an account has never had a rate change logged (common for accounts created before rate history existed, or never rate-edited since), its <em>current</em> rate is assumed to have applied since it was opened, rather than showing no data — real historical rate changes before you started logging them aren't captured.</li>
       <li><strong>TD rollovers aren't linked:</strong> closing a time deposit and opening its replacement are unconnected records; the old account's contribution simply stops at its closure date and the new one picks up — any delay between closing and logging the new account shows as a dip.</li>
       <li><strong>Flat 20% tax assumption:</strong> applied uniformly to all accounts regardless of any account-specific tax treatment.</li>
+      <li><strong>Benchmarks are shown as year-over-year % change:</strong> PH Inflation and PHP Depreciation are plotted as their YoY % change (not the raw CPI index level or the raw ₱/$ rate), so they sit on the same % scale as net yield and can be compared directly — but the underlying absolute numbers (today's actual exchange rate, the index level) aren't shown here.</li>
+      <li><strong>Benchmark data is a frozen snapshot:</strong> USD/PHP and PH CPI were fetched once and bundled into the app (see <code>scripts/benchmarks-data.js</code>) — they won't pick up new months automatically. PH CPI's underlying index only starts in 2010, so its YoY line can't begin until 2011.</li>
     </ul>
   </div>
 </main>
@@ -225,6 +227,10 @@ async function seedBenchmarksIfNeeded() {
 let _chartPeriod = localStorage.getItem('imago-performance-chart-period') || 'ALL';
 
 const BUCKETS = { savings: { label: 'Savings', color: '#1a6b3c' }, td: { label: 'Time Deposit', color: '#185fa5' } };
+const BENCHMARKS = {
+  phCpi: { label: 'PH Inflation (YoY)', color: '#854f0b' },
+  usdphp: { label: 'PHP Depreciation (YoY)', color: '#a32d2d' },
+};
 
 function dateOnly(s) { return String(s || '').slice(0, 10); }
 function todayStr() { return new Date().toISOString().slice(0, 10); }
@@ -362,21 +368,51 @@ async function computeBucketSeries() {
   return result;
 }
 
+// ── Benchmarks ────────────────────────────────────────────────────────────────
+// Converts a raw monthly level series (CPI index, ₱/$ rate) into its
+// year-over-year % change, so it sits on the same % scale as net yield.
+function yoyChangeSeries(points) {
+  const byMonth = new Map(points.map(p => [p.date.slice(0, 7), p.value]));
+  const out = [];
+  points.forEach(p => {
+    const [y, m] = p.date.slice(0, 7).split('-').map(Number);
+    const priorYm = `${y - 1}-${String(m).padStart(2, '0')}`;
+    const priorVal = byMonth.get(priorYm);
+    if (priorVal != null && priorVal !== 0) {
+      out.push({ date: p.date, value: ((p.value / priorVal) - 1) * 100 });
+    }
+  });
+  return out;
+}
+
+async function computeBenchmarkSeries() {
+  const rows = await db.benchmarks.toArray();
+  const result = {};
+  Object.keys(BENCHMARKS).forEach(source => {
+    const pts = rows.filter(r => r.source === source)
+      .map(r => ({ date: r.date, value: r.value }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    result[source] = yoyChangeSeries(pts);
+  });
+  return result;
+}
+
 // ── Render ────────────────────────────────────────────────────────────────────
 async function render() {
   document.querySelectorAll('#chartPeriodFilters .filter-chip').forEach(c => {
     c.classList.toggle('active', c.dataset.period === _chartPeriod);
   });
 
-  const filled = await computeBucketSeries();
+  const [filled, benchmarks] = await Promise.all([computeBucketSeries(), computeBenchmarkSeries()]);
   const chart = document.getElementById('perfChart');
   const empty = document.getElementById('chartEmpty');
 
-  const series = Object.keys(BUCKETS)
-    .map(tag => ({ label: BUCKETS[tag].label, color: BUCKETS[tag].color, points: applyPeriodFilter(filled[tag]) }))
-    .filter(s => s.points.length > 0);
+  const series = [
+    ...Object.keys(BUCKETS).map(tag => ({ label: BUCKETS[tag].label, color: BUCKETS[tag].color, points: applyPeriodFilter(filled[tag]) })),
+    ...Object.keys(BENCHMARKS).map(key => ({ label: BENCHMARKS[key].label, color: BENCHMARKS[key].color, points: applyPeriodFilter(benchmarks[key]) })),
+  ].filter(s => s.points.length > 0);
 
-  renderSummary(filled);
+  renderSummary(filled, benchmarks);
 
   if (series.length === 0) {
     chart.style.display = 'none';
@@ -390,9 +426,9 @@ async function render() {
   chart.data = { series, unit: '%' };
 }
 
-function renderSummary(filled) {
+function renderSummary(filled, benchmarks) {
   const row = document.getElementById('summaryRow');
-  row.innerHTML = Object.keys(BUCKETS).map(tag => {
+  const yieldCards = Object.keys(BUCKETS).map(tag => {
     const pts = filled[tag];
     const last = pts.length ? pts[pts.length - 1] : null;
     return `
@@ -403,10 +439,24 @@ function renderSummary(filled) {
       </div>
     `;
   }).join('');
+  const benchmarkCards = Object.keys(BENCHMARKS).map(key => {
+    const pts = benchmarks[key];
+    const last = pts.length ? pts[pts.length - 1] : null;
+    return `
+      <div class="sum-card">
+        <div class="lbl">${BENCHMARKS[key].label}</div>
+        <div class="val">${last ? last.value.toFixed(2) + '%' : '—'}</div>
+        <div class="sub">${last ? 'as of ' + last.date : 'not enough history yet'}</div>
+      </div>
+    `;
+  }).join('');
+  row.innerHTML = yieldCards + benchmarkCards;
 }
 
-render();
-seedBenchmarksIfNeeded();
+(async function init() {
+  await seedBenchmarksIfNeeded();
+  render();
+})();
 </script>
 <script src="pwa-register.js"></script>
 </body>
