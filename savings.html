@@ -326,7 +326,7 @@ td.actions{text-align:right;white-space:nowrap}
         <select id="fTag" onchange="syncBalanceSign(this.value==='credit')">
           <option value="savings">savings</option>
           <option value="equities">equities</option>
-          <option value="td">td</option>
+          <option value="td">time deposit</option>
           <option value="buffer">buffer</option>
           <option value="cash">cash</option>
           <option value="credit">credit</option>
@@ -1008,7 +1008,7 @@ function renderFilterBar(accounts) {
   bar.innerHTML = tags.map(t => {
     const active = _activeTag === t ? 'active' : '';
     const cls    = t !== 'all' ? 'tag-'+t : '';
-    return `<span class="filter-chip ${cls} ${active}" data-tag="${esc(t)}">${esc(t)}</span>`;
+    return `<span class="filter-chip ${cls} ${active}" data-tag="${esc(t)}">${esc(t === 'td' ? 'time deposit' : t)}</span>`;
   }).join('');
   bar.querySelectorAll('.filter-chip').forEach(chip =>
     chip.addEventListener('click', () => {
@@ -1109,7 +1109,7 @@ function renderTable(allAccounts) {
       <td>
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <span style="font-weight:500">${esc(a.label||a.key)}</span>
-          ${_activeTag === 'all' ? `<span class="tag ${tag}" style="font-size:10px; padding:1px 6px;">${tag}</span>` : ''}
+          ${_activeTag === 'all' ? `<span class="tag ${tag}" style="font-size:10px; padding:1px 6px;">${tag === 'td' ? 'time deposit' : tag}</span>` : ''}
         </div>
         ${a.note ? `<div class="note-text" style="margin-top:2px;">${esc(a.note)}</div>` : ''}
       </td>
