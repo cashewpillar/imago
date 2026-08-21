@@ -35,7 +35,7 @@ class FinanceChart extends HTMLElement {
         :host([has-legend]) .legend { display: flex; }
 
         :host([legend-bottom]) .chart-container { flex-direction: column; gap: 10px; }
-        :host([legend-bottom]) .canvas-wrap { flex: 1 1 auto; width: 100%; }
+        :host([legend-bottom]) .canvas-wrap { flex: 1 1 0; width: 100%; height: auto; min-height: 0; }
         :host([legend-bottom]) .legend {
           flex: 0 0 auto;
           width: 100%;
