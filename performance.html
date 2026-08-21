@@ -146,9 +146,10 @@ main{max-width:940px;margin:0 auto;padding:20px 16px}
   <div class="disclaimers">
     <h3>About the Growth Comparison</h3>
     <ul>
-      <li><strong>This is compounded growth, not a rate</strong> — each line starts at 100 on the same date and shows how it would have grown since. It answers "which grew more, equities or the cost of living," not "is my rate healthy right now" (that's the Yield Trend chart above).</li>
-      <li><strong>This chart is independent of your account data on purpose</strong> — it shows VWRA's and PH CPI's full available history, not bounded by how long you've tracked accounts in this app. (To see how your actual Savings+TD yield compares to inflation, see the Yield Trend chart and its Real Yield line above.)</li>
-      <li><strong>VWRA only goes back to July 2019</strong> — that's the ETF's actual inception, not a data limitation, so the comparison (both lines, rebased together) can't start earlier than that.</li>
+      <li><strong>This is compounded growth, not a rate</strong> — most lines start at 100 on the same date and show how they'd have grown since. It answers "which grew more, equities or the cost of living," not "is my rate healthy right now" (that's the Yield Trend chart above).</li>
+      <li><strong>The chart's period is set by VWRA, not your accounts</strong> — it always spans VWRA's and PH CPI's full available history, never shrinking just because you've only tracked accounts for a short time.</li>
+      <li><strong>Savings+TD (simulated) is the one exception</strong> — it starts at 100 on YOUR account data's own start date, whatever that is, not on VWRA's 2019 start. So it may appear only partway through the chart, and its "100" isn't the same calendar date as the other lines' "100" — compare its slope and shape, not its absolute height, against the others. Same simulation logic as the Yield Trend chart: your blended yield % compounded forward, not your real (deposit/withdrawal-contaminated) balance history.</li>
+      <li><strong>VWRA only goes back to July 2019</strong> — that's the ETF's actual inception, not a data limitation, so the two VWRA lines and CPI (rebased together) can't start earlier than that.</li>
       <li><strong>Two VWRA lines show the currency effect directly:</strong> "VWRA (₱, incl. FX)" multiplies VWRA's USD price by the USD/PHP rate at each date before rebasing — the gap between it and "VWRA (USD)" is purely the peso's depreciation over that period, not a change in the fund's actual USD price.</li>
       <li><strong>This shows where each line ended up, not how bumpy the ride was:</strong> equities can swing far more month-to-month than fixed income along the way, even when the ending point looks better — this chart doesn't show that volatility, only the destination.</li>
     </ul>
@@ -490,21 +491,22 @@ function rebaseTo100(points, startDate) {
 }
 
 async function computeGrowthSeries() {
-  const [vwraRows, usdphpRows, cpiRows] = await Promise.all([
+  const [vwraRows, usdphpRows, cpiRows, accounts, logs, rateChanges] = await Promise.all([
     db.benchmarks.where('source').equals('vwra').toArray(),
     db.benchmarks.where('source').equals('usdphp').toArray(),
     db.benchmarks.where('source').equals('phCpi').toArray(),
+    db.accounts.toArray(), db.logs.toArray(), db.rateChanges.toArray()
   ]);
   const vwra = vwraRows.map(r => ({ date: r.date, value: r.value })).sort((a, b) => a.date.localeCompare(b.date));
   const usdphp = usdphpRows.map(r => ({ date: r.date, value: r.value })).sort((a, b) => a.date.localeCompare(b.date));
   const cpi = cpiRows.map(r => ({ date: r.date, value: r.value })).sort((a, b) => a.date.localeCompare(b.date));
 
-  // Common start: VWRA's own start (its actual 2019 inception) -- CPI already
+  // Chart period: VWRA's own start (its actual 2019 inception) -- CPI already
   // covers back to 2010, so VWRA is always the binding constraint. Deliberately
   // NOT tied to your account history, so this chart always shows VWRA's and
   // CPI's full available lives, regardless of how long you've tracked accounts.
   const commonStart = vwra.length ? vwra[0].date : null;
-  if (!commonStart) return { vwraUsd: [], vwraPhp: [], cpi: [] };
+  if (!commonStart) return { vwraUsd: [], vwraPhp: [], cpi: [], fixedIncome: [] };
 
   const vwraUsdRebased = rebaseTo100(vwra, commonStart);
   const usdphpByDate = new Map(usdphp.map(p => [p.date, p.value]));
@@ -514,7 +516,35 @@ async function computeGrowthSeries() {
   const vwraPhpRebased = rebaseTo100(vwraPhpRaw, commonStart);
   const cpiRebased = rebaseTo100(cpi, commonStart);
 
-  return { vwraUsd: vwraUsdRebased, vwraPhp: vwraPhpRebased, cpi: cpiRebased };
+  // Simulated Savings+TD growth: compounds your blended yield % forward from
+  // 100, starting at YOUR OWN account data's start -- not commonStart above --
+  // so it never restricts the chart's period; it just appears (or doesn't)
+  // for whatever portion of the period your accounts actually cover.
+  const today = todayStr();
+  const prepared = accounts
+    .filter(a => (a.tags || []).some(t => t === 'savings' || t === 'td'))
+    .map(acc => ({
+      balanceSteps: buildBalanceSteps(acc, logs.filter(l => l.accountId === acc.id)),
+      rateSteps: buildRateSteps(acc, rateChanges.filter(rc => rc.accountId === acc.id)),
+      endDate: acc.status === 'closed' && acc.closedDate ? dateOnly(acc.closedDate) : today
+    }));
+  const fiStarts = prepared.flatMap(e => [e.balanceSteps[0]?.date, e.rateSteps[0]?.date]).filter(Boolean).sort();
+
+  const fixedIncomePoints = [];
+  if (fiStarts.length) {
+    const fiDates = monthlyTimeline(fiStarts[0], today);
+    const yieldPoints = weightedYieldAtDates(prepared, fiDates);
+    const yieldByDate = new Map(yieldPoints.map(p => [p.date, p.value]));
+    let sim = null, lastRate = null;
+    fiDates.forEach(d => {
+      if (yieldByDate.has(d)) lastRate = yieldByDate.get(d);
+      if (lastRate == null) return;
+      sim = sim == null ? 100 : sim * (1 + lastRate / 100 / 12);
+      fixedIncomePoints.push({ date: d, value: sim });
+    });
+  }
+
+  return { vwraUsd: vwraUsdRebased, vwraPhp: vwraPhpRebased, cpi: cpiRebased, fixedIncome: fixedIncomePoints };
 }
 
 async function renderGrowth() {
@@ -530,6 +560,7 @@ async function renderGrowth() {
     { label: 'VWRA (USD)', color: '#185fa5', points: applyGrowthPeriodFilter(growth.vwraUsd) },
     { label: 'VWRA (₱, incl. FX)', color: '#a32d2d', points: applyGrowthPeriodFilter(growth.vwraPhp) },
     { label: 'PH Cost of Living (CPI)', color: '#854f0b', points: applyGrowthPeriodFilter(growth.cpi) },
+    { label: 'Savings+TD (simulated)', color: '#1a6b3c', points: applyGrowthPeriodFilter(growth.fixedIncome) },
   ].filter(s => s.points.length > 0);
 
   if (series.length === 0) {
