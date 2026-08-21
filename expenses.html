@@ -37,6 +37,14 @@ header h1{font-size:17px;font-weight:600;letter-spacing:-.3px}
 .btn-sm{padding:3px 8px;font-size:11px}
 .btn svg{width:13px;height:13px;flex-shrink:0}
 
+.fab-add{display:none;position:fixed;bottom:18px;right:18px;width:44px;height:44px;border-radius:50%;background:var(--text);color:#fff;border:none;box-shadow:0 2px 10px rgba(0,0,0,.22);align-items:center;justify-content:center;cursor:pointer;z-index:50}
+.fab-add svg{width:18px;height:18px}
+.fab-add:active{background:#333}
+@media(max-width:640px){
+  .header-actions .add-expense-btn{display:none}
+  .fab-add{display:flex}
+}
+
 main{max-width:940px;margin:0 auto;padding:20px 16px}
 .page-actions{display:flex;gap:8px;align-items:center;justify-content:flex-start;margin-bottom:16px;flex-wrap:wrap}
 
@@ -145,7 +153,7 @@ select.tag.type{
 <header>
   <h1>expenses</h1>
   <div class="header-actions">
-    <button class="btn btn-primary" onclick="openAddExpense()">
+    <button class="btn btn-primary add-expense-btn" onclick="openAddExpense()">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
       Add expense
     </button>
@@ -180,6 +188,10 @@ select.tag.type{
     </div>
   </div>
 </header>
+
+<button class="fab-add" onclick="openAddExpense()" aria-label="Add expense">
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
+</button>
 
 <main>
   <!-- Summary Cards -->
