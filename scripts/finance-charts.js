@@ -912,6 +912,8 @@ class FinanceChart extends HTMLElement {
 
       const clickedBar = drawnBars.find(b => mx >= b.x && mx <= b.x + b.w && my >= b.y - 10 && my <= b.y + b.h);
       if (clickedBar) {
+        this.tooltip.style.display = 'none';
+        this.canvas.style.cursor = 'default';
         this.dispatchEvent(new CustomEvent('bar-click', {
           detail: {
             label: clickedBar.label,
