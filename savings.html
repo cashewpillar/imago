@@ -417,7 +417,7 @@ td.actions{text-align:right;white-space:nowrap}
     </div>
     <div class="form-row" id="changeReasonRow">
       <label>Update Reason / Change Note</label>
-      <input type="text" id="fChangeNote" placeholder="e.g. Salary, Rent, Correction">
+      <textarea id="fChangeNote" placeholder="e.g. Salary, Rent, Correction" rows="2" style="min-height:auto;font-family:inherit;font-size:13px;resize:vertical"></textarea>
     </div>
     
     <div class="history-section" id="accountHistorySection" style="display:none">
@@ -1187,8 +1187,11 @@ function renderChart(history) {
 }
 
 // ── Filter bar ────────────────────────────────────────────────────────────────
+const TAG_ORDER = ['all', 'savings', 'td', 'equities', 'credit'];
 function renderFilterBar(accounts) {
-  const tags = ['all', ...new Set(accounts.flatMap(a => a.tags||[]))];
+  const seen = new Set(accounts.flatMap(a => a.tags||[]));
+  const rest = [...seen].filter(t => !TAG_ORDER.includes(t));
+  const tags = ['all', ...TAG_ORDER.filter(t => t !== 'all' && seen.has(t)), ...rest];
   const bar  = document.getElementById('filterBar');
   bar.innerHTML = tags.map(t => {
     const active = _activeTag === t ? 'active' : '';
@@ -1291,7 +1294,13 @@ function renderTable(allAccounts) {
           cls = 'mat-near';
         } else {
           const months = Math.floor(diffDays / 30);
-          label = `${months}mo`;
+          if (months > 12) {
+            const yrs = Math.floor(months / 12);
+            const remMo = months % 12;
+            label = remMo ? `${yrs}y ${remMo}mo` : `${yrs}y`;
+          } else {
+            label = `${months}mo`;
+          }
           cls = months <= 2 ? 'mat-near' : 'mat-far';
         }
         matBadge = `<div class="mat-badge ${cls}">${label}</div>`;
