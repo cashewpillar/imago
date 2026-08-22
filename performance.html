@@ -561,6 +561,14 @@ async function computeGrowthSeries() {
   const vwraPhpRebased = rebaseTo100(vwraPhpRaw, commonStart);
   const cpiRebased = rebaseTo100(cpi, commonStart);
 
+  // Real (inflation-adjusted) VWRA in peso terms: divide out CPI's growth
+  // from VWRA(₱)'s -- both already rebased to 100 at the same commonStart,
+  // so this is just their ratio × 100 at each shared date.
+  const cpiRebasedByDate = new Map(cpiRebased.map(p => [p.date, p.value]));
+  const vwraPhpReal = vwraPhpRebased
+    .filter(p => cpiRebasedByDate.has(p.date))
+    .map(p => ({ date: p.date, value: (p.value / cpiRebasedByDate.get(p.date)) * 100 }));
+
   // Simulated Savings+TD growth: compounds your blended yield % forward from
   // 100, starting at YOUR OWN account data's start -- not commonStart above --
   // so it never restricts the chart's period; it just appears (or doesn't)
@@ -601,7 +609,7 @@ async function computeGrowthSeries() {
     });
   }
 
-  return { vwraUsd: vwraUsdRebased, vwraPhp: vwraPhpRebased, cpi: cpiRebased, fixedIncome: fixedIncomePoints };
+  return { vwraUsd: vwraUsdRebased, vwraPhp: vwraPhpRebased, vwraPhpReal, cpi: cpiRebased, fixedIncome: fixedIncomePoints };
 }
 
 async function renderGrowth() {
@@ -616,6 +624,7 @@ async function renderGrowth() {
   const series = [
     { label: 'VWRA (USD)', color: '#185fa5', points: applyGrowthPeriodFilter(growth.vwraUsd) },
     { label: 'VWRA (₱, incl. FX)', color: '#a32d2d', points: applyGrowthPeriodFilter(growth.vwraPhp) },
+    { label: 'VWRA (₱, incl. inflation & FX)', color: '#6b3fa0', points: applyGrowthPeriodFilter(growth.vwraPhpReal), defaultHidden: true },
     { label: 'PH Cost of Living (CPI)', color: '#854f0b', points: applyGrowthPeriodFilter(growth.cpi) },
     { label: 'Savings+TD (simulated)', color: '#1a6b3c', points: applyGrowthPeriodFilter(growth.fixedIncome) },
   ].filter(s => s.points.length > 0);

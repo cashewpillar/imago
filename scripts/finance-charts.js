@@ -117,6 +117,7 @@ class FinanceChart extends HTMLElement {
     this._resizeObserver = new ResizeObserver(() => this.render());
 
     this._hiddenSeries = new Set();
+    this._defaultHiddenApplied = new Set();
     this.legend.addEventListener('click', e => {
       const item = e.target.closest('.legend-item[data-key]');
       if (!item) return;
@@ -159,6 +160,16 @@ class FinanceChart extends HTMLElement {
 
   set data(val) {
     this._data = val;
+    // Seed default-hidden series exactly once per label -- keeps the user's
+    // own toggle sticky across re-renders instead of re-hiding it every time.
+    const seriesArr = val && !Array.isArray(val) ? val.series : val;
+    (seriesArr || []).forEach((s, si) => {
+      if (!s.defaultHidden) return;
+      const key = s.label || ('series-' + si);
+      if (this._defaultHiddenApplied.has(key)) return;
+      this._defaultHiddenApplied.add(key);
+      this._hiddenSeries.add(key);
+    });
     this.render();
   }
 
