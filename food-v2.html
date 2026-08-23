@@ -51,39 +51,35 @@
     background:linear-gradient(180deg, var(--bg) 60%, rgba(255,255,255,0.92));
     backdrop-filter:blur(6px);
     border-bottom:1px solid var(--line);
-    padding:18px 16px 14px;
+    padding:14px 20px;
   }
   .brand{
-    display:flex; align-items:baseline; justify-content:space-between; gap:8px;
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+  }
+  .header-actions{
+    display:flex; gap:8px; align-items:center; flex-wrap:wrap;
   }
   .brand h1{
     font-family:'Kalam', cursive;
     font-weight:700;
-    font-size:28px;
+    font-size:19px;
     margin:0;
-    letter-spacing:0.3px;
+    letter-spacing:0.2px;
     color:var(--chalk);
-    position:relative;
-  }
-  .brand .tagline{
-    font-size:11px;
-    color:var(--chalk-faint);
-    text-transform:uppercase;
-    letter-spacing:1.5px;
-    margin-top:2px;
   }
   .icon-btn{
     background:none; border:1px solid var(--line-strong); color:var(--chalk-dim);
-    width:38px; height:38px; border-radius:9px;
+    width:34px; height:34px; border-radius:8px;
     display:flex; align-items:center; justify-content:center;
     cursor:pointer; transition:background .15s, color .15s, border-color .15s;
     flex:none;
   }
   .icon-btn:hover, .icon-btn:focus-visible{ color:var(--chalk); border-color:var(--accent); outline:none; }
-  .icon-btn svg{ width:18px; height:18px; }
+  .icon-btn svg{ width:16px; height:16px; }
 
   .toolbar{
-    display:flex; gap:8px; margin-top:14px; align-items:center; flex-wrap:wrap;
+    display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+    max-width:940px; margin:12px auto 0; padding:0 16px;
   }
   .search-wrap{
     flex:1; min-width:180px; position:relative;
@@ -92,6 +88,7 @@
     position:absolute; left:11px; top:50%; transform:translateY(-50%);
     width:15px; height:15px; color:var(--chalk-faint); pointer-events:none;
   }
+  .search-wrap input{ font-size:13px; padding:8px 12px 8px 34px; }
   input[type="search"], input[type="text"], input[type="number"], select, textarea{
     font-family:'Work Sans', sans-serif;
     background:var(--bg-inset);
@@ -114,7 +111,7 @@
   }
   .view-toggle button{
     background:none; border:none; color:var(--chalk-faint);
-    font-size:12.5px; font-weight:600; padding:7px 12px; border-radius:7px;
+    font-size:12px; font-weight:600; padding:6px 10px; border-radius:7px;
     cursor:pointer; transition:background .15s, color .15s;
     font-family:'Work Sans',sans-serif; white-space:nowrap;
     display:flex; align-items:center; gap:5px;
@@ -637,26 +634,26 @@
 
 <header>
   <div class="brand">
-    <div>
-      <h1>The Larder</h1>
-      <div class="tagline">Dish, Snack &amp; Inventory Tracker</div>
-    </div>
-    <button class="icon-btn" id="ioBtn" title="Import / Export" aria-label="Import or export data">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
-    </button>
-  </div>
-  <div class="toolbar">
-    <div class="search-wrap">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-      <input type="search" id="searchInput" placeholder="Search dishes, pantry, or grocery…">
-    </div>
-    <div class="view-toggle">
-      <button id="tabDishes" class="active">Dishes</button>
-      <button id="tabIngredients">Pantry</button>
-      <button id="tabGrocery">Grocery <span class="badge-count" id="toBuyBadge">0</span></button>
+    <h1>foo</h1>
+    <div class="header-actions">
+      <div class="view-toggle">
+        <button id="tabDishes" class="active">Dishes</button>
+        <button id="tabIngredients">Pantry</button>
+        <button id="tabGrocery">Grocery <span class="badge-count" id="toBuyBadge">0</span></button>
+      </div>
+      <button class="icon-btn" id="ioBtn" title="Import / Export" aria-label="Import or export data">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
+      </button>
     </div>
   </div>
 </header>
+
+<div class="toolbar">
+  <div class="search-wrap">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+    <input type="search" id="searchInput" placeholder="Search dishes and pantry…">
+  </div>
+</div>
 
 <main id="main"></main>
 
@@ -2172,6 +2169,7 @@
     document.getElementById('tabDishes').classList.toggle('active', currentTab === 'dishes');
     document.getElementById('tabIngredients').classList.toggle('active', currentTab === 'ingredients');
     document.getElementById('tabGrocery').classList.toggle('active', currentTab === 'grocery');
+    document.querySelector('.toolbar').style.display = currentTab === 'grocery' ? 'none' : 'flex';
   }
 
   /* ---------------- Persistence ---------------- */
