@@ -214,13 +214,13 @@
   /* Collapsible ingredients cell */
   .ing-cell{ cursor:pointer; }
   .ing-cell-collapsed{
-    display:flex; align-items:center; gap:8px;
+    display:flex; align-items:center; gap:8px; flex-wrap:nowrap;
   }
   .ing-cell-expanded{ display:none; margin-top:8px; }
   .dish-row.expanded .ing-cell-collapsed{ margin-bottom:0; }
   .dish-row.expanded .ing-cell-expanded{ display:block; }
   .ing-count-pill{
-    display:inline-flex; align-items:center;
+    display:inline-flex; align-items:center; gap:5px; white-space:nowrap; flex:none;
     background:var(--bg-inset); border:1px solid var(--line);
     color:var(--chalk-dim); font-size:12px; font-weight:600;
     padding:3px 10px; border-radius:20px;
@@ -228,18 +228,17 @@
   .dish-row.expanded .ing-count-pill{
     background:var(--chalk); color:var(--bg); border-color:var(--chalk);
   }
-  .expand-chevron{
-    width:14px; height:14px; color:var(--chalk-faint);
-    transition:transform .2s; flex:none;
+  .ing-count-pill .expand-chevron{
+    width:11px; height:11px; flex:none;
+    transition:transform .2s;
   }
-  .dish-row.expanded .expand-chevron{ transform:rotate(180deg); }
+  .dish-row.expanded .ing-count-pill .expand-chevron{ transform:rotate(180deg); }
 
   /* On mobile, always show the expanded view — no toggle */
   @media (max-width: 640px){
     .ing-cell{ cursor:default; }
     .ing-cell-collapsed{ display:none; }
     .ing-cell-expanded{ display:block !important; margin-top:0; }
-    .expand-chevron{ display:none; }
   }
   .dish-type{
     display:inline-block; font-size:10.5px; text-transform:uppercase;
@@ -1543,10 +1542,9 @@
         <td data-label="Ingredients" class="ing-cell">
           <div class="ing-cell-collapsed">
             ${ingCount > 0
-              ? `<span class="ing-count-pill">${ingCount} ingredient${ingCount === 1 ? '' : 's'}</span>`
+              ? `<span class="ing-count-pill">${ingCount} ingredient${ingCount === 1 ? '' : 's'}<svg class="expand-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></span>`
               : `<span style="color:var(--chalk-faint);font-size:12px;">None</span>`
             }
-            <svg class="expand-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg>
           </div>
           <div class="ing-cell-expanded"><div class="chips">${chips || '<span style="color:var(--chalk-faint);font-size:12.5px;">No ingredients yet</span>'}</div></div>
         </td>
