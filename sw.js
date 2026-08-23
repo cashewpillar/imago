@@ -11,6 +11,7 @@ const APP_SHELL = [
   './performance.html',
   './prompt-track.html',
   './savings.html',
+  './ulam-spiral.html',
   './archive/architect.html',
   './archive/commonplace.html',
   './archive/day.html',
