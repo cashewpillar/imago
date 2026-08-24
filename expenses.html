@@ -41,9 +41,22 @@ header h1{font-size:17px;font-weight:600;letter-spacing:-.3px}
 .fab-add{display:none;position:fixed;bottom:18px;right:18px;width:44px;height:44px;border-radius:50%;background:var(--text);color:#fff;border:none;box-shadow:0 2px 10px rgba(0,0,0,.22);align-items:center;justify-content:center;cursor:pointer;z-index:50}
 .fab-add svg{width:18px;height:18px}
 .fab-add:active{background:#333}
+.exp-detail-row{display:none}
 @media(max-width:640px){
   .header-actions .add-expense-btn{display:none}
   .fab-add{display:flex}
+  .col-type,.col-source,.col-actions{display:none}
+  tr.exp-row{cursor:pointer}
+  tr.exp-row td{padding-top:11px;padding-bottom:11px}
+  tr.exp-row.expanded td{border-bottom-color:transparent;background:var(--bg)}
+  .exp-detail-row.open{display:table-row}
+  .exp-detail-row.open td{background:var(--bg)}
+  .exp-detail-row td{padding:0 14px 14px;border-bottom:1px solid var(--border)}
+  .exp-detail{display:flex;gap:10px;padding-top:10px;border-top:1px dashed var(--border)}
+  .exp-detail-field{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+  .exp-detail-field.exp-detail-edit{flex:0 0 auto}
+  .exp-detail-label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}
+  .exp-detail-field select.tag,.exp-detail-field .tag{width:fit-content}
 }
 
 main{max-width:940px;margin:0 auto;padding:20px 16px}
@@ -264,10 +277,10 @@ select.tag.type{
         <tr>
           <th>Date</th>
           <th>Expense Name</th>
-          <th>Type</th>
-          <th>Source Account</th>
+          <th class="col-type">Type</th>
+          <th class="col-source">Source Account</th>
           <th class="num">Amount</th>
-          <th></th>
+          <th class="col-actions"></th>
         </tr>
       </thead>
       <tbody id="expensesTbody"></tbody>
@@ -549,6 +562,7 @@ async function seedBenchmarksIfNeeded() {
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let _editExpenseId = null;
+let _expandedExpenseRows = new Set();
 let _activeTypeFilter = localStorage.getItem('imago-expenses-active-type-filter') || 'all';
 let _chartPeriod = localStorage.getItem('imago-expenses-chart-period') || '6M';
 let _chartTypeFilter = (() => {
@@ -1250,25 +1264,58 @@ function renderTable() {
       ${sortedTypes.map(t => `<option value="${t.id}" ${t.id === e.typeId ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}
     `;
 
+    const isOpen = _expandedExpenseRows.has(e.id);
+
     return `
-      <tr>
+      <tr class="exp-row${isOpen ? ' expanded' : ''}" onclick="toggleExpenseRow('${e.id}', event)">
         <td style="font-family:var(--mono);font-size:12px;color:var(--text-muted)">${esc(e.date || '—')}</td>
         <td><strong>${esc(e.name)}</strong>${e.note ? `<div style="font-size:11px;color:var(--text-faint);font-style:italic">${esc(e.note)}</div>` : ''}</td>
-        <td>
-          <select class="tag type" onchange="updateExpenseType('${e.id}', this.value)">
+        <td class="col-type">
+          <select class="tag type" onchange="updateExpenseType('${e.id}', this.value)" onclick="event.stopPropagation()">
             ${typeOptions}
           </select>
         </td>
-        <td>${e.accountId ? `<span class="tag source">${esc(accMap[e.accountId] || 'Account')}</span>` : '<span style="color:var(--text-faint);font-size:11px">—</span>'}</td>
+        <td class="col-source">${e.accountId ? `<span class="tag source">${esc(accMap[e.accountId] || 'Account')}</span>` : '<span style="color:var(--text-faint);font-size:11px">—</span>'}</td>
         <td class="num col-neg">-₱${fmtMoney(e.amount)}</td>
-        <td class="actions">
-          <button class="icon-btn" onclick="editExpense('${e.id}')" title="Edit">
+        <td class="actions col-actions">
+          <button class="icon-btn" onclick="event.stopPropagation();editExpense('${e.id}')" title="Edit">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 13l2 2 10-10L12 3 2 13zM9 5l2 2"/></svg>
           </button>
         </td>
       </tr>
+      <tr class="exp-detail-row${isOpen ? ' open' : ''}">
+        <td colspan="6">
+          <div class="exp-detail">
+            <div class="exp-detail-field">
+              <span class="exp-detail-label">Type</span>
+              <select class="tag type" onchange="updateExpenseType('${e.id}', this.value)" onclick="event.stopPropagation()">
+                ${typeOptions}
+              </select>
+            </div>
+            <div class="exp-detail-field">
+              <span class="exp-detail-label">Source</span>
+              ${e.accountId ? `<span class="tag source">${esc(accMap[e.accountId] || 'Account')}</span>` : '<span style="color:var(--text-faint);font-size:11px">—</span>'}
+            </div>
+            <div class="exp-detail-field exp-detail-edit">
+              <span class="exp-detail-label">&nbsp;</span>
+              <button class="btn btn-sm" onclick="event.stopPropagation();editExpense('${e.id}')">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 13l2 2 10-10L12 3 2 13zM9 5l2 2"/></svg>
+                Edit
+              </button>
+            </div>
+          </div>
+        </td>
+      </tr>
     `;
   }).join('');
+}
+
+function toggleExpenseRow(id, event) {
+  if (event.target.closest('button') || event.target.closest('select')) return;
+  if (window.matchMedia('(min-width:641px)').matches) return;
+  if (_expandedExpenseRows.has(id)) _expandedExpenseRows.delete(id);
+  else _expandedExpenseRows.add(id);
+  renderTable();
 }
 
 async function updateExpenseType(expenseId, typeId) {
