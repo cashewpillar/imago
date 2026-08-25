@@ -40,7 +40,8 @@
     -webkit-font-smoothing:antialiased;
     padding-bottom:80px;
   }
-  ::selection{ background:var(--accent-dim); color:var(--chalk); }
+  ::selection{ background:transparent; color:inherit; }
+  input::selection, textarea::selection{ background:Highlight; color:HighlightText; }
 
   .display{ font-family:'Kalam', cursive; }
   .mono{ font-family:'IBM Plex Mono', monospace; }
@@ -373,8 +374,8 @@
   .ing-row.is-draggable:active{ cursor:grabbing; }
   .ing-row.dragging{ opacity:0.4; transform:scale(0.98); }
   .drag-handle{ color:var(--chalk-faint); margin-right:4px; font-weight:bold; cursor:grab; user-select:none; font-size:14px; }
-  .tag-group{ border:2px dashed transparent; border-radius:12px; padding:4px; transition:all .15s ease; }
-  .tag-group.drag-over{ border-color:var(--accent); background:var(--accent-dim); }
+  .tag-group{ outline:2px dashed transparent; outline-offset:4px; border-radius:12px; transition:all .15s ease; }
+  .tag-group.drag-over{ outline-color:var(--accent); background:var(--accent-dim); }
   .ing-row-top{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
   .ing-row.expanded{ border-color:var(--accent); }
   .ing-row-history{
