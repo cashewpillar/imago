@@ -716,6 +716,7 @@
       <textarea id="dishNotesInput" rows="2" placeholder="Prep notes, occasion, source…" style="padding-left:12px; resize:vertical;"></textarea>
     </div>
     <div class="modal-actions">
+      <button class="btn danger" id="btnDeleteDish" style="margin-right:auto; display:none;">Delete</button>
       <button class="btn ghost" id="cancelDishBtn">Cancel</button>
       <button class="btn primary" id="saveDishBtn">Save dish</button>
     </div>
@@ -1163,6 +1164,29 @@
     render();
   }
 
+  async function duplicateDish(itemId){
+    const item = await db.items.get(itemId);
+    if(!item) return;
+    const ts = nowISO();
+    const newId = uuid();
+    await db.items.put({
+      id: newId, name: `${item.name} (copy)`, type: item.type, stockStatus: 'in_stock',
+      notes: item.notes || '', isPlanned: 0, lastPrepared: '',
+      createdAt: ts, updatedAt: ts
+    });
+    const joins = await db.itemIngredients.where('itemId').equals(itemId).toArray();
+    for(const j of joins){
+      await db.itemIngredients.put({
+        id: uuid(), itemId: newId, ingredientId: j.ingredientId,
+        quantity: j.quantity || '', unit: j.unit || '',
+        createdAt: ts, updatedAt: ts
+      });
+    }
+    toast(`"${item.name}" duplicated`);
+    updateHeaderBadge();
+    render();
+  }
+
   /* ---------------- Ingredient Edit / Delete ---------------- */
   async function openIngModal(ingId){
     editingIngId = ingId || null;
@@ -1373,8 +1397,9 @@
       }
     }
     if(document.querySelectorAll('#ingRows .ing-input-row').length === 0) addIngRow();
+    document.getElementById('btnDeleteDish').style.display = itemId ? 'inline-flex' : 'none';
     document.getElementById('dishOverlay').classList.add('show');
-    document.getElementById('dishNameInput').focus();
+    if(!itemId) document.getElementById('dishNameInput').focus();
   }
 
   function closeDishModal(){
@@ -1524,7 +1549,7 @@
                 <svg viewBox="0 0 24 24" fill="${isPlanned?'currentColor':'none'}" stroke="currentColor" stroke-width="1.8"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
               </button>
               <button class="edit-btn" aria-label="Edit" style="width:30px;height:30px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
-              <button class="delete-btn danger" aria-label="Delete" style="width:30px;height:30px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6"/></svg></button>
+              <button class="duplicate-btn" aria-label="Duplicate" title="Duplicate dish" style="width:30px;height:30px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
             </div>
           </div>
           <!-- Mobile detail body -->
@@ -1573,7 +1598,7 @@
               <svg viewBox="0 0 24 24" fill="${isPlanned?'currentColor':'none'}" stroke="currentColor" stroke-width="1.8"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
             </button>
             <button class="edit-btn" aria-label="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
-            <button class="delete-btn danger" aria-label="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6"/></svg></button>
+            <button class="duplicate-btn" aria-label="Duplicate" title="Duplicate dish"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
           </div>
         </td>
       </tr>`;
@@ -1597,11 +1622,10 @@
       tr.querySelectorAll('.edit-btn').forEach(btn => {
         btn.addEventListener('click', e => { e.stopPropagation(); openDishModal(id); });
       });
-      tr.querySelectorAll('.delete-btn').forEach(btn => {
+      tr.querySelectorAll('.duplicate-btn').forEach(btn => {
         btn.addEventListener('click', e => {
           e.stopPropagation();
-          const item = items.find(i => i.id === id);
-          openConfirm('Delete dish?', `"${item?.name || 'This dish'}" will be removed. Shared ingredients stay in your list.`, () => deleteDish(id));
+          duplicateDish(id);
         });
       });
       tr.querySelectorAll('.chip').forEach(chip => {
@@ -2309,6 +2333,15 @@
 
   document.getElementById('cancelDishBtn').addEventListener('click', closeDishModal);
   document.getElementById('saveDishBtn').addEventListener('click', saveDish);
+  document.getElementById('btnDeleteDish').addEventListener('click', async () => {
+    if(!editingItemId) return;
+    const itemId = editingItemId;
+    const item = await db.items.get(itemId);
+    openConfirm('Delete dish?', `"${item?.name || 'This dish'}" will be removed. Shared ingredients stay in your list.`, () => {
+      closeDishModal();
+      deleteDish(itemId);
+    });
+  });
   document.getElementById('addIngRowBtn').addEventListener('click', () => addIngRow());
   document.getElementById('dishSetTodayBtn').addEventListener('click', () => {
     const today = new Date().toISOString().split('T')[0];
