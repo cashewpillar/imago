@@ -283,6 +283,12 @@
   .chip .tally i{ display:block; width:1.5px; height:9px; background:var(--accent); transform:rotate(8deg); }
   .chip .tally i.diag{ width:11px; height:1.5px; transform:rotate(-35deg) translate(1px,3px); }
 
+  /* Mobile: a chip too long for one line takes its own row and truncates, instead of forcing page-wide horizontal scroll */
+  @media (max-width:640px){
+    .chip{ max-width:100%; min-width:0; }
+    .chip-label{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  }
+
   /* stock pills on chips */
   .stock-dot{ width:7px; height:7px; border-radius:50%; flex:none; }
   .stock-dot.in_stock{ background:var(--sage); }
@@ -304,7 +310,7 @@
 
   /* mobile: compact list rows, not cards */
   @media (max-width: 640px){
-    table.dishes{ border-spacing:0 4px; }
+    table.dishes{ border-spacing:0 4px; table-layout:fixed; }
     table.dishes thead{ display:none; }
     /* collapse all columns except the first */
     table.dishes td:not(:first-child){ display:none; }
@@ -324,6 +330,9 @@
       flex:1; min-width:0;
       font-weight:600; font-size:14.5px; color:var(--chalk);
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .dish-row.expanded .dish-mobile-name{
+      white-space:normal; overflow:visible; text-overflow:unset;
     }
     .dish-mobile-badges{ display:flex; align-items:center; gap:5px; flex:none; }
     .dish-mobile-actions{ display:flex; align-items:center; gap:4px; flex:none; }
@@ -1470,7 +1479,7 @@
         const qtyStr = [j.quantity, j.unit].filter(Boolean).join(' ');
         return `<span class="chip${shared ? ' shared':''}" data-ing-id="${ing.id}" title="${shared ? `Used in ${count} items` : 'Used in 1 item'} — Stock: ${stock.replace('_',' ')}">
           <span class="stock-dot ${stock}"></span>
-          ${escapeHtml(ing.name)}
+          <span class="chip-label">${escapeHtml(ing.name)}</span>
           ${qtyStr ? `<span class="qty">${escapeHtml(qtyStr)}</span>` : ''}
           ${shared ? tallySVG(count) : ''}
         </span>`;
@@ -1622,6 +1631,7 @@
           const body = tr.querySelector('.dish-mobile-body');
           if(!body) return;
           const open = body.classList.toggle('open');
+          tr.classList.toggle('expanded', open);
           mobileRow.setAttribute('aria-expanded', String(open));
           if(open) expandedDishRows.add(id);
           else expandedDishRows.delete(id);
@@ -2208,7 +2218,7 @@
   async function exportData(){
     const data = await getAllData();
     const payload = {
-      app: 'the-larder',
+      app: 'food',
       version: 2,
       exportedAt: nowISO(),
       items: data.items,
@@ -2220,7 +2230,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `the-larder-export-${new Date().toISOString().slice(0,10)}.json`;
+    a.download = `food-export-${new Date().toISOString().slice(0,10)}.json`;
     document.body.appendChild(a);
     a.click();
     a.remove();
