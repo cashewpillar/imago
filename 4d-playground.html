@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>4D Playground</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #F8F9FC;
+    --surface: #FFFFFF;
+    --surface-sunken: #F1F2F8;
+    --border: #E1E3ED;
+    --border-strong: #CBCEDD;
+    --ink: #15172B;
+    --ink-muted: #5B5F78;
+    --ink-faint: #9498AC;
+    --accent-a: #5B4FE0; /* far in W */
+    --accent-b: #F0577A; /* near in W */
+    --accent-a-soft: #EDEBFC;
+    --accent-b-soft: #FDEBEF;
+    --radius-lg: 20px;
+    --radius-md: 14px;
+    --radius-sm: 10px;
+    --font-display: 'Space Grotesk', system-ui, sans-serif;
+    --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: contain;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  header {
+    padding: 18px 18px 8px;
+    flex-shrink: 0;
+  }
+
+  header .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent-a);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  header .eyebrow .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+    display: inline-block;
+  }
+
+  header h1 {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 700;
+    margin: 4px 0 0;
+    letter-spacing: -0.01em;
+  }
+
+  header h1 span {
+    background: linear-gradient(120deg, var(--accent-a), var(--accent-b));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 8px 12px 24px;
+    gap: 14px;
+  }
+
+  /* ---------- Canvas stage ---------- */
+
+  .stage {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(21,23,43,0.04), 0 8px 24px -12px rgba(21,23,43,0.10);
+    touch-action: none;
+    flex-shrink: 0;
+  }
+
+  .stage canvas {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    touch-action: none;
+  }
+
+  .stage .hint {
+    position: absolute;
+    left: 12px; bottom: 10px; right: 12px;
+    font-size: 11.5px;
+    color: var(--ink-faint);
+    font-family: var(--font-mono);
+    pointer-events: none;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .stage .badge {
+    position: absolute;
+    top: 12px; left: 12px;
+    background: rgba(255,255,255,0.88);
+    backdrop-filter: blur(6px);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 5px 11px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--ink-muted);
+    font-weight: 600;
+  }
+
+  .stage .w-readout {
+    position: absolute;
+    top: 12px; right: 12px;
+    background: rgba(255,255,255,0.88);
+    backdrop-filter: blur(6px);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 5px 11px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .stage .w-readout .swatch {
+    width: 9px; height: 9px; border-radius: 50%;
+  }
+
+  /* ---------- Panels ---------- */
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 14px 14px 16px;
+  }
+
+  .panel + .panel { }
+
+  .panel-label {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 600;
+    margin: 0 0 10px;
+  }
+
+  /* Primary hyper-slider */
+
+  .hyper-slider-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .hyper-slider-row .title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 15px;
+  }
+
+  .hyper-slider-row .value {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--accent-a);
+    font-weight: 600;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 44px;
+    background: transparent;
+    margin: 0;
+  }
+
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 10px;
+    border-radius: 999px;
+    background: var(--surface-sunken);
+    border: 1px solid var(--border);
+  }
+  input[type=range]::-moz-range-track {
+    height: 10px;
+    border-radius: 999px;
+    background: var(--surface-sunken);
+    border: 1px solid var(--border);
+  }
+
+  #hyperSlider::-webkit-slider-runnable-track {
+    background: linear-gradient(90deg, var(--accent-a), var(--accent-b));
+    border: none;
+  }
+  #hyperSlider::-moz-range-track {
+    background: linear-gradient(90deg, var(--accent-a), var(--accent-b));
+    border: none;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 26px; height: 26px;
+    margin-top: -8px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 3px solid var(--ink);
+    box-shadow: 0 1px 4px rgba(21,23,43,0.25);
+    cursor: grab;
+  }
+  #hyperSlider::-webkit-slider-thumb { border-color: var(--accent-a); }
+
+  input[type=range]::-moz-range-thumb {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 3px solid var(--ink);
+    box-shadow: 0 1px 4px rgba(21,23,43,0.25);
+    cursor: grab;
+  }
+  #hyperSlider::-moz-range-thumb { border-color: var(--accent-a); }
+
+  .slider-scale {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--ink-faint);
+    margin-top: 4px;
+  }
+
+  /* Shape pills */
+
+  .pills {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+  .pills::-webkit-scrollbar { display: none; }
+
+  .pill {
+    flex-shrink: 0;
+    font-family: var(--font-body);
+    font-size: 13.5px;
+    font-weight: 600;
+    padding: 9px 15px;
+    border-radius: 999px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--ink-muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+
+  .pill.active {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: #fff;
+  }
+
+  .shape-caption {
+    margin: 10px 2px 0;
+    font-size: 12.5px;
+    color: var(--ink-muted);
+    line-height: 1.5;
+  }
+  .shape-caption b { color: var(--ink); font-family: var(--font-mono); font-weight: 600; }
+
+  /* Row controls: auto-rotate + reset */
+
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .switch-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .switch {
+    position: relative;
+    width: 42px; height: 26px;
+    flex-shrink: 0;
+  }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch .track {
+    position: absolute; inset: 0;
+    background: var(--border-strong);
+    border-radius: 999px;
+    transition: background 0.15s;
+  }
+  .switch .knob {
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 20px; height: 20px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(21,23,43,0.3);
+    transition: transform 0.15s;
+  }
+  .switch input:checked + .track { background: linear-gradient(90deg, var(--accent-a), var(--accent-b)); }
+  .switch input:checked + .track + .knob { transform: translateX(16px); }
+
+  button.ghost {
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-muted);
+    background: var(--surface-sunken);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 8px 14px;
+    cursor: pointer;
+  }
+  button.ghost:active { background: var(--border); }
+
+  /* Advanced disclosure */
+
+  details.panel summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 14.5px;
+  }
+  details.panel summary::-webkit-details-marker { display: none; }
+  details.panel summary .chev {
+    font-family: var(--font-mono);
+    color: var(--ink-faint);
+    transition: transform 0.15s;
+    font-size: 13px;
+  }
+  details.panel[open] summary .chev { transform: rotate(90deg); }
+
+  .plane-grid {
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .plane-row .plane-row-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12.5px;
+    margin-bottom: 4px;
+  }
+  .plane-row .plane-row-label .name { font-weight: 600; }
+  .plane-row .plane-row-label .name .hint-plane { color: var(--ink-faint); font-weight: 400; }
+  .plane-row .plane-row-label .val { font-family: var(--font-mono); color: var(--ink-muted); }
+
+  .plane-row.spatial input[type=range]::-webkit-slider-thumb { border-color: var(--ink-muted); }
+  .plane-row.hyper .plane-row-label .name { color: var(--accent-a); }
+  .plane-row.hyper input[type=range]::-webkit-slider-thumb { border-color: var(--accent-a); }
+  .plane-row.hyper input[type=range]::-moz-range-thumb { border-color: var(--accent-a); }
+
+  .divider-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 4px 0 -4px;
+  }
+
+  .persp-grid {
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  @media (max-width: 420px) {
+    .persp-grid { grid-template-columns: 1fr; }
+  }
+
+  footer {
+    text-align: center;
+    padding: 4px 16px 18px;
+    font-size: 11.5px;
+    color: var(--ink-faint);
+    font-family: var(--font-mono);
+  }
+
+  /* ---------- Desktop / tablet enhancement ---------- */
+
+  @media (min-width: 860px) {
+    main {
+      display: grid;
+      grid-template-columns: minmax(360px, 620px) 340px;
+      align-items: start;
+      gap: 20px;
+      padding: 10px 24px 32px;
+    }
+    .stage canvas { aspect-ratio: 1 / 1; }
+    .controls-col {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+  }
+</style>
+<meta name="theme-color" content="#f7f6f2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="imago">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/imago-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+</head>
+<body>
+
+<header>
+  <div class="eyebrow"><span class="dot"></span> A viewport into four dimensions</div>
+  <h1>4D <span>Playground</span></h1>
+</header>
+
+<main>
+
+  <div class="stage-col">
+    <div class="stage">
+      <canvas id="canvas"></canvas>
+      <div class="badge" id="shapeBadge">Tesseract</div>
+      <div class="w-readout"><span class="swatch" id="wSwatch"></span><span id="wValue">w 0.00</span></div>
+      <div class="hint"><span>drag to rotate</span><span id="edgeCount">32 edges</span></div>
+    </div>
+  </div>
+
+  <div class="controls-col">
+
+    <div class="panel">
+      <div class="hyper-slider-row">
+        <span class="title">Rotate into the 4th dimension</span>
+        <span class="value" id="hyperValue">0°</span>
+      </div>
+      <input type="range" id="hyperSlider" min="-180" max="180" value="0" step="1">
+      <div class="slider-scale"><span>far side (−w)</span><span>near side (+w)</span></div>
+    </div>
+
+    <div class="panel">
+      <p class="panel-label">Shape</p>
+      <div class="pills" id="shapePills"></div>
+      <p class="shape-caption" id="shapeCaption"></p>
+    </div>
+
+    <div class="panel row">
+      <label class="switch-label" for="autoToggle">
+        <span class="switch">
+          <input type="checkbox" id="autoToggle" checked>
+          <span class="track"></span>
+          <span class="knob"></span>
+        </span>
+        Auto-tumble
+      </label>
+      <button class="ghost" id="resetBtn">Reset view</button>
+    </div>
+
+    <details class="panel" id="advancedPanel">
+      <summary>Advanced rotation<span class="chev">▸</span></summary>
+      <div class="plane-grid">
+        <div class="divider-label">Ordinary 3D planes</div>
+        <div class="plane-row spatial">
+          <div class="plane-row-label"><span class="name">XZ <span class="hint-plane">— left / right spin</span></span><span class="val" data-val="xz">0°</span></div>
+          <input type="range" class="plane-slider" data-plane="xz" min="-180" max="180" value="0">
+        </div>
+        <div class="plane-row spatial">
+          <div class="plane-row-label"><span class="name">YZ <span class="hint-plane">— up / down tilt</span></span><span class="val" data-val="yz">0°</span></div>
+          <input type="range" class="plane-slider" data-plane="yz" min="-180" max="180" value="0">
+        </div>
+        <div class="plane-row spatial">
+          <div class="plane-row-label"><span class="name">XY <span class="hint-plane">— roll</span></span><span class="val" data-val="xy">0°</span></div>
+          <input type="range" class="plane-slider" data-plane="xy" min="-180" max="180" value="0">
+        </div>
+        <div class="divider-label">Planes that touch W (the hidden axis)</div>
+        <div class="plane-row hyper">
+          <div class="plane-row-label"><span class="name">XW</span><span class="val" data-val="xw">0°</span></div>
+          <input type="range" class="plane-slider" data-plane="xw" min="-180" max="180" value="0">
+        </div>
+        <div class="plane-row hyper">
+          <div class="plane-row-label"><span class="name">YW</span><span class="val" data-val="yw">0°</span></div>
+          <input type="range" class="plane-slider" data-plane="yw" min="-180" max="180" value="0">
+        </div>
+        <div class="plane-row hyper">
+          <div class="plane-row-label"><span class="name">ZW <span class="hint-plane">— same as slider above</span></span><span class="val" data-val="zw">0°</span></div>
+          <input type="range" class="plane-slider" data-plane="zw" min="-180" max="180" value="0">
+        </div>
+      </div>
+
+      <div class="persp-grid">
+        <div>
+          <div class="plane-row-label"><span class="name">Depth perspective</span></div>
+          <input type="range" id="zPersp" min="2" max="9" step="0.1" value="4">
+        </div>
+        <div>
+          <div class="plane-row-label"><span class="name">Hyper perspective</span></div>
+          <input type="range" id="wPersp" min="1.4" max="6" step="0.1" value="3">
+        </div>
+      </div>
+    </details>
+
+  </div>
+
+</main>
+
+<footer>color encodes position along W · the axis no eye can see</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------------------------------------------------------------
+  // Geometry: build each 4-polytope as { vertices: [[x,y,z,w],...], edges: [[i,j],...] }
+  // ---------------------------------------------------------------
+
+  function normalize(shape, target){
+    const avg = shape.vertices.reduce((s,v)=> s + Math.hypot(v[0],v[1],v[2],v[3]), 0) / shape.vertices.length;
+    const f = target / avg;
+    shape.vertices = shape.vertices.map(v => v.map(c => c*f));
+    return shape;
+  }
+
+  function buildTesseract(){
+    const vertices = [];
+    for (let i=0;i<16;i++){
+      vertices.push([ (i&1)?1:-1, (i&2)?1:-1, (i&4)?1:-1, (i&8)?1:-1 ]);
+    }
+    const edges = [];
+    for (let a=0;a<16;a++){
+      for (let b=a+1;b<16;b++){
+        let diff = 0, diffBits = a ^ b;
+        while(diffBits){ diff += diffBits & 1; diffBits >>= 1; }
+        if (diff === 1) edges.push([a,b]);
+      }
+    }
+    return normalize({vertices, edges}, 1.7);
+  }
+
+  function build16Cell(){
+    const vertices = [];
+    for (let axis=0; axis<4; axis++){
+      for (const sign of [1,-1]){
+        const v = [0,0,0,0];
+        v[axis] = sign;
+        vertices.push(v);
+      }
+    }
+    const edges = [];
+    for (let a=0;a<8;a++){
+      for (let b=a+1;b<8;b++){
+        // antipodal pair = same axis, opposite index parity (0<->1, 2<->3, 4<->5, 6<->7)
+        const antipodal = Math.floor(a/2) === Math.floor(b/2);
+        if (!antipodal) edges.push([a,b]);
+      }
+    }
+    return normalize({vertices, edges}, 1.7);
+  }
+
+  function build5Cell(){
+    // 5 points of a regular simplex in 5D (standard basis vectors, centered),
+    // then projected via Gram-Schmidt onto the 4D hyperplane they span.
+    const pts5 = [];
+    for (let i=0;i<5;i++){ const p=[0,0,0,0,0]; p[i]=1; pts5.push(p); }
+    const centroid = [0.2,0.2,0.2,0.2,0.2];
+    const centered = pts5.map(p => p.map((c,i)=> c - centroid[i]));
+
+    const dot = (a,b) => a.reduce((s,v,i)=> s + v*b[i], 0);
+    const sub = (a,b) => a.map((v,i)=> v - b[i]);
+    const scale = (a,k) => a.map(v => v*k);
+    const norm = (a) => Math.sqrt(dot(a,a));
+
+    const basis = [];
+    for (let i=0;i<4;i++){
+      let v = centered[i].slice();
+      for (const b of basis){
+        const proj = dot(v,b);
+        v = sub(v, scale(b, proj));
+      }
+      const n = norm(v);
+      basis.push(v.map(c => c/n));
+    }
+
+    const vertices = centered.map(p => basis.map(b => dot(p,b)));
+    const edges = [];
+    for (let a=0;a<5;a++) for (let b=a+1;b<5;b++) edges.push([a,b]);
+    return normalize({vertices, edges}, 1.7);
+  }
+
+  function buildCliffordTorus(){
+    const N = 16, M = 10; // segments around each circle
+    const r = Math.SQRT1_2;
+    const vertices = [];
+    const index = (i,j) => i*M + j;
+    for (let i=0;i<N;i++){
+      const t = (2*Math.PI*i)/N;
+      for (let j=0;j<M;j++){
+        const p = (2*Math.PI*j)/M;
+        vertices.push([ r*Math.cos(t), r*Math.sin(t), r*Math.cos(p), r*Math.sin(p) ]);
+      }
+    }
+    const edges = [];
+    for (let i=0;i<N;i++){
+      for (let j=0;j<M;j++){
+        edges.push([index(i,j), index((i+1)%N, j)]);
+        edges.push([index(i,j), index(i, (j+1)%M)]);
+      }
+    }
+    return normalize({vertices, edges}, 1.9);
+  }
+
+  const SHAPES = {
+    tesseract: {
+      name: "Tesseract",
+      build: buildTesseract,
+      caption: "The 4-cube. <b>16</b> vertices, <b>32</b> edges, 8 cubic cells — the classic \"cube within a cube\"."
+    },
+    cell16: {
+      name: "16-Cell",
+      build: build16Cell,
+      caption: "The 4D cross-polytope. <b>8</b> vertices, <b>24</b> edges — every vertex connects to all but its opposite."
+    },
+    cell5: {
+      name: "5-Cell",
+      build: build5Cell,
+      caption: "The simplest possible 4D shape. <b>5</b> vertices, <b>10</b> edges — every vertex connects to every other."
+    },
+    torus: {
+      name: "Clifford Torus",
+      build: buildCliffordTorus,
+      caption: "A flat torus living on the 3-sphere. Every point sits at equal distance from the center — impossible to build in 3D without distortion."
+    }
+  };
+
+  // ---------------------------------------------------------------
+  // State
+  // ---------------------------------------------------------------
+
+  const angles = { xy:0, xz:0, xw:0, yz:0, yw:0, zw:0 };
+  const autoSpeed = { xw: 0.09, yw: 0.065, zw: 0.05 }; // radians/sec while auto-tumbling
+  let currentShapeKey = "tesseract";
+  let currentShape = SHAPES[currentShapeKey].build();
+  let autoRotate = true;
+  let zDist = 4;
+  let wDist = 3;
+
+  let dragging = false;
+  let lastX = 0, lastY = 0;
+  let velX = 0, velY = 0;
+  let lastMoveT = 0;
+
+  // ---------------------------------------------------------------
+  // Canvas setup
+  // ---------------------------------------------------------------
+
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  let cssSize = 0, dpr = 1;
+
+  function resizeCanvas(){
+    const rect = canvas.getBoundingClientRect();
+    cssSize = rect.width;
+    dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    canvas.width = Math.round(cssSize * dpr);
+    canvas.height = Math.round(cssSize * dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  window.addEventListener('resize', resizeCanvas);
+
+  // ---------------------------------------------------------------
+  // Math: rotate a 4D point through all six planes, then project
+  // ---------------------------------------------------------------
+
+  function rotatePoint(p){
+    let [x,y,z,w] = p;
+    let c,s,t;
+    c=Math.cos(angles.xy); s=Math.sin(angles.xy); t=x*c-y*s; y=x*s+y*c; x=t;
+    c=Math.cos(angles.xz); s=Math.sin(angles.xz); t=x*c-z*s; z=x*s+z*c; x=t;
+    c=Math.cos(angles.xw); s=Math.sin(angles.xw); t=x*c-w*s; w=x*s+w*c; x=t;
+    c=Math.cos(angles.yz); s=Math.sin(angles.yz); t=y*c-z*s; z=y*s+z*c; y=t;
+    c=Math.cos(angles.yw); s=Math.sin(angles.yw); t=y*c-w*s; w=y*s+w*c; y=t;
+    c=Math.cos(angles.zw); s=Math.sin(angles.zw); t=z*c-w*s; w=z*s+w*c; z=t;
+    return [x,y,z,w];
+  }
+
+  function project(p4, scaleFactor, cx, cy){
+    const [x,y,z,w] = p4;
+    const wf = wDist / (wDist - w);
+    const x3 = x*wf, y3 = y*wf, z3 = z*wf;
+    const zf = zDist / (zDist - z3);
+    const x2 = x3*zf, y2 = y3*zf;
+    return { sx: cx + x2*scaleFactor, sy: cy - y2*scaleFactor, depth: z3, w };
+  }
+
+  function lerpColor(hexA, hexB, t){
+    t = Math.max(0, Math.min(1, t));
+    const a = [1,3,5].map(i => parseInt(hexA.substr(i,2),16));
+    const b = [1,3,5].map(i => parseInt(hexB.substr(i,2),16));
+    const c = a.map((v,i)=> Math.round(v + (b[i]-v)*t));
+    return `rgb(${c[0]},${c[1]},${c[2]})`;
+  }
+
+  const ACCENT_A = '#5B4FE0';
+  const ACCENT_B = '#F0577A';
+
+  // ---------------------------------------------------------------
+  // Render loop
+  // ---------------------------------------------------------------
+
+  let lastFrameT = performance.now();
+
+  function render(now){
+    const dt = Math.min(0.05, (now - lastFrameT) / 1000);
+    lastFrameT = now;
+
+    if (autoRotate && !dragging){
+      angles.xw += autoSpeed.xw * dt;
+      angles.yw += autoSpeed.yw * dt;
+      angles.zw += autoSpeed.zw * dt;
+      syncHyperSliderFromAngle();
+      syncAdvancedSliders();
+    }
+
+    if (!dragging && (Math.abs(velX) > 0.0001 || Math.abs(velY) > 0.0001)){
+      angles.xz += velX;
+      angles.yz += velY;
+      velX *= 0.94;
+      velY *= 0.94;
+      syncAdvancedSliders();
+    }
+
+    draw();
+    requestAnimationFrame(render);
+  }
+
+  function draw(){
+    const size = cssSize;
+    const cx = size/2, cy = size/2;
+    const scaleFactor = size * 0.145;
+
+    ctx.clearRect(0,0,size,size);
+
+    // subtle background grid for spatial reference
+    ctx.strokeStyle = '#EEF0F7';
+    ctx.lineWidth = 1;
+    const gridN = 8;
+    for (let i=1;i<gridN;i++){
+      const p = (size/gridN)*i;
+      ctx.beginPath(); ctx.moveTo(p,0); ctx.lineTo(p,size); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0,p); ctx.lineTo(size,p); ctx.stroke();
+    }
+
+    const rotated = currentShape.vertices.map(rotatePoint);
+    const projected = rotated.map(p => project(p, scaleFactor, cx, cy));
+
+    // average w range for this shape, used to normalize color mapping
+    let maxAbsW = 0.0001;
+    for (const p of rotated) maxAbsW = Math.max(maxAbsW, Math.abs(p[3]));
+
+    const edgeData = currentShape.edges.map(([a,b]) => {
+      const pa = projected[a], pb = projected[b];
+      const depth = (pa.depth + pb.depth) / 2;
+      const w = (pa.w + pb.w) / 2;
+      return { pa, pb, depth, w };
+    });
+    edgeData.sort((e1,e2) => e1.depth - e2.depth);
+
+    for (const e of edgeData){
+      const t = (e.w / maxAbsW + 1) / 2;
+      ctx.strokeStyle = lerpColor(ACCENT_A, ACCENT_B, t);
+      ctx.lineWidth = 1.6 + (e.depth / zDist) * 1.6;
+      ctx.globalAlpha = 0.55 + 0.4 * ((e.depth + zDist) / (2*zDist));
+      ctx.beginPath();
+      ctx.moveTo(e.pa.sx, e.pa.sy);
+      ctx.lineTo(e.pb.sx, e.pb.sy);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    const vertOrder = projected.map((p,i)=>i).sort((i,j)=> projected[i].depth - projected[j].depth);
+    for (const i of vertOrder){
+      const p = projected[i];
+      const t = (p.w / maxAbsW + 1) / 2;
+      const r = 2.6 + (p.depth / zDist) * 2.2;
+      ctx.fillStyle = lerpColor(ACCENT_A, ACCENT_B, t);
+      ctx.beginPath();
+      ctx.arc(p.sx, p.sy, Math.max(1.6, r), 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // update the little "current w" readout using the average w of all vertices weighted toward slider plane
+    const meanW = rotated.reduce((s,p)=> s + p[3], 0) / rotated.length;
+    document.getElementById('wValue').textContent = 'w ' + meanW.toFixed(2);
+    document.getElementById('wSwatch').style.background = lerpColor(ACCENT_A, ACCENT_B, (meanW/maxAbsW + 1)/2);
+  }
+
+  // ---------------------------------------------------------------
+  // Pointer drag → XZ / YZ rotation, with momentum
+  // ---------------------------------------------------------------
+
+  canvas.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    autoRotate = false;
+    document.getElementById('autoToggle').checked = false;
+    lastX = e.clientX; lastY = e.clientY;
+    velX = 0; velY = 0;
+    canvas.setPointerCapture(e.pointerId);
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    const sens = 0.008;
+    angles.xz += dx * sens;
+    angles.yz -= dy * sens;
+    velX = dx * sens;
+    velY = -dy * sens;
+    syncAdvancedSliders();
+  });
+
+  function endDrag(e){
+    if (!dragging) return;
+    dragging = false;
+  }
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+  canvas.addEventListener('pointerleave', (e) => { if (e.pointerId !== undefined && dragging === true && e.buttons === 0) dragging = false; });
+
+  // ---------------------------------------------------------------
+  // Primary hyper-slider (bound to the ZW plane)
+  // ---------------------------------------------------------------
+
+  const hyperSlider = document.getElementById('hyperSlider');
+  const hyperValue = document.getElementById('hyperValue');
+
+  function syncHyperSliderFromAngle(){
+    const deg = ((angles.zw * 180 / Math.PI) % 360 + 540) % 360 - 180;
+    hyperSlider.value = deg.toFixed(0);
+    hyperValue.textContent = deg.toFixed(0) + '°';
+  }
+
+  hyperSlider.addEventListener('input', () => {
+    autoRotate = false;
+    document.getElementById('autoToggle').checked = false;
+    const deg = parseFloat(hyperSlider.value);
+    angles.zw = deg * Math.PI / 180;
+    hyperValue.textContent = deg.toFixed(0) + '°';
+    syncAdvancedSliders();
+  });
+
+  // ---------------------------------------------------------------
+  // Advanced plane sliders
+  // ---------------------------------------------------------------
+
+  const planeSliders = Array.from(document.querySelectorAll('.plane-slider'));
+  planeSliders.forEach(slider => {
+    slider.addEventListener('input', () => {
+      autoRotate = false;
+      document.getElementById('autoToggle').checked = false;
+      const plane = slider.dataset.plane;
+      const deg = parseFloat(slider.value);
+      angles[plane] = deg * Math.PI / 180;
+      document.querySelector(`.val[data-val="${plane}"]`).textContent = deg.toFixed(0) + '°';
+      if (plane === 'zw') syncHyperSliderFromAngle();
+    });
+  });
+
+  function syncAdvancedSliders(){
+    for (const key of Object.keys(angles)){
+      const deg = ((angles[key] * 180 / Math.PI) % 360 + 540) % 360 - 180;
+      const slider = document.querySelector(`.plane-slider[data-plane="${key}"]`);
+      if (slider) slider.value = deg.toFixed(0);
+      const label = document.querySelector(`.val[data-val="${key}"]`);
+      if (label) label.textContent = deg.toFixed(0) + '°';
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Auto-tumble toggle + reset
+  // ---------------------------------------------------------------
+
+  document.getElementById('autoToggle').addEventListener('change', (e) => {
+    autoRotate = e.target.checked;
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    for (const k of Object.keys(angles)) angles[k] = 0;
+    velX = 0; velY = 0;
+    zDist = 4; wDist = 3;
+    document.getElementById('zPersp').value = 4;
+    document.getElementById('wPersp').value = 3;
+    syncAdvancedSliders();
+    syncHyperSliderFromAngle();
+  });
+
+  // ---------------------------------------------------------------
+  // Perspective sliders
+  // ---------------------------------------------------------------
+
+  document.getElementById('zPersp').addEventListener('input', (e) => { zDist = parseFloat(e.target.value); });
+  document.getElementById('wPersp').addEventListener('input', (e) => { wDist = parseFloat(e.target.value); });
+
+  // ---------------------------------------------------------------
+  // Shape picker
+  // ---------------------------------------------------------------
+
+  const pillsWrap = document.getElementById('shapePills');
+  const shapeCaption = document.getElementById('shapeCaption');
+  const shapeBadge = document.getElementById('shapeBadge');
+  const edgeCountEl = document.getElementById('edgeCount');
+
+  function selectShape(key){
+    currentShapeKey = key;
+    currentShape = SHAPES[key].build();
+    shapeBadge.textContent = SHAPES[key].name;
+    shapeCaption.innerHTML = SHAPES[key].caption;
+    edgeCountEl.textContent = currentShape.edges.length + ' edges';
+    Array.from(pillsWrap.children).forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.key === key);
+    });
+  }
+
+  Object.entries(SHAPES).forEach(([key, def]) => {
+    const btn = document.createElement('button');
+    btn.className = 'pill';
+    btn.textContent = def.name;
+    btn.dataset.key = key;
+    btn.addEventListener('click', () => selectShape(key));
+    pillsWrap.appendChild(btn);
+  });
+
+  // ---------------------------------------------------------------
+  // Boot
+  // ---------------------------------------------------------------
+
+  selectShape('tesseract');
+  resizeCanvas();
+  requestAnimationFrame((t) => { lastFrameT = t; requestAnimationFrame(render); });
+
+})();
+</script>
+
+  <script src="pwa-register.js"></script>
+</body>
+</html>
