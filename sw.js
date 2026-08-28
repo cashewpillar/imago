@@ -1,4 +1,4 @@
-const CACHE_NAME = 'imago-shell-v4';
+const CACHE_NAME = 'imago-shell-v5';
 const APP_SHELL = [
   './',
   // BEGIN GENERATED HTML PAGES

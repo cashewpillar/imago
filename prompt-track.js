@@ -99,16 +99,24 @@ async function migrateLegacyIfNeeded(){
 
 /* ── TABLE RENDER ── */
 function renderGroupingSelect(){
-  const el=document.getElementById('group-by');
+  const el=document.getElementById('grouping-row');
   if(!el) return;
-  const options = [{key:'', label:'No grouping'}].concat(
-    config.fields.filter(f=>f.type==='select').map(f=>({key:f.key,label:`Group: ${f.label}`}))
+  const c = gc(config.color);
+  const options = [{key:'', label:'None'}].concat(
+    config.fields.filter(f=>f.type==='select').map(f=>({key:f.key,label:f.label}))
   );
-  el.innerHTML = options.map(opt=>`<option value="${esc(opt.key)}"${opt.key===groupField?' selected':''}>${esc(opt.label)}</option>`).join('');
+  el.innerHTML = `<div class="tag-group">
+    <div class="tag-group-label">Grouping</div>
+    <div class="tag-group-chips">${options.map(opt=>{
+      const on = opt.key===groupField;
+      return `<div class="tag-chip${on?' active':''}" style="${on?`background:${c.val};border-color:${c.val};`:''}" onclick="setGrouping('${CSS.escape(opt.key)}')">${esc(opt.label)}</div>`;
+    }).join('')}</div>
+  </div>`;
 }
-function handleGroupingChange(){
-  groupField = document.getElementById('group-by')?.value || '';
+function setGrouping(key){
+  groupField = key;
   collapsedGroups = {};
+  renderGroupingSelect();
   renderTable();
 }
 function toggleTopSearch(){
@@ -161,6 +169,12 @@ function fieldCellHtml(field, val, c){
   }
   if(field.type==='url') return val ? `<a href="${esc(val)}" target="_blank" rel="noopener" class="cell-link" onclick="event.stopPropagation()">${esc(val)}</a>` : '<span class="cell-empty">—</span>';
   if(field.type==='date') return val ? esc(formatDate(val)) : '<span class="cell-empty">—</span>';
+  if(field.type==='textarea'){
+    if(val===undefined || val===null || val==='') return '<span class="cell-empty">—</span>';
+    const str = String(val);
+    const truncated = str.length>30 ? str.slice(0,30)+'…' : str;
+    return str.length>30 ? `<span title="${esc(str)}">${esc(truncated)}</span>` : esc(truncated);
+  }
   return (val!==undefined && val!==null && val!=='') ? esc(String(val)) : '<span class="cell-empty">—</span>';
 }
 function renderThead(fields){

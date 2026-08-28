@@ -50,8 +50,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .topbar-actions{display:flex;gap:6px;margin-left:auto;flex-shrink:0;}
 
 .filter-bar{padding:10px 14px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0;}
-.filter-controls{display:flex;gap:8px;align-items:center;}
-.grouping-select{flex:0 0 168px;max-width:60%;}
 .search-wrap{position:relative;}
 .search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;}
 .search-input{width:100%;padding:8px 10px 8px 32px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:13px;font-family:var(--font-b);outline:none;transition:border-color .15s;}
@@ -71,20 +69,21 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .tag-chip.active{border-color:transparent;color:#0e0e10;font-weight:600;}
 
 /* ── data table ── */
-.table-scroll{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;position:relative;}
-table.data-table{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px;}
-thead th{position:sticky;top:0;z-index:2;background:var(--bg);text-align:left;padding:10px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;}
+.table-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;position:relative;padding:14px;}
+.table-card{border:1px solid var(--border);border-radius:var(--r);background:var(--bg2);overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.table-scroll.empty .table-card{display:none;}
+table.data-table{width:auto;min-width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px;}
+thead th{background:var(--bg2);text-align:left;padding:10px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;width:1%;}
 thead th:hover{color:var(--text);}
-thead th:first-child{position:sticky;left:0;z-index:3;}
 thead th.actions-h{cursor:default;width:34px;}
 thead th.actions-h:hover{color:var(--muted);}
 .sort-arrow{margin-left:4px;font-size:9px;opacity:.4;}
 .sort-arrow.active{opacity:1;color:var(--primary);}
 tbody tr{border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;}
-tbody tr:hover{background:var(--bg2);}
-tbody tr:hover td:first-child{background:var(--bg2);}
-tbody td{padding:9px 12px;white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis;color:var(--text);}
-tbody td:first-child{position:sticky;left:0;z-index:1;background:var(--bg);font-weight:600;}
+tbody tr:last-child{border-bottom:none;}
+tbody tr:hover{background:var(--bg3);}
+tbody td{padding:9px 12px;white-space:nowrap;width:1%;color:var(--text);}
+tbody td:first-child{font-weight:600;white-space:normal;min-width:140px;width:auto;}
 td.actions{width:34px;text-align:right;padding:6px 8px;}
 .row-menu-btn{width:24px;height:24px;border-radius:6px;border:none;background:none;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:16px;line-height:1;transition:all .12s;}
 .row-menu-btn:hover{background:var(--bg4);color:var(--text);}
@@ -99,7 +98,7 @@ td.actions{width:34px;text-align:right;padding:6px 8px;}
 .cell-link:hover{text-decoration:underline;}
 .cell-empty{color:var(--muted2);}
 
-.group-row td{background:var(--bg3);border-bottom:1px solid var(--border);font-weight:700;font-size:11px;padding:8px 12px;position:sticky;left:0;}
+.group-row td{background:var(--bg3);border-bottom:1px solid var(--border);font-weight:700;font-size:11px;padding:8px 12px;}
 .group-row .group-toggle{display:inline-block;width:14px;color:var(--muted);font-size:11px;}
 .group-row .group-count{margin-left:8px;font-size:10px;font-weight:700;color:var(--muted);padding:2px 7px;border-radius:999px;background:var(--bg4);border:1px solid var(--border);}
 
@@ -213,16 +212,16 @@ td.actions{width:34px;text-align:right;padding:6px 8px;}
     </div>
   </div>
   <div class="filter-bar">
-    <div class="filter-controls">
-      <select class="fselect grouping-select" id="group-by" onchange="handleGroupingChange()"></select>
-    </div>
+    <div class="tag-row" id="grouping-row"></div>
     <div class="tag-row" id="tags-row"></div>
   </div>
   <div class="table-scroll" id="table-scroll">
-    <table class="data-table">
-      <thead id="table-head"></thead>
-      <tbody id="table-body"></tbody>
-    </table>
+    <div class="table-card" id="table-card">
+      <table class="data-table">
+        <thead id="table-head"></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
     <div class="empty-state" id="empty-state">
       <div class="empty-icon" id="empty-icon">🗂️</div>
       <h3 id="empty-title">No records yet</h3>
