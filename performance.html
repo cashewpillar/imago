@@ -39,17 +39,24 @@ main{max-width:940px;margin:0 auto;padding:20px 16px}
 .col-neg{color:var(--danger)}
 
 .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:16px 18px;margin-bottom:18px}
-.chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.chart-header{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
 .chart-title{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted)}
 #chartWrap{position:relative;height:280px}
+#growthChartWrap{position:relative;height:280px}
 .chart-empty{display:none;text-align:center;color:var(--text-faint);font-size:13px;padding:50px 0}
+
+/* Line charts grow a little taller on touch devices to make room for the
+   scrub track below the x-axis -- an addition, not a squeeze on the plot. */
+@media (pointer:coarse){
+  #chartWrap, #growthChartWrap{height:316px}
+}
 
 .filters{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
 .filter-chip{padding:3px 10px;border:1px solid var(--border-strong);border-radius:99px;font-size:11px;cursor:pointer;background:var(--surface);color:var(--text-muted);transition:all .12s;user-select:none}
 .filter-chip:hover{border-color:var(--text-muted)}
 .filter-chip.active{background:var(--text);color:#fff;border-color:var(--text)}
 
-.disclaimers{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:16px 18px}
+.disclaimers{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:16px 18px;margin-bottom:18px}
 .disclaimers h3{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint);margin-bottom:10px}
 .disclaimers ul{list-style:none;display:flex;flex-direction:column;gap:8px}
 .disclaimers li{font-size:12px;color:var(--text-muted);padding-left:14px;position:relative}
@@ -157,7 +164,7 @@ main{max-width:940px;margin:0 auto;padding:20px 16px}
       </div>
     </div>
     <div style="font-size:11px;color:var(--text-faint);margin-bottom:8px;">Click a point on the chart for a breakdown of how it was computed.</div>
-    <div id="growthChartWrap" style="position:relative;height:280px">
+    <div id="growthChartWrap">
       <div class="chart-empty" id="growthEmpty">Not enough overlapping history yet to compare.</div>
       <imago-chart id="growthChart" style="display:none"></imago-chart>
     </div>

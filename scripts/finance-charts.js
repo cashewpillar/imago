@@ -18,8 +18,11 @@ class FinanceChart extends HTMLElement {
           display: flex; gap: 20px; align-items: stretch; 
           box-sizing: border-box;
         }
-        .canvas-wrap { flex: 1.5; position: relative; min-width: 0; height: 100%; }
-        canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+        .canvas-wrap {
+          flex: 1.5; min-width: 0; height: 100%;
+          display: flex; flex-direction: column;
+        }
+        canvas { display: block; width: 100%; flex: 1 1 0; min-height: 0; cursor: crosshair; }
         .legend {
           flex: 1;
           display: none;
@@ -82,6 +85,43 @@ class FinanceChart extends HTMLElement {
         .legend-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #1a1917; }
         .legend-val { color: #9c9a94; font-family: monospace; font-size: 10px; }
         
+        .scrub-track {
+          display: none;
+          flex: 0 0 auto;
+          margin-top: 10px;
+          height: 26px;
+          position: relative;
+          touch-action: none;
+        }
+        .scrub-track::before {
+          content: '';
+          position: absolute;
+          left: 8px; right: 8px;
+          top: 50%; transform: translateY(-50%);
+          height: 3px;
+          border-radius: 2px;
+          background: #e2e0d8;
+        }
+        .scrub-track .scrub-handle {
+          position: absolute;
+          top: 50%; left: 50%;
+          width: 22px; height: 14px;
+          margin-left: -11px;
+          transform: translateY(-50%);
+          border-radius: 7px;
+          background: #c8c5bb;
+        }
+        .scrub-track .scrub-handle::before,
+        .scrub-track .scrub-handle::after {
+          content: '';
+          position: absolute;
+          top: 4px; bottom: 4px;
+          width: 1px;
+          background: #f4f2ec;
+        }
+        .scrub-track .scrub-handle::before { left: 8px; }
+        .scrub-track .scrub-handle::after { left: 13px; }
+
         .tooltip {
           position: fixed;
           background: #1a1917;
@@ -103,15 +143,18 @@ class FinanceChart extends HTMLElement {
       <div class="chart-container">
         <div class="canvas-wrap">
           <canvas id="canvas"></canvas>
+          <div id="scrubTrack" class="scrub-track"><div id="scrubHandle" class="scrub-handle"></div></div>
         </div>
         <div id="legend" class="legend"></div>
         <div id="tooltip" class="tooltip"></div>
       </div>
     `;
-    
+
     this.canvas = this.shadowRoot.getElementById('canvas');
     this.legend = this.shadowRoot.getElementById('legend');
     this.tooltip = this.shadowRoot.getElementById('tooltip');
+    this.scrubTrack = this.shadowRoot.getElementById('scrubTrack');
+    this.scrubHandle = this.shadowRoot.getElementById('scrubHandle');
     this.ctx = this.canvas.getContext('2d');
 
     this._resizeObserver = new ResizeObserver(() => this.render());
@@ -126,6 +169,12 @@ class FinanceChart extends HTMLElement {
       else this._hiddenSeries.add(key);
       this.render();
     });
+  }
+
+  // Coarse (touch) pointers can't hover without a finger covering the chart,
+  // so touch-driven hover-follow is disabled on those devices for now.
+  _isCoarsePointer() {
+    return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
   }
 
   connectedCallback() {
@@ -200,12 +249,24 @@ class FinanceChart extends HTMLElement {
       this.removeAttribute('legend-bottom');
     }
 
+    // Set before measuring so the canvas's flex box already excludes the
+    // track's space -- it sits below the canvas, not on top of it.
+    this.scrubTrack.style.display = (this._type === 'line' && this._isCoarsePointer()) ? 'flex' : 'none';
+
     requestAnimationFrame(() => {
       const dpr = window.devicePixelRatio || 1;
-      const rect = this.canvas.parentElement.getBoundingClientRect();
-      const W = rect.width;
-      const H = rect.height;
-      
+      // Measure the wrap, not the canvas itself: canvas gets an inline pixel
+      // width/height below, so re-measuring its own (possibly stale, e.g.
+      // pinned narrow from a prior 2-column layout) box would never let it
+      // grow back when the wrap later has more room to give it.
+      const wrapRect = this.canvas.parentElement.getBoundingClientRect();
+      const trackVisible = this.scrubTrack.style.display !== 'none';
+      const trackSpace = trackVisible
+        ? this.scrubTrack.getBoundingClientRect().height + parseFloat(getComputedStyle(this.scrubTrack).marginTop || 0)
+        : 0;
+      const W = wrapRect.width;
+      const H = wrapRect.height - trackSpace;
+
       if (W === 0 || H === 0) return;
 
       this.canvas.width = W * dpr;
@@ -338,14 +399,12 @@ class FinanceChart extends HTMLElement {
       ctx.fillText(dStr.length > 5 ? dStr.slice(5) : dStr, xOf(i), H - 4);
     }
 
-    const handlePointer = e => {
+    const updateAt = clientX => {
       const rect = this.canvas.getBoundingClientRect();
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
       const mx = clientX - rect.left;
       let ci = null, md = Infinity;
       values.forEach((_, i) => { const d = Math.abs(xOf(i) - mx); if (d < md) { md = d; ci = i; } });
-      
+
       if (md > (data.length === 1 ? 100 : 44)) {
         if (this._hoverIdx !== null) {
           this._hoverIdx = null;
@@ -354,12 +413,14 @@ class FinanceChart extends HTMLElement {
         this.tooltip.style.display = 'none';
         return;
       }
-      
+
       if (this._hoverIdx !== ci) {
         this._hoverIdx = ci;
         this.render();
       }
-      
+
+      this.scrubHandle.style.left = xOf(ci) + 'px';
+
       this.tooltip.textContent = dates[ci] + ' · ₱' + this._fmtk(values[ci]);
       this.tooltip.style.display = 'block';
       this.tooltip.style.left = (rect.left + xOf(ci)) + 'px';
@@ -367,10 +428,21 @@ class FinanceChart extends HTMLElement {
       this.tooltip.style.top = (py - this.tooltip.offsetHeight - 8 < 10) ? (py + 18) + 'px' : (py - this.tooltip.offsetHeight - 8) + 'px';
     };
 
+    // Canvas hover is mouse-only -- on coarse pointers a dragging finger would
+    // otherwise cover the very data it's pointing at. Those devices instead
+    // scrub via the dedicated track below the x-axis (see .scrub-track).
+    const handlePointer = e => {
+      if (this._isCoarsePointer()) return;
+      updateAt(e.touches ? e.touches[0].clientX : e.clientX);
+    };
+    const handleTrackPointer = e => updateAt(e.touches[0].clientX);
+
     this.canvas.onmousemove = handlePointer;
     this.canvas.ontouchmove = handlePointer;
     this.canvas.ontouchstart = handlePointer;
-    
+    this.scrubTrack.ontouchstart = handleTrackPointer;
+    this.scrubTrack.ontouchmove = handleTrackPointer;
+
     const hideTooltip = () => {
       if (this._hoverIdx !== null) {
         this._hoverIdx = null;
@@ -378,9 +450,10 @@ class FinanceChart extends HTMLElement {
       }
       this.tooltip.style.display = 'none';
     };
-    
+
     this.canvas.onmouseleave = hideTooltip;
     this.canvas.ontouchend = hideTooltip;
+    this.scrubTrack.ontouchend = hideTooltip;
   }
 
   _formatVal(v, unit) {
@@ -561,9 +634,8 @@ class FinanceChart extends HTMLElement {
       });
     }
 
-    const handlePointer = e => {
+    const updateAt = clientX => {
       const rect = this.canvas.getBoundingClientRect();
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const mx = clientX - rect.left;
       let ci = null, md = Infinity;
       dates.forEach((_, i) => { const d = Math.abs(xOf(i) - mx); if (d < md) { md = d; ci = i; } });
@@ -574,11 +646,22 @@ class FinanceChart extends HTMLElement {
       }
 
       if (this._hoverIdx !== ci) { this._hoverIdx = ci; this.render(); }
+      this.scrubHandle.style.left = xOf(ci) + 'px';
     };
+
+    // See single-series chart: coarse pointers scrub via the track below the
+    // x-axis instead of hovering the canvas directly.
+    const handlePointer = e => {
+      if (this._isCoarsePointer()) return;
+      updateAt(e.touches ? e.touches[0].clientX : e.clientX);
+    };
+    const handleTrackPointer = e => updateAt(e.touches[0].clientX);
 
     this.canvas.onmousemove = handlePointer;
     this.canvas.ontouchmove = handlePointer;
     this.canvas.ontouchstart = handlePointer;
+    this.scrubTrack.ontouchstart = handleTrackPointer;
+    this.scrubTrack.ontouchmove = handleTrackPointer;
 
     const hideTooltip = () => {
       if (this._hoverIdx !== null) { this._hoverIdx = null; this.render(); }
@@ -586,6 +669,7 @@ class FinanceChart extends HTMLElement {
 
     this.canvas.onmouseleave = hideTooltip;
     this.canvas.ontouchend = hideTooltip;
+    this.scrubTrack.ontouchend = hideTooltip;
 
     this.canvas.onclick = e => {
       const rect = this.canvas.getBoundingClientRect();

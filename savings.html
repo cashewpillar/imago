@@ -53,6 +53,12 @@ main{max-width:940px;margin:0 auto;padding:20px 16px}
 #chartWrap{position:relative;height:160px}
 .chart-empty{display:none;text-align:center;color:var(--text-faint);font-size:13px;padding:50px 0}
 
+/* Line charts grow a little taller on touch devices to make room for the
+   scrub track below the x-axis -- an addition, not a squeeze on the plot. */
+@media (pointer:coarse){
+  #chartWrap{height:196px}
+}
+
 .section-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
 .section-title{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-right:4px}
 .filters{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
