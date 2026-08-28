@@ -1026,9 +1026,11 @@ function renderSummary() {
     .filter(e => (e.date || '').startsWith(currentMonthStr))
     .reduce((s, e) => s + (Number(e.amount) || 0), 0);
 
-  // Only count incomes that are active RIGHT NOW (today's month)
+  // Only count incomes that are active RIGHT NOW (today's month).
+  // Excludes annual/quarterly incomes here since prorating them monthly overstates
+  // what's actually expected to land this month.
   const activeIncomes = _allIncomes.filter(inc =>
-    inc.frequency !== 'one-time' && isIncomeActiveInMonth(inc, currentMonthStr)
+    inc.frequency === 'monthly' && isIncomeActiveInMonth(inc, currentMonthStr)
   );
   const monthlyIncome = activeIncomes.reduce((s, inc) => s + incomeAmountForMonth(inc, currentMonthStr), 0);
 
