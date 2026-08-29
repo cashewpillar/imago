@@ -385,16 +385,16 @@ function openAddRecordModal(){
   editEntryId=null;
   document.getElementById('m-rec-ttl').textContent='Add Record';
   document.getElementById('rec-save-btn').textContent='Add';
-  buildRecForm({});
   om('m-record');
+  buildRecForm({});
 }
 async function openEditRecord(id){
   editEntryId=id;
   const r=await db.records.get(id); if(!r) return;
   document.getElementById('m-rec-ttl').textContent='Edit Record';
   document.getElementById('rec-save-btn').textContent='Save';
-  buildRecForm(r.data||{});
   om('m-record');
+  buildRecForm(r.data||{});
 }
 function buildRecForm(data){
   const fields=config.fields.length ? config.fields : [{key:'title',label:'Title',type:'text'}];
@@ -404,7 +404,7 @@ function buildRecForm(data){
     const val=data[field.key]!==undefined?data[field.key]:'';
     let inp='';
     if(field.type==='textarea'){
-      inp=`<textarea class="ftextarea" data-k="${field.key}">${esc(String(val))}</textarea>`;
+      inp=`<textarea class="ftextarea" data-k="${field.key}" oninput="autoGrowTextarea(this)">${esc(String(val))}</textarea>`;
     } else if(field.type==='boolean'){
       inp=`<div style="display:flex;gap:16px;margin-top:2px;">${['true','false'].map(bv=>`<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;"><input type="radio" name="b_${field.key}" data-k="${field.key}" value="${bv}"${String(val)===bv||(bv==='false'&&val==='')?'checked':''} style="accent-color:${c.val};">${bv==='true'?'Yes':'No'}</label>`).join('')}</div>`;
     } else if(field.type==='progress'){
@@ -425,6 +425,11 @@ function buildRecForm(data){
     return `<div class="rfrow"><div class="rflabel">${esc(field.label)}<span class="type-badge">${field.type}</span></div>${inp}</div>`;
   }).join('');
   document.getElementById('rec-form').innerHTML=fhtml;
+  document.querySelectorAll('#rec-form .ftextarea').forEach(autoGrowTextarea);
+}
+function autoGrowTextarea(el){
+  el.style.height='auto';
+  el.style.height=el.scrollHeight+'px';
 }
 async function saveRecord(){
   const fields=config.fields;
