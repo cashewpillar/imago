@@ -22,6 +22,7 @@ const COLORS = [
 const FTYPES = ['text','number','date','url','boolean','select','progress','textarea'];
 const THEME_KEY = 'tablevault-theme';
 const CONFIG_KEY = 'tablevault-config-v1';
+const VIEW_KEY = 'tablevault-view-v1';
 
 let config = null, entries = [], tagF = [], editEntryId = null, selColor = 'Lime';
 let groupField = '', collapsedGroups = {};
@@ -40,6 +41,18 @@ const gc = n => {
   return { ...def, val, dim: hexToRgba(val, isLight ? 0.12 : 0.13) };
 };
 const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function loadViewState(){
+  let stored = null;
+  try { stored = JSON.parse(localStorage.getItem(VIEW_KEY)); } catch {}
+  if(!stored) return;
+  tagF = Array.isArray(stored.tagF) ? stored.tagF : [];
+  groupField = stored.groupField || '';
+  sortKey = stored.sortKey ?? null;
+  sortDir = stored.sortDir === -1 ? -1 : 1;
+}
+function saveViewState(){
+  localStorage.setItem(VIEW_KEY, JSON.stringify({tagF, groupField, sortKey, sortDir}));
+}
 const om = id => document.getElementById(id).classList.add('open');
 const cm = id => document.getElementById(id).classList.remove('open');
 const bdClose = (e,id) => { if(e.target.id===id) cm(id); };
@@ -47,6 +60,7 @@ const bdClose = (e,id) => { if(e.target.id===id) cm(id); };
 async function init() {
   initTheme();
   loadConfig();
+  loadViewState();
   const migrated = await migrateLegacyIfNeeded();
   renderTitle();
   entries = await db.records.toArray();
@@ -116,6 +130,7 @@ function renderGroupingSelect(){
 function setGrouping(key){
   groupField = key;
   collapsedGroups = {};
+  saveViewState();
   renderGroupingSelect();
   renderTable();
 }
@@ -133,6 +148,7 @@ function toggleGroup(encodedName){
 function setSort(key){
   if(sortKey===key){ sortDir = -sortDir; }
   else { sortKey = key; sortDir = 1; }
+  saveViewState();
   renderTable();
 }
 function sortArrow(key){
@@ -200,7 +216,7 @@ function renderTable(){
     });
   });
   renderTagRow('tags-row',[...tagGroups.entries()].map(([key, group])=>({key,label:group.label,tags:[...group.chips]})),tagF,config.color,tag=>{
-    const i=tagF.indexOf(tag); i>=0?tagF.splice(i,1):tagF.push(tag); renderTable();
+    const i=tagF.indexOf(tag); i>=0?tagF.splice(i,1):tagF.push(tag); saveViewState(); renderTable();
   });
 
   let list = entries.filter(r=>{
