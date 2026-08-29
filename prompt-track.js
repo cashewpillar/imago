@@ -75,7 +75,7 @@ function saveConfig(patch){
 }
 function renderTitle(){
   const el = document.getElementById('app-title');
-  if(el) el.textContent = (config.icon||'')+' '+(config.name||'');
+  if(el) el.textContent = config.name||'';
   document.title = 'Prompt Track';
 }
 
@@ -308,36 +308,67 @@ function renderFieldsEd(fields){
     const field=normalizeField(f,i);
     const options = (field.options||[]).join(', ');
     return `
-    <div class="field-row${i===0?' primary':''}${field.type==='select'?' wrap':''}" data-i="${i}">
-      ${i===0?'<span class="field-badge">Title</span>':'<span style="color:var(--muted2);cursor:grab;font-size:14px;">⠿</span>'}
+    <div class="field-row${i===0?' primary':''}${field.type==='select'?' wrap':''}" data-key="${esc(field.key)}" draggable="true" ondragstart="fieldDragStart(event)" ondragend="fieldDragEnd(event)" ondragover="fieldDragOver(event)" ondrop="fieldDrop(event)">
+      ${i===0?'<span class="field-badge">Title</span>':'<span class="field-grip">⠿</span>'}
       <input type="text" value="${esc(field.label)}" placeholder="Field name" data-k="label">
       <select data-k="type"${i===0?' disabled':''} onchange="handleFieldTypeChange()">
         ${FTYPES.map(t=>`<option value="${t}"${field.type===t?' selected':''}>${t}</option>`).join('')}
       </select>
-      ${i===0?'<div style="width:22px;"></div>':`<button class="field-del" onclick="delField(${i})">✕</button>`}
+      ${i===0?'<div style="width:22px;"></div>':`<button class="field-del" onclick="delField(this)">✕</button>`}
       ${field.type==='select'?`<div class="field-options"><input type="text" value="${esc(options)}" placeholder="Options, separated by commas" data-k="options"></div>`:''}
     </div>`;
   }).join('');
+}
+let fieldDragEl=null;
+function fieldDragStart(e){
+  if(e.target.closest('input,select,textarea,button')){
+    e.preventDefault();
+    return;
+  }
+  fieldDragEl=e.currentTarget;
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('text/plain','');
+}
+function fieldDragOver(e){
+  if(!fieldDragEl) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect='move';
+  const row=e.currentTarget;
+  if(row===fieldDragEl) return;
+  const rect=row.getBoundingClientRect();
+  const before=(e.clientY-rect.top)<rect.height/2;
+  row.parentNode.insertBefore(fieldDragEl, before?row:row.nextSibling);
+}
+function fieldDrop(e){
+  e.preventDefault();
+}
+function fieldDragEnd(){
+  if(fieldDragEl) renderFieldsEd(getFieldsFromEd());
+  fieldDragEl=null;
 }
 function addField(){
   const fields=getFieldsFromEd();
   fields.push({key:'f_'+Date.now(),label:'',type:'text',options:[]});
   renderFieldsEd(fields);
 }
-function delField(i){
-  const fields=getFieldsFromEd(); fields.splice(i,1); renderFieldsEd(fields);
+function delField(el){
+  const fields=getFieldsFromEd();
+  const row=el.closest('.field-row');
+  const i=[...row.parentNode.children].indexOf(row);
+  fields.splice(i,1); renderFieldsEd(fields);
 }
 function handleFieldTypeChange(){
   renderFieldsEd(getFieldsFromEd());
 }
 function getFieldsFromEd(){
-  const ex = config.fields || [];
-  return [...document.querySelectorAll('#fields-ed .field-row')].map((row,i)=>normalizeField({
-    key:ex[i]?.key||('f_'+Date.now()+'_'+i),
-    label:row.querySelector('[data-k="label"]').value.trim()||'Field',
-    type:row.querySelector('[data-k="type"]').value,
-    options:parseSelectOptions(row.querySelector('[data-k="options"]')?.value||''),
-  },i));
+  return [...document.querySelectorAll('#fields-ed .field-row')].map((row,i)=>{
+    return normalizeField({
+      key:row.dataset.key||('f_'+Date.now()+'_'+i),
+      label:row.querySelector('[data-k="label"]').value.trim()||'Field',
+      type:row.querySelector('[data-k="type"]').value,
+      options:parseSelectOptions(row.querySelector('[data-k="options"]')?.value||''),
+    },i);
+  });
 }
 function saveFields(){
   const fields=getFieldsFromEd();
