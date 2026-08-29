@@ -7,6 +7,7 @@ const APP_SHELL = [
   './4d-playground.html',
   './cebpac-flight-finder.html',
   './expenses.html',
+  './food-v2.html',
   './meralco-multi-account.html',
   './performance.html',
   './prompt-track.html',
