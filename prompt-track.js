@@ -1,13 +1,15 @@
-/* TableVault — single table, row-based data manager.
-   Data model: one `config` (name/icon/color/fields) persisted in localStorage,
-   plus a `records` store in IndexedDB for the rows. Legacy multi-table data
-   (from the old "table of tables" version) is migrated in automatically the
-   first time the app runs, so existing data isn't lost. */
+/* TableVault — table of tables. Each table has its own `config` (name/icon/
+   color/fields), stored in the `tables` IndexedDB store, and its rows live in
+   the `records` store tagged with a `tableId`. Legacy data from older versions
+   of this app (a multi-vault schema, then a single-table-only schema) is
+   migrated in automatically the first time the app runs, so existing data
+   isn't lost. */
 
 const db = new Dexie('PromptTrackDB');
 db.version(1).stores({ vaults:'++id,name', entries:'++id,tableId,createdAt' });
 db.version(2).stores({ vaults:'++id,name,sourceTrackerId', entries:'++id,tableId,createdAt,sourceRowUid,sourceTrackerId' });
 db.version(3).stores({ vaults:'++id,name,sourceTrackerId', entries:'++id,tableId,createdAt,sourceRowUid,sourceTrackerId', records:'++id,createdAt' });
+db.version(4).stores({ vaults:'++id,name,sourceTrackerId', entries:'++id,tableId,createdAt,sourceRowUid,sourceTrackerId', records:'++id,tableId,createdAt', tableDefs:'++id,createdAt' });
 
 const COLORS = [
   {name:'Lime',  val:'#b8ff57', lightVal:'#61a300', dim:'rgba(184,255,87,.13)'},
@@ -23,10 +25,12 @@ const FTYPES = ['text','number','date','url','boolean','select','progress','text
 const THEME_KEY = 'tablevault-theme';
 const CONFIG_KEY = 'tablevault-config-v1';
 const VIEW_KEY = 'tablevault-view-v1';
+const CURRENT_TABLE_KEY = 'tablevault-current-table';
 
 let config = null, entries = [], tagF = [], editEntryId = null, selColor = 'Lime';
 let groupField = '', collapsedGroups = {};
 let sortKey = null, sortDir = 1;
+let currentTableId = null;
 
 const gc = n => {
   const named = COLORS.find(c=>c.name===n);
@@ -41,9 +45,13 @@ const gc = n => {
   return { ...def, val, dim: hexToRgba(val, isLight ? 0.12 : 0.13) };
 };
 const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function viewKey(){
+  return VIEW_KEY+':'+currentTableId;
+}
 function loadViewState(){
+  tagF = []; groupField = ''; collapsedGroups = {}; sortKey = null; sortDir = 1;
   let stored = null;
-  try { stored = JSON.parse(localStorage.getItem(VIEW_KEY)); } catch {}
+  try { stored = JSON.parse(localStorage.getItem(viewKey())); } catch {}
   if(!stored) return;
   tagF = Array.isArray(stored.tagF) ? stored.tagF : [];
   groupField = stored.groupField || '';
@@ -51,7 +59,7 @@ function loadViewState(){
   sortDir = stored.sortDir === -1 ? -1 : 1;
 }
 function saveViewState(){
-  localStorage.setItem(VIEW_KEY, JSON.stringify({tagF, groupField, sortKey, sortDir}));
+  localStorage.setItem(viewKey(), JSON.stringify({tagF, groupField, sortKey, sortDir}));
 }
 const om = id => document.getElementById(id).classList.add('open');
 const cm = id => document.getElementById(id).classList.remove('open');
@@ -59,33 +67,30 @@ const bdClose = (e,id) => { if(e.target.id===id) cm(id); };
 
 async function init() {
   initTheme();
-  loadConfig();
-  loadViewState();
-  const migrated = await migrateLegacyIfNeeded();
-  renderTitle();
-  entries = await db.records.toArray();
-  renderGroupingSelect();
-  initCPs();
-  renderTable();
-  if(migrated) toast('Imported your existing table','success');
+  const migrated = await migrateToTablesIfNeeded();
+  const savedId = Number(localStorage.getItem(CURRENT_TABLE_KEY)) || null;
+  if(savedId && await db.tableDefs.get(savedId)){
+    await openTable(savedId);
+  } else {
+    await goHome();
+  }
+  if(migrated) toast('Imported your existing tables','success');
 }
 
-/* ── CONFIG (the single table) ── */
+/* ── CONFIG (per table) ── */
 function defaultFields(){
   return [{key:'title',label:'Title',type:'text',options:[]},{key:'notes',label:'Notes',type:'textarea',options:[]}];
 }
 function defaultConfig(){
   return {name:'My Table', icon:'📋', color:'Lime', fields:defaultFields()};
 }
-function loadConfig(){
-  let stored = null;
-  try { stored = JSON.parse(localStorage.getItem(CONFIG_KEY)); } catch {}
-  config = Object.assign(defaultConfig(), stored||{});
-  config.fields = (config.fields&&config.fields.length ? config.fields : defaultFields()).map((f,i)=>normalizeField(f,i));
+function loadConfigFromRow(row){
+  config = {id:row.id, name:row.name||'My Table', icon:row.icon||'📋', color:row.color||'Lime'};
+  config.fields = (row.fields&&row.fields.length ? row.fields : defaultFields()).map((f,i)=>normalizeField(f,i));
 }
 function saveConfig(patch){
   config = Object.assign({}, config, patch);
-  localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+  db.tableDefs.update(currentTableId, patch);
 }
 function renderTitle(){
   const el = document.getElementById('app-title');
@@ -93,22 +98,105 @@ function renderTitle(){
   document.title = 'Prompt Track';
 }
 
-/* ── ONE-TIME MIGRATION FROM OLD MULTI-TABLE VERSION ── */
-async function migrateLegacyIfNeeded(){
-  const alreadyConfigured = localStorage.getItem(CONFIG_KEY) !== null;
-  const existingRecords = await db.records.count();
-  if(alreadyConfigured || existingRecords>0) return false;
-  const oldVaults = await db.vaults.toArray();
-  if(!oldVaults.length) return false;
-  oldVaults.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
-  const primary = oldVaults[0];
-  const fields = (primary.fields&&primary.fields.length ? primary.fields : defaultFields()).map((f,i)=>normalizeField(f,i));
-  saveConfig({name:primary.name||'My Table', icon:primary.icon||'📋', color:primary.color||'Lime', fields});
-  const oldEntries = await db.entries.where('tableId').equals(primary.id).toArray();
-  if(oldEntries.length){
-    await db.records.bulkAdd(oldEntries.map(e=>({data:e.data||{}, createdAt:e.createdAt||Date.now()})));
+/* ── NAVIGATION: table of tables ── */
+async function goHome(){
+  currentTableId = null;
+  localStorage.removeItem(CURRENT_TABLE_KEY);
+  document.getElementById('table-view').style.display = 'none';
+  document.getElementById('home-view').style.display = 'flex';
+  await renderTablesHome();
+}
+async function openTable(id){
+  const row = await db.tableDefs.get(id);
+  if(!row){ toast('Table not found','error'); await goHome(); return; }
+  currentTableId = id;
+  localStorage.setItem(CURRENT_TABLE_KEY, String(id));
+  loadConfigFromRow(row);
+  loadViewState();
+  entries = await db.records.where('tableId').equals(id).toArray();
+  document.getElementById('home-view').style.display = 'none';
+  document.getElementById('table-view').style.display = 'flex';
+  renderTitle();
+  renderGroupingSelect();
+  initCPs();
+  renderTable();
+}
+async function createTable(){
+  const id = await db.tableDefs.add({...defaultConfig(), createdAt:Date.now()});
+  await openTable(id);
+  toast('Table created — customize it in Settings','success');
+}
+async function renderTablesHome(){
+  const list = await db.tableDefs.orderBy('createdAt').toArray();
+  const el = document.getElementById('tables-list');
+  if(!list.length){
+    el.innerHTML = '<div class="empty-state" style="display:flex;padding-top:60px;"><div class="empty-icon">🗂️</div><h3>No tables yet</h3><p>Tap + to create your first table.</p></div>';
+    return;
   }
-  return true;
+  const counts = {};
+  await Promise.all(list.map(async t=>{ counts[t.id] = await db.records.where('tableId').equals(t.id).count(); }));
+  el.innerHTML = list.map(t=>`
+    <div class="table-item" onclick="openTable(${t.id})">
+      <div class="table-item-icon">${esc(t.icon||'📋')}</div>
+      <div class="table-item-name">${esc(t.name||'Untitled')}</div>
+      <div class="table-item-count">${counts[t.id]||0}</div>
+      <button class="row-menu-btn" title="More" onclick="event.stopPropagation();showTableCtx(event,${t.id})">⋮</button>
+    </div>`).join('');
+}
+function showTableCtx(e,id){
+  showCtx(e.clientX,e.clientY,[
+    {l:'🗑  Delete',f:()=>deleteTable(id),d:true},
+  ]);
+}
+async function deleteTable(id){
+  if(!confirm('Delete this table and all its records? This cannot be undone.')) return;
+  await db.records.where('tableId').equals(id).delete();
+  await db.tableDefs.delete(id);
+  localStorage.removeItem(VIEW_KEY+':'+id);
+  if(currentTableId===id){ currentTableId=null; localStorage.removeItem(CURRENT_TABLE_KEY); }
+  await renderTablesHome();
+  toast('Table deleted','error');
+}
+
+/* ── ONE-TIME MIGRATION FROM OLDER VERSIONS OF THIS APP ── */
+async function migrateToTablesIfNeeded(){
+  if(await db.tableDefs.count() > 0) return false;
+  let migratedAny = false;
+  let firstNewId = null;
+
+  const storedConfig = (() => { try { return JSON.parse(localStorage.getItem(CONFIG_KEY)); } catch { return null; } })();
+  if(storedConfig){
+    const fields = (storedConfig.fields&&storedConfig.fields.length ? storedConfig.fields : defaultFields()).map((f,i)=>normalizeField(f,i));
+    const id = await db.tableDefs.add({name:storedConfig.name||'My Table', icon:storedConfig.icon||'📋', color:storedConfig.color||'Lime', fields, createdAt:Date.now()});
+    const orphanRecords = (await db.records.toArray()).filter(r=>r.tableId==null);
+    if(orphanRecords.length) await db.records.bulkPut(orphanRecords.map(r=>({...r, tableId:id})));
+    localStorage.removeItem(CONFIG_KEY);
+    firstNewId = id;
+    migratedAny = true;
+  }
+
+  const oldVaults = await db.vaults.toArray();
+  if(oldVaults.length){
+    oldVaults.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+    for(const v of oldVaults){
+      const fields = (v.fields&&v.fields.length ? v.fields : defaultFields()).map((f,i)=>normalizeField(f,i));
+      const id = await db.tableDefs.add({name:v.name||'My Table', icon:v.icon||'📋', color:v.color||'Lime', fields, createdAt:v.createdAt||Date.now()});
+      const oldEntries = await db.entries.where('tableId').equals(v.id).toArray();
+      if(oldEntries.length){
+        await db.records.bulkAdd(oldEntries.map(e=>({data:e.data||{}, tableId:id, createdAt:e.createdAt||Date.now()})));
+      }
+      if(firstNewId===null) firstNewId = id;
+      migratedAny = true;
+    }
+  }
+
+  if(!migratedAny){
+    firstNewId = await db.tableDefs.add({...defaultConfig(), createdAt:Date.now()});
+  }
+  if(!localStorage.getItem(CURRENT_TABLE_KEY) && firstNewId!==null){
+    localStorage.setItem(CURRENT_TABLE_KEY, String(firstNewId));
+  }
+  return migratedAny;
 }
 
 /* ── TABLE RENDER ── */
@@ -306,7 +394,7 @@ function saveSettings(){
 }
 function confirmClearRecords(){
   if(!confirm('Delete all records in this table? This cannot be undone.')) return;
-  db.records.clear().then(()=>{
+  db.records.where('tableId').equals(currentTableId).delete().then(()=>{
     entries = [];
     cm('m-settings');
     renderTable();
@@ -455,9 +543,9 @@ async function saveRecord(){
     else{const el=document.querySelector(`[data-k="${f.key}"]`);data[f.key]=el?el.value:'';}
   });
   if(editEntryId){await db.records.update(editEntryId,{data});toast('Updated!','success');}
-  else{await db.records.add({data,createdAt:Date.now()});toast('Record added!','success');}
+  else{await db.records.add({data,tableId:currentTableId,createdAt:Date.now()});toast('Record added!','success');}
   cm('m-record');
-  entries=await db.records.toArray();
+  entries=await db.records.where('tableId').equals(currentTableId).toArray();
   renderTable();
 }
 
@@ -569,9 +657,9 @@ async function handleBackupFile(event){
     const parsed = parseBackupJson(snapshot);
     if(!parsed){ toast('Invalid backup file','error'); return; }
     saveConfig(parsed.config);
-    await db.records.clear();
-    if(parsed.entries.length) await db.records.bulkAdd(parsed.entries);
-    entries = await db.records.toArray();
+    await db.records.where('tableId').equals(currentTableId).delete();
+    if(parsed.entries.length) await db.records.bulkAdd(parsed.entries.map(e=>({...e, tableId:currentTableId})));
+    entries = await db.records.where('tableId').equals(currentTableId).toArray();
     renderTitle();
     renderGroupingSelect();
     renderTable();
