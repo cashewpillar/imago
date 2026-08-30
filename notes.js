@@ -95,7 +95,7 @@ function saveConfig(patch){
 function renderTitle(){
   const el = document.getElementById('app-title');
   if(el) el.textContent = config.name||'';
-  document.title = 'Prompt Track';
+  document.title = 'Notes';
 }
 
 /* ── NAVIGATION: table of tables ── */
@@ -915,7 +915,7 @@ document.addEventListener('keydown',e=>{
 
 init().catch(async err => {
   if(err?.name === 'VersionError'){
-    const reset = confirm('This browser has a PromptTrack database saved at a newer schema version than this app knows how to open, so it can\'t be upgraded automatically. Reset local data and start fresh?');
+    const reset = confirm('This browser has a Notes database saved at a newer schema version than this app knows how to open, so it can\'t be upgraded automatically. Reset local data and start fresh?');
     if(reset){
       try {
         await db.delete();
