@@ -508,7 +508,10 @@ function buildRecForm(data){
     const val=data[field.key]!==undefined?data[field.key]:'';
     let inp='';
     if(field.type==='textarea'){
-      inp=`<textarea class="ftextarea" data-k="${field.key}" oninput="autoGrowTextarea(this)">${esc(String(val))}</textarea>`;
+      inp=`<div class="md-editor-container">
+        <textarea class="ftextarea" data-k="${field.key}" oninput="handleMdInput(this)" onkeydown="handleMdKeydown(event,this)" onfocus="mdSetEditing(this,true)" onblur="mdSetEditing(this,false)">${esc(String(val))}</textarea>
+        <div class="md-preview" onclick="handleMdPreviewClick(event,this)"></div>
+      </div>`;
     } else if(field.type==='boolean'){
       inp=`<div style="display:flex;gap:16px;margin-top:2px;">${['true','false'].map(bv=>`<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;"><input type="radio" name="b_${field.key}" data-k="${field.key}" value="${bv}"${String(val)===bv||(bv==='false'&&val==='')?'checked':''} style="accent-color:${c.val};">${bv==='true'?'Yes':'No'}</label>`).join('')}</div>`;
     } else if(field.type==='progress'){
@@ -529,11 +532,92 @@ function buildRecForm(data){
     return `<div class="rfrow"><div class="rflabel">${esc(field.label)}<span class="type-badge">${field.type}</span></div>${inp}</div>`;
   }).join('');
   document.getElementById('rec-form').innerHTML=fhtml;
-  document.querySelectorAll('#rec-form .ftextarea').forEach(autoGrowTextarea);
+  document.querySelectorAll('#rec-form .md-editor-container').forEach(initMdEditor);
 }
 function autoGrowTextarea(el){
   el.style.height='auto';
   el.style.height=el.scrollHeight+'px';
+}
+
+/* ── MARKDOWN TEXTAREA (preview + checkbox toggling) ── */
+function mdRenderHtml(text){
+  if(!text) return '';
+  let html = esc(text);
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  const lines = html.split('\n');
+  return lines.map((line,index)=>{
+    if(line.startsWith('### ')) return `<h3>${line.substring(4)}</h3>`;
+    if(line.startsWith('#### ')) return `<h4>${line.substring(5)}</h4>`;
+    if(line.startsWith('##### ')) return `<h5>${line.substring(6)}</h5>`;
+    if(line.startsWith('- [ ] ')) return `<div class="md-check" data-line="${index}"><input type="checkbox"> <span>${line.substring(6)}</span></div>`;
+    if(line.startsWith('- [x] ')) return `<div class="md-check is-checked" data-line="${index}"><input type="checkbox" checked> <span>${line.substring(6)}</span></div>`;
+    if(line.startsWith('- ')) return `<div class="md-bullet"><span>•</span> <span>${line.substring(2)}</span></div>`;
+    if(line.startsWith('* ')) return `<div class="md-bullet"><span>•</span> <span>${line.substring(2)}</span></div>`;
+    return line ? `<p>${line}</p>` : '<br/>';
+  }).join('');
+}
+function updateMdPreview(container){
+  const ta = container.querySelector('textarea');
+  container.querySelector('.md-preview').innerHTML = mdRenderHtml(ta.value);
+}
+function initMdEditor(container){
+  const ta = container.querySelector('textarea');
+  updateMdPreview(container);
+  container.classList.toggle('is-editing', !ta.value);
+  autoGrowTextarea(ta);
+}
+function handleMdInput(ta){
+  autoGrowTextarea(ta);
+  updateMdPreview(ta.closest('.md-editor-container'));
+}
+function mdSetEditing(ta, focused){
+  const container = ta.closest('.md-editor-container');
+  updateMdPreview(container);
+  if(focused){ container.classList.add('is-editing'); autoGrowTextarea(ta); }
+  else if(ta.value){ container.classList.remove('is-editing'); }
+}
+function handleMdKeydown(e, ta){
+  if(e.key!=='Enter') return;
+  const start=ta.selectionStart, end=ta.selectionEnd, value=ta.value;
+  const beforeCursor=value.substring(0,start);
+  const lastNewline=beforeCursor.lastIndexOf('\n');
+  const currentLine=beforeCursor.substring(lastNewline+1);
+  let prefix='';
+  if(currentLine.trimStart().startsWith('- [ ] ')) prefix='- [ ] ';
+  else if(currentLine.trimStart().startsWith('- [x] ')) prefix='- [ ] ';
+  else if(currentLine.trimStart().startsWith('- ')) prefix='- ';
+  else if(currentLine.trimStart().startsWith('* ')) prefix='* ';
+  if(!prefix) return;
+  e.preventDefault();
+  if(currentLine.trim()===prefix.trim()){
+    ta.value = value.substring(0,lastNewline+1) + value.substring(end);
+    ta.selectionStart = ta.selectionEnd = lastNewline+1;
+  } else {
+    const insertion='\n'+prefix;
+    ta.value = value.substring(0,start)+insertion+value.substring(end);
+    ta.selectionStart = ta.selectionEnd = start+insertion.length;
+  }
+  handleMdInput(ta);
+}
+function handleMdPreviewClick(e, previewEl){
+  const container = previewEl.closest('.md-editor-container');
+  const ta = container.querySelector('textarea');
+  const checkRow = e.target.closest('.md-check');
+  if(checkRow){
+    e.stopPropagation();
+    const lineIndex = parseInt(checkRow.getAttribute('data-line'));
+    const lines = ta.value.split('\n');
+    const line = lines[lineIndex];
+    if(line.startsWith('- [ ] ')) lines[lineIndex]=line.replace('- [ ] ','- [x] ');
+    else if(line.startsWith('- [x] ')) lines[lineIndex]=line.replace('- [x] ','- [ ] ');
+    ta.value = lines.join('\n');
+    updateMdPreview(container);
+    return;
+  }
+  if(e.target.closest('a')){ e.stopPropagation(); return; }
+  container.classList.add('is-editing');
+  ta.focus();
+  autoGrowTextarea(ta);
 }
 async function saveRecord(){
   const fields=config.fields;
@@ -756,7 +840,19 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape')['m-settings','m-fields','m-record'].forEach(cm);
 });
 
-init().catch(err => {
+init().catch(async err => {
+  if(err?.name === 'VersionError'){
+    const reset = confirm('This browser has a PromptTrack database saved at a newer schema version than this app knows how to open, so it can\'t be upgraded automatically. Reset local data and start fresh?');
+    if(reset){
+      try {
+        await db.delete();
+        location.reload();
+        return;
+      } catch(delErr){
+        console.error('Failed to delete stale PromptTrackDB', delErr);
+      }
+    }
+  }
   console.error('TableVault init failed', err);
   const msg = err?.message || err?.name || 'Startup failed';
   try { toast(msg, 'error'); } catch {}
