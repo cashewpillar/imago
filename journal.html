@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Journal — a journal that remembers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+
+  :root{
+    --paper: #EEEAE0;
+    --paper-raised: #F7F4EC;
+    --paper-deep: #E4DFCF;
+    --line: #DAD2BC;
+    --line-soft: #E6E0D0;
+    --ink: #2A2924;
+    --ink-soft: #746B5B;
+    --ink-faint: #A69E8C;
+    --teal: #1F4B4C;
+    --teal-dark: #143434;
+    --teal-tint: #DEE9E7;
+    --ochre: #A9762F;
+    --ochre-tint: #EFE1BE;
+    --ochre-line: #D8BC7C;
+    --brick: #9C3F36;
+    --brick-tint: #F1DAD4;
+    --radius-s: 4px;
+    --radius-m: 10px;
+    --radius-l: 16px;
+    --font-display: 'Fraunces', Georgia, serif;
+    --font-body: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+    --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+    --shadow-card: 0 1px 2px rgba(42,41,36,0.06), 0 4px 14px rgba(42,41,36,0.05);
+  }
+
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    background-image:
+      linear-gradient(var(--line-soft) 1px, transparent 1px);
+    background-size: 100% 2.1em;
+    background-position: 0 7.2em;
+  }
+
+  button{ font-family: inherit; }
+
+  .app{
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 0 0 96px 0;
+    position: relative;
+  }
+
+  /* ---------- Header ---------- */
+  header.top{
+    padding: 28px 20px 14px 20px;
+    position: relative;
+  }
+  .wordmark{
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.9rem;
+    letter-spacing: -0.01em;
+    color: var(--teal-dark);
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .wordmark .dot{
+    color: var(--ochre);
+    font-size: 1.2rem;
+  }
+  .subtitle{
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-top: 4px;
+  }
+
+  /* ---------- Tabs ---------- */
+  .tabs{
+    display: flex;
+    gap: 2px;
+    margin: 18px 20px 0 20px;
+    background: var(--paper-deep);
+    border-radius: var(--radius-m);
+    padding: 3px;
+  }
+  .tab-btn{
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 10px 8px;
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    letter-spacing: 0.02em;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .tab-btn[aria-selected="true"]{
+    background: var(--paper-raised);
+    color: var(--teal-dark);
+    box-shadow: var(--shadow-card);
+  }
+  .tab-btn .count{
+    color: var(--ink-faint);
+    font-weight: 400;
+  }
+  .tab-btn[aria-selected="true"] .count{ color: var(--ochre); }
+
+  .panel{ display: none; padding: 20px; }
+  .panel.active{ display: block; }
+
+  /* ---------- Write panel ---------- */
+  .editing-bar{
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--ochre-tint);
+    border: 1px solid var(--ochre-line);
+    border-radius: var(--radius-s);
+    padding: 8px 12px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: #6B4E1C;
+    margin-bottom: 12px;
+  }
+  .editing-bar.show{ display: flex; }
+  .editing-bar button{
+    background: none; border: none; color: var(--teal-dark);
+    text-decoration: underline; cursor: pointer; font-family: var(--font-mono); font-size: 0.75rem;
+  }
+
+  .date-label{
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 10px;
+  }
+
+  .composer-wrap{
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-l);
+    box-shadow: var(--shadow-card);
+    padding: 4px;
+  }
+  #composer{
+    min-height: 180px;
+    padding: 16px 16px 12px 16px;
+    font-family: var(--font-body);
+    font-size: 1.06rem;
+    line-height: 1.7;
+    color: var(--ink);
+    outline: none;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+  }
+  #composer:empty:before{
+    content: attr(data-placeholder);
+    color: var(--ink-faint);
+    font-style: italic;
+  }
+  .composer-hint{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px 12px 14px;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--ink-faint);
+    border-top: 1px dashed var(--line);
+    margin-top: 4px;
+  }
+  .composer-hint code{
+    background: var(--ochre-tint);
+    color: #6B4E1C;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+  }
+
+  .pill{
+    display: inline-flex;
+    align-items: center;
+    background: var(--ochre-tint);
+    border-left: 2px dashed var(--ochre-line);
+    color: #6B4E1C;
+    font-family: var(--font-mono);
+    font-size: 0.82em;
+    font-weight: 500;
+    padding: 1px 8px 1px 7px;
+    border-radius: 3px;
+    margin: 0 1px;
+    cursor: pointer;
+    user-select: none;
+    line-height: 1.5;
+  }
+  .pill:hover{ background: #E9D8A9; }
+  .pill.readonly{ cursor: default; }
+  .pill.readonly:hover{ background: var(--ochre-tint); }
+
+  .save-row{
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .btn{
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    border-radius: var(--radius-s);
+    padding: 12px 18px;
+    border: none;
+    cursor: pointer;
+    min-height: 44px;
+  }
+  .btn-primary{
+    background: var(--teal-dark);
+    color: var(--paper-raised);
+    flex: 1;
+  }
+  .btn-primary:disabled{
+    background: var(--ink-faint);
+    cursor: not-allowed;
+  }
+  .btn-primary:not(:disabled):active{ background: var(--teal); }
+  .btn-ghost{
+    background: transparent;
+    color: var(--ink-soft);
+    border: 1px solid var(--line);
+  }
+
+  .toast{
+    position: fixed;
+    left: 50%;
+    bottom: 26px;
+    transform: translateX(-50%) translateY(12px);
+    background: var(--teal-dark);
+    color: var(--paper-raised);
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    padding: 10px 18px;
+    border-radius: 999px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 40;
+    white-space: nowrap;
+  }
+  .toast.show{ opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ---------- Resurfacing ---------- */
+  .thread-block{ margin-top: 18px; }
+  .thread-heading{
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--teal);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .thread-heading:before{
+    content: "";
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--teal);
+    display: inline-block;
+  }
+  .thread-card{
+    background: var(--teal-tint);
+    border-radius: var(--radius-m);
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    border: 1px solid #C9DBD8;
+  }
+  .thread-card .tc-top{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+  .thread-card .tc-date{
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--teal-dark);
+    font-weight: 600;
+  }
+  .thread-card .tc-flag{
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    color: var(--brick);
+    background: var(--brick-tint);
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+  .thread-card .tc-snippet{
+    font-size: 0.92rem;
+    color: var(--ink);
+    line-height: 1.5;
+  }
+
+  /* ---------- Entries panel ---------- */
+  .controls-row{
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .search-input{
+    flex: 1;
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    padding: 10px 12px;
+    border-radius: var(--radius-s);
+    border: 1px solid var(--line);
+    background: var(--paper-raised);
+    color: var(--ink);
+  }
+  .search-input:focus{ outline: 2px solid var(--teal); outline-offset: 1px; }
+
+  .filter-seg{
+    display: flex;
+    background: var(--paper-deep);
+    border-radius: var(--radius-s);
+    padding: 3px;
+  }
+  .filter-seg button{
+    border: none;
+    background: transparent;
+    padding: 8px 10px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--ink-soft);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .filter-seg button[aria-selected="true"]{
+    background: var(--paper-raised);
+    color: var(--teal-dark);
+    font-weight: 600;
+  }
+
+  .table-scroll{
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-m);
+    background: var(--paper-raised);
+    box-shadow: var(--shadow-card);
+  }
+  table.entries{
+    width: 100%;
+    min-width: 460px;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+  }
+  table.entries thead th{
+    position: sticky; top: 0;
+    background: var(--paper-deep);
+    text-align: left;
+    padding: 10px 12px;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-soft);
+    cursor: pointer;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--line);
+  }
+  table.entries thead th .arrow{ color: var(--ochre); margin-left: 3px; }
+  table.entries tbody tr{
+    border-bottom: 1px solid var(--line-soft);
+    cursor: pointer;
+  }
+  table.entries tbody tr:last-child{ border-bottom: none; }
+  table.entries tbody tr:hover{ background: var(--teal-tint); }
+  table.entries tbody tr.archived-row{ opacity: 0.6; }
+  table.entries td{
+    padding: 11px 12px;
+    vertical-align: top;
+  }
+  td.col-date{
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+  td.col-snippet{ color: var(--ink); line-height: 1.4; max-width: 220px; }
+  td.col-tags{ max-width: 140px; }
+  td.col-words{
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--ink-faint);
+    text-align: right;
+  }
+  .mini-pill{
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    background: var(--ochre-tint);
+    color: #6B4E1C;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin: 1px 3px 1px 0;
+    white-space: nowrap;
+  }
+
+  .expand-row td{
+    background: #FBF9F3;
+    padding: 16px 16px 18px 16px;
+  }
+  .expand-body{
+    font-size: 0.98rem;
+    line-height: 1.7;
+    color: var(--ink);
+    margin-bottom: 12px;
+    white-space: pre-wrap;
+  }
+  .expand-meta{
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--ink-faint);
+    margin-bottom: 12px;
+  }
+  .expand-actions{
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .chip-btn{
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    padding: 7px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--paper-raised);
+    color: var(--ink-soft);
+    cursor: pointer;
+  }
+  .chip-btn.edit{ border-color: var(--teal); color: var(--teal-dark); }
+  .chip-btn.archive{ border-color: var(--ochre-line); color: #6B4E1C; }
+  .chip-btn.delete{ border-color: var(--brick); color: var(--brick); }
+
+  .history-list{
+    margin-top: 10px;
+    border-top: 1px dashed var(--line);
+    padding-top: 10px;
+  }
+  .history-item{
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+    padding: 6px 0;
+    border-bottom: 1px solid var(--line-soft);
+    white-space: pre-wrap;
+  }
+  .history-item:last-child{ border-bottom: none; }
+  .history-item .h-date{
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--ink-faint);
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  .empty-state{
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--ink-faint);
+  }
+  .empty-state .es-mark{
+    font-family: var(--font-display);
+    font-size: 2.4rem;
+    color: var(--ink-faint);
+    margin-bottom: 8px;
+  }
+  .empty-state p{ font-size: 0.9rem; max-width: 280px; margin: 0 auto; }
+
+  /* ---------- Footer / reset ---------- */
+  footer.bottom{
+    text-align: center;
+    padding: 10px 20px 30px 20px;
+  }
+  .reset-link{
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--ink-faint);
+    background: none;
+    border: none;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 8px;
+  }
+
+  /* ---------- Modal ---------- */
+  .modal-backdrop{
+    position: fixed; inset: 0;
+    background: rgba(42,41,36,0.4);
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 50;
+  }
+  .modal-backdrop.show{ display: flex; }
+  .modal-card{
+    background: var(--paper-raised);
+    width: 100%;
+    max-width: 480px;
+    border-radius: 18px 18px 0 0;
+    padding: 22px 20px 28px 20px;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.18);
+  }
+  @media (min-width: 560px){
+    .modal-backdrop{ align-items: center; }
+    .modal-card{ border-radius: var(--radius-l); }
+  }
+  .modal-card h3{
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.2rem;
+    margin: 0 0 8px 0;
+    color: var(--ink);
+  }
+  .modal-card p{
+    font-size: 0.9rem;
+    color: var(--ink-soft);
+    line-height: 1.5;
+    margin: 0 0 18px 0;
+  }
+  .modal-actions{ display: flex; gap: 10px; }
+  .modal-actions .btn{ flex: 1; }
+  .btn-danger{ background: var(--brick); color: #fff; }
+
+  @media (min-width: 480px){
+    .wordmark{ font-size: 2.1rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <header class="top">
+    <div class="wordmark">Journal<span class="dot">·</span></div>
+    <div class="subtitle">a journal that remembers what you archived</div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab-btn" id="tabBtnWrite" role="tab" aria-selected="true">Write</button>
+    <button class="tab-btn" id="tabBtnEntries" role="tab" aria-selected="false">Entries <span class="count" id="entriesCount"></span></button>
+  </nav>
+
+  <!-- WRITE PANEL -->
+  <section class="panel active" id="panelWrite">
+
+    <div class="editing-bar" id="editingBar">
+      <span>Editing entry from <b id="editingDate"></b></span>
+      <button id="cancelEdit">cancel</button>
+    </div>
+
+    <div class="date-label" id="todayLabel"></div>
+
+    <div class="composer-wrap">
+      <div id="composer" contenteditable="true" data-placeholder="What's on your mind? Type a word and wrap it like [ this ] to mark it for later."></div>
+      <div class="composer-hint">Type <code>[word]</code> to make a pill — tap a pill to edit it again.</div>
+    </div>
+
+    <div class="save-row">
+      <button class="btn btn-primary" id="saveBtn" disabled>Save entry</button>
+    </div>
+
+    <div id="onThisDayBlock"></div>
+    <div id="threadBlock"></div>
+
+  </section>
+
+  <!-- ENTRIES PANEL -->
+  <section class="panel" id="panelEntries">
+
+    <div class="controls-row">
+      <input type="text" class="search-input" id="searchInput" placeholder="Search entries or tags…">
+      <div class="filter-seg" role="tablist">
+        <button data-filter="active" aria-selected="true">Active</button>
+        <button data-filter="archived" aria-selected="false">Archived</button>
+        <button data-filter="all" aria-selected="false">All</button>
+      </div>
+    </div>
+
+    <div id="tableWrap"></div>
+
+  </section>
+
+  <footer class="bottom">
+    <button class="reset-link" id="resetBtn">Clear all local data</button>
+  </footer>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal-card">
+    <h3 id="modalTitle">Are you sure?</h3>
+    <p id="modalBody"></p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="modalCancel">Cancel</button>
+      <button class="btn btn-danger" id="modalConfirm">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+
+  var STORAGE_KEY = 'journal_entries_v1';
+
+  /* ---------------- data layer ---------------- */
+  function loadEntries(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    }catch(e){ return []; }
+  }
+  function saveEntries(list){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  }
+  var entries = loadEntries();
+
+  function uid(){
+    return 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  }
+
+  /* ---------------- utils ---------------- */
+  function escapeHtml(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function fmtDate(ts){
+    var d = new Date(ts);
+    return d.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric', year:'numeric' });
+  }
+  function fmtDateTime(ts){
+    var d = new Date(ts);
+    return d.toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }) + ' · ' +
+           d.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' });
+  }
+  function wordCount(raw){
+    var stripped = raw.replace(/\[([^\[\]]+)\]/g, '$1');
+    var t = stripped.trim();
+    return t.length ? t.split(/\s+/).length : 0;
+  }
+  function rawToSnippet(raw, len){
+    var stripped = raw.replace(/\[([^\[\]]+)\]/g, '$1').replace(/\s+/g,' ').trim();
+    if (stripped.length > len) stripped = stripped.slice(0, len).trim() + '…';
+    return stripped;
+  }
+  function rawToHtml(raw){
+    var esc = escapeHtml(raw);
+    return esc.replace(/\[([^\[\]]+)\]/g, function(m, tag){
+      return '<span class="pill readonly">' + escapeHtml(tag.trim()) + '</span>';
+    });
+  }
+  function extractTags(raw){
+    var out = [];
+    var seen = {};
+    var re = /\[([^\[\]]+)\]/g, m;
+    while ((m = re.exec(raw))){
+      var t = m[1].trim().toLowerCase();
+      if (t && !seen[t]){ seen[t]=true; out.push(t); }
+    }
+    return out;
+  }
+
+  function toast(msg){
+    var el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function(){ el.classList.remove('show'); }, 1800);
+  }
+
+  /* ---------------- modal (delete / reset confirm) ---------------- */
+  var modalBackdrop = document.getElementById('modalBackdrop');
+  var modalTitle = document.getElementById('modalTitle');
+  var modalBody = document.getElementById('modalBody');
+  var modalConfirm = document.getElementById('modalConfirm');
+  var modalCancel = document.getElementById('modalCancel');
+  var pendingConfirm = null;
+
+  function askConfirm(title, body, onConfirm){
+    modalTitle.textContent = title;
+    modalBody.textContent = body;
+    pendingConfirm = onConfirm;
+    modalBackdrop.classList.add('show');
+  }
+  modalCancel.addEventListener('click', function(){ modalBackdrop.classList.remove('show'); pendingConfirm = null; });
+  modalBackdrop.addEventListener('click', function(e){ if (e.target === modalBackdrop){ modalBackdrop.classList.remove('show'); pendingConfirm = null; } });
+  modalConfirm.addEventListener('click', function(){
+    if (pendingConfirm) pendingConfirm();
+    modalBackdrop.classList.remove('show');
+    pendingConfirm = null;
+  });
+
+  /* ---------------- tabs ---------------- */
+  var tabBtnWrite = document.getElementById('tabBtnWrite');
+  var tabBtnEntries = document.getElementById('tabBtnEntries');
+  var panelWrite = document.getElementById('panelWrite');
+  var panelEntries = document.getElementById('panelEntries');
+
+  function showTab(name){
+    var isWrite = name === 'write';
+    panelWrite.classList.toggle('active', isWrite);
+    panelEntries.classList.toggle('active', !isWrite);
+    tabBtnWrite.setAttribute('aria-selected', isWrite);
+    tabBtnEntries.setAttribute('aria-selected', !isWrite);
+    if (!isWrite) renderTable();
+  }
+  tabBtnWrite.addEventListener('click', function(){ showTab('write'); });
+  tabBtnEntries.addEventListener('click', function(){ showTab('entries'); });
+
+  /* ---------------- composer / pills ---------------- */
+  var composer = document.getElementById('composer');
+  var saveBtn = document.getElementById('saveBtn');
+  var editingBar = document.getElementById('editingBar');
+  var editingDate = document.getElementById('editingDate');
+  var cancelEdit = document.getElementById('cancelEdit');
+  var editingId = null;
+
+  document.getElementById('todayLabel').textContent = fmtDate(Date.now());
+
+  function composerModel(){
+    // walk children, build raw text with [tag] markup + tag list
+    var raw = '';
+    var tags = [];
+    var seen = {};
+    composer.childNodes.forEach(function(node){
+      if (node.nodeType === Node.TEXT_NODE){
+        raw += node.textContent;
+      } else if (node.nodeType === Node.ELEMENT_NODE){
+        if (node.classList && node.classList.contains('pill')){
+          var t = (node.dataset.tag || node.textContent).trim();
+          raw += '[' + t + ']';
+          var key = t.toLowerCase();
+          if (t && !seen[key]){ seen[key]=true; tags.push(key); }
+        } else if (node.tagName === 'BR'){
+          raw += '\n';
+        } else {
+          raw += node.textContent;
+        }
+      }
+    });
+    return { raw: raw, tags: tags };
+  }
+
+  function updateSaveState(){
+    var m = composerModel();
+    saveBtn.disabled = m.raw.trim().length === 0;
+  }
+
+  function tryConvertPill(){
+    var sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    var range = sel.getRangeAt(0);
+    if (!range.collapsed) return;
+    var node = range.startContainer;
+    if (node.nodeType !== Node.TEXT_NODE) return;
+    var offset = range.startOffset;
+    var text = node.textContent;
+    if (text[offset-1] !== ']') return;
+
+    // scan backward for matching unescaped '['
+    var openIdx = -1;
+    for (var i = offset - 2; i >= 0; i--){
+      if (text[i] === ']') break; // nested, bail
+      if (text[i] === '['){ openIdx = i; break; }
+    }
+    if (openIdx === -1) return;
+
+    var tagText = text.slice(openIdx + 1, offset - 1).trim();
+    if (!tagText) return;
+
+    var before = text.slice(0, openIdx);
+    var after = text.slice(offset);
+
+    var pill = document.createElement('span');
+    pill.className = 'pill';
+    pill.contentEditable = 'false';
+    pill.dataset.tag = tagText;
+    pill.textContent = tagText;
+
+    var parent = node.parentNode;
+    var afterNode = document.createTextNode(after.length ? after : '\u200b');
+    var beforeNode = document.createTextNode(before);
+
+    parent.replaceChild(afterNode, node);
+    parent.insertBefore(pill, afterNode);
+    parent.insertBefore(beforeNode, pill);
+
+    // place cursor right after pill / at start of afterNode
+    var newRange = document.createRange();
+    newRange.setStart(afterNode, 0);
+    newRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+  }
+
+  composer.addEventListener('input', function(e){
+    if (e.data === ']') tryConvertPill();
+    updateSaveState();
+    renderResurfacing();
+  });
+
+  composer.addEventListener('click', function(e){
+    var pill = e.target.closest && e.target.closest('.pill');
+    if (!pill || !composer.contains(pill)) return;
+    // convert pill back to editable [tag] text, selected for quick retyping
+    var tagText = pill.dataset.tag || pill.textContent;
+    var textNode = document.createTextNode('[' + tagText + ']');
+    pill.parentNode.replaceChild(textNode, pill);
+
+    var range = document.createRange();
+    range.setStart(textNode, 1);
+    range.setEnd(textNode, 1 + tagText.length);
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    composer.focus();
+    updateSaveState();
+  });
+
+  function clearComposer(){
+    composer.innerHTML = '';
+    editingId = null;
+    editingBar.classList.remove('show');
+    updateSaveState();
+    renderResurfacing();
+  }
+
+  function loadRawIntoComposer(raw){
+    composer.innerHTML = '';
+    var parts = raw.split(/(\[[^\[\]]+\])/g);
+    parts.forEach(function(part){
+      if (!part) return;
+      var m = part.match(/^\[([^\[\]]+)\]$/);
+      if (m){
+        var pill = document.createElement('span');
+        pill.className = 'pill';
+        pill.contentEditable = 'false';
+        pill.dataset.tag = m[1].trim();
+        pill.textContent = m[1].trim();
+        composer.appendChild(pill);
+      } else {
+        composer.appendChild(document.createTextNode(part));
+      }
+    });
+    updateSaveState();
+  }
+
+  cancelEdit.addEventListener('click', function(){
+    clearComposer();
+  });
+
+  saveBtn.addEventListener('click', function(){
+    var m = composerModel();
+    if (!m.raw.trim()) return;
+    var now = Date.now();
+
+    if (editingId){
+      var entry = entries.find(function(e){ return e.id === editingId; });
+      if (entry){
+        entry.history = entry.history || [];
+        entry.history.unshift({ text: entry.text, savedAt: entry.updatedAt || entry.createdAt });
+        entry.text = m.raw;
+        entry.tags = m.tags;
+        entry.updatedAt = now;
+      }
+      toast('Entry updated');
+    } else {
+      entries.unshift({
+        id: uid(),
+        createdAt: now,
+        updatedAt: now,
+        text: m.raw,
+        tags: m.tags,
+        status: 'active',
+        history: []
+      });
+      toast('Saved to today');
+    }
+    saveEntries(entries);
+    clearComposer();
+    refreshCounts();
+  });
+
+  /* ---------------- resurfacing ---------------- */
+  var threadBlock = document.getElementById('threadBlock');
+  var onThisDayBlock = document.getElementById('onThisDayBlock');
+  var resurfaceDebounce = null;
+
+  function renderOnThisDay(){
+    var today = new Date();
+    var matches = entries.filter(function(e){
+      if (editingId && e.id === editingId) return false;
+      var d = new Date(e.createdAt);
+      return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() !== today.getFullYear();
+    }).sort(function(a,b){ return b.createdAt - a.createdAt; }).slice(0,2);
+
+    if (!matches.length){ onThisDayBlock.innerHTML = ''; return; }
+
+    var html = '<div class="thread-block"><div class="thread-heading">On this day</div>';
+    matches.forEach(function(e){
+      html += '<div class="thread-card" data-open="' + e.id + '">' +
+        '<div class="tc-top"><span class="tc-date">' + fmtDate(e.createdAt) + '</span>' +
+        (e.status === 'archived' ? '<span class="tc-flag">archived</span>' : '') + '</div>' +
+        '<div class="tc-snippet">' + escapeHtml(rawToSnippet(e.text, 110)) + '</div></div>';
+    });
+    html += '</div>';
+    onThisDayBlock.innerHTML = html;
+  }
+
+  function renderResurfacing(){
+    clearTimeout(resurfaceDebounce);
+    resurfaceDebounce = setTimeout(function(){
+      var m = composerModel();
+      if (!m.tags.length){ threadBlock.innerHTML = ''; return; }
+      var matches = entries.filter(function(e){
+        if (editingId && e.id === editingId) return false;
+        return e.tags.some(function(t){ return m.tags.indexOf(t) !== -1; });
+      }).sort(function(a,b){ return b.updatedAt - a.updatedAt; }).slice(0,3);
+
+      if (!matches.length){ threadBlock.innerHTML = ''; return; }
+
+      var html = '<div class="thread-block"><div class="thread-heading">Threads from before</div>';
+      matches.forEach(function(e){
+        var shared = e.tags.filter(function(t){ return m.tags.indexOf(t) !== -1; });
+        html += '<div class="thread-card" data-open="' + e.id + '">' +
+          '<div class="tc-top"><span class="tc-date">' + fmtDate(e.createdAt) + '</span>' +
+          (e.status === 'archived' ? '<span class="tc-flag">archived — still relevant?</span>' : '') + '</div>' +
+          '<div class="tc-snippet">' + escapeHtml(rawToSnippet(e.text, 110)) + '</div>' +
+          '<div style="margin-top:6px;">' + shared.map(function(t){ return '<span class="mini-pill">' + escapeHtml(t) + '</span>'; }).join('') + '</div>' +
+          '</div>';
+      });
+      html += '</div>';
+      threadBlock.innerHTML = html;
+    }, 250);
+  }
+
+  document.addEventListener('click', function(e){
+    var card = e.target.closest && e.target.closest('.thread-card');
+    if (!card) return;
+    var id = card.dataset.open;
+    showTab('entries');
+    setFilter('all');
+    setTimeout(function(){ openRowFor(id); }, 30);
+  });
+
+  /* ---------------- entries table ---------------- */
+  var tableWrap = document.getElementById('tableWrap');
+  var searchInput = document.getElementById('searchInput');
+  var filterSeg = document.querySelector('.filter-seg');
+  var currentFilter = 'active';
+  var sortKey = 'date';
+  var sortDir = 'desc';
+  var expandedId = null;
+
+  function setFilter(f){
+    currentFilter = f;
+    filterSeg.querySelectorAll('button').forEach(function(b){
+      b.setAttribute('aria-selected', b.dataset.filter === f);
+    });
+    renderTable();
+  }
+  filterSeg.querySelectorAll('button').forEach(function(b){
+    b.addEventListener('click', function(){ setFilter(b.dataset.filter); });
+  });
+  searchInput.addEventListener('input', renderTable);
+
+  function getFilteredSorted(){
+    var q = searchInput.value.trim().toLowerCase();
+    var list = entries.filter(function(e){
+      if (currentFilter === 'active' && e.status !== 'active') return false;
+      if (currentFilter === 'archived' && e.status !== 'archived') return false;
+      if (q){
+        var hay = (e.text + ' ' + e.tags.join(' ')).toLowerCase();
+        if (hay.indexOf(q) === -1) return false;
+      }
+      return true;
+    });
+    list.sort(function(a,b){
+      var v;
+      if (sortKey === 'date') v = a.createdAt - b.createdAt;
+      else if (sortKey === 'words') v = wordCount(a.text) - wordCount(b.text);
+      else v = 0;
+      return sortDir === 'asc' ? v : -v;
+    });
+    return list;
+  }
+
+  function arrow(key){
+    if (sortKey !== key) return '';
+    return '<span class="arrow">' + (sortDir === 'asc' ? '↑' : '↓') + '</span>';
+  }
+
+  function openRowFor(id){
+    expandedId = (expandedId === id) ? null : id;
+    renderTable();
+    if (expandedId === id){
+      setTimeout(function(){
+        var row = document.querySelector('[data-expand-of="' + id + '"]');
+        if (row) row.scrollIntoView({ behavior:'smooth', block:'center' });
+      }, 30);
+    }
+  }
+
+  function renderExpandRow(e){
+    var historyHtml = '';
+    if (e.history && e.history.length){
+      historyHtml = '<div class="history-list"><div class="expand-meta">Previous versions (' + e.history.length + ')</div>' +
+        e.history.map(function(h){
+          return '<div class="history-item"><span class="h-date">' + fmtDateTime(h.savedAt) + '</span>' + escapeHtml(rawToSnippet(h.text, 160)) + '</div>';
+        }).join('') + '</div>';
+    }
+    return '<tr class="expand-row" data-expand-of="' + e.id + '"><td colspan="4">' +
+      '<div class="expand-body">' + rawToHtml(e.text) + '</div>' +
+      '<div class="expand-meta">Created ' + fmtDateTime(e.createdAt) + (e.updatedAt !== e.createdAt ? ' · edited ' + fmtDateTime(e.updatedAt) : '') + '</div>' +
+      '<div class="expand-actions">' +
+        '<button class="chip-btn edit" data-act="edit" data-id="' + e.id + '">Edit</button>' +
+        '<button class="chip-btn archive" data-act="toggle-archive" data-id="' + e.id + '">' + (e.status === 'archived' ? 'Restore' : 'Archive') + '</button>' +
+        '<button class="chip-btn delete" data-act="delete" data-id="' + e.id + '">Delete</button>' +
+      '</div>' +
+      historyHtml +
+      '</td></tr>';
+  }
+
+  function renderTable(){
+    var list = getFilteredSorted();
+    document.getElementById('entriesCount').textContent = entries.length ? '· ' + entries.length : '';
+
+    if (!entries.length){
+      tableWrap.innerHTML = '<div class="empty-state"><div class="es-mark">＊</div><p>No entries yet — write your first one in the Write tab. It\'ll wait here for you.</p></div>';
+      return;
+    }
+    if (!list.length){
+      tableWrap.innerHTML = '<div class="empty-state"><div class="es-mark">…</div><p>Nothing matches here.</p></div>';
+      return;
+    }
+
+    var rows = list.map(function(e){
+      var tagsHtml = e.tags.slice(0,3).map(function(t){ return '<span class="mini-pill">' + escapeHtml(t) + '</span>'; }).join('');
+      var rowHtml = '<tr class="' + (e.status === 'archived' ? 'archived-row' : '') + '" data-row="' + e.id + '">' +
+        '<td class="col-date">' + fmtDate(e.createdAt) + '</td>' +
+        '<td class="col-snippet">' + escapeHtml(rawToSnippet(e.text, 70)) + '</td>' +
+        '<td class="col-tags">' + tagsHtml + '</td>' +
+        '<td class="col-words">' + wordCount(e.text) + '</td>' +
+        '</tr>';
+      if (expandedId === e.id) rowHtml += renderExpandRow(e);
+      return rowHtml;
+    }).join('');
+
+    tableWrap.innerHTML =
+      '<div class="table-scroll"><table class="entries"><thead><tr>' +
+      '<th data-sort="date">Date' + arrow('date') + '</th>' +
+      '<th>Entry</th>' +
+      '<th>Tags</th>' +
+      '<th data-sort="words">Words' + arrow('words') + '</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+
+  tableWrap.addEventListener('click', function(e){
+    var th = e.target.closest('th[data-sort]');
+    if (th){
+      var key = th.dataset.sort;
+      if (sortKey === key) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      else { sortKey = key; sortDir = 'desc'; }
+      renderTable();
+      return;
+    }
+    var actBtn = e.target.closest('[data-act]');
+    if (actBtn){
+      var id = actBtn.dataset.id;
+      var act = actBtn.dataset.act;
+      var entry = entries.find(function(x){ return x.id === id; });
+      if (!entry) return;
+      if (act === 'edit'){
+        editingId = id;
+        editingDate.textContent = fmtDate(entry.createdAt);
+        editingBar.classList.add('show');
+        loadRawIntoComposer(entry.text);
+        showTab('write');
+        composer.focus();
+      } else if (act === 'toggle-archive'){
+        entry.status = entry.status === 'archived' ? 'active' : 'archived';
+        saveEntries(entries);
+        toast(entry.status === 'archived' ? 'Archived — still here if it comes back' : 'Restored to active');
+        renderTable();
+      } else if (act === 'delete'){
+        askConfirm('Delete this entry?', 'This removes it completely, including its history. This can\'t be undone.', function(){
+          entries = entries.filter(function(x){ return x.id !== id; });
+          saveEntries(entries);
+          expandedId = null;
+          renderTable();
+          toast('Entry deleted');
+        });
+      }
+      return;
+    }
+    var row = e.target.closest('tr[data-row]');
+    if (row) openRowFor(row.dataset.row);
+  });
+
+  /* ---------------- reset ---------------- */
+  document.getElementById('resetBtn').addEventListener('click', function(){
+    askConfirm('Clear all local data?', 'This deletes every entry stored in this browser. There is no undo.', function(){
+      entries = [];
+      saveEntries(entries);
+      clearComposer();
+      renderTable();
+      toast('All data cleared');
+    });
+  });
+
+  function refreshCounts(){
+    document.getElementById('entriesCount').textContent = entries.length ? '· ' + entries.length : '';
+  }
+
+  /* ---------------- init ---------------- */
+  updateSaveState();
+  renderOnThisDay();
+  refreshCounts();
+
+})();
+</script>
+</body>
+</html>
