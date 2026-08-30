@@ -145,18 +145,15 @@ td.actions{width:34px;text-align:right;padding:6px 8px;}
 
 .fg{display:flex;flex-direction:column;gap:5px;}
 .flabel{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);}
-.finput,.fselect,.ftextarea{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);font-family:var(--font-b);font-size:13px;padding:8px 10px;outline:none;transition:border-color .15s;width:100%;}
+.finput,.fselect,.ftextarea{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);font-family:var(--font-b);font-size:13px;line-height:1.5;padding:8px 10px;outline:none;transition:border-color .15s;width:100%;}
 .finput:focus,.fselect:focus,.ftextarea:focus{border-color:var(--primary);}
 .ftextarea{resize:none;min-height:70px;overflow:hidden;}
-.md-editor-container{display:flex;flex-direction:column;gap:10px;width:100%;}
-.md-editor-container .md-pane{display:flex;flex-direction:column;gap:4px;min-width:0;}
-.md-editor-container .md-pane-label{font-size:9px;font-weight:600;color:var(--muted2);text-transform:uppercase;letter-spacing:.04em;}
-.md-editor-container .ftextarea{min-height:70px;}
-.md-preview{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);font-size:13px;line-height:1.5;padding:8px 10px;min-height:70px;overflow:hidden;}
-@media (min-width:640px){
-  .md-editor-container{flex-direction:row;}
-  .md-editor-container .md-pane{flex:1;}
-}
+.md-editor-container{display:grid;width:100%;}
+.md-editor-container .ftextarea,.md-editor-container .md-preview{grid-area:1/1/2/2;min-height:70px;width:100%;}
+.md-preview{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);font-size:13px;line-height:1.5;padding:8px 10px;cursor:text;z-index:1;overflow:hidden;transition:border-color .15s;}
+.md-preview:hover{border-color:var(--primary);}
+.md-editor-container.is-editing .md-preview{visibility:hidden;pointer-events:none;}
+.md-editor-container:not(.is-editing) .ftextarea{visibility:hidden;pointer-events:none;}
 .md-preview .md-tag{font-size:11px;font-weight:600;padding:1px 7px;border-radius:20px;display:inline-block;}
 .md-preview h3,.md-preview h4,.md-preview h5,.md-preview p{margin:0;padding:0;}
 .md-preview h3{font-size:16px;font-weight:700;margin-bottom:4px;}

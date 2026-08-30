@@ -509,8 +509,8 @@ function buildRecForm(data){
     let inp='';
     if(field.type==='textarea'){
       inp=`<div class="md-editor-container">
-        <div class="md-pane"><div class="md-pane-label">write</div><textarea class="ftextarea" data-k="${field.key}" oninput="handleMdInput(this)" onkeydown="handleMdKeydown(event,this)">${esc(String(val))}</textarea></div>
-        <div class="md-pane"><div class="md-pane-label">preview</div><div class="md-preview" onclick="handleMdPreviewClick(event,this)"></div></div>
+        <textarea class="ftextarea" data-k="${field.key}" oninput="handleMdInput(this)" onkeydown="handleMdKeydown(event,this)" onfocus="mdSetEditing(this,true)" onblur="mdSetEditing(this,false)">${esc(String(val))}</textarea>
+        <div class="md-preview" onclick="handleMdPreviewClick(event,this)"></div>
       </div>`;
     } else if(field.type==='boolean'){
       inp=`<div style="display:flex;gap:16px;margin-top:2px;">${['true','false'].map(bv=>`<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;"><input type="radio" name="b_${field.key}" data-k="${field.key}" value="${bv}"${String(val)===bv||(bv==='false'&&val==='')?'checked':''} style="accent-color:${c.val};">${bv==='true'?'Yes':'No'}</label>`).join('')}</div>`;
@@ -570,11 +570,18 @@ function updateMdPreview(container){
 function initMdEditor(container){
   const ta = container.querySelector('textarea');
   updateMdPreview(container);
+  container.classList.toggle('is-editing', !ta.value);
   autoGrowTextarea(ta);
 }
 function handleMdInput(ta){
   autoGrowTextarea(ta);
   updateMdPreview(ta.closest('.md-editor-container'));
+}
+function mdSetEditing(ta, focused){
+  const container = ta.closest('.md-editor-container');
+  updateMdPreview(container);
+  if(focused){ container.classList.add('is-editing'); autoGrowTextarea(ta); }
+  else if(ta.value){ container.classList.remove('is-editing'); }
 }
 function handleMdKeydown(e, ta){
   if(e.key!=='Enter') return;
@@ -615,7 +622,9 @@ function handleMdPreviewClick(e, previewEl){
     return;
   }
   if(e.target.closest('a')){ e.stopPropagation(); return; }
+  container.classList.add('is-editing');
   ta.focus();
+  autoGrowTextarea(ta);
 }
 async function saveRecord(){
   const fields=config.fields;
