@@ -539,29 +539,90 @@ function autoGrowTextarea(el){
   el.style.height=el.scrollHeight+'px';
 }
 
-/* ── MARKDOWN TEXTAREA (preview + checkbox toggling) ── */
+/* ── MARKDOWN TEXTAREA (preview + checkbox toggling + cursor mapping) ──
+   Every rendered line/token carries data-raw-start / data-prefix / data-raw
+   attributes pointing back at its exact offset in the raw textarea value, so
+   a click in the preview can place the real caret at the matching spot. */
+const MD_TOKEN_RE = /\[([^\]]+)\]\(([^)]+)\)|\*\*([^*\n]+)\*\*|__([^_\n]+)__|\+\+([^+\n]+)\+\+|\*([^*\n]+)\*|_([^_\n]+)_|(?<=^|\s)#([a-zA-Z0-9_-]+)/g;
+function tokenizeMdLine(content){
+  const tokens=[];
+  let last=0, m;
+  MD_TOKEN_RE.lastIndex=0;
+  while((m=MD_TOKEN_RE.exec(content))){
+    if(m.index>last) tokens.push({kind:'plain', text:content.slice(last,m.index), rawStart:last});
+    if(m[1]!==undefined) tokens.push({kind:'link', text:m[1], href:m[2], rawStart:m.index+1});
+    else if(m[3]!==undefined) tokens.push({kind:'bold', text:m[3], rawStart:m.index+2});
+    else if(m[4]!==undefined) tokens.push({kind:'bold', text:m[4], rawStart:m.index+2});
+    else if(m[5]!==undefined) tokens.push({kind:'underline', text:m[5], rawStart:m.index+2});
+    else if(m[6]!==undefined) tokens.push({kind:'italic', text:m[6], rawStart:m.index+1});
+    else if(m[7]!==undefined) tokens.push({kind:'italic', text:m[7], rawStart:m.index+1});
+    else if(m[8]!==undefined) tokens.push({kind:'tag', text:m[8], rawStart:m.index+1});
+    last=m.index+m[0].length;
+  }
+  if(last<content.length) tokens.push({kind:'plain', text:content.slice(last), rawStart:last});
+  return tokens;
+}
+function renderMdTokens(tokens,c){
+  return tokens.map(t=>{
+    const dr=`data-raw="${t.rawStart}" data-rawlen="${t.text.length}"`;
+    const body=esc(t.text);
+    if(t.kind==='link') return `<a href="${esc(t.href)}" target="_blank" rel="noopener noreferrer" ${dr}>${body}</a>`;
+    if(t.kind==='bold') return `<strong ${dr}>${body}</strong>`;
+    if(t.kind==='italic') return `<em ${dr}>${body}</em>`;
+    if(t.kind==='underline') return `<u ${dr}>${body}</u>`;
+    if(t.kind==='tag') return `<span class="md-tag" style="background:${c.dim};color:${c.val};" ${dr}>#${body}</span>`;
+    return `<span ${dr}>${body}</span>`;
+  }).join('');
+}
 function mdRenderHtml(text){
   if(!text) return '';
   const c = gc(config.color);
-  let html = esc(text);
-  html = html.replace(/(^|\s)#([a-zA-Z0-9_-]+)/g, (m,pre,tag)=>`${pre}<span class="md-tag" style="background:${c.dim};color:${c.val};">#${tag}</span>`);
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
-  html = html.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/__([^_\n]+)__/g, '<strong>$1</strong>');
-  html = html.replace(/\+\+([^+\n]+)\+\+/g, '<u>$1</u>');
-  html = html.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
-  html = html.replace(/_([^_\n]+)_/g, '<em>$1</em>');
-  const lines = html.split('\n');
+  const lines = text.split('\n');
+  let lineStart = 0;
   return lines.map((line,index)=>{
-    if(line.startsWith('### ')) return `<h3>${line.substring(4)}</h3>`;
-    if(line.startsWith('#### ')) return `<h4>${line.substring(5)}</h4>`;
-    if(line.startsWith('##### ')) return `<h5>${line.substring(6)}</h5>`;
-    if(line.startsWith('- [ ] ')) return `<div class="md-check" data-line="${index}"><input type="checkbox"> <span>${line.substring(6)}</span></div>`;
-    if(line.startsWith('- [x] ')) return `<div class="md-check is-checked" data-line="${index}"><input type="checkbox" checked> <span>${line.substring(6)}</span></div>`;
-    if(line.startsWith('- ')) return `<div class="md-bullet"><span>•</span> <span>${line.substring(2)}</span></div>`;
-    if(line.startsWith('* ')) return `<div class="md-bullet"><span>•</span> <span>${line.substring(2)}</span></div>`;
-    return line ? `<p>${line}</p>` : '<br/>';
+    const attrsFor = prefixLen => `data-line="${index}" data-raw-start="${lineStart}" data-prefix="${prefixLen}"`;
+    let out;
+    if(line.startsWith('##### ')){
+      out=`<h5 ${attrsFor(6)}>${renderMdTokens(tokenizeMdLine(line.substring(6)),c)}</h5>`;
+    } else if(line.startsWith('#### ')){
+      out=`<h4 ${attrsFor(5)}>${renderMdTokens(tokenizeMdLine(line.substring(5)),c)}</h4>`;
+    } else if(line.startsWith('### ')){
+      out=`<h3 ${attrsFor(4)}>${renderMdTokens(tokenizeMdLine(line.substring(4)),c)}</h3>`;
+    } else if(line.startsWith('- [ ] ')){
+      out=`<div class="md-check" ${attrsFor(6)}><input type="checkbox"> <span>${renderMdTokens(tokenizeMdLine(line.substring(6)),c)}</span></div>`;
+    } else if(line.startsWith('- [x] ')){
+      out=`<div class="md-check is-checked" ${attrsFor(6)}><input type="checkbox" checked> <span>${renderMdTokens(tokenizeMdLine(line.substring(6)),c)}</span></div>`;
+    } else if(line.startsWith('- ')||line.startsWith('* ')){
+      out=`<div class="md-bullet" ${attrsFor(2)}><span>•</span> <span>${renderMdTokens(tokenizeMdLine(line.substring(2)),c)}</span></div>`;
+    } else if(line){
+      out=`<p ${attrsFor(0)}>${renderMdTokens(tokenizeMdLine(line),c)}</p>`;
+    } else {
+      out=`<br ${attrsFor(0)}/>`;
+    }
+    lineStart += line.length+1;
+    return out;
   }).join('');
+}
+function mdRawOffsetFromPoint(x,y){
+  let node,offset;
+  if(document.caretPositionFromPoint){
+    const pos=document.caretPositionFromPoint(x,y);
+    if(!pos) return null;
+    node=pos.offsetNode; offset=pos.offset;
+  } else if(document.caretRangeFromPoint){
+    const range=document.caretRangeFromPoint(x,y);
+    if(!range) return null;
+    node=range.startContainer; offset=range.startOffset;
+  } else return null;
+  const el = node.nodeType===3 ? node.parentElement : node;
+  if(!el) return null;
+  const lineEl = el.closest('[data-line]');
+  if(!lineEl) return null;
+  const lineStart = parseInt(lineEl.getAttribute('data-raw-start'))||0;
+  const prefixLen = parseInt(lineEl.getAttribute('data-prefix'))||0;
+  const tokenEl = el.closest('[data-raw]');
+  const tokenStart = tokenEl ? parseInt(tokenEl.getAttribute('data-raw'))||0 : 0;
+  return lineStart+prefixLen+tokenStart+offset;
 }
 function updateMdPreview(container){
   const ta = container.querySelector('textarea');
@@ -622,9 +683,14 @@ function handleMdPreviewClick(e, previewEl){
     return;
   }
   if(e.target.closest('a')){ e.stopPropagation(); return; }
+  const raw = mdRawOffsetFromPoint(e.clientX, e.clientY);
   container.classList.add('is-editing');
   ta.focus();
   autoGrowTextarea(ta);
+  if(raw!=null){
+    const pos = Math.max(0, Math.min(ta.value.length, raw));
+    ta.selectionStart = ta.selectionEnd = pos;
+  }
 }
 async function saveRecord(){
   const fields=config.fields;
