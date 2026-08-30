@@ -529,7 +529,8 @@ function buildRecForm(data){
     } else {
       inp=`<input class="finput" type="text" data-k="${field.key}" value="${esc(String(val))}">`;
     }
-    return `<div class="rfrow"><div class="rflabel">${esc(field.label)}<span class="type-badge">${field.type}</span></div>${inp}</div>`;
+    const rowClass = field.type==='textarea' ? 'rfrow rfrow-full' : 'rfrow';
+    return `<div class="${rowClass}"><div class="rflabel">${esc(field.label)}<span class="type-badge">${field.type}</span></div>${inp}</div>`;
   }).join('');
   document.getElementById('rec-form').innerHTML=fhtml;
   document.querySelectorAll('#rec-form .md-editor-container').forEach(initMdEditor);

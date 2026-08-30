@@ -188,7 +188,12 @@ td.actions{width:34px;text-align:right;padding:6px 8px;}
 .btn-add-field{display:flex;align-items:center;gap:6px;padding:8px 10px;border:1px dashed var(--border2);border-radius:var(--r-sm);background:none;color:var(--muted);font-size:12px;font-family:var(--font-b);cursor:pointer;width:100%;transition:all .12s;}
 .btn-add-field:hover{border-color:var(--primary);color:var(--primary);}
 
-.rfrow{display:flex;flex-direction:column;gap:5px;}
+#rec-form{display:grid;grid-template-columns:1fr 1fr;column-gap:12px;}
+.rfrow{display:flex;flex-direction:column;gap:5px;min-width:0;}
+.rfrow-full{grid-column:1/-1;}
+@media (max-width:480px){
+  #rec-form{grid-template-columns:1fr;}
+}
 .rflabel{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:6px;}
 .type-badge{font-size:9px;font-weight:600;padding:1px 5px;border-radius:4px;background:var(--bg4);color:var(--muted2);text-transform:lowercase;letter-spacing:0;}
 
