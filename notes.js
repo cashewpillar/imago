@@ -45,6 +45,9 @@ const gc = n => {
   return { ...def, val, dim: hexToRgba(val, isLight ? 0.12 : 0.13) };
 };
 const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+// Stable cross-device row identity for sync-client.js merges — crypto.randomUUID()
+// requires a secure context, which a plain http://<lan-ip> page on a phone isn't.
+const genUid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,10);
 function viewKey(){
   return VIEW_KEY+':'+currentTableId;
 }
@@ -90,7 +93,7 @@ function loadConfigFromRow(row){
 }
 function saveConfig(patch){
   config = Object.assign({}, config, patch);
-  db.tableDefs.update(currentTableId, patch);
+  db.tableDefs.update(currentTableId, {...patch, updatedAt:Date.now()});
 }
 function renderTitle(){
   const el = document.getElementById('app-title');
@@ -122,7 +125,7 @@ async function openTable(id){
   renderTable();
 }
 async function createTable(){
-  const id = await db.tableDefs.add({...defaultConfig(), createdAt:Date.now()});
+  const id = await db.tableDefs.add({...defaultConfig(), createdAt:Date.now(), uid:genUid()});
   await openTable(id);
   toast('Table created — customize it in Settings','success');
 }
@@ -167,7 +170,7 @@ async function migrateToTablesIfNeeded(){
   const storedConfig = (() => { try { return JSON.parse(localStorage.getItem(CONFIG_KEY)); } catch { return null; } })();
   if(storedConfig){
     const fields = (storedConfig.fields&&storedConfig.fields.length ? storedConfig.fields : defaultFields()).map((f,i)=>normalizeField(f,i));
-    const id = await db.tableDefs.add({name:storedConfig.name||'My Table', icon:storedConfig.icon||'📋', color:storedConfig.color||'Lime', fields, createdAt:Date.now()});
+    const id = await db.tableDefs.add({name:storedConfig.name||'My Table', icon:storedConfig.icon||'📋', color:storedConfig.color||'Lime', fields, createdAt:Date.now(), uid:genUid()});
     const orphanRecords = (await db.records.toArray()).filter(r=>r.tableId==null);
     if(orphanRecords.length) await db.records.bulkPut(orphanRecords.map(r=>({...r, tableId:id})));
     localStorage.removeItem(CONFIG_KEY);
@@ -180,7 +183,7 @@ async function migrateToTablesIfNeeded(){
     oldVaults.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
     for(const v of oldVaults){
       const fields = (v.fields&&v.fields.length ? v.fields : defaultFields()).map((f,i)=>normalizeField(f,i));
-      const id = await db.tableDefs.add({name:v.name||'My Table', icon:v.icon||'📋', color:v.color||'Lime', fields, createdAt:v.createdAt||Date.now()});
+      const id = await db.tableDefs.add({name:v.name||'My Table', icon:v.icon||'📋', color:v.color||'Lime', fields, createdAt:v.createdAt||Date.now(), uid:genUid()});
       const oldEntries = await db.entries.where('tableId').equals(v.id).toArray();
       if(oldEntries.length){
         await db.records.bulkAdd(oldEntries.map(e=>({data:e.data||{}, tableId:id, createdAt:e.createdAt||Date.now()})));
@@ -191,7 +194,7 @@ async function migrateToTablesIfNeeded(){
   }
 
   if(!migratedAny){
-    firstNewId = await db.tableDefs.add({...defaultConfig(), createdAt:Date.now()});
+    firstNewId = await db.tableDefs.add({...defaultConfig(), createdAt:Date.now(), uid:genUid()});
   }
   if(!localStorage.getItem(CURRENT_TABLE_KEY) && firstNewId!==null){
     localStorage.setItem(CURRENT_TABLE_KEY, String(firstNewId));
@@ -400,6 +403,12 @@ function confirmClearRecords(){
     renderTable();
     toast('All records cleared','error');
   });
+}
+
+function openDeviceSync(){
+  if(typeof ImagoSync==='undefined'){ toast('Sync client failed to load','error'); return; }
+  const relayUrl = `http://${location.hostname}:8791`;
+  ImagoSync.openSyncModal({ relayUrl, db, tables:['records','tableDefs'] });
 }
 
 /* ── FIELDS ── */
@@ -700,8 +709,8 @@ async function saveRecord(){
     if(f.type==='boolean'){const el=document.querySelector(`input[name="b_${f.key}"]:checked`);data[f.key]=el?el.value==='true':false;}
     else{const el=document.querySelector(`[data-k="${f.key}"]`);data[f.key]=el?el.value:'';}
   });
-  if(editEntryId){await db.records.update(editEntryId,{data});toast('Updated!','success');}
-  else{await db.records.add({data,tableId:currentTableId,createdAt:Date.now()});toast('Record added!','success');}
+  if(editEntryId){await db.records.update(editEntryId,{data,updatedAt:Date.now()});toast('Updated!','success');}
+  else{await db.records.add({data,tableId:currentTableId,createdAt:Date.now(),updatedAt:Date.now(),uid:genUid()});toast('Record added!','success');}
   cm('m-record');
   entries=await db.records.where('tableId').equals(currentTableId).toArray();
   renderTable();

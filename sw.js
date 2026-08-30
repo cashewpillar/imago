@@ -1,4 +1,4 @@
-const CACHE_NAME = 'imago-shell-v6';
+const CACHE_NAME = 'imago-shell-v7';
 const APP_SHELL = [
   './',
   // BEGIN GENERATED HTML PAGES
@@ -33,6 +33,7 @@ const APP_SHELL = [
   './scripts/finance-charts.js',
   './imago-export.js',
   './pwa-register.js',
+  './sync-client.js',
   './manifest.webmanifest',
   './icons/imago-icon.svg',
   './icons/imago-icon-maskable.svg',

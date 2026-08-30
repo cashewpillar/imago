@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Savings</title>
 <script src="scripts/dexie.min.js"></script>
+<script src="sync-client.js"></script>
 <script src="scripts/explore-mode.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -266,6 +267,11 @@ td.actions{text-align:right;white-space:nowrap}
         <button class="btn-flat" onclick="exportSavingsData()">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,6 3,3 13,3 13,6"/><polyline points="5,9 8,6 11,9"/><line x1="8" y1="13" x2="8" y2="6"/></svg>
           Export Savings Only
+        </button>
+        <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
+        <button class="btn-flat" onclick="openDeviceSync()">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M11.5 1.5l2.5 2.5-2.5 2.5M2 9V7a3 3 0 013-3h9M4.5 14.5L2 12l2.5-2.5M14 7v2a3 3 0 01-3 3H2"/></svg>
+          Sync Devices
         </button>
         <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
         <button class="btn-flat" onclick="clearAllDataPrompt()" style="color:var(--danger)">
@@ -1709,6 +1715,16 @@ async function doImport(reset) {
   closeModal('importModal');
   toast(reset ? 'Reset & imported.' : 'Merged.');
   render();
+}
+
+function openDeviceSync() {
+  document.getElementById('settingsDropdown').classList.remove('open');
+  if (typeof ImagoSync === 'undefined') { toast('Sync client failed to load', true); return; }
+  ImagoSync.openSyncModal({
+    relayUrl: `http://${location.hostname}:8791`,
+    db: realDb,
+    tables: ['accounts','history','logs','expenses','expenseTypes','incomes','rateChanges'],
+  });
 }
 
 async function exportData() {

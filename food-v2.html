@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="scripts/dexie.min.js"></script>
+<script src="sync-client.js"></script>
 <style>
   :root{
     --bg:#ffffff;
@@ -794,6 +795,10 @@
       <button class="io-btn" id="importBtn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 21V9m0 0l-4 4m4-4l4 4M5 3h14"/></svg>
         <span>Import data<small>Merge a JSON file — existing records are updated in place</small></span>
+      </button>
+      <button class="io-btn" id="syncBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3"/></svg>
+        <span>Sync devices<small>Merge data with another device on the same network</small></span>
       </button>
       <input type="file" accept="application/json" class="hidden-file" id="importFile">
     </div>
@@ -2360,6 +2365,13 @@
   document.getElementById('closeIoBtn').addEventListener('click', closeIo);
   document.getElementById('exportBtn').addEventListener('click', exportData);
   document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
+  document.getElementById('syncBtn').addEventListener('click', () => {
+    if(typeof ImagoSync==='undefined'){ toast('Sync client failed to load'); return; }
+    ImagoSync.openSyncModal({
+      relayUrl: `http://${location.hostname}:8791`,
+      db, tables:['items','ingredients','itemIngredients','customGrocery','purchaseHistory'],
+    });
+  });
   document.getElementById('importFile').addEventListener('change', e => {
     const file = e.target.files[0];
     if(file) importData(file);

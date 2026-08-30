@@ -302,6 +302,7 @@ td.actions{width:34px;text-align:right;padding:6px 8px;}
           <button class="btn btn-ghost" style="flex:1;" onclick="exportBackup()">Export Backup</button>
           <button class="btn btn-ghost" style="flex:1;" onclick="importBackup()">Import Backup</button>
         </div>
+        <button class="btn btn-ghost" onclick="openDeviceSync()">Sync Devices</button>
         <button class="btn btn-danger" onclick="confirmClearRecords()">Clear All Records</button>
       </div>
     </div>
@@ -353,7 +354,8 @@ td.actions{width:34px;text-align:right;padding:6px 8px;}
 <div id="toast"><div class="tdot" id="tdot"></div><span id="tmsg"></span></div>
 <input type="file" id="backup-file-input" accept=".json,application/json" style="display:none;" onchange="handleBackupFile(event)">
 
+<script src="sync-client.js"></script>
 <script src="notes.js"></script>
-  <script src="../pwa-register.js"></script>
+  <script src="pwa-register.js"></script>
 </body>
 </html>
