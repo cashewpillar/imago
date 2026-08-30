@@ -10,19 +10,27 @@ const indexPath = path.join(root, 'index.html');
 function getRootHtmlFiles() {
   return fs
     .readdirSync(root, { withFileTypes: true })
-    .filter(entry => entry.isFile() && entry.name.endsWith('.html') && entry.name !== 'index.html' && entry.name !== 'archive.html')
+    .filter(entry => entry.isFile() && entry.name.endsWith('.html') && entry.name !== 'index.html' && entry.name !== 'archive.html' && entry.name !== 'seldom.html')
     .map(entry => entry.name)
     .sort((a, b) => a.localeCompare(b));
 }
 
-function getArchiveHtmlFiles() {
-  const archiveDir = path.join(root, 'archive');
-  if (!fs.existsSync(archiveDir)) return [];
+function getFilesFromSubdir(dirName) {
+  const dir = path.join(root, dirName);
+  if (!fs.existsSync(dir)) return [];
   return fs
-    .readdirSync(archiveDir, { withFileTypes: true })
+    .readdirSync(dir, { withFileTypes: true })
     .filter(entry => entry.isFile() && entry.name.endsWith('.html'))
-    .map(entry => `archive/${entry.name}`)
+    .map(entry => `${dirName}/${entry.name}`)
     .sort((a, b) => a.localeCompare(b));
+}
+
+function getArchiveHtmlFiles() {
+  return getFilesFromSubdir('archive');
+}
+
+function getSeldomHtmlFiles() {
+  return getFilesFromSubdir('seldom');
 }
 
 function getHeadRequirementsForFile(file) {
@@ -79,11 +87,11 @@ function getHtmlTitle(content, file) {
     return match[1].trim();
   }
 
-  return file.replace(/^archive\//i, '').replace(/\.html$/i, '');
+  return file.replace(/^(archive|seldom)\//i, '').replace(/\.html$/i, '');
 }
 
 function getMetaLabel(file) {
-  return file.replace(/^archive\//i, '').replace(/\.html$/i, '').replace(/-/g, ' ');
+  return file.replace(/^(archive|seldom)\//i, '').replace(/\.html$/i, '').replace(/-/g, ' ');
 }
 
 function updateHtmlFile(file) {
@@ -137,12 +145,14 @@ function updateServiceWorker(htmlFiles) {
   }
 }
 
-function updateLaunchers(rootFiles, archiveFiles) {
+function updateLaunchers(rootFiles, archiveFiles, seldomFiles) {
   const rawIndex = fs.readFileSync(indexPath, 'utf8');
   const generatedPattern = new RegExp(
     `\\n?\\s*<!-- BEGIN GENERATED PROTOTYPE LINKS -->[\\s\\S]*?<!-- END GENERATED PROTOTYPE LINKS -->`,
     'i'
   );
+
+  const launcherPages = ['index.html', 'archive.html', 'seldom.html'];
 
   // Helper to generate the list items for a set of files
   function generateListItems(files) {
@@ -151,7 +161,7 @@ function updateLaunchers(rootFiles, archiveFiles) {
       [...withoutGenerated.matchAll(/<a\s+href="([^"]+\.html)"/gi)].map(match => match[1])
     );
 
-    const generatedFiles = files.filter(file => file !== 'index.html' && file !== 'archive.html' && !linkedFiles.has(file));
+    const generatedFiles = files.filter(file => !launcherPages.includes(file) && !linkedFiles.has(file));
     return generatedFiles.map(file => {
       const diskPath = path.join(root, file);
       const content = fs.readFileSync(diskPath, 'utf8');
@@ -169,73 +179,77 @@ function updateLaunchers(rootFiles, archiveFiles) {
     });
   }
 
+  function buildPage(items, href) {
+    const block = [
+      generatedIndexStart,
+      ...items,
+      generatedIndexEnd
+    ].join('\n');
+    const replacement = items.length ? `\n${block}\n` : '\n';
+    let next = generatedPattern.test(rawIndex)
+      ? rawIndex.replace(generatedPattern, replacement.trimEnd())
+      : rawIndex.replace(/(\s*<\/ul>)/i, `${replacement}$1`);
+
+    // Set this page's tab as active, all others inactive
+    next = next
+      .replace(/class="tab\s+active"/g, 'class="tab"')
+      .replace(new RegExp(`href="${href}"\\s+class="tab"`), `href="${href}" class="tab active"`);
+
+    return next;
+  }
+
   const rootItems = generateListItems(rootFiles);
   const archiveItems = generateListItems(archiveFiles);
+  const seldomItems = generateListItems(seldomFiles);
 
   // 1. Update index.html
-  const rootBlock = [
-    generatedIndexStart,
-    ...rootItems,
-    generatedIndexEnd
-  ].join('\n');
-  const rootReplacement = rootItems.length ? `\n${rootBlock}\n` : '\n';
-  let nextIndex = generatedPattern.test(rawIndex)
-    ? rawIndex.replace(generatedPattern, rootReplacement.trimEnd())
-    : rawIndex.replace(/(\s*<\/ul>)/i, `${rootReplacement}$1`);
-
-  // Ensure active tab class
-  nextIndex = nextIndex
-    .replace(/class="tab\s+active"/g, 'class="tab"')
-    .replace(/href="index\.html"\s+class="tab"/g, 'href="index.html" class="tab active"');
-
+  const nextIndex = buildPage(rootItems, 'index.html');
   if (nextIndex !== rawIndex) {
     fs.writeFileSync(indexPath, nextIndex);
     console.log(`Updated index.html with ${rootItems.length} active launcher links`);
   }
 
   // 2. Update/create archive.html
-  const archiveBlock = [
-    generatedIndexStart,
-    ...archiveItems,
-    generatedIndexEnd
-  ].join('\n');
-  const archiveReplacement = archiveItems.length ? `\n${archiveBlock}\n` : '\n';
-  let nextArchive = generatedPattern.test(rawIndex)
-    ? rawIndex.replace(generatedPattern, archiveReplacement.trimEnd())
-    : rawIndex.replace(/(\s*<\/ul>)/i, `${archiveReplacement}$1`);
-
-  // Set archive tab as active, index as inactive
-  nextArchive = nextArchive
-    .replace(/class="tab\s+active"/g, 'class="tab"')
-    .replace(/href="archive\.html"\s+class="tab"/g, 'href="archive.html" class="tab active"');
-
+  const nextArchive = buildPage(archiveItems, 'archive.html');
   const archivePath = path.join(root, 'archive.html');
   const rawArchive = fs.existsSync(archivePath) ? fs.readFileSync(archivePath, 'utf8') : '';
   if (nextArchive !== rawArchive) {
     fs.writeFileSync(archivePath, nextArchive);
     console.log(`Updated archive.html with ${archiveItems.length} archived launcher links`);
   }
+
+  // 3. Update/create seldom.html
+  const nextSeldom = buildPage(seldomItems, 'seldom.html');
+  const seldomPath = path.join(root, 'seldom.html');
+  const rawSeldom = fs.existsSync(seldomPath) ? fs.readFileSync(seldomPath, 'utf8') : '';
+  if (nextSeldom !== rawSeldom) {
+    fs.writeFileSync(seldomPath, nextSeldom);
+    console.log(`Updated seldom.html with ${seldomItems.length} seldom launcher links`);
+  }
 }
 
 function main() {
   const rootFiles = getRootHtmlFiles();
   const archiveFiles = getArchiveHtmlFiles();
-  const allFiles = [...rootFiles, ...archiveFiles];
+  const seldomFiles = getSeldomHtmlFiles();
+  const allFiles = [...rootFiles, ...archiveFiles, ...seldomFiles];
 
-  // Process all files for PWA injection (including index.html and archive.html)
-  const allFilesToUpdate = ['index.html', 'archive.html', ...allFiles];
+  // Process all files for PWA injection (including index.html, archive.html and seldom.html)
+  const allFilesToUpdate = ['index.html', 'archive.html', 'seldom.html', ...allFiles];
   allFilesToUpdate.forEach(file => {
     if (fs.existsSync(path.join(root, file))) {
       updateHtmlFile(file);
     }
   });
 
-  updateServiceWorker(['index.html', 'archive.html', ...allFiles]);
-  updateLaunchers(rootFiles, archiveFiles);
+  updateServiceWorker(['index.html', 'archive.html', 'seldom.html', ...allFiles]);
+  updateLaunchers(rootFiles, archiveFiles, seldomFiles);
 
   console.log('\nRegistered HTML pages:');
   console.log('Root:');
   rootFiles.forEach(file => console.log(`- ${file}`));
+  console.log('Seldom:');
+  seldomFiles.forEach(file => console.log(`- ${file}`));
   console.log('Archive:');
   archiveFiles.forEach(file => console.log(`- ${file}`));
 }
