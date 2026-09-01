@@ -254,10 +254,13 @@ select.tag.type{
     </button>
   </div>
 
-  <!-- Income vs Expenses Chart Card -->
+  <!-- Expenses Chart Card -->
   <div class="chart-card">
     <div class="chart-header">
-      <div class="chart-title">Income vs Expenses (Monthly)</div>
+      <div class="filters" id="chartViewFilters">
+        <span class="filter-chip" data-view="income-expense" onclick="changeChartView('income-expense', this)">Income vs Expenses</span>
+        <span class="filter-chip" data-view="by-type" onclick="changeChartView('by-type', this)">Expenses by Type</span>
+      </div>
     </div>
     <div id="chartWrap">
       <div class="chart-empty" id="chartEmpty">No expense or income records yet.</div>
@@ -572,6 +575,7 @@ async function seedBenchmarksIfNeeded() {
 let _editExpenseId = null;
 let _expandedExpenseRows = new Set();
 let _activeTypeFilter = localStorage.getItem('imago-expenses-active-type-filter') || 'all';
+let _chartView = localStorage.getItem('imago-expenses-chart-view') || 'income-expense';
 let _chartPeriod = localStorage.getItem('imago-expenses-chart-period') || '6M';
 let _chartTypeFilter = (() => {
   try { return JSON.parse(localStorage.getItem('imago-expenses-chart-type-filter-v2')) || ['all']; }
@@ -583,6 +587,17 @@ let _allExpenses = [];
 let _allIncomes = [];
 // Session-only memory: forgets on page close/refresh
 let _lastExpenseDefaults = null;
+
+// Auto-assigned expense type colors — deterministic (sorted by name) so a
+// given type always lands on the same color without storing one per record.
+const TYPE_PALETTE = ['#1a6b3c', '#a32d2d', '#8a6d1f', '#2d5f8a', '#6b3fa0', '#a34e8a', '#3f8a7c', '#8a5a2d'];
+const GENERAL_COLOR = '#9c9a94';
+function typeColor(typeId) {
+  if (!typeId) return GENERAL_COLOR;
+  const sorted = [..._allTypes].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const idx = sorted.findIndex(t => t.id === typeId);
+  return idx === -1 ? GENERAL_COLOR : TYPE_PALETTE[idx % TYPE_PALETTE.length];
+}
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 function uuid() {
@@ -941,6 +956,9 @@ async function render() {
       c.classList.remove('active');
     }
   });
+  document.querySelectorAll('#chartViewFilters .filter-chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.view === _chartView);
+  });
 
   await loadData();
   renderSummary();
@@ -955,9 +973,13 @@ function renderChartTypeFilter() {
   const bar = document.getElementById('chartTypeFilters');
   if (!bar) return;
 
+  const hasGeneral = _allExpenses.some(e => !e.typeId);
+
   // Validate saved filters still exist
   const validIds = new Set(_allTypes.map(t => t.id));
-  let cleanFilters = _chartTypeFilter.filter(id => id === 'all' || validIds.has(id));
+  let cleanFilters = _chartTypeFilter.filter(id =>
+    id === 'all' || validIds.has(id) || (id === '__general__' && hasGeneral)
+  );
   if (cleanFilters.length === 0) {
     cleanFilters = ['all'];
   }
@@ -965,12 +987,14 @@ function renderChartTypeFilter() {
   localStorage.setItem('imago-expenses-chart-type-filter-v2', JSON.stringify(_chartTypeFilter));
 
   const chips = [{ id: 'all', name: 'All types' }, ..._allTypes];
+  if (hasGeneral) chips.push({ id: '__general__', name: 'General' });
   bar.innerHTML = chips.map(t => {
     const isActive = _chartTypeFilter.includes(t.id);
+    const dot = t.id === 'all' ? '' : `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${typeColor(t.id === '__general__' ? null : t.id)};margin-right:5px;vertical-align:middle"></span>`;
     return `
       <span class="filter-chip ${isActive ? 'active' : ''}"
             onclick="toggleChartTypeFilter('${t.id}')">
-        ${esc(t.name)}
+        ${dot}${esc(t.name)}
       </span>
     `;
   }).join('');
@@ -1079,18 +1103,31 @@ function setChartPeriod(period, el) {
   renderChart();
 }
 
+function changeChartView(view, el) {
+  _chartView = view;
+  localStorage.setItem('imago-expenses-chart-view', view);
+  document.querySelectorAll('#chartViewFilters .filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  renderChart();
+}
+
 function renderChart() {
   const chart = document.getElementById('expenseChart');
   const empty = document.getElementById('chartEmpty');
 
   const isFiltered = !_chartTypeFilter.includes('all');
-  const selectedTypeName = !isFiltered 
-    ? 'Expenses' 
-    : _chartTypeFilter.map(id => _allTypes.find(t => t.id === id)?.name).filter(Boolean).join(', ');
 
   const filteredExpenses = !isFiltered
     ? _allExpenses
-    : _allExpenses.filter(exp => _chartTypeFilter.includes(exp.typeId));
+    : _allExpenses.filter(exp => _chartTypeFilter.includes(exp.typeId || '__general__'));
+
+  // Tally each period bucket's expense total into a byType map alongside
+  // its .expense total, so the by-type chart stays in sync automatically.
+  const addToByType = (bucket, exp) => {
+    const typeKey = exp.typeId || '__general__';
+    bucket.byType = bucket.byType || {};
+    bucket.byType[typeKey] = (bucket.byType[typeKey] || 0) + (Number(exp.amount) || 0);
+  };
 
   // Helper: total recurring income for a given YYYY-MM key (respects date ranges)
   const recurringForMonth = (monthKey) =>
@@ -1103,12 +1140,9 @@ function renderChart() {
       .reduce((s, inc) => s + (Number(inc.amount) || 0), 0);
 
   let chartData = [];
-  const titleEl = document.querySelector('.chart-card .chart-title');
 
   if (_chartPeriod === 'MONTH') {
     const now = new Date();
-    const curMonthName = now.toLocaleDateString(undefined, { month: 'short' });
-    if (titleEl) titleEl.textContent = `Income vs ${selectedTypeName} (${curMonthName} · 4 Weeks)`;
 
     const curMonth = now.getMonth() + 1; // 1-12
     const curMonthKey = `${now.getFullYear()}-${String(curMonth).padStart(2, '0')}`;
@@ -1153,15 +1187,16 @@ function renderChart() {
       if ((exp.date || '').startsWith(curMonthKey)) {
         const day = parseInt((exp.date || '').slice(8, 10)) || 1;
         const w = weeks.find(w => day >= w.startDay && day <= w.endDay);
-        if (w) w.expense += (Number(exp.amount) || 0);
+        if (w) {
+          w.expense += (Number(exp.amount) || 0);
+          addToByType(w, exp);
+        }
       }
     });
 
     chartData = weeks;
 
   } else if (_chartPeriod === 'ALL') {
-    if (titleEl) titleEl.textContent = `Income vs ${selectedTypeName} (Yearly / Lifetime)`;
-
     const yearMap = {};
 
     // Sum recurring income month-by-month within each year for accuracy
@@ -1183,6 +1218,7 @@ function renderChart() {
       const year = (exp.date || '').slice(0, 4) || new Date().getFullYear().toString();
       if (!yearMap[year]) yearMap[year] = { label: year, income: getIncomeForYear(year), expense: 0 };
       yearMap[year].expense += (Number(exp.amount) || 0);
+      addToByType(yearMap[year], exp);
     });
 
     const currentYear = new Date().getFullYear().toString();
@@ -1191,8 +1227,6 @@ function renderChart() {
     chartData = Object.keys(yearMap).sort().map(y => yearMap[y]);
 
   } else {
-    if (titleEl) titleEl.textContent = `Income vs ${selectedTypeName} (Monthly)`;
-
     const monthMap = {};
     const numMonths = _chartPeriod === '3M' ? 3 : _chartPeriod === '6M' ? 6 : 12;
     const now = new Date();
@@ -1213,23 +1247,58 @@ function renderChart() {
       const mKey = (exp.date || '').slice(0, 7);
       if (monthMap[mKey]) {
         monthMap[mKey].expense += (Number(exp.amount) || 0);
+        addToByType(monthMap[mKey], exp);
       }
     });
 
     chartData = Object.values(monthMap);
   }
 
-  const hasData = chartData.some(d => d.income > 0 || d.expense > 0);
-  if (!hasData) {
-    chart.style.display = 'none';
-    empty.style.display = 'block';
-    return;
-  }
+  if (_chartView === 'by-type') {
+    // Fixed stacking order shared by every bar — largest total-spend type at
+    // the bottom — so a given type sits at the same relative position across
+    // periods instead of shuffling based on which expense was recorded first.
+    const totalByType = {};
+    chartData.forEach(item => {
+      Object.entries(item.byType || {}).forEach(([typeId, value]) => {
+        totalByType[typeId] = (totalByType[typeId] || 0) + value;
+      });
+    });
+    const typeOrder = Object.keys(totalByType).sort((a, b) => totalByType[b] - totalByType[a]);
 
-  empty.style.display = 'none';
-  chart.style.display = 'block';
-  chart.setAttribute('type', 'bar');
-  chart.data = chartData;
+    const typeChartData = chartData.map(item => ({
+      label: item.label,
+      key: item.key,
+      segments: typeOrder.map(typeId => ({
+        id: typeId,
+        name: typeId === '__general__' ? 'General' : (_allTypes.find(t => t.id === typeId)?.name || 'Unknown'),
+        color: typeId === '__general__' ? GENERAL_COLOR : typeColor(typeId),
+        value: (item.byType || {})[typeId] || 0
+      }))
+    }));
+
+    const hasData = typeChartData.some(d => d.segments.some(s => s.value > 0));
+    if (!hasData) {
+      chart.style.display = 'none';
+      empty.style.display = 'block';
+    } else {
+      empty.style.display = 'none';
+      chart.style.display = 'block';
+      chart.setAttribute('type', 'stacked-bar');
+      chart.data = typeChartData;
+    }
+  } else {
+    const hasData = chartData.some(d => d.income > 0 || d.expense > 0);
+    if (!hasData) {
+      chart.style.display = 'none';
+      empty.style.display = 'block';
+    } else {
+      empty.style.display = 'none';
+      chart.style.display = 'block';
+      chart.setAttribute('type', 'bar');
+      chart.data = chartData;
+    }
+  }
 }
 
 

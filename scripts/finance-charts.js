@@ -232,6 +232,8 @@ class FinanceChart extends HTMLElement {
           this._renderDonutChart(data, W, H);
         } else if (this._type === 'bar') {
           this._renderBarChart(data, W, H);
+        } else if (this._type === 'stacked-bar') {
+          this._renderStackedBarChart(data, W, H);
         }
       } catch (e) {
         console.error('Chart render error:', e);
@@ -926,12 +928,122 @@ class FinanceChart extends HTMLElement {
       }
     };
 
-    const hideTooltip = () => { 
-      this.tooltip.style.display = 'none'; 
+    const hideTooltip = () => {
+      this.tooltip.style.display = 'none';
       this.canvas.style.cursor = 'default';
     };
     this.canvas.onmouseleave = hideTooltip;
     this.canvas.ontouchend = hideTooltip;
+  }
+
+  // items: [{ label, key, segments: [{ id, name, color, value }] }]
+  // One bar per item, segments stacked bottom-to-top. Hover-tooltip only —
+  // no click handling, since this chart has no drill-down.
+  _renderStackedBarChart(items, W, H) {
+    if (!Array.isArray(items) || items.length === 0) {
+      this._drawMessage('No data');
+      return;
+    }
+
+    const ctx = this.ctx;
+    const PAD = { top: 20, right: 16, bottom: 28, left: 50 };
+    const cW = W - PAD.left - PAD.right;
+    const cH = H - PAD.top - PAD.bottom;
+
+    const totals = items.map(d => (d.segments || []).reduce((s, seg) => s + (seg.value || 0), 0));
+    const maxVal = Math.max(...totals, 100);
+    const rng = maxVal * 1.15; // small headroom
+
+    // Y-axis Grid lines & labels
+    ctx.strokeStyle = '#e2e0d8';
+    ctx.lineWidth = 0.5;
+    ctx.fillStyle = '#9c9a94';
+    ctx.font = '10px system-ui';
+    ctx.textAlign = 'right';
+    for (let i = 0; i <= 4; i++) {
+      const y = PAD.top + (cH / 4) * i;
+      ctx.beginPath();
+      ctx.moveTo(PAD.left, y);
+      ctx.lineTo(W - PAD.right, y);
+      ctx.stroke();
+      ctx.fillText('₱' + this._fmtk(rng - (rng / 4) * i), PAD.left - 5, y + 3);
+    }
+
+    const count = items.length;
+    const groupW = cW / count;
+    const barWidth = Math.min(Math.max(groupW * 0.5, 14), 56);
+    const radius = 3;
+
+    const drawnBars = [];
+
+    items.forEach((item, idx) => {
+      const groupX = PAD.left + idx * groupW;
+      const midX = groupX + groupW / 2;
+      const x = midX - barWidth / 2;
+
+      // Group X-axis label
+      ctx.fillStyle = '#6b6860';
+      ctx.font = '10px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText(item.label || '', midX, H - 8);
+
+      const segments = (item.segments || []).filter(seg => (seg.value || 0) > 0);
+      let cumH = 0;
+      segments.forEach((seg, si) => {
+        const barH = (seg.value / rng) * cH;
+        const y = PAD.top + cH - cumH - barH;
+        const isTop = si === segments.length - 1;
+
+        ctx.fillStyle = seg.color || '#9c9a94';
+        ctx.beginPath();
+        if (ctx.roundRect) {
+          ctx.roundRect(x, y, barWidth, barH, isTop ? [radius, radius, 0, 0] : 0);
+        } else {
+          ctx.rect(x, y, barWidth, barH);
+        }
+        ctx.fill();
+
+        drawnBars.push({
+          x, y, w: barWidth, h: barH,
+          label: `${item.label || ''} · ${seg.name || ''}`,
+          value: seg.value,
+          color: seg.color,
+          item
+        });
+
+        cumH += barH;
+      });
+    });
+
+    const handlePointer = e => {
+      const rect = this.canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const mx = clientX - rect.left;
+      const my = clientY - rect.top;
+
+      const hovered = drawnBars.find(b => mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h);
+
+      if (hovered) {
+        this.canvas.style.cursor = 'default';
+        this.tooltip.textContent = `${hovered.label} · ₱${this._fmtk(hovered.value)}`;
+        this.tooltip.style.display = 'block';
+        this.tooltip.style.left = (rect.left + hovered.x + hovered.w / 2) + 'px';
+        const py = rect.top + hovered.y;
+        this.tooltip.style.top = (py - this.tooltip.offsetHeight - 8 < 10) ? (py + hovered.h + 10) + 'px' : (py - this.tooltip.offsetHeight - 8) + 'px';
+      } else {
+        this.tooltip.style.display = 'none';
+      }
+    };
+
+    this.canvas.onmousemove = handlePointer;
+    this.canvas.ontouchmove = handlePointer;
+    this.canvas.ontouchstart = handlePointer;
+
+    const hideTooltip = () => { this.tooltip.style.display = 'none'; };
+    this.canvas.onmouseleave = hideTooltip;
+    this.canvas.ontouchend = hideTooltip;
+    this.canvas.onclick = null;
   }
 }
 
