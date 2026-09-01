@@ -258,6 +258,7 @@ select.tag.type{
     </div>
     <div class="filters" id="chartPeriodFilters" style="margin-top:12px">
       <span class="filter-chip" onclick="setChartPeriod('MONTH', this)">4W</span>
+      <span class="filter-chip" onclick="setChartPeriod('3M', this)">3M</span>
       <span class="filter-chip" onclick="setChartPeriod('6M', this)">6M</span>
       <span class="filter-chip" onclick="setChartPeriod('1Y', this)">1Y</span>
       <span class="filter-chip" onclick="setChartPeriod('ALL', this)">ALL</span>
@@ -1007,13 +1008,20 @@ function isIncomeActiveInMonth(inc, monthKey) {
 
 // Monthly income contribution of one income record for a given YYYY-MM key.
 // Returns 0 if the income wasn't active that month.
+// Quarterly/annual incomes only land in their actual payout month(s) (per
+// payoutDays) instead of being prorated across every month — proration would
+// smear e.g. a once-a-year bonus into every month's bar.
 function incomeAmountForMonth(inc, monthKey) {
   if (!isIncomeActiveInMonth(inc, monthKey)) return 0;
   const amt = Number(inc.amount) || 0;
   if (inc.frequency === 'one-time') return 0; // handled separately
   if (inc.frequency === 'monthly')   return amt;
-  if (inc.frequency === 'quarterly') return amt / 3;
-  if (inc.frequency === 'annual')    return amt / 12;
+  if (inc.frequency === 'quarterly' || inc.frequency === 'annual') {
+    const month = parseInt(monthKey.slice(5, 7), 10);
+    const payoutMonths = (inc.payoutDays || '')
+      .split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+    return payoutMonths.includes(month) ? amt : 0;
+  }
   return amt;
 }
 
@@ -1179,7 +1187,7 @@ function renderChart() {
     if (titleEl) titleEl.textContent = `Income vs ${selectedTypeName} (Monthly)`;
 
     const monthMap = {};
-    const numMonths = _chartPeriod === '6M' ? 6 : 12;
+    const numMonths = _chartPeriod === '3M' ? 3 : _chartPeriod === '6M' ? 6 : 12;
     const now = new Date();
 
     for (let i = numMonths - 1; i >= 0; i--) {
