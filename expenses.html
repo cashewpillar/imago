@@ -6,6 +6,7 @@
 <title>Expenses</title>
 <script src="scripts/dexie.min.js"></script>
 <script src="scripts/explore-mode.js"></script>
+<script src="scripts/privacy-mask.js?v=2"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -67,6 +68,12 @@ main{max-width:940px;margin:0 auto;padding:20px 16px}
 .sum-card .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:4px}
 .sum-card .val{font-size:22px;font-weight:600;letter-spacing:-.5px}
 .sum-card .sub{font-size:11px;color:var(--text-faint);margin-top:2px}
+.mask-wrap{display:inline-flex;align-items:center;gap:5px;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.mask-val{cursor:pointer;transition:filter .15s;-webkit-touch-callout:none}
+.mask-val.is-masked{filter:blur(6px)}
+.mask-eye{background:none;border:none;padding:0;margin:0;cursor:pointer;color:var(--text-faint);display:inline-flex;align-items:center;-webkit-tap-highlight-color:transparent}
+.mask-eye:hover{color:var(--text)}
+.mask-eye svg{width:13px;height:13px}
 .col-pos{color:var(--accent)}
 .col-neg{color:var(--danger)}
 .col-warn{color:var(--warning)}
@@ -1048,7 +1055,7 @@ function renderSummary() {
   document.getElementById('summaryRow').innerHTML = `
     <div class="sum-card">
       <div class="lbl">Monthly Income</div>
-      <div class="val col-pos">₱${fmtk(monthlyIncome)}</div>
+      <div class="val col-pos">${maskedAmount('₱' + fmtk(monthlyIncome))}</div>
       <div class="sub">${activeIncomes.length} active source(s)</div>
     </div>
     <div class="sum-card">

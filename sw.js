@@ -7,6 +7,7 @@ const APP_SHELL = [
   './seldom.html',
   './expenses.html',
   './food-v2.html',
+  './journal.html',
   './notes.html',
   './performance.html',
   './savings.html',

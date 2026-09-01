@@ -6,6 +6,7 @@
 <title>Savings</title>
 <script src="scripts/dexie.min.js"></script>
 <script src="scripts/explore-mode.js"></script>
+<script src="scripts/privacy-mask.js?v=2"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -43,6 +44,12 @@ main{max-width:940px;margin:0 auto;padding:20px 16px}
 .sum-card .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:4px}
 .sum-card .val{font-size:22px;font-weight:600;letter-spacing:-.5px}
 .sum-card .sub{font-size:11px;color:var(--text-faint);margin-top:2px}
+.mask-wrap{display:inline-flex;align-items:center;gap:5px;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.mask-val{cursor:pointer;transition:filter .15s;-webkit-touch-callout:none}
+.mask-val.is-masked{filter:blur(6px)}
+.mask-eye{background:none;border:none;padding:0;margin:0;cursor:pointer;color:var(--text-faint);display:inline-flex;align-items:center;-webkit-tap-highlight-color:transparent}
+.mask-eye:hover{color:var(--text)}
+.mask-eye svg{width:13px;height:13px}
 .col-pos{color:var(--accent)}
 .col-neg{color:var(--danger)}
 .col-warn{color:var(--warning)}
@@ -995,7 +1002,7 @@ function renderSummary(accounts) {
   document.getElementById('summaryRow').innerHTML = `
     <div class="sum-card">
       <div class="lbl">Net worth</div>
-      <div class="val">₱${fmtk(total)}</div>
+      <div class="val">${maskedAmount('₱' + fmtk(total))}</div>
       <div style="margin-top:10px; padding-top:8px; border-top:1px dashed var(--border); font-family:var(--mono); font-size:10px; line-height:1.6; color:var(--text-muted);">
         <div style="display:flex; justify-content:space-between;"><span>Cash/Sav</span> <span>+₱${fmtk(cashTotal)}</span></div>
         <div style="display:flex; justify-content:space-between;"><span>Equities</span> <span>+₱${fmtk(equitiesTotal)}</span></div>
@@ -1007,7 +1014,7 @@ function renderSummary(accounts) {
     </div>
     <div class="sum-card">
       <div class="lbl">Stable Liquid</div>
-      <div class="val col-pos">₱${fmtk(cashTotal + credTotal)}</div>
+      <div class="val col-pos">${maskedAmount('₱' + fmtk(cashTotal + credTotal))}</div>
       <div style="margin-top:10px; padding-top:8px; border-top:1px dashed var(--border); font-family:var(--mono); font-size:10px; line-height:1.6; color:var(--text-muted);">
         <div style="display:flex; justify-content:space-between;"><span>Total NW</span> <span>₱${fmtk(total)}</span></div>
         <div style="display:flex; justify-content:space-between;"><span>- Illiquid</span> <span class="col-neg">-₱${fmtk(illiqOnlyTotal)}</span></div>
@@ -1019,14 +1026,14 @@ function renderSummary(accounts) {
     </div>
     <div class="sum-card">
       <div class="lbl">Liabilities</div>
-      <div class="val col-neg">₱${fmtk(Math.abs(liab))}</div>
+      <div class="val col-neg">${maskedAmount('₱' + fmtk(Math.abs(liab)))}</div>
       <div class="sub">credit / negative</div>
     </div>
     <div class="sum-card" onclick="openYieldBreakdown()" style="cursor:pointer" title="Click for breakdown">
       <div style="margin-bottom:4px;">
         <div class="lbl" style="margin-bottom:2px">Est. yield (net)</div>
       </div>
-      <div class="val col-warn">₱${fmtk(netYld)}</div>
+      <div class="val col-warn">${maskedAmount('₱' + fmtk(netYld))}</div>
       <label style="font-size:9px; color:var(--text-faint); display:inline-flex; align-items:center; gap:3px; cursor:pointer;" onclick="event.stopPropagation()">
         <input type="checkbox" ${_excludeTD ? 'checked' : ''} onchange="_excludeTD=this.checked; render();" style="width:10px; height:10px;">
           Excl. TD
