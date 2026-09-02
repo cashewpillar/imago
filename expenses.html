@@ -281,7 +281,6 @@ select.tag.type{
     <div class="section-title">Expenses Log</div>
     <div class="filters" id="typeFilterBar"></div>
   </div>
-  <div class="filters" id="dateRangeFilterBar" style="display:none;margin-bottom:10px"></div>
 
   <div class="table-container">
     <table>
@@ -550,7 +549,10 @@ async function seedBenchmarksIfNeeded() {
 // ── State ─────────────────────────────────────────────────────────────────────
 let _editExpenseId = null;
 let _expandedExpenseRows = new Set();
-let _activeTypeFilter = localStorage.getItem('imago-expenses-active-type-filter') || 'all';
+let _activeTypeFilter = (() => {
+  try { return JSON.parse(localStorage.getItem('imago-expenses-active-type-filter-v2')) || ['all']; }
+  catch { return ['all']; }
+})();
 // Transient drill-down filter set by clicking a chart bar — not persisted,
 // so the table doesn't stay filtered on an unrelated visit later.
 let _activeDateRange = null; // { start: 'YYYY-MM-DD', end: 'YYYY-MM-DD', label }
@@ -944,7 +946,6 @@ async function render() {
   renderChartTypeFilter();
   renderChart();
   renderFilterBar();
-  renderDateRangeFilterBar();
   renderTable();
   populateDropdowns();
 }
@@ -1289,62 +1290,56 @@ function renderFilterBar() {
   if (hasGeneral) types.push({ id: '__general__', name: 'General' });
   types.push(..._allTypes);
 
-  if (!types.some(t => t.id === _activeTypeFilter)) {
-    _activeTypeFilter = 'all';
-    localStorage.setItem('imago-expenses-active-type-filter', 'all');
-  }
+  const validIds = new Set(types.map(t => t.id));
+  let cleanFilters = _activeTypeFilter.filter(id => validIds.has(id));
+  if (cleanFilters.length === 0) cleanFilters = ['all'];
+  _activeTypeFilter = cleanFilters;
+  localStorage.setItem('imago-expenses-active-type-filter-v2', JSON.stringify(_activeTypeFilter));
+
+  const dateChip = _activeDateRange ? `
+    <span class="filter-chip active" onclick="clearDateRangeFilter()">
+      ${esc(_activeDateRange.label)} ✕
+    </span>
+  ` : '';
 
   bar.innerHTML = types.map(t => `
-    <span class="filter-chip ${_activeTypeFilter === t.id ? 'active' : ''}" onclick="setTypeFilter('${t.id}')">
+    <span class="filter-chip ${_activeTypeFilter.includes(t.id) ? 'active' : ''}" onclick="toggleTypeFilter('${t.id}')">
       ${esc(t.name)}
     </span>
-  `).join('');
+  `).join('') + dateChip;
 }
 
-function setTypeFilter(typeId) {
-  _activeTypeFilter = typeId;
-  localStorage.setItem('imago-expenses-active-type-filter', typeId);
+function toggleTypeFilter(typeId) {
+  if (typeId === 'all') {
+    _activeTypeFilter = ['all'];
+  } else {
+    _activeTypeFilter = _activeTypeFilter.filter(id => id !== 'all');
+    if (_activeTypeFilter.includes(typeId)) {
+      _activeTypeFilter = _activeTypeFilter.filter(id => id !== typeId);
+    } else {
+      _activeTypeFilter.push(typeId);
+    }
+    if (_activeTypeFilter.length === 0) _activeTypeFilter = ['all'];
+  }
+  localStorage.setItem('imago-expenses-active-type-filter-v2', JSON.stringify(_activeTypeFilter));
   renderFilterBar();
   renderTable();
 }
 
-function renderDateRangeFilterBar() {
-  const bar = document.getElementById('dateRangeFilterBar');
-  if (!bar) return;
-
-  if (!_activeDateRange) {
-    bar.style.display = 'none';
-    bar.innerHTML = '';
-    return;
-  }
-
-  bar.style.display = 'flex';
-  bar.innerHTML = `
-    <span class="filter-chip active" onclick="clearDateRangeFilter()">
-      ${esc(_activeDateRange.label)} ✕
-    </span>
-  `;
-}
-
 function clearDateRangeFilter() {
   _activeDateRange = null;
-  renderDateRangeFilterBar();
+  renderFilterBar();
   renderTable();
 }
 
 function renderTable() {
   const tbody = document.getElementById('expensesTbody');
-  let filtered = _activeTypeFilter === 'all'
+  let filtered = _activeTypeFilter.includes('all')
     ? _allExpenses
-    : _activeTypeFilter === '__general__'
-      ? _allExpenses.filter(e => !e.typeId)
-      : _allExpenses.filter(e => e.typeId === _activeTypeFilter);
+    : _allExpenses.filter(e => _activeTypeFilter.includes(e.typeId || '__general__'));
 
   if (_activeDateRange) {
     filtered = filtered.filter(e => e.date >= _activeDateRange.start && e.date <= _activeDateRange.end);
-    if (_activeDateRange.typeIds) {
-      filtered = filtered.filter(e => _activeDateRange.typeIds.includes(e.typeId || '__general__'));
-    }
   }
 
   if (filtered.length === 0) {
@@ -1891,19 +1886,14 @@ document.getElementById('expenseChart').addEventListener('bar-click', e => {
     rangeLabel = new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
   }
 
-  // Carry over the chart's own type-filter selection so the table drill-down
-  // matches what the chart is actually showing, not just its time period.
-  const isTypeFiltered = !_chartTypeFilter.includes('all');
-  const typeIds = isTypeFiltered ? [..._chartTypeFilter] : null;
-  const typeLabel = isTypeFiltered
-    ? _chartTypeFilter.map(id => id === '__general__' ? 'General' : _allTypes.find(t => t.id === id)?.name).filter(Boolean).join(', ')
-    : null;
+  _activeDateRange = { start, end, label: rangeLabel };
 
-  _activeDateRange = {
-    start, end, typeIds,
-    label: typeLabel ? `${rangeLabel} · ${typeLabel}` : rangeLabel
-  };
-  renderDateRangeFilterBar();
+  // Mirror the chart's own type-filter selection onto the table's type pills,
+  // so the drill-down matches what the chart was actually showing.
+  _activeTypeFilter = [..._chartTypeFilter];
+  localStorage.setItem('imago-expenses-active-type-filter-v2', JSON.stringify(_activeTypeFilter));
+  renderFilterBar();
+
   renderTable();
 });
 
