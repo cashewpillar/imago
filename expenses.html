@@ -281,6 +281,7 @@ select.tag.type{
     <div class="section-title">Expenses Log</div>
     <div class="filters" id="typeFilterBar"></div>
   </div>
+  <div class="filters" id="dateRangeFilterBar" style="display:none;margin-bottom:10px"></div>
 
   <div class="table-container">
     <table>
@@ -457,31 +458,6 @@ select.tag.type{
     </div>
   </div>
 </div>
-<!-- Chart Drill-down Modal -->
-<div class="modal-backdrop" id="drillDownModal">
-  <div class="modal" style="width: min(640px, 95vw)">
-    <h2 id="drillDownTitle">Expenses</h2>
-    <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px" id="drillDownSubTitle"></p>
-    
-    <div style="max-height: 50vh; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--r); margin-bottom: 12px">
-      <table style="width: 100%; border-collapse: collapse;">
-        <thead>
-          <tr style="background: var(--bg); border-bottom: 1px solid var(--border)">
-            <th style="padding: 8px; text-align: left; font-size: 11px; color: var(--text-muted); text-transform: uppercase">Date</th>
-            <th style="padding: 8px; text-align: left; font-size: 11px; color: var(--text-muted); text-transform: uppercase">Expense Name</th>
-            <th style="padding: 8px; text-align: left; font-size: 11px; color: var(--text-muted); text-transform: uppercase">Type</th>
-            <th style="padding: 8px; text-align: right; font-size: 11px; color: var(--text-muted); text-transform: uppercase">Amount</th>
-          </tr>
-        </thead>
-        <tbody id="drillDownTbody"></tbody>
-      </table>
-    </div>
-
-    <div class="modal-actions">
-      <button class="btn" onclick="closeModal('drillDownModal')">Close</button>
-    </div>
-  </div>
-</div>
 
 <div class="toast" id="toast"></div>
 
@@ -575,6 +551,9 @@ async function seedBenchmarksIfNeeded() {
 let _editExpenseId = null;
 let _expandedExpenseRows = new Set();
 let _activeTypeFilter = localStorage.getItem('imago-expenses-active-type-filter') || 'all';
+// Transient drill-down filter set by clicking a chart bar — not persisted,
+// so the table doesn't stay filtered on an unrelated visit later.
+let _activeDateRange = null; // { start: 'YYYY-MM-DD', end: 'YYYY-MM-DD', label }
 let _chartView = localStorage.getItem('imago-expenses-chart-view') || 'income-expense';
 let _chartPeriod = localStorage.getItem('imago-expenses-chart-period') || '6M';
 let _chartTypeFilter = (() => {
@@ -965,6 +944,7 @@ async function render() {
   renderChartTypeFilter();
   renderChart();
   renderFilterBar();
+  renderDateRangeFilterBar();
   renderTable();
   populateDropdowns();
 }
@@ -1328,13 +1308,44 @@ function setTypeFilter(typeId) {
   renderTable();
 }
 
+function renderDateRangeFilterBar() {
+  const bar = document.getElementById('dateRangeFilterBar');
+  if (!bar) return;
+
+  if (!_activeDateRange) {
+    bar.style.display = 'none';
+    bar.innerHTML = '';
+    return;
+  }
+
+  bar.style.display = 'flex';
+  bar.innerHTML = `
+    <span class="filter-chip active" onclick="clearDateRangeFilter()">
+      ${esc(_activeDateRange.label)} ✕
+    </span>
+  `;
+}
+
+function clearDateRangeFilter() {
+  _activeDateRange = null;
+  renderDateRangeFilterBar();
+  renderTable();
+}
+
 function renderTable() {
   const tbody = document.getElementById('expensesTbody');
-  const filtered = _activeTypeFilter === 'all'
+  let filtered = _activeTypeFilter === 'all'
     ? _allExpenses
     : _activeTypeFilter === '__general__'
       ? _allExpenses.filter(e => !e.typeId)
       : _allExpenses.filter(e => e.typeId === _activeTypeFilter);
+
+  if (_activeDateRange) {
+    filtered = filtered.filter(e => e.date >= _activeDateRange.start && e.date <= _activeDateRange.end);
+    if (_activeDateRange.typeIds) {
+      filtered = filtered.filter(e => _activeDateRange.typeIds.includes(e.typeId || '__general__'));
+    }
+  }
 
   if (filtered.length === 0) {
     tbody.innerHTML = `<tr><td colspan="6" class="empty">No expenses logged yet.</td></tr>`;
@@ -1850,52 +1861,50 @@ async function deleteIncome(id) {
   renderIncomesList();
 }
 
+function lastDayOfMonth(year, month) {
+  return new Date(year, month, 0).getDate(); // month is 1-12
+}
+
 document.getElementById('expenseChart').addEventListener('bar-click', e => {
-  const { label, value, item } = e.detail;
+  const { label, item } = e.detail;
   if (!label || label.toLowerCase().includes('income')) return;
 
-  const isFiltered = !_chartTypeFilter.includes('all');
-  let filtered = _allExpenses;
-
-  if (isFiltered) {
-    filtered = filtered.filter(exp => _chartTypeFilter.includes(exp.typeId));
-  }
+  let start, end, rangeLabel;
 
   if (_chartPeriod === 'MONTH') {
     const now = new Date();
-    const curMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    filtered = filtered.filter(exp => {
-      if (!(exp.date || '').startsWith(curMonthKey)) return false;
-      const day = parseInt((exp.date || '').slice(8, 10)) || 1;
-      return day >= item.startDay && day <= item.endDay;
-    });
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    const lastDay = Math.min(item.endDay, lastDayOfMonth(year, month));
+    start = `${year}-${String(month).padStart(2, '0')}-${String(item.startDay).padStart(2, '0')}`;
+    end = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    rangeLabel = label;
   } else if (_chartPeriod === 'ALL') {
-    filtered = filtered.filter(exp => (exp.date || '').startsWith(item.label));
+    const year = item.label;
+    start = `${year}-01-01`;
+    end = `${year}-12-31`;
+    rangeLabel = year;
   } else {
-    filtered = filtered.filter(exp => (exp.date || '').startsWith(item.key));
+    const [year, month] = item.key.split('-').map(Number);
+    start = `${item.key}-01`;
+    end = `${item.key}-${String(lastDayOfMonth(year, month)).padStart(2, '0')}`;
+    rangeLabel = new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
   }
 
-  const tbody = document.getElementById('drillDownTbody');
-  const typeMap = Object.fromEntries(_allTypes.map(t => [t.id, t.name]));
-  const accMap = Object.fromEntries(_allAccounts.map(a => [a.id, a.label || a.key]));
-  
-  document.getElementById('drillDownTitle').textContent = label;
-  document.getElementById('drillDownSubTitle').textContent = `${filtered.length} expense(s) total: ₱${fmtMoney(value)}`;
+  // Carry over the chart's own type-filter selection so the table drill-down
+  // matches what the chart is actually showing, not just its time period.
+  const isTypeFiltered = !_chartTypeFilter.includes('all');
+  const typeIds = isTypeFiltered ? [..._chartTypeFilter] : null;
+  const typeLabel = isTypeFiltered
+    ? _chartTypeFilter.map(id => id === '__general__' ? 'General' : _allTypes.find(t => t.id === id)?.name).filter(Boolean).join(', ')
+    : null;
 
-  if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="4" class="empty">No expenses found for this period.</td></tr>`;
-  } else {
-    tbody.innerHTML = filtered.map(exp => `
-      <tr style="border-bottom: 1px solid var(--border)">
-        <td style="padding: 8px; font-family: var(--mono); font-size: 12px; color: var(--text-muted)">${esc(exp.date || '—')}</td>
-        <td style="padding: 8px; font-weight: 500">${esc(exp.name)}</td>
-        <td style="padding: 8px;"><span class="tag type" style="font-size: 10px">${esc(typeMap[exp.typeId] || 'General')}</span></td>
-        <td style="padding: 8px; text-align: right;" class="num col-neg">-₱${fmtMoney(exp.amount)}</td>
-      </tr>
-    `).join('');
-  }
-
-  openModal('drillDownModal');
+  _activeDateRange = {
+    start, end, typeIds,
+    label: typeLabel ? `${rangeLabel} · ${typeLabel}` : rangeLabel
+  };
+  renderDateRangeFilterBar();
+  renderTable();
 });
 
 // enterExploreMode/exitExploreMode/toggleExploreMode/adoptDemoData/refreshMode
