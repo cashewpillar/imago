@@ -16,6 +16,14 @@ html,body{height:100%}
 body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;display:flex;flex-direction:column}
 main{max-width:940px;width:100%;margin:0 auto;padding:20px 16px;flex:1;display:flex;flex-direction:column;min-height:0}
 
+.pills-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pill{padding:4px 12px;border:1px solid var(--border-strong);border-radius:99px;font-size:12px;font-family:var(--mono);cursor:pointer;background:var(--surface);color:var(--text-muted);transition:all .12s;user-select:none}
+.pill:hover{border-color:var(--text-muted)}
+.pill.active{background:#000;color:#fff;border-color:#000}
+.pill.disabled{opacity:.4;cursor:not-allowed}
+.pills-hint{font-size:11px;color:var(--text-faint)}
+
 .table-container{width:100%;flex:1;min-height:0;overflow-y:auto;border:1px solid var(--border);border-radius:var(--rl);background:var(--surface);scrollbar-width:none;-ms-overflow-style:none}
 .table-container::-webkit-scrollbar{display:none}
 table{width:100%;border-collapse:separate;border-spacing:0;text-align:left}
@@ -51,150 +59,180 @@ tr:hover td{background:#fafaf8}
 </head>
 <body>
 <main>
+<div class="pills-row">
+  <div class="pills" id="tickerPills"></div>
+  <span class="pills-hint" id="pillsHint"></span>
+</div>
 <div class="table-container">
 <table>
-  <thead>
-    <tr>
-      <th>Dimension</th>
-      <th>VWRA</th>
-      <th>IWVL</th>
-      <th>XDEW</th>
-      <th>VDVA</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Full name</td>
-      <td>Vanguard FTSE All-World UCITS ETF</td>
-      <td>iShares Edge MSCI World Value Factor UCITS ETF</td>
-      <td>Xtrackers S&amp;P 500 Equal Weight UCITS ETF</td>
-      <td>Vanguard Global Value Factor UCITS ETF</td>
-    </tr>
-    <tr>
-      <td>ISIN</td>
-      <td>IE00BK5BQT80 (Acc)</td>
-      <td>IE00BP3QZB59 (Acc)</td>
-      <td>IE00BLNMYC90 (Acc)</td>
-      <td>IE00BYYR0B57 (Acc)</td>
-    </tr>
-    <tr>
-      <td>Domicile</td>
-      <td>Ireland</td>
-      <td>Ireland</td>
-      <td>Ireland</td>
-      <td>Ireland</td>
-    </tr>
-    <tr>
-      <td>Management style</td>
-      <td>Passive, index-tracking</td>
-      <td>Passive, index-tracking</td>
-      <td>Passive, index-tracking</td>
-      <td><strong>Active</strong> (index used as reference only)</td>
-    </tr>
-    <tr>
-      <td>Strategy (in full)</td>
-      <td>Cap-weighted, holds the whole global market as-is, no tilt</td>
-      <td><strong>Value factor</strong>: screens for cheap stocks using price-to-book, price-to-forward-earnings, and enterprise-value-to-cash-flow, tracks MSCI World Enhanced Value</td>
-      <td><strong>Equal weight</strong>: every S&amp;P 500 constituent gets ~0.2% regardless of size, no valuation screen at all</td>
-      <td>Value factor, but stock selection and weighting are at the manager's discretion within that value mandate, not a fixed rules-based index</td>
-    </tr>
-    <tr>
-      <td><strong>Distributing / Accumulating</strong></td>
-      <td>Both available (VWRA = Acc, VWRD = Dist)</td>
-      <td>Both available (this ISIN = Acc; IE00BFYTYS33 = Dist)</td>
-      <td>Both available (1C = Acc share class)</td>
-      <td>Acc (confirm distributing share class exists before assuming)</td>
-    </tr>
-    <tr>
-      <td>Geographic scope — top markets<sup class="dyn" data-tip="Shifts with market movements and index rebalancing — verify current figures">*</sup></td>
-      <td>Global: ~3,800 holdings across developed + emerging markets</td>
-      <td>
-        US 49%<br>
-        Japan 19%<br>
-        UK 8%<br>
-        France 6%<br>
-        Germany 4%<br>
-        Other 13%
-      </td>
-      <td>100% United States</td>
-      <td>Global developed markets (exact split not fixed — shifts with active positioning, but typically majority-US, meaningfully less concentrated than a plain cap-weighted world index)</td>
-    </tr>
-    <tr>
-      <td>TER<sup class="dyn" data-tip="Fee levels can change — verify current figures">*</sup></td>
-      <td>0.14%</td>
-      <td>0.25%</td>
-      <td>0.15%</td>
-      <td>~0.22–0.24%</td>
-    </tr>
-    <tr>
-      <td>Top 10 holdings (%)<sup class="dyn" data-tip="Shifts with market movements and index rebalancing — verify current figures">*</sup></td>
-      <td>
-        Nvidia 4.7%<br>
-        Apple 4.3%<br>
-        Alphabet 3.8%<br>
-        Microsoft 3.2%<br>
-        Amazon 2.5%<br>
-        — top 10 ≈ 24.6% of fund
-      </td>
-      <td>
-        Micron 4.0%<br>
-        Cisco 3.7%<br>
-        Intel 2.7%<br>
-        Qualcomm 2.3%<br>
-        Verizon 2.1%<br>
-        AT&amp;T 1.9%<br>
-        Toyota 1.8%<br>
-        Comcast 1.5%<br>
-        British American Tobacco 1.4%<br>
-        Merck 1.1%<br>
-        — top 10 ≈ 22.6%
-      </td>
-      <td>~500 holdings, none above ~0.2–0.3% — top 10 ≈ 2–3%</td>
-      <td>Diversified, no single-name dominance disclosed at this level (active fund, holdings shift)</td>
-    </tr>
-    <tr>
-      <td>Sector tilt<sup class="dyn" data-tip="Shifts with market movements and index rebalancing — verify current figures">*</sup></td>
-      <td>Tech-heavy</td>
-      <td>
-        Tech 30%<br>
-        Financials 16%<br>
-        Industrials 12%<br>
-        Consumer Cyclical 9%<br>
-        Healthcare 9%<br>
-        — more balanced
-      </td>
-      <td>Naturally de-weights mega-cap tech vs. the cap-weighted S&amp;P 500</td>
-      <td>Balanced by mandate, but composition shifts over time</td>
-    </tr>
-    <tr>
-      <td>Number of holdings<sup class="dyn" data-tip="Shifts with index rebalancing — verify current figures">*</sup></td>
-      <td>~3,800</td>
-      <td>~399</td>
-      <td>~500</td>
-      <td>Not fixed (active)</td>
-    </tr>
-  </tbody>
+  <thead id="tableHead"></thead>
+  <tbody id="tableBody"></tbody>
 </table>
 </div>
 <p class="disclaimer"><sup class="dyn" data-tip="Shifts with market movements and index rebalancing — verify current figures">*</sup>Rows marked with an asterisk reflect a snapshot in time and shift with market movements and index rebalancing — verify current figures before acting on them. Data last retrieved 2026-09-04.</p>
 </main>
 <div id="tooltip" class="tooltip"></div>
 <script>
-(() => {
-  const tip = document.getElementById('tooltip');
-  document.querySelectorAll('.dyn[data-tip]').forEach(el => {
-    el.addEventListener('mouseenter', () => {
-      tip.textContent = el.dataset.tip;
-      tip.style.display = 'block';
-      const r = el.getBoundingClientRect();
-      tip.style.left = (r.right + 8) + 'px';
-      tip.style.top = r.top + 'px';
-    });
-    el.addEventListener('mouseleave', () => {
-      tip.style.display = 'none';
-    });
+const DIMENSIONS = [
+  { key: 'fullName', label: 'Full name' },
+  { key: 'isin', label: 'ISIN' },
+  { key: 'domicile', label: 'Domicile' },
+  { key: 'mgmtStyle', label: 'Management style' },
+  { key: 'strategy', label: 'Strategy (in full)' },
+  { key: 'distAcc', label: 'Distributing / Accumulating' },
+  { key: 'geo', label: 'Geographic scope — top markets', dynamic: true,
+    tip: 'Shifts with market movements and index rebalancing — verify current figures' },
+  { key: 'ter', label: 'TER', dynamic: true,
+    tip: 'Fee levels can change — verify current figures' },
+  { key: 'top10', label: 'Top 10 holdings (%)', dynamic: true,
+    tip: 'Shifts with market movements and index rebalancing — verify current figures' },
+  { key: 'sector', label: 'Sector tilt', dynamic: true,
+    tip: 'Shifts with market movements and index rebalancing — verify current figures' },
+  { key: 'numHoldings', label: 'Number of holdings', dynamic: true,
+    tip: 'Shifts with index rebalancing — verify current figures' },
+];
+
+const FUNDS = [
+  {
+    ticker: 'VWRA',
+    fullName: 'Vanguard FTSE All-World UCITS ETF',
+    isin: 'IE00BK5BQT80 (Acc)',
+    domicile: 'Ireland',
+    mgmtStyle: 'Passive, index-tracking',
+    strategy: 'Cap-weighted, holds the whole global market as-is, no tilt',
+    distAcc: 'Both available (VWRA = Acc, VWRD = Dist)',
+    geo: 'Global: ~3,800 holdings across developed + emerging markets',
+    ter: '0.14%',
+    top10: ['Nvidia 4.7%', 'Apple 4.3%', 'Alphabet 3.8%', 'Microsoft 3.2%', 'Amazon 2.5%', '— top 10 ≈ 24.6% of fund'],
+    sector: 'Tech-heavy',
+    numHoldings: '~3,800',
+  },
+  {
+    ticker: 'IWVL',
+    fullName: 'iShares Edge MSCI World Value Factor UCITS ETF',
+    isin: 'IE00BP3QZB59 (Acc)',
+    domicile: 'Ireland',
+    mgmtStyle: 'Passive, index-tracking',
+    strategy: '<strong>Value factor</strong>: screens for cheap stocks using price-to-book, price-to-forward-earnings, and enterprise-value-to-cash-flow, tracks MSCI World Enhanced Value',
+    distAcc: 'Both available (this ISIN = Acc; IE00BFYTYS33 = Dist)',
+    geo: ['US 49%', 'Japan 19%', 'UK 8%', 'France 6%', 'Germany 4%', 'Other 13%'],
+    ter: '0.25%',
+    top10: ['Micron 4.0%', 'Cisco 3.7%', 'Intel 2.7%', 'Qualcomm 2.3%', 'Verizon 2.1%', 'AT&amp;T 1.9%', 'Toyota 1.8%', 'Comcast 1.5%', 'British American Tobacco 1.4%', 'Merck 1.1%', '— top 10 ≈ 22.6%'],
+    sector: ['Tech 30%', 'Financials 16%', 'Industrials 12%', 'Consumer Cyclical 9%', 'Healthcare 9%', '— more balanced'],
+    numHoldings: '~399',
+  },
+  {
+    ticker: 'XDEW',
+    fullName: 'Xtrackers S&amp;P 500 Equal Weight UCITS ETF',
+    isin: 'IE00BLNMYC90 (Acc)',
+    domicile: 'Ireland',
+    mgmtStyle: 'Passive, index-tracking',
+    strategy: '<strong>Equal weight</strong>: every S&amp;P 500 constituent gets ~0.2% regardless of size, no valuation screen at all',
+    distAcc: 'Both available (1C = Acc share class)',
+    geo: '100% United States',
+    ter: '0.15%',
+    top10: '~500 holdings, none above ~0.2–0.3% — top 10 ≈ 2–3%',
+    sector: 'Naturally de-weights mega-cap tech vs. the cap-weighted S&amp;P 500',
+    numHoldings: '~500',
+  },
+  {
+    ticker: 'VDVA',
+    fullName: 'Vanguard Global Value Factor UCITS ETF',
+    isin: 'IE00BYYR0B57 (Acc)',
+    domicile: 'Ireland',
+    mgmtStyle: '<strong>Active</strong> (index used as reference only)',
+    strategy: "Value factor, but stock selection and weighting are at the manager's discretion within that value mandate, not a fixed rules-based index",
+    distAcc: 'Acc (confirm distributing share class exists before assuming)',
+    geo: 'Global developed markets (exact split not fixed — shifts with active positioning, but typically majority-US, meaningfully less concentrated than a plain cap-weighted world index)',
+    ter: '~0.22–0.24%',
+    top10: 'Diversified, no single-name dominance disclosed at this level (active fund, holdings shift)',
+    sector: 'Balanced by mandate, but composition shifts over time',
+    numHoldings: 'Not fixed (active)',
+  },
+];
+
+const MOBILE_BREAKPOINT = 640;
+const MIN_SELECTED = 3;
+let selected = new Set(['VWRA', 'IWVL', 'XDEW']);
+let MAX_SELECTED = computeMaxSelected();
+
+function computeMaxSelected() {
+  return window.innerWidth <= MOBILE_BREAKPOINT ? MIN_SELECTED : FUNDS.length;
+}
+
+function cellHTML(value) {
+  return Array.isArray(value) ? value.join('<br>') : value;
+}
+
+function renderPills() {
+  document.getElementById('pillsHint').textContent = `max ${MAX_SELECTED}`;
+  const wrap = document.getElementById('tickerPills');
+  wrap.innerHTML = '';
+  FUNDS.forEach(fund => {
+    const isActive = selected.has(fund.ticker);
+    const isDisabled = !isActive && selected.size >= MAX_SELECTED;
+    const btn = document.createElement('button');
+    btn.className = 'pill' + (isActive ? ' active' : '') + (isDisabled ? ' disabled' : '');
+    btn.textContent = fund.ticker;
+    btn.onclick = () => {
+      if (isActive) {
+        if (selected.size > 1) selected.delete(fund.ticker);
+      } else if (selected.size < MAX_SELECTED) {
+        selected.add(fund.ticker);
+      }
+      renderPills();
+      renderTable();
+    };
+    wrap.appendChild(btn);
   });
-})();
+}
+
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    MAX_SELECTED = computeMaxSelected();
+    if (selected.size > MAX_SELECTED) {
+      const trimmed = FUNDS.filter(f => selected.has(f.ticker)).slice(0, MAX_SELECTED).map(f => f.ticker);
+      selected = new Set(trimmed);
+      renderTable();
+    }
+    renderPills();
+  }, 150);
+});
+
+function renderTable() {
+  const visibleFunds = FUNDS.filter(f => selected.has(f.ticker));
+
+  const thead = document.getElementById('tableHead');
+  thead.innerHTML = `<tr><th>Dimension</th>${visibleFunds.map(f => `<th>${f.ticker}</th>`).join('')}</tr>`;
+
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = DIMENSIONS.map(dim => {
+    const label = dim.label + (dim.dynamic ? `<sup class="dyn" data-tip="${dim.tip}">*</sup>` : '');
+    const cells = visibleFunds.map(f => `<td>${cellHTML(f[dim.key])}</td>`).join('');
+    return `<tr><td>${label}</td>${cells}</tr>`;
+  }).join('');
+}
+
+renderPills();
+renderTable();
+
+const tip = document.getElementById('tooltip');
+document.addEventListener('mouseover', e => {
+  const el = e.target.closest('.dyn[data-tip]');
+  if (!el) return;
+  tip.textContent = el.dataset.tip;
+  tip.style.display = 'block';
+  const r = el.getBoundingClientRect();
+  tip.style.left = (r.right + 8) + 'px';
+  tip.style.top = r.top + 'px';
+});
+document.addEventListener('mouseout', e => {
+  const el = e.target.closest('.dyn[data-tip]');
+  if (!el) return;
+  tip.style.display = 'none';
+});
 </script>
 <script src="pwa-register.js"></script>
 </body>
