@@ -9,6 +9,7 @@
 :root{
   --bg:#f8f7f4;--surface:#fff;--border:#e2e0d8;--border-strong:#c8c5bb;
   --text:#1a1917;--text-muted:#6b6860;--text-faint:#9c9a94;--danger:#a32d2d;
+  --accent:#1a6b3c;--accent-bg:#eaf4ee;--warning:#854f0b;--warning-bg:#faeeda;--info:#185fa5;--info-bg:#e6f1fb;
   --r:8px;--rl:12px;
   --mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
 }
@@ -40,6 +41,12 @@ tr:hover td{background:#fafaf8}
 .dyn{color:var(--danger);font-size:13px;font-weight:400;vertical-align:super;margin-left:2px;cursor:help}
 .disclaimer{font-size:11px;color:var(--text-faint);padding-top:10px}
 .disclaimer .dyn{margin-left:0;margin-right:3px}
+
+.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;white-space:nowrap}
+.tag-info{background:var(--info-bg);color:var(--info)}
+.tag-accent{background:var(--accent-bg);color:var(--accent)}
+.tag-warning{background:var(--warning-bg);color:var(--warning)}
+.cell-desc{margin-top:4px}
 
 .tooltip{
   position:fixed;background:#1a1917;color:#fff;padding:6px 10px;border-radius:6px;
@@ -79,7 +86,7 @@ const DIMENSIONS = [
   { key: 'domicile', label: 'Domicile' },
   { key: 'mgmtStyle', label: 'Management style' },
   { key: 'strategy', label: 'Strategy (in full)' },
-  { key: 'distAcc', label: 'Distributing / Accumulating' },
+  { key: 'isAcc', label: 'Is accumulating?' },
   { key: 'geo', label: 'Geographic scope — top markets', dynamic: true,
     tip: 'Shifts with market movements and index rebalancing — verify current figures' },
   { key: 'ter', label: 'TER', dynamic: true,
@@ -99,12 +106,12 @@ const FUNDS = [
     isin: 'IE00BK5BQT80 (Acc)',
     domicile: 'Ireland',
     mgmtStyle: 'Passive, index-tracking',
-    strategy: 'Cap-weighted, holds the whole global market as-is, no tilt',
-    distAcc: 'Both available (VWRA = Acc, VWRD = Dist)',
+    strategy: { tag: 'Cap-weighted', desc: 'Holds the whole global market as-is, no tilt' },
+    isAcc: 'Yes',
     geo: 'Global: ~3,800 holdings across developed + emerging markets',
     ter: '0.14%',
     top10: ['Nvidia 4.7%', 'Apple 4.3%', 'Alphabet 3.8%', 'Microsoft 3.2%', 'Amazon 2.5%', '— top 10 ≈ 24.6% of fund'],
-    sector: 'Tech-heavy',
+    sector: ['Tech 31%', 'Financials 17%', 'Industrials 11%', 'Consumer Cyclical 9%', 'Healthcare 8%', 'Other 24%'],
     numHoldings: '~3,800',
   },
   {
@@ -113,8 +120,8 @@ const FUNDS = [
     isin: 'IE00BP3QZB59 (Acc)',
     domicile: 'Ireland',
     mgmtStyle: 'Passive, index-tracking',
-    strategy: '<strong>Value factor</strong>: screens for cheap stocks using price-to-book, price-to-forward-earnings, and enterprise-value-to-cash-flow, tracks MSCI World Enhanced Value',
-    distAcc: 'Both available (this ISIN = Acc; IE00BFYTYS33 = Dist)',
+    strategy: { tag: 'Value factor', desc: 'Screens for cheap stocks using price-to-book, price-to-forward-earnings, and enterprise-value-to-cash-flow, tracks MSCI World Enhanced Value' },
+    isAcc: 'Yes',
     geo: ['US 49%', 'Japan 19%', 'UK 8%', 'France 6%', 'Germany 4%', 'Other 13%'],
     ter: '0.25%',
     top10: ['Micron 4.0%', 'Cisco 3.7%', 'Intel 2.7%', 'Qualcomm 2.3%', 'Verizon 2.1%', 'AT&amp;T 1.9%', 'Toyota 1.8%', 'Comcast 1.5%', 'British American Tobacco 1.4%', 'Merck 1.1%', '— top 10 ≈ 22.6%'],
@@ -127,8 +134,8 @@ const FUNDS = [
     isin: 'IE00BLNMYC90 (Acc)',
     domicile: 'Ireland',
     mgmtStyle: 'Passive, index-tracking',
-    strategy: '<strong>Equal weight</strong>: every S&amp;P 500 constituent gets ~0.2% regardless of size, no valuation screen at all',
-    distAcc: 'Both available (1C = Acc share class)',
+    strategy: { tag: 'Equal weight', desc: 'Every S&amp;P 500 constituent gets ~0.2% regardless of size, no valuation screen at all' },
+    isAcc: 'Yes',
     geo: '100% United States',
     ter: '0.15%',
     top10: '~500 holdings, none above ~0.2–0.3% — top 10 ≈ 2–3%',
@@ -141,13 +148,27 @@ const FUNDS = [
     isin: 'IE00BYYR0B57 (Acc)',
     domicile: 'Ireland',
     mgmtStyle: '<strong>Active</strong> (index used as reference only)',
-    strategy: "Value factor, but stock selection and weighting are at the manager's discretion within that value mandate, not a fixed rules-based index",
-    distAcc: 'Acc (confirm distributing share class exists before assuming)',
+    strategy: { tag: 'Value factor', desc: "Stock selection and weighting are at the manager's discretion within that value mandate, not a fixed rules-based index" },
+    isAcc: 'Yes',
     geo: 'Global developed markets (exact split not fixed — shifts with active positioning, but typically majority-US, meaningfully less concentrated than a plain cap-weighted world index)',
     ter: '~0.22–0.24%',
     top10: 'Diversified, no single-name dominance disclosed at this level (active fund, holdings shift)',
     sector: 'Balanced by mandate, but composition shifts over time',
     numHoldings: 'Not fixed (active)',
+  },
+  {
+    ticker: 'XUSE',
+    fullName: 'iShares MSCI World ex-USA UCITS ETF',
+    isin: 'IE000R4ZNTN3 (Acc)',
+    domicile: 'Ireland',
+    mgmtStyle: 'Passive, index-tracking',
+    strategy: { tag: 'Cap-weighted', desc: 'Tracks MSCI World ex USA — same passive approach as VWRA but excludes the US market entirely' },
+    isAcc: 'Yes',
+    geo: ['Japan 20%', 'UK 12%', 'Canada 12%', 'Switzerland 9%', 'Other 47%'],
+    ter: '0.15%',
+    top10: ['ASML Holding 2.6%', 'HSBC Holdings 1.4%', 'Roche 1.2%', 'Royal Bank of Canada 1.2%', 'Novartis 1.2%', 'Nestlé 1.2%', 'AstraZeneca 1.0%', 'Shell 1.0%', 'Siemens 1.0%', 'Mitsubishi UFJ 0.9%', '— top 10 ≈ 12.7%'],
+    sector: ['Finance 30%', 'Industrials 15%', 'Technology 11%', 'Healthcare 9%', 'Other 35%'],
+    numHoldings: '~735',
   },
 ];
 
@@ -160,7 +181,17 @@ function computeMaxSelected() {
   return window.innerWidth <= MOBILE_BREAKPOINT ? MIN_SELECTED : FUNDS.length;
 }
 
+const STRATEGY_TAG_CLASS = {
+  'Cap-weighted': 'tag-info',
+  'Value factor': 'tag-accent',
+  'Equal weight': 'tag-warning',
+};
+
 function cellHTML(value) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const cls = STRATEGY_TAG_CLASS[value.tag] || '';
+    return `<span class="tag ${cls}">${value.tag}</span><div class="cell-desc">${value.desc}</div>`;
+  }
   return Array.isArray(value) ? value.join('<br>') : value;
 }
 
