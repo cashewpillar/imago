@@ -8,6 +8,7 @@ const APP_SHELL = [
   './etf-comparison.html',
   './expenses.html',
   './food-v2.html',
+  './invest.html',
   './journal.html',
   './notes.html',
   './performance.html',

@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invest</title>
+<script src="scripts/dexie.min.js"></script>
+<script src="scripts/benchmarks-data.js?v=2"></script>
+<script src="scripts/etf-catalog.js"></script>
+<script src="scripts/invest-demo.js"></script>
+<script src="scripts/finance-charts.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f8f7f4;--surface:#fff;--border:#e2e0d8;--border-strong:#c8c5bb;
+  --text:#1a1917;--text-muted:#6b6860;--text-faint:#9c9a94;
+  --accent:#3454d1;--accent-bg:#e8ecfb;
+  --danger:#a32d2d;--danger-bg:#fcebeb;
+  --warning:#854f0b;--warning-bg:#faeeda;
+  --positive:#1a6b3c;
+  --r:8px;--rl:12px;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh}
+
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header .brand{display:flex;align-items:center;gap:10px}
+header .brand a{font-size:12px;color:var(--text-faint);text-decoration:none}
+header .brand a:hover{color:var(--text-muted)}
+header h1{font-size:17px;font-weight:600;letter-spacing:-.3px}
+.header-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border:1px solid var(--border-strong);border-radius:var(--r);background:var(--surface);color:var(--text);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .12s}
+.btn:hover{background:var(--bg)}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-primary:hover{background:var(--accent);filter:brightness(0.85)}
+.btn-danger{color:var(--danger);border-color:#f7c1c1}
+.btn-danger:hover{background:var(--danger-bg)}
+.btn svg{width:13px;height:13px;flex-shrink:0}
+.btn-sm{padding:3px 8px;font-size:11px}
+
+main{max-width:940px;margin:0 auto;padding:20px 16px}
+
+.summary-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px}
+.sum-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px}
+.sum-card .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:4px}
+.sum-card .val{font-size:22px;font-weight:600;letter-spacing:-.5px}
+.sum-card .sub{font-size:11px;color:var(--text-faint);margin-top:2px}
+.col-pos{color:var(--positive)}
+.col-neg{color:var(--danger)}
+.return-badge{font-size:13px;font-weight:600;vertical-align:middle;opacity:.6}
+
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:16px 18px;margin-bottom:18px}
+.chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+.chart-title{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted)}
+.chart-wrap{position:relative;height:180px}
+.chart-empty{display:none;text-align:center;color:var(--text-faint);font-size:13px;padding:50px 0}
+
+.filters{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.filter-chip{padding:3px 10px;border:1px solid var(--border-strong);border-radius:99px;font-size:11px;cursor:pointer;background:var(--surface);color:var(--text-muted);transition:all .12s;user-select:none}
+.filter-chip:hover{border-color:var(--text-muted)}
+.filter-chip.active{background:var(--text);color:#fff;border-color:var(--text)}
+
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;margin-top:22px;flex-wrap:wrap;gap:8px}
+.section-title{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted)}
+
+.table-container{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:20px;border:1px solid var(--border);border-radius:var(--rl);background:var(--surface)}
+table{width:100%;border-collapse:collapse;text-align:left}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);font-weight:500;padding:9px 14px;border-bottom:1px solid var(--border);background:var(--bg);user-select:none}
+th:not(:first-child){padding-left:6px;padding-right:6px}
+td{padding:9px 14px;border-bottom:1px solid var(--border);vertical-align:middle;font-size:13px}
+td:not(:first-child){padding-left:6px;padding-right:6px}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#fafaf8}
+td.num{text-align:left;font-variant-numeric:tabular-nums;font-family:var(--mono)}
+td.actions{text-align:right;white-space:nowrap}
+
+.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;background:var(--accent-bg);color:var(--accent);border:1px solid transparent}
+.ticker-symbol{font-weight:600;font-family:var(--mono)}
+
+.icon-btn{background:none;border:none;cursor:pointer;color:var(--text-faint);padding:3px 5px;border-radius:var(--r);display:inline-flex;align-items:center}
+.icon-btn:hover{background:var(--bg);color:var(--danger)}
+.icon-btn svg{width:13px;height:13px}
+
+.history-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px dashed var(--border);font-size:13px;gap:10px}
+.history-item:last-child{border-bottom:none}
+.history-meta{display:flex;flex-direction:column;gap:2px;min-width:0}
+.history-meta .sub{font-size:11px;color:var(--text-faint)}
+.history-amount{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:100;align-items:center;justify-content:center}
+.modal-backdrop.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:22px;width:min(420px,95vw);max-height:90vh;overflow-y:auto}
+.modal h2{font-size:17px;font-weight:600;margin-bottom:16px}
+.form-row{display:flex;flex-direction:column;gap:3px;margin-bottom:10px}
+.form-row label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}
+.form-row input,.form-row select,.form-row textarea{width:100%;padding:7px 10px;border:1px solid var(--border-strong);border-radius:var(--r);font-family:inherit;font-size:13px;color:var(--text);background:var(--surface)}
+.form-row input:focus,.form-row select:focus{outline:2px solid var(--accent-bg);border-color:var(--accent)}
+.form-row textarea{resize:vertical;min-height:100px;font-family:monospace;font-size:11px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
+
+.dropdown{position:relative;display:inline-block}
+.dropdown-content{display:none;position:absolute;right:0;top:100%;background:var(--surface);min-width:200px;box-shadow:0 4px 20px rgba(0,0,0,0.15);border:1px solid var(--border);border-radius:var(--r);z-index:1000;margin-top:8px;overflow:hidden;padding:4px 0}
+.dropdown-content .btn-flat{display:flex;align-items:center;gap:10px;width:100%;padding:10px 16px;border:none;background:none;color:var(--text);font-size:13px;cursor:pointer;text-align:left;text-decoration:none;font-family:inherit;transition:background .12s;white-space:nowrap}
+.dropdown-content .btn-flat:hover{background:var(--bg)}
+.dropdown-content svg{width:14px;height:14px;color:var(--text-muted)}
+.dropdown.open .dropdown-content{display:block}
+
+.import-area{border:2px dashed var(--border-strong);border-radius:var(--r);padding:14px;margin-bottom:10px;font-size:13px;color:var(--text-muted);text-align:center;display:flex;flex-direction:column;gap:6px;align-items:center;justify-content:center;cursor:pointer}
+.import-area:hover{border-color:var(--accent);color:var(--accent)}
+
+.toast{position:fixed;bottom:20px;right:20px;background:var(--text);color:#fff;padding:9px 16px;border-radius:var(--r);font-size:13px;z-index:200;opacity:0;transform:translateY(6px);transition:all .18s;pointer-events:none}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.error{background:var(--danger)}
+.empty{text-align:center;padding:36px;color:var(--text-faint);font-size:13px}
+.no-data-note{font-size:11px;color:var(--text-faint);font-style:italic}
+
+.demo-banner{display:none;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;background:var(--warning-bg);color:var(--warning);border-bottom:1px solid var(--border);padding:9px 16px;font-size:12.5px;text-align:center}
+.demo-banner.show{display:flex}
+.demo-banner button{flex-shrink:0}
+</style>
+<meta name="theme-color" content="#f7f6f2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="imago">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/imago-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <a href="index.html">← imago</a>
+    <h1>Invest</h1>
+  </div>
+  <div class="header-actions">
+    <button class="btn" onclick="openTickerModal()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
+      Add ticker
+    </button>
+    <button class="btn btn-primary" onclick="openBuyModal()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
+      Add investment
+    </button>
+    <div class="dropdown" id="settingsDropdown">
+      <button class="btn" onclick="toggleDropdown('settingsDropdown')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/></svg>
+      </button>
+      <div class="dropdown-content">
+        <button class="btn-flat" id="exploreToggleBtn" onclick="toggleExploreMode()">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>
+          <span id="exploreToggleLabel">Try demo data</span>
+        </button>
+        <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
+        <button class="btn-flat" onclick="openImport()">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,10 3,13 13,13 13,10"/><polyline points="5,7 8,10 11,7"/><line x1="8" y1="3" x2="8" y2="10"/></svg>
+          Import
+        </button>
+        <button class="btn-flat" onclick="exportData()">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,6 3,3 13,3 13,6"/><polyline points="5,9 8,6 11,9"/><line x1="8" y1="13" x2="8" y2="6"/></svg>
+          Export
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="demo-banner" id="demoBanner">
+  <span>You're exploring with sample data — nothing here is saved yet.</span>
+  <button class="btn btn-sm btn-primary" onclick="adoptDemoData()">Use this data</button>
+  <button class="btn btn-sm" onclick="exitExploreMode()">Exit demo</button>
+</div>
+
+<main>
+  <div class="summary-row">
+    <div class="sum-card">
+      <div class="lbl">Total invested</div>
+      <div class="val" id="sumInvested">$0</div>
+    </div>
+    <div class="sum-card">
+      <div class="lbl">Current value</div>
+      <div class="val">
+        <span id="sumCurrentUsd">$0</span>
+        <span class="return-badge" id="sumCurrentReturn"></span>
+      </div>
+      <div class="sub" id="sumCurrentPhp">₱0</div>
+    </div>
+    <div class="sum-card">
+      <div class="lbl">Total return</div>
+      <div class="val" id="sumReturn">—</div>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">Portfolio value</div>
+      <div class="filters" id="periodFilters">
+        <div class="filter-chip" data-period="3M" onclick="changePeriod('3M', this)">3M</div>
+        <div class="filter-chip" data-period="6M" onclick="changePeriod('6M', this)">6M</div>
+        <div class="filter-chip" data-period="1Y" onclick="changePeriod('1Y', this)">1Y</div>
+        <div class="filter-chip active" data-period="ALL" onclick="changePeriod('ALL', this)">ALL</div>
+      </div>
+    </div>
+    <div class="chart-wrap" id="usdChartWrap">
+      <imago-chart id="usdChart" style="display:none"></imago-chart>
+      <div class="chart-empty" id="usdChartEmpty">No investments logged yet.</div>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">Portfolio value (₱, converted)</div>
+    </div>
+    <div class="chart-wrap" id="phpChartWrap">
+      <imago-chart id="phpChart" style="display:none"></imago-chart>
+      <div class="chart-empty" id="phpChartEmpty">No investments logged yet.</div>
+    </div>
+  </div>
+
+  <div class="section-header">
+    <div class="section-title">Tickers</div>
+  </div>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Ticker</th>
+          <th>Invested</th>
+          <th>Current (USD)</th>
+          <th>Current (₱)</th>
+          <th>Return</th>
+          <th class="actions"></th>
+        </tr>
+      </thead>
+      <tbody id="tickerRows"></tbody>
+    </table>
+    <div class="empty" id="tickerEmpty" style="display:none">No tickers yet — add one to start tracking.</div>
+  </div>
+
+  <div class="section-header">
+    <div class="section-title">Investment history</div>
+  </div>
+  <div id="historyList"></div>
+  <div class="empty" id="historyEmpty" style="display:none">No investments logged yet.</div>
+</main>
+
+<div class="modal-backdrop" id="tickerModal">
+  <div class="modal">
+    <h2>Add ticker</h2>
+    <div class="form-row">
+      <label>Ticker</label>
+      <select id="fSymbol"></select>
+    </div>
+    <div class="form-grid">
+      <div class="form-row">
+        <label>Starting investment (USD)</label>
+        <input type="number" id="fStartAmount" step="0.01" min="0" placeholder="0">
+      </div>
+      <div class="form-row">
+        <label>Date</label>
+        <input type="date" id="fStartDate">
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Note (optional)</label>
+      <input type="text" id="fTickerNote" placeholder="">
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('tickerModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitTicker()">Add ticker</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="buyModal">
+  <div class="modal">
+    <h2>Add investment</h2>
+    <div class="form-row">
+      <label>Ticker</label>
+      <select id="fBuyTicker"></select>
+    </div>
+    <div class="form-grid">
+      <div class="form-row">
+        <label>Amount (USD)</label>
+        <input type="number" id="fBuyAmount" step="0.01" min="0" placeholder="0">
+      </div>
+      <div class="form-row">
+        <label>Date</label>
+        <input type="date" id="fBuyDate">
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Note (optional)</label>
+      <input type="text" id="fBuyNote" placeholder="">
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('buyModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitBuy()">Add investment</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="importModal">
+  <div class="modal">
+    <h2>Import data</h2>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px">Duplicates are skipped; conflicts resolve to the newer <code>created_at</code>. Reset import wipes existing data first.</p>
+    <div class="import-area" ondragover="event.preventDefault()" ondrop="handleDrop(event)">
+      <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,10 3,13 13,13 13,10"/><polyline points="5,7 8,10 11,7"/><line x1="8" y1="3" x2="8" y2="10"/></svg>
+      Drop JSON file here or <label style="color:var(--accent);cursor:pointer;text-decoration:underline">browse<input type="file" accept=".json" style="display:none" onchange="handleFileInput(event)"></label>
+    </div>
+    <div class="form-row"><textarea id="importJson" placeholder="…or paste JSON here"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" onclick="doImport(true)">Reset &amp; import</button>
+      <button class="btn" onclick="closeModal('importModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="doImport(false)">Merge import</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── DB (separate from the fin family's FinanceTrackerV2) ─────────────────────
+// `db` points at whichever database is currently active (realDb, or demoDb
+// while exploring) -- every render/CRUD call below just uses `db`, so demo
+// mode needs no special-casing anywhere else. Benchmarks (the bundled VWRA/FX
+// snapshot) always live on realDb regardless of mode, since it's reference
+// data, not something demo mode needs its own copy of.
+let realDb = new Dexie('InvestTrackerV1');
+let db = realDb;
+let demoDb;
+realDb.version(1).stores({
+  tickers: 'id,symbol',
+  buys: 'id,tickerId,date',
+  benchmarks: 'id,source,date'
+});
+
+function getDemoDb() {
+  if (!demoDb) {
+    demoDb = new Dexie('InvestTrackerDemoPreview');
+    demoDb.version(1).stores({ tickers: 'id,symbol', buys: 'id,tickerId,date' });
+  }
+  return demoDb;
+}
+
+// One-time seed of the bundled static benchmark snapshot (scripts/benchmarks-data.js)
+// -- frozen VWRA price / USD-PHP FX snapshot, not user data. Mirrors the same
+// per-source count-check pattern performance.html uses against its own db.
+async function seedBenchmarksIfNeeded() {
+  if (!window.BENCHMARKS_DATA) return;
+  for (const [source, points] of Object.entries(window.BENCHMARKS_DATA)) {
+    const existing = await realDb.benchmarks.where('source').equals(source).count();
+    if (existing > 0) continue;
+    const rows = (points || []).map(p => ({ id: `${source}-${p.date}`, source, date: p.date, value: p.value }));
+    if (rows.length) await realDb.benchmarks.bulkPut(rows);
+  }
+}
+
+// ── Explore mode (demo data) ──────────────────────────────────────────────────
+const EXPLORE_FLAG = 'imago-invest-explore-mode';
+const EXPLORE_DISMISSED_FLAG = 'imago-invest-explore-dismissed';
+
+function isExploreMode() { return sessionStorage.getItem(EXPLORE_FLAG) === '1'; }
+
+async function clearAllData(targetDb = db) {
+  await targetDb.tickers.clear();
+  await targetDb.buys.clear();
+}
+
+async function enterExploreMode() {
+  const dDb = getDemoDb();
+  await clearAllData(dDb);
+  if (window.INVEST_DEMO_DATA) {
+    const { tickers, buys } = window.INVEST_DEMO_DATA;
+    await dDb.tickers.bulkPut(tickers);
+    await dDb.buys.bulkPut(buys);
+  }
+  db = dDb;
+  sessionStorage.setItem(EXPLORE_FLAG, '1');
+  updateDemoUI();
+}
+
+async function exitExploreMode() {
+  db = realDb;
+  sessionStorage.removeItem(EXPLORE_FLAG);
+  localStorage.setItem(EXPLORE_DISMISSED_FLAG, '1');
+  updateDemoUI();
+  render();
+}
+
+async function toggleExploreMode() {
+  document.getElementById('settingsDropdown').classList.remove('open');
+  if (isExploreMode()) {
+    await exitExploreMode();
+  } else {
+    localStorage.removeItem(EXPLORE_DISMISSED_FLAG);
+    await enterExploreMode();
+    render();
+  }
+}
+
+async function adoptDemoData() {
+  if (!confirm('This adds the sample ticker and investments to your real data. Continue?')) return;
+  const dDb = getDemoDb();
+  const [tickers, buys] = await Promise.all([dDb.tickers.toArray(), dDb.buys.toArray()]);
+  await realDb.tickers.bulkPut(tickers);
+  await realDb.buys.bulkPut(buys);
+  db = realDb;
+  sessionStorage.removeItem(EXPLORE_FLAG);
+  updateDemoUI();
+  toast('Sample data added to your account.');
+  render();
+}
+
+function updateDemoUI() {
+  const exploring = isExploreMode();
+  document.getElementById('demoBanner').classList.toggle('show', exploring);
+  const label = document.getElementById('exploreToggleLabel');
+  if (label) label.textContent = exploring ? 'Exit demo mode' : 'Try demo data';
+}
+
+async function refreshMode() {
+  if (isExploreMode()) {
+    db = getDemoDb();
+  } else {
+    db = realDb;
+    if (await realDb.tickers.count() === 0 && !localStorage.getItem(EXPLORE_DISMISSED_FLAG)) {
+      await enterExploreMode();
+    }
+  }
+  updateDemoUI();
+  render();
+}
+
+function uuid() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+function todayStr() { return new Date().toISOString().slice(0, 10); }
+
+function toast(msg, err = false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (err ? ' error' : '');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.className = 'toast', 2800);
+}
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-backdrop').forEach(bd => {
+  bd.addEventListener('click', e => { if (e.target === bd) bd.classList.remove('open'); });
+});
+
+function toggleDropdown(id) { document.getElementById(id).classList.toggle('open'); }
+window.addEventListener('click', e => {
+  if (!e.target.closest('.dropdown')) {
+    document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('open'));
+  }
+});
+
+function fmtUsd(v) { return '$' + v.toLocaleString(undefined, { maximumFractionDigits: 0 }); }
+function fmtPhp(v) { return '₱' + v.toLocaleString(undefined, { maximumFractionDigits: 0 }); }
+
+// ── Price/FX lookups ──────────────────────────────────────────────────────────
+// Only VWRA has a real price series bundled today (scripts/benchmarks-data.js).
+// Any other ticker symbol falls back to flat cost-basis (no simulated growth)
+// until its own series is added to that file and matched here by symbol.
+let _vwraPoints = [], _fxPoints = [];
+
+function valueAtOrBefore(points, date) {
+  if (!points.length) return null;
+  let best = null;
+  for (const p of points) {
+    if (p.date <= date) best = p;
+    else break;
+  }
+  return (best || points[0]).value;
+}
+function priceAt(symbol, date) {
+  if (symbol === 'VWRA') return valueAtOrBefore(_vwraPoints, date);
+  return null;
+}
+function fxAt(date) { return valueAtOrBefore(_fxPoints, date) ?? 1; }
+
+function buyValueAt(buy, symbol, date) {
+  if (date < buy.date) return 0;
+  const p0 = priceAt(symbol, buy.date);
+  const p1 = priceAt(symbol, date);
+  if (p0 != null && p1 != null && p0 > 0) return buy.amountUsd * (p1 / p0);
+  return buy.amountUsd;
+}
+
+function monthlyTimeline(start, end) {
+  const startD = new Date(start + 'T00:00:00Z');
+  const endD = new Date(end + 'T00:00:00Z');
+  const out = [];
+  let cursor = new Date(Date.UTC(startD.getUTCFullYear(), startD.getUTCMonth(), 1));
+  while (cursor <= endD) {
+    const monthEnd = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 0));
+    const sample = monthEnd > endD ? endD : monthEnd;
+    out.push(sample.toISOString().slice(0, 10));
+    cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1));
+  }
+  return out;
+}
+
+// ── Chart period filter ───────────────────────────────────────────────────────
+let _period = localStorage.getItem('imago-invest-chart-period') || 'ALL';
+
+function applyPeriodFilter(points) {
+  if (!points || !points.length || _period === 'ALL') return points;
+  const now = new Date();
+  const cutoff = new Date(now);
+  if (_period === '3M') cutoff.setMonth(cutoff.getMonth() - 3);
+  if (_period === '6M') cutoff.setMonth(cutoff.getMonth() - 6);
+  if (_period === '1Y') cutoff.setFullYear(cutoff.getFullYear() - 1);
+  const cutStr = cutoff.toISOString().slice(0, 10);
+  return points.filter(p => p.date >= cutStr);
+}
+
+function changePeriod(period, el) {
+  _period = period;
+  localStorage.setItem('imago-invest-chart-period', period);
+  document.querySelectorAll('#periodFilters .filter-chip').forEach(c => c.classList.toggle('active', c === el));
+  render();
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────────
+async function render() {
+  const [tickers, buys, benchmarks] = await Promise.all([
+    db.tickers.toArray(), db.buys.toArray(), realDb.benchmarks.toArray()
+  ]);
+
+  _vwraPoints = benchmarks.filter(r => r.source === 'vwra').map(r => ({ date: r.date, value: r.value })).sort((a, b) => a.date.localeCompare(b.date));
+  _fxPoints = benchmarks.filter(r => r.source === 'usdphp').map(r => ({ date: r.date, value: r.value })).sort((a, b) => a.date.localeCompare(b.date));
+
+  const tickerById = new Map(tickers.map(t => [t.id, t]));
+  const today = todayStr();
+
+  renderSummary(tickers, buys, tickerById, today);
+  renderCharts(buys, tickerById, today);
+  renderTickerTable(tickers, buys, today);
+  renderHistory(buys, tickerById);
+}
+
+function renderSummary(tickers, buys, tickerById, today) {
+  let invested = 0, currentUsd = 0;
+  buys.forEach(b => {
+    const t = tickerById.get(b.tickerId);
+    if (!t) return;
+    invested += b.amountUsd;
+    currentUsd += buyValueAt(b, t.symbol, today);
+  });
+  const currentPhp = currentUsd * fxAt(today);
+  const returnPct = invested > 0 ? ((currentUsd / invested) - 1) * 100 : null;
+
+  document.getElementById('sumInvested').textContent = fmtUsd(invested);
+  document.getElementById('sumCurrentUsd').textContent = fmtUsd(currentUsd);
+  document.getElementById('sumCurrentPhp').textContent = fmtPhp(currentPhp);
+
+  const badge = document.getElementById('sumCurrentReturn');
+  if (returnPct == null) {
+    badge.textContent = '';
+    badge.className = 'return-badge';
+  } else {
+    badge.textContent = (returnPct >= 0 ? '▲ +' : '▼ ') + returnPct.toFixed(1) + '%';
+    badge.className = 'return-badge ' + (returnPct >= 0 ? 'col-pos' : 'col-neg');
+  }
+
+  const returnEl = document.getElementById('sumReturn');
+  if (returnPct == null) {
+    returnEl.textContent = '—';
+    returnEl.className = 'val';
+  } else {
+    returnEl.textContent = (returnPct >= 0 ? '+' : '') + returnPct.toFixed(1) + '%';
+    returnEl.className = 'val ' + (returnPct >= 0 ? 'col-pos' : 'col-neg');
+  }
+}
+
+function renderCharts(buys, tickerById, today) {
+  const usdChart = document.getElementById('usdChart');
+  const usdEmpty = document.getElementById('usdChartEmpty');
+  const phpChart = document.getElementById('phpChart');
+  const phpEmpty = document.getElementById('phpChartEmpty');
+
+  if (!buys.length) {
+    usdChart.style.display = 'none'; usdEmpty.style.display = 'block';
+    phpChart.style.display = 'none'; phpEmpty.style.display = 'block';
+    return;
+  }
+
+  const earliest = buys.map(b => b.date).sort()[0];
+  const timeline = monthlyTimeline(earliest, today);
+
+  const usdPoints = timeline.map(d => ({
+    date: d,
+    value: buys.reduce((sum, b) => {
+      const t = tickerById.get(b.tickerId);
+      if (!t || b.date > d) return sum;
+      return sum + buyValueAt(b, t.symbol, d);
+    }, 0)
+  }));
+  const phpPoints = usdPoints.map(p => ({ date: p.date, value: p.value * fxAt(p.date) }));
+
+  const usdFiltered = applyPeriodFilter(usdPoints);
+  const phpFiltered = applyPeriodFilter(phpPoints);
+
+  usdEmpty.style.display = 'none';
+  usdChart.style.display = 'block';
+  usdChart.setAttribute('type', 'line');
+  usdChart.data = { series: [{ label: 'Portfolio (USD)', color: '#3454d1', points: usdFiltered }], unit: 'usd' };
+
+  phpEmpty.style.display = 'none';
+  phpChart.style.display = 'block';
+  phpChart.setAttribute('type', 'line');
+  phpChart.data = { series: [{ label: 'Portfolio (₱)', color: '#1a6b3c', points: phpFiltered }], unit: 'php' };
+}
+
+function renderTickerTable(tickers, buys, today) {
+  const tbody = document.getElementById('tickerRows');
+  const empty = document.getElementById('tickerEmpty');
+
+  if (!tickers.length) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  tbody.innerHTML = tickers.map(t => {
+    const tBuys = buys.filter(b => b.tickerId === t.id);
+    const invested = tBuys.reduce((s, b) => s + b.amountUsd, 0);
+    const currentUsd = tBuys.reduce((s, b) => s + buyValueAt(b, t.symbol, today), 0);
+    const currentPhp = currentUsd * fxAt(today);
+    const hasData = priceAt(t.symbol, today) != null;
+    const returnPct = invested > 0 && hasData ? ((currentUsd / invested) - 1) * 100 : null;
+    const returnHtml = returnPct == null
+      ? '<span class="no-data-note">' + (invested > 0 ? 'no price data' : '—') + '</span>'
+      : `<span class="${returnPct >= 0 ? 'col-pos' : 'col-neg'}">${returnPct >= 0 ? '+' : ''}${returnPct.toFixed(1)}%</span>`;
+
+    return `<tr>
+      <td><span class="ticker-symbol">${t.symbol}</span>${t.label ? `<div class="no-data-note" style="margin-top:3px">${t.label}</div>` : ''}</td>
+      <td class="num">${fmtUsd(invested)}</td>
+      <td class="num">${fmtUsd(currentUsd)}</td>
+      <td class="num">${fmtPhp(currentPhp)}</td>
+      <td>${returnHtml}</td>
+      <td class="actions">
+        <button class="icon-btn" title="Delete ticker" onclick="deleteTicker('${t.id}')">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 5h10M6 5V3.5a1 1 0 011-1h2a1 1 0 011 1V5M5 5l.5 8a1 1 0 001 .9h3a1 1 0 001-.9l.5-8"/></svg>
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function renderHistory(buys, tickerById) {
+  const wrap = document.getElementById('historyList');
+  const empty = document.getElementById('historyEmpty');
+
+  if (!buys.length) {
+    wrap.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  const sorted = [...buys].sort((a, b) => b.date.localeCompare(a.date));
+  wrap.innerHTML = sorted.map(b => {
+    const t = tickerById.get(b.tickerId);
+    return `<div class="history-item">
+      <div class="history-meta">
+        <span><span class="tag">${t ? t.symbol : '?'}</span> ${b.date}</span>
+        ${b.note ? `<span class="sub">${b.note}</span>` : ''}
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="history-amount">${fmtUsd(b.amountUsd)}</span>
+        <button class="icon-btn" title="Delete" onclick="deleteBuy('${b.id}')">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 5h10M6 5V3.5a1 1 0 011-1h2a1 1 0 011 1V5M5 5l.5 8a1 1 0 001 .9h3a1 1 0 001-.9l.5-8"/></svg>
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── CRUD ───────────────────────────────────────────────────────────────────────
+async function openTickerModal() {
+  const existingTickers = await db.tickers.toArray();
+  const usedSymbols = new Set(existingTickers.map(t => t.symbol));
+  const available = (window.ETF_CATALOG || []).filter(c => !c.archived && !usedSymbols.has(c.symbol));
+
+  if (!available.length) {
+    toast('All available tickers already added', true);
+    return;
+  }
+
+  document.getElementById('fSymbol').innerHTML = available.map(c => `<option value="${c.symbol}">${c.symbol} — ${c.label}</option>`).join('');
+  document.getElementById('fStartDate').value = todayStr();
+  openModal('tickerModal');
+}
+
+async function submitTicker() {
+  const symbol = document.getElementById('fSymbol').value;
+  const label = (window.ETF_CATALOG || []).find(c => c.symbol === symbol)?.label || '';
+  const note = document.getElementById('fTickerNote').value.trim();
+  const startAmount = parseFloat(document.getElementById('fStartAmount').value);
+  const startDate = document.getElementById('fStartDate').value || todayStr();
+
+  if (!symbol) { toast('Pick a ticker', true); return; }
+
+  const existing = await db.tickers.where('symbol').equals(symbol).count();
+  if (existing > 0) { toast('That ticker already exists', true); return; }
+
+  const ticker = { id: uuid(), symbol, label, note, created_at: new Date().toISOString() };
+  await db.tickers.put(ticker);
+
+  if (startAmount > 0) {
+    await db.buys.put({ id: uuid(), tickerId: ticker.id, date: startDate, amountUsd: startAmount, note: '', created_at: new Date().toISOString() });
+  }
+
+  closeModal('tickerModal');
+  document.getElementById('fTickerNote').value = '';
+  document.getElementById('fStartAmount').value = '';
+  toast('Ticker added');
+  render();
+}
+
+async function deleteTicker(id) {
+  if (!confirm('Delete this ticker and all its investment history?')) return;
+  await db.buys.where('tickerId').equals(id).delete();
+  await db.tickers.delete(id);
+  toast('Ticker deleted');
+  render();
+}
+
+async function openBuyModal() {
+  const tickers = await db.tickers.toArray();
+  const select = document.getElementById('fBuyTicker');
+  if (!tickers.length) {
+    toast('Add a ticker first', true);
+    return;
+  }
+  select.innerHTML = tickers.map(t => `<option value="${t.id}">${t.symbol}</option>`).join('');
+  document.getElementById('fBuyDate').value = todayStr();
+  openModal('buyModal');
+}
+
+async function submitBuy() {
+  const tickerId = document.getElementById('fBuyTicker').value;
+  const amountUsd = parseFloat(document.getElementById('fBuyAmount').value);
+  const date = document.getElementById('fBuyDate').value || todayStr();
+  const note = document.getElementById('fBuyNote').value.trim();
+
+  if (!tickerId) { toast('Pick a ticker', true); return; }
+  if (!(amountUsd > 0)) { toast('Enter an amount', true); return; }
+
+  await db.buys.put({ id: uuid(), tickerId, date, amountUsd, note, created_at: new Date().toISOString() });
+
+  closeModal('buyModal');
+  document.getElementById('fBuyAmount').value = '';
+  document.getElementById('fBuyNote').value = '';
+  toast('Investment added');
+  render();
+}
+
+async function deleteBuy(id) {
+  if (!confirm('Delete this investment entry?')) return;
+  await db.buys.delete(id);
+  toast('Investment deleted');
+  render();
+}
+
+// ── Import / Export ───────────────────────────────────────────────────────────
+async function openImport() {
+  document.getElementById('importJson').value = '';
+  document.getElementById('settingsDropdown').classList.remove('open');
+  openModal('importModal');
+}
+function handleDrop(e) { e.preventDefault(); readFile(e.dataTransfer.files[0]); }
+function handleFileInput(e) { readFile(e.target.files[0]); }
+function readFile(f) {
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => { document.getElementById('importJson').value = ev.target.result; };
+  r.readAsText(f);
+}
+
+async function doImport(reset) {
+  let raw;
+  try { raw = JSON.parse(document.getElementById('importJson').value.trim()); }
+  catch { toast('Invalid JSON.', true); return; }
+
+  if (reset) {
+    if (!confirm('This will overwrite all existing data. Continue?')) return;
+    await db.tickers.clear();
+    await db.buys.clear();
+  }
+
+  for (const t of (raw.tickers || [])) {
+    if (!t.id) t.id = uuid();
+    const ex = await db.tickers.get(t.id);
+    if (!ex) await db.tickers.put(t);
+  }
+
+  for (const b of (raw.buys || [])) {
+    if (!b.id) b.id = uuid();
+    const ex = await db.buys.get(b.id);
+    if (!ex) await db.buys.put(b);
+  }
+
+  closeModal('importModal');
+  toast(reset ? 'Reset & imported.' : 'Merged.');
+  render();
+}
+
+async function exportData() {
+  const tickers = await realDb.tickers.toArray();
+  const buys = await realDb.buys.orderBy('date').toArray();
+  const out = { version: 1, exported_at: new Date().toISOString(), tickers, buys };
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'invest_' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click(); URL.revokeObjectURL(url);
+  toast('Exported.');
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+(async () => {
+  await seedBenchmarksIfNeeded();
+  await refreshMode();
+})();
+</script>
+  <script src="pwa-register.js"></script>
+</body>
+</html>
