@@ -19,9 +19,11 @@ main{max-width:940px;width:100%;margin:0 auto;padding:20px 16px;flex:1;display:f
 main.wide{max-width:none;padding-left:clamp(16px,4vw,64px);padding-right:clamp(16px,4vw,64px)}
 
 .pills-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.mode-toggle{display:flex;gap:2px;background:var(--border);padding:3px;border-radius:99px}
+.mode-btn{appearance:none;-webkit-tap-highlight-color:transparent;border:none;padding:4px 10px;border-radius:99px;font-size:11px;font-family:var(--mono);cursor:pointer;background:transparent;color:var(--text-muted);transition:all .12s}
+.mode-btn.active{background:#000;color:#fff}
 .pills{display:flex;gap:6px;flex-wrap:wrap}
-.pill{padding:4px 12px;border:1px solid var(--border-strong);border-radius:99px;font-size:12px;font-family:var(--mono);cursor:pointer;background:var(--surface);color:var(--text-muted);transition:all .12s;user-select:none}
-.pill:hover{border-color:var(--text-muted)}
+.pill{appearance:none;-webkit-tap-highlight-color:transparent;padding:4px 12px;border:1px solid var(--border-strong);border-radius:99px;font-size:12px;font-family:var(--mono);cursor:pointer;background:var(--surface);color:var(--text-muted);transition:all .12s;user-select:none}
 .pill.active{background:#000;color:#fff;border-color:#000}
 .pill.disabled{opacity:.4;cursor:not-allowed}
 .pills-hint{font-size:11px;color:var(--text-faint)}
@@ -55,8 +57,11 @@ tr:hover td{background:#fafaf8}
 .tip-underline:hover,.tip-underline:focus-visible{border-bottom-color:var(--text)}
 .tip-underline.open{border-bottom-style:solid;border-bottom-color:var(--text)}
 .disclaimer{font-size:11px;color:var(--text-faint);padding-top:10px}
+.disclaimer .emphasis{border-bottom:1px dotted #8a5a2b}
 
 .tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;white-space:nowrap}
+.tag[data-tip]{cursor:pointer}
+.tag[data-tip].open{box-shadow:0 0 0 2px var(--border-strong) inset}
 .tag-info{background:var(--info-bg);color:var(--info)}
 .tag-accent{background:var(--accent-bg);color:var(--accent)}
 .tag-warning{background:var(--warning-bg);color:var(--warning)}
@@ -70,6 +75,12 @@ tr:hover td{background:#fafaf8}
   display:none;max-width:220px;line-height:1.4;text-align:left;
   box-shadow:0 4px 12px rgba(0,0,0,0.15);font-family:system-ui,-apple-system,sans-serif;
 }
+.copy-toast{
+  position:fixed;background:#1a1917;color:#fff;padding:4px 9px;border-radius:6px;
+  font-size:11px;z-index:10001;pointer-events:none;opacity:0;transition:opacity .15s;
+  font-family:system-ui,-apple-system,sans-serif;transform:translate(-50%,-100%);
+}
+.copy-toast.show{opacity:1}
 </style>
 <meta name="theme-color" content="#f7f6f2">
 <meta name="mobile-web-app-capable" content="yes">
@@ -83,7 +94,8 @@ tr:hover td{background:#fafaf8}
 <body>
 <main>
 <div class="pills-row">
-  <div class="pills" id="assetPills"></div>
+  <div class="mode-toggle" id="modeToggle"></div>
+  <div class="pills" id="filterPills"></div>
   <span class="pills-hint" id="pillsHint"></span>
 </div>
 <div class="table-container">
@@ -92,18 +104,19 @@ tr:hover td{background:#fafaf8}
   <tbody id="tableBody"></tbody>
 </table>
 </div>
-<p class="disclaimer">Comparing asset classes in general, not individual funds or tickers — figures are long-run, order-of-magnitude estimates for building intuition, not forecasts, advice, or jurisdiction-specific tax guidance. All columns except Own business and Career assume access as an ETF through IBKR.</p>
+<p class="disclaimer">Comparing asset classes in general, not individual funds or tickers — figures are long-run, order-of-magnitude estimates for building intuition, not forecasts, advice, or jurisdiction-specific tax guidance. All columns except Own business and Career <span class="emphasis">assume access as an ETF through IBKR</span>.</p>
 <p class="disclaimer">Cash and time deposits play a different game than the rest of this table — they're not here to compete on return, they always lose that. They're here to answer "how much of my wealth should sit out of growth assets" rather than "which growth asset should I pick."</p>
 </main>
 <div id="tooltip" class="tooltip"></div>
+<div id="copyToast" class="copy-toast"></div>
 <script>
 const DIMENSIONS = [
   { key: 'return', label: 'Expected long-term return', group: 'Intrinsic to the asset',
     tip: 'The realistic average annual return over a full market cycle — sets the ceiling on how much this asset can grow your wealth.' },
   { key: 'volatility', label: 'Volatility / drawdown risk', group: 'Intrinsic to the asset',
     tip: 'How far and how often the value swings, especially in downturns — the price you pay in stomach-churn for the return above.' },
-  { key: 'correlation', label: 'Correlation with other rows', group: 'Intrinsic to the asset',
-    tip: 'Whether it tends to rise and fall together with the other rows here, or independently — low correlation is what makes diversification actually work.' },
+  { key: 'correlation', label: 'Correlation with other asset classes', group: 'Intrinsic to the asset',
+    tip: 'Whether it tends to rise and fall together with the other asset classes here, or independently — low correlation is what makes diversification actually work.' },
   { key: 'liquidity', label: 'Liquidity', group: 'Practical considerations',
     tip: 'How fast you can turn this into spendable cash without taking a discount — matters most when you need money on short notice.' },
   { key: 'effort', label: 'Time & effort to manage', group: 'Practical considerations',
@@ -132,7 +145,7 @@ const ASSETS = [
   { key: 'equities', symbol: 'Equities', header: 'Broad global equities',
     return: { value: '~5–8%/yr nominal', desc: 'Historical baseline return for taking equity risk, blending developed and emerging markets' },
     volatility: { value: 'High', desc: '15–20% annualized volatility, drawdowns of 30–50% in severe bear markets' },
-    correlation: { value: 'Baseline', desc: 'The reference point — most other rows are described relative to this one' },
+    correlation: { value: 'Baseline', desc: 'The reference point — most other asset classes are described relative to this one' },
     liquidity: { value: 'Very high', desc: 'Sells settle in 1–2 days, tight spreads on major ETFs (e.g. VWRA)' },
     effort: { value: 'Very low', desc: 'Passive — check in a few times a year' },
     capital: { value: 'Very low', desc: 'One ETF share is enough to be diversified' },
@@ -158,13 +171,13 @@ const ASSETS = [
     liquidity: { value: 'Very high', desc: 'Major government/aggregate bond ETFs trade as easily as equity ETFs' },
     effort: { value: 'Very low', desc: 'Passive, with occasional duration/credit review' },
     capital: { value: 'Very low', desc: 'One ETF share' },
-    tax: { value: 'Ordinary income', desc: 'Interest income is usually taxed as ordinary income — the least tax-efficient row here' },
+    tax: { value: 'Ordinary income', desc: 'Interest income is usually taxed as ordinary income — the least tax-efficient asset class here' },
     control: { value: 'Very low', desc: 'Pure exposure to rates and credit markets' },
     role: { tag: 'Ballast', desc: 'Dampens overall portfolio volatility and holds value when equities fall' },
   },
   { key: 'reits', symbol: 'REITs', header: 'REITs / real estate',
     return: { value: 'Moderate', desc: 'Historically near broad-equity returns, with more of it paid out as income' },
-    volatility: { value: 'High', desc: 'Sensitive to both equity sentiment and interest rates — hit hardest of all rows in 2008' },
+    volatility: { value: 'High', desc: 'Sensitive to both equity sentiment and interest rates — hit hardest of all asset classes in 2008' },
     correlation: { value: 'Moderate-high', desc: 'Tracks equities day to day, with its own added sensitivity to interest rates' },
     liquidity: { value: 'High', desc: 'Trades like any ETF, even though the underlying property itself is illiquid' },
     effort: { value: 'Very low', desc: 'Passive, same as broad equities' },
@@ -191,7 +204,7 @@ const ASSETS = [
     liquidity: { value: 'Very low', desc: 'No public market — cashing out needs a buyer or a sale process' },
     effort: { value: 'Very high', desc: 'Trades time directly for return, often full-time' },
     capital: { value: 'Varies widely', desc: 'Near-zero for a service business, substantial for inventory or staff' },
-    tax: { value: 'Ordinary income', desc: 'Self-employment income, but opens deductions the other rows don’t have' },
+    tax: { value: 'Ordinary income', desc: 'Self-employment income, but opens deductions the other asset classes don’t have' },
     control: { value: 'Very high', desc: 'Your decisions directly move the outcome' },
     role: { tag: 'Optionality', desc: 'Uncapped upside and a direct channel for skill and effort to compound' },
   },
@@ -202,16 +215,18 @@ const ASSETS = [
     liquidity: { value: 'None', desc: 'Can’t be sold — only monetized by continuing to work' },
     effort: { value: 'Very high', desc: 'Literally selling your time, typically 40+ hrs/week' },
     capital: { value: 'None financially', desc: 'But requires prior investment in skills, education, or network' },
-    tax: { value: 'Ordinary income', desc: 'Usually the highest marginal rate of any row here' },
+    tax: { value: 'Ordinary income', desc: 'Usually the highest marginal rate of any asset class here' },
     control: { value: 'Moderate', desc: 'You influence performance, but the employer controls the terms' },
-    role: { tag: 'Income foundation', desc: 'The base cash flow that funds contributions to every other row' },
+    role: { tag: 'Income foundation', desc: 'The base cash flow that funds contributions to every other asset class' },
   },
 ];
 
 const MOBILE_BREAKPOINT = 640;
 const MIN_SELECTED = 3;
 const SELECTED_KEY = 'imago-asset-comparison-selected';
+const SELECTED_DIMS_KEY = 'imago-asset-comparison-selected-dims';
 const COLLAPSED_KEY = 'imago-asset-comparison-collapsed-groups';
+const FILTER_MODE_KEY = 'imago-asset-comparison-filter-mode';
 
 function loadSet(key, fallback) {
   try {
@@ -225,7 +240,9 @@ function loadSet(key, fallback) {
 function saveState() {
   try {
     localStorage.setItem(SELECTED_KEY, JSON.stringify([...selected]));
+    localStorage.setItem(SELECTED_DIMS_KEY, JSON.stringify([...selectedDimensions]));
     localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...collapsedGroups]));
+    localStorage.setItem(FILTER_MODE_KEY, filterMode);
   } catch {}
 }
 
@@ -241,6 +258,18 @@ let MAX_SELECTED = computeMaxSelected();
 if (selected.size > MAX_SELECTED) {
   selected = new Set(ASSETS.filter(a => selected.has(a.key)).slice(0, MAX_SELECTED).map(a => a.key));
 }
+
+const VALID_DIM_KEYS = new Set(DIMENSIONS.map(d => d.key));
+const ALL_DIM_KEYS = DIMENSIONS.map(d => d.key);
+let selectedDimensions = loadSet(SELECTED_DIMS_KEY, ALL_DIM_KEYS);
+selectedDimensions = new Set([...selectedDimensions].filter(k => VALID_DIM_KEYS.has(k)));
+if (selectedDimensions.size === 0) selectedDimensions = new Set(ALL_DIM_KEYS);
+
+let filterMode = 'asset';
+try {
+  if (localStorage.getItem(FILTER_MODE_KEY) === 'dimension') filterMode = 'dimension';
+} catch {}
+
 let collapsedGroups = loadSet(COLLAPSED_KEY, []);
 
 function escapeAttr(s) {
@@ -251,22 +280,47 @@ function tipIcon(text) {
   return `<sup class="tip-icon" role="button" tabindex="0" aria-label="More info" data-tip="${escapeAttr(text)}">ⓘ</sup>`;
 }
 
-function cellHTML(value) {
+function cellHTML(value, asset, dim) {
   if (value === undefined || value === null || value === '') return '<span class="cell-empty">—</span>';
   if (typeof value === 'object' && !Array.isArray(value)) {
-    const attrs = `role="button" tabindex="0" aria-label="More info" data-tip="${escapeAttr(value.desc)}"`;
+    const title = value.tag || value.value;
+    const attrs = `role="button" tabindex="0" aria-label="More info" data-tip="${escapeAttr(value.desc)}" `
+      + `data-asset="${escapeAttr(asset.header)}" data-dim="${escapeAttr(dim.label)}" data-title="${escapeAttr(title)}"`;
     if (value.tag) {
       const cls = ROLE_TAG_CLASS[value.tag] || '';
-      return `<span class="tag ${cls} tip-underline" ${attrs}>${value.tag}</span>`;
+      return `<span class="tag ${cls}" ${attrs}>${value.tag}</span>`;
     }
     return `<span class="cell-value tip-underline" ${attrs}>${value.value}</span>`;
   }
   return Array.isArray(value) ? value.join('<br>') : value;
 }
 
-function renderPills() {
+function renderModeToggle() {
+  const wrap = document.getElementById('modeToggle');
+  wrap.innerHTML = '';
+  [['asset', 'Asset class'], ['dimension', 'Dimension']].forEach(([mode, label]) => {
+    const btn = document.createElement('button');
+    btn.className = 'mode-btn' + (filterMode === mode ? ' active' : '');
+    btn.textContent = label;
+    btn.onclick = () => {
+      if (filterMode === mode) return;
+      filterMode = mode;
+      saveState();
+      renderModeToggle();
+      renderFilterPills();
+    };
+    wrap.appendChild(btn);
+  });
+}
+
+function renderFilterPills() {
+  if (filterMode === 'dimension') renderDimensionPills();
+  else renderAssetPills();
+}
+
+function renderAssetPills() {
   document.getElementById('pillsHint').textContent = `max ${MAX_SELECTED}`;
-  const wrap = document.getElementById('assetPills');
+  const wrap = document.getElementById('filterPills');
   wrap.innerHTML = '';
   ASSETS.forEach(asset => {
     const isActive = selected.has(asset.key);
@@ -281,7 +335,30 @@ function renderPills() {
         selected.add(asset.key);
       }
       saveState();
-      renderPills();
+      renderAssetPills();
+      renderTable();
+    };
+    wrap.appendChild(btn);
+  });
+}
+
+function renderDimensionPills() {
+  document.getElementById('pillsHint').textContent = '';
+  const wrap = document.getElementById('filterPills');
+  wrap.innerHTML = '';
+  DIMENSIONS.forEach(dim => {
+    const isActive = selectedDimensions.has(dim.key);
+    const btn = document.createElement('button');
+    btn.className = 'pill' + (isActive ? ' active' : '');
+    btn.textContent = dim.label;
+    btn.onclick = () => {
+      if (isActive) {
+        if (selectedDimensions.size > 1) selectedDimensions.delete(dim.key);
+      } else {
+        selectedDimensions.add(dim.key);
+      }
+      saveState();
+      renderDimensionPills();
       renderTable();
     };
     wrap.appendChild(btn);
@@ -299,12 +376,13 @@ window.addEventListener('resize', () => {
       saveState();
       renderTable();
     }
-    renderPills();
+    renderFilterPills();
   }, 150);
 });
 
 function renderTable() {
   const visible = ASSETS.filter(a => selected.has(a.key));
+  const visibleDims = DIMENSIONS.filter(d => selectedDimensions.has(d.key));
   document.querySelector('main').classList.toggle('wide', visible.length >= 4);
 
   const thead = document.getElementById('tableHead');
@@ -313,7 +391,7 @@ function renderTable() {
   const tbody = document.getElementById('tableBody');
   const colspan = visible.length + 1;
   let lastGroup = null;
-  tbody.innerHTML = DIMENSIONS.map(dim => {
+  tbody.innerHTML = visibleDims.map(dim => {
     let groupRow = '';
     if (dim.group !== lastGroup) {
       const isCollapsed = collapsedGroups.has(dim.group);
@@ -323,7 +401,7 @@ function renderTable() {
     }
     if (collapsedGroups.has(dim.group)) return groupRow;
     const label = dim.label + (dim.tip ? tipIcon(dim.tip) : '');
-    const cells = visible.map(a => `<td>${cellHTML(a[dim.key])}</td>`).join('');
+    const cells = visible.map(a => `<td>${cellHTML(a[dim.key], a, dim)}</td>`).join('');
     return groupRow + `<tr><td>${label}</td>${cells}</tr>`;
   }).join('');
 }
@@ -337,7 +415,8 @@ document.getElementById('tableBody').addEventListener('click', e => {
   renderTable();
 });
 
-renderPills();
+renderModeToggle();
+renderFilterPills();
 renderTable();
 
 const tip = document.getElementById('tooltip');
@@ -365,12 +444,47 @@ function showTip(el) {
   tipAnchor.classList.add('open');
 }
 
+function copyText(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(() => fallbackCopyText(text));
+  } else {
+    fallbackCopyText(text);
+  }
+}
+
+function fallbackCopyText(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); } catch {}
+  document.body.removeChild(ta);
+}
+
+let copyToastTimer;
+function showCopyToast(x, y) {
+  const toast = document.getElementById('copyToast');
+  toast.textContent = 'Copied';
+  toast.style.left = x + 'px';
+  toast.style.top = (y - 10) + 'px';
+  toast.classList.add('show');
+  clearTimeout(copyToastTimer);
+  copyToastTimer = setTimeout(() => toast.classList.remove('show'), 900);
+}
+
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-tip]');
   if (el) {
     e.stopPropagation();
     if (tipAnchor === el) hideTip();
     else showTip(el);
+    if (el.dataset.asset) {
+      const md = `${el.dataset.asset}\n---\n${el.dataset.dim}:\n${el.dataset.title}\n---\n${el.dataset.tip}`;
+      copyText(md);
+      showCopyToast(e.clientX, e.clientY);
+    }
     return;
   }
   if (tip.contains(e.target)) return;
