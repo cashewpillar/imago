@@ -304,20 +304,21 @@ td.actions{text-align:right;white-space:nowrap}
         <span class="filter-chip" data-type="line" onclick="changeChartType('line', this)">Balance History</span>
         <span class="filter-chip" data-type="liquidity" onclick="changeChartType('liquidity', this)">Liquidity</span>
         <span class="filter-chip" data-type="yield" onclick="changeChartType('yield', this)">Yield</span>
+        <span class="filter-chip" data-type="goals" onclick="changeChartType('goals', this)">Fund Goals</span>
       </div>
     </div>
     <div id="chartWrap" style="display:flex; gap:20px; align-items:stretch;">
       <div class="chart-empty" id="chartEmpty" style="flex:1">No history yet — balances are auto-snapshotted each time you save changes.</div>
       
       <div class="chart-sub" id="currentChartWrap" style="display:none">
-        <div class="chart-sub-h"><span class="chart-sub-lbl">Current</span></div>
+        <div class="chart-sub-h"><span class="chart-sub-lbl" id="currentChartLbl">Current</span></div>
         <imago-chart id="mainChart"></imago-chart>
       </div>
 
       <div class="chart-sub" id="targetChartWrap" style="display:none; border-left:1px solid var(--border); padding-left:20px;">
         <div class="chart-sub-h">
-          <span class="chart-sub-lbl">Target</span>
-          <button class="icon-btn" onclick="openTargetModal()" title="Configure Targets">
+          <span class="chart-sub-lbl" id="targetChartLbl">Target</span>
+          <button class="icon-btn" onclick="openAllocationModal()" title="Configure Targets">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="3"/><path d="M12.5 12.5l-1.5-1.5M3.5 3.5l1.5 1.5M12.5 3.5l-1.5 1.5M3.5 12.5l1.5-1.5"/></svg>
           </button>
         </div>
@@ -503,6 +504,22 @@ td.actions{text-align:right;white-space:nowrap}
   </div>
 </div>
 
+<!-- Fund Goals Modal -->
+<div class="modal-backdrop" id="fundGoalModal">
+  <div class="modal">
+    <h2>Fund Goals (%)</h2>
+    <div id="fundGoalInputs"></div>
+    <div style="margin-top:14px; padding-top:10px; border-top:1px solid var(--border); display:flex; justify-content:space-between; font-weight:600; font-size:12px;">
+      <span>Total</span>
+      <span id="fundGoalTotalPct">0%</span>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="cancelFundGoals()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveFundGoals()">Save</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -632,6 +649,19 @@ let _targetsSnapshot = null;
 let _lockedTags = JSON.parse(localStorage.getItem('imago-finance-locked-tags') || '{}');
 window._allAccounts = [];
 
+// Life-priority grouping (Emergency/Growth/Fun) layered on top of the per-tag
+// targets above. Fun has no backing tags — it's a goal-only bucket that
+// always shows ₱0 on the "current" side.
+const GROUP_TAGS = {
+  emergency: ['savings', 'buffer', 'cash', 'td'],
+  growth:    ['equities', 'illiquid'],
+  fun:       [],
+};
+const DEFAULT_FUND_GOALS = {emergency: 40, growth: 40, fun: 20};
+let _fundGoals = JSON.parse(localStorage.getItem('imago-finance-fund-goals') || JSON.stringify(DEFAULT_FUND_GOALS));
+let _fundGoalsSnapshot = null;
+let _lockedFundGoals = JSON.parse(localStorage.getItem('imago-finance-locked-fund-goals') || '{}');
+
 const TAG_COLORS = {
   savings:  '#1a6b3c',
   equities: '#185fa5',
@@ -642,6 +672,32 @@ const TAG_COLORS = {
   liquid:   '#4f8c6d',
   credit:   '#a32d2d',
 };
+
+const FUND_GROUP_COLORS = {
+  emergency: TAG_COLORS.savings,
+  growth:    TAG_COLORS.equities,
+  fun:       '#b8546b',
+};
+
+const FUND_GROUP_LABELS = {
+  emergency: 'Emergency',
+  growth:    'Growth',
+  fun:       'Fun',
+};
+
+function computeFundSplit(accounts) {
+  const split = { emergency: 0, growth: 0, fun: 0 };
+  (accounts || []).forEach(a => {
+    const tag = (a.tags && a.tags[0]) || 'savings';
+    if (a.balance > 0) {
+      if (GROUP_TAGS.emergency.includes(tag)) split.emergency += a.balance;
+      else if (GROUP_TAGS.growth.includes(tag)) split.growth += a.balance;
+    } else if (tag === 'credit') {
+      split.emergency += a.balance; // net credit into emergency, same convention as donut/liquidity modes
+    }
+  });
+  return split;
+}
 
 function openTargetModal() {
   _targetsSnapshot = JSON.parse(JSON.stringify(_targets)); // snapshot for cancel
@@ -812,6 +868,147 @@ async function copyTargetTable() {
   } catch (err) {
     toast('Failed to copy.', true);
   }
+}
+
+// ── Fund Goals (Emergency/Growth/Fun) ────────────────────────────────────────
+function openAllocationModal() {
+  if (_chartType === 'goals') openFundGoalModal();
+  else openTargetModal();
+}
+
+function openFundGoalModal() {
+  _fundGoalsSnapshot = JSON.parse(JSON.stringify(_fundGoals));
+  const container = document.getElementById('fundGoalInputs');
+  const buckets = ['emergency', 'growth', 'fun'];
+  container.innerHTML = buckets.map(b => `
+    <div class="target-row" data-bucket="${b}">
+      <button class="lock-btn ${(_lockedFundGoals[b] ? 'active' : '')}" onclick="toggleFundGoalLock('${b}', this)" title="Lock amount">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+          ${_lockedFundGoals[b]
+            ? '<rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5 7V5a3 3 0 016 0v2"/>'
+            : '<rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5 7V4.5a3 3 0 014.5-2.6"/>'}
+        </svg>
+      </button>
+      <label>${FUND_GROUP_LABELS[b]}</label>
+      <input type="range" min="0" max="100" step="0.1" value="${_fundGoals[b]||0}" oninput="onFundGoalChange('${b}', this.value, 'range')">
+      <div class="target-num-wrap">
+        <button class="step-btn" type="button" onclick="stepFundGoal('${b}', -0.1)" aria-label="Decrease">‹</button>
+        <input type="number" min="0" max="100" step="0.1" value="${(_fundGoals[b]||0).toFixed(1)}" oninput="onFundGoalChange('${b}', this.value, 'number')">
+        <button class="step-btn" type="button" onclick="stepFundGoal('${b}', 0.1)" aria-label="Increase">›</button>
+      </div>
+      <span class="target-amt" id="fund-amt-${b}">₱0</span>
+    </div>
+  `).join('');
+  updateFundGoalTotalDisplay();
+  openModal('fundGoalModal');
+}
+
+function stepFundGoal(bucket, delta) {
+  const cur = _fundGoals[bucket] || 0;
+  const next = Math.max(0, Math.min(100, +(cur + delta).toFixed(1)));
+  onFundGoalChange(bucket, String(next), 'step');
+}
+
+function toggleFundGoalLock(bucket, btn) {
+  _lockedFundGoals[bucket] = !_lockedFundGoals[bucket];
+  localStorage.setItem('imago-finance-locked-fund-goals', JSON.stringify(_lockedFundGoals));
+  btn.classList.toggle('active', _lockedFundGoals[bucket]);
+  btn.innerHTML = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+    ${_lockedFundGoals[bucket]
+      ? '<rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5 7V5a3 3 0 016 0v2"/>'
+      : '<rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5 7V4.5a3 3 0 014.5-2.6"/>'}
+  </svg>`;
+}
+
+function onFundGoalChange(bucket, val, source) {
+  if (source === 'number' && (val.endsWith('.') || val.endsWith('.0'))) {
+    const row = document.querySelector(`#fundGoalInputs .target-row[data-bucket="${bucket}"]`);
+    if (row) row.querySelector('input[type="range"]').value = val;
+    return;
+  }
+
+  let parsedVal = parseFloat(val) || 0;
+  if (parsedVal > 100) parsedVal = 100;
+
+  const buckets = ['emergency', 'growth', 'fun'];
+  const others = buckets.filter(b => b !== bucket);
+
+  // Calculate fixed sum from locked "others" (ensure missing keys are 0)
+  const lockedSum = others.reduce((s, b) => s + (_lockedFundGoals[b] ? (_fundGoals[b] || 0) : 0), 0);
+
+  // Constrain parsedVal so total doesn't exceed 100 if everything else is locked
+  if (parsedVal + lockedSum > 100) {
+    parsedVal = 100 - lockedSum;
+  }
+
+  const unlockedOthers = others.filter(b => !_lockedFundGoals[b]);
+  const unlockedSum = unlockedOthers.reduce((s, b) => s + (_fundGoals[b] || 0), 0);
+
+  const remaining = 100 - parsedVal - lockedSum;
+
+  if (unlockedOthers.length > 0) {
+    if (unlockedSum > 0) {
+      unlockedOthers.forEach(b => {
+        const currentVal = _fundGoals[b] || 0;
+        _fundGoals[b] = (currentVal / unlockedSum) * remaining;
+      });
+    } else if (Math.abs(remaining) > 0.001) {
+      unlockedOthers.forEach(b => _fundGoals[b] = remaining / unlockedOthers.length);
+    }
+  } else if (Math.abs(remaining) > 0.001) {
+    parsedVal = 100 - lockedSum;
+  }
+
+  _fundGoals[bucket] = parsedVal;
+
+  const totalNW = window._allAccounts.reduce((s,a) => s + (a.balance||0), 0);
+  buckets.forEach(b => {
+    const row = document.querySelector(`#fundGoalInputs .target-row[data-bucket="${b}"]`);
+    if (row) {
+      const pct = _fundGoals[b] || 0;
+      if (!(b === bucket && source === 'range')) row.querySelector('input[type="range"]').value = pct.toFixed(1);
+      if (!(b === bucket && source === 'number')) row.querySelector('input[type="number"]').value = pct.toFixed(1);
+      document.getElementById(`fund-amt-${b}`).textContent = '₱' + fmtk(totalNW * (pct / 100));
+    }
+  });
+
+  updateFundGoalTotalDisplay();
+}
+
+function updateFundGoalTotalDisplay() {
+  let sum = 0;
+  Object.values(_fundGoals).forEach(v => sum += v);
+  const el = document.getElementById('fundGoalTotalPct');
+  el.textContent = sum.toFixed(1) + '%';
+  el.style.color = Math.abs(sum - 100) < 0.01 ? 'var(--accent)' : 'var(--danger)';
+
+  const totalNW = window._allAccounts.reduce((s,a) => s + (a.balance||0), 0);
+  ['emergency', 'growth', 'fun'].forEach(b => {
+    const amtEl = document.getElementById(`fund-amt-${b}`);
+    if (amtEl) amtEl.textContent = '₱' + fmtk(totalNW * ((_fundGoals[b]||0) / 100));
+  });
+}
+
+function saveFundGoals() {
+  const buckets = Object.keys(_fundGoals);
+  let sum = 0;
+  buckets.forEach(b => {
+    _fundGoals[b] = Math.round(_fundGoals[b] * 10) / 10;
+    sum += _fundGoals[b];
+  });
+
+  if (Math.abs(sum - 100) > 0.01 && buckets.length > 0) {
+    _fundGoals[buckets[buckets.length-1]] = Math.round((_fundGoals[buckets[buckets.length-1]] + (100 - sum)) * 10) / 10;
+  }
+
+  localStorage.setItem('imago-finance-fund-goals', JSON.stringify(_fundGoals));
+  closeModal('fundGoalModal');
+  render();
+}
+
+function cancelFundGoals() {
+  if (_fundGoalsSnapshot) _fundGoals = _fundGoalsSnapshot;
+  closeModal('fundGoalModal');
 }
 
 function changeChartType(type, el) {
@@ -1059,8 +1256,15 @@ function renderChart(history) {
     
     const currentWrap = document.getElementById('currentChartWrap');
     const targetWrap  = document.getElementById('targetChartWrap');
+    const currentLbl  = document.getElementById('currentChartLbl');
+    const targetLbl   = document.getElementById('targetChartLbl');
 
     if (!chart) return;
+
+    currentLbl.textContent = 'Current';
+    targetLbl.textContent  = 'Target';
+    chart.tooltipAnchor = 'top';
+    targetChart.tooltipAnchor = 'top';
 
     // Update active pill state
     document.querySelectorAll('#chartTypeFilters .filter-chip').forEach(c => {
@@ -1149,6 +1353,42 @@ function renderChart(history) {
       targetChart.data = targetData;
       
       period.textContent = 'Current vs Target';
+    } else if (_chartType === 'goals') {
+      document.getElementById('chartPeriodFilters').style.display = 'none';
+      const accounts = window._allAccounts || [];
+      const currentSplit = computeFundSplit(accounts);
+
+      const currentData = Object.entries(currentSplit).map(([label, value]) => ({
+        label: FUND_GROUP_LABELS[label] || label, value, color: FUND_GROUP_COLORS[label] || '#999'
+      })).filter(d => d.value > 0).sort((a,b) => b.value - a.value);
+
+      if (currentData.length === 0) {
+        empty.style.display = 'block';
+        return;
+      }
+
+      currentWrap.style.display = 'flex';
+      targetWrap.style.display  = 'flex';
+      chart.style.display = 'block';
+      chart.setAttribute('type', 'donut');
+      chart.tooltipAnchor = 'bottom-right';
+      chart.data = currentData;
+
+      const totalBalance = Object.values(currentSplit).reduce((s, v) => s + v, 0);
+      const goalData = Object.entries(_fundGoals).map(([label, pct]) => ({
+        label: FUND_GROUP_LABELS[label] || label,
+        value: totalBalance * (pct / 100),
+        color: FUND_GROUP_COLORS[label] || '#999'
+      })).filter(d => d.value > 0).sort((a,b) => b.value - a.value);
+
+      targetChart.style.display = 'block';
+      targetChart.setAttribute('type', 'donut');
+      targetChart.tooltipAnchor = 'bottom-right';
+      targetChart.data = goalData;
+
+      currentLbl.textContent = 'Current Split';
+      targetLbl.textContent  = 'Fund Goals';
+      period.textContent = 'Current vs Fund Goals';
     } else if (_chartType === 'liquidity') {
       document.getElementById('chartPeriodFilters').style.display = 'none';
       const accounts = window._allAccounts || [];
@@ -1712,6 +1952,14 @@ async function doImport(reset) {
     _lockedTags = raw.lockedTags;
     localStorage.setItem('imago-finance-locked-tags', JSON.stringify(_lockedTags));
   }
+  if (raw.fundGoals) {
+    _fundGoals = { ...DEFAULT_FUND_GOALS, ...raw.fundGoals };
+    localStorage.setItem('imago-finance-fund-goals', JSON.stringify(_fundGoals));
+  }
+  if (raw.lockedFundGoals) {
+    _lockedFundGoals = raw.lockedFundGoals;
+    localStorage.setItem('imago-finance-locked-fund-goals', JSON.stringify(_lockedFundGoals));
+  }
 
   closeModal('importModal');
   toast(reset ? 'Reset & imported.' : 'Merged.');
@@ -1737,7 +1985,9 @@ async function exportData() {
     incomes,
     rateChanges,
     targets: _targets,
-    lockedTags: _lockedTags
+    lockedTags: _lockedTags,
+    fundGoals: _fundGoals,
+    lockedFundGoals: _lockedFundGoals
   };
   const blob = new Blob([JSON.stringify(out,null,2)], {type:'application/json'});
   const url  = URL.createObjectURL(blob);
@@ -1758,7 +2008,9 @@ async function exportSavingsData() {
     history, 
     logs,
     targets: _targets,
-    lockedTags: _lockedTags
+    lockedTags: _lockedTags,
+    fundGoals: _fundGoals,
+    lockedFundGoals: _lockedFundGoals
   };
   const blob = new Blob([JSON.stringify(out,null,2)], {type:'application/json'});
   const url  = URL.createObjectURL(blob);

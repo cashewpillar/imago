@@ -8,7 +8,8 @@ class FinanceChart extends HTMLElement {
     super();
     this.attachShadow({ mode: 'open' });
     this._data = [];
-    this._type = 'line'; 
+    this._type = 'line';
+    this.tooltipAnchor = 'top'; // 'top' (centered above cursor) | 'bottom-right' (offset below-right)
     
     this.shadowRoot.innerHTML = `
       <style>
@@ -812,8 +813,17 @@ class FinanceChart extends HTMLElement {
       if (s) {
         this.tooltip.textContent = s.label + ' · ₱' + this._fmtk(s.value) + ' (' + (s.value / total * 100).toFixed(1) + '%)';
         this.tooltip.style.display = 'block';
-        this.tooltip.style.left = e.clientX + 'px';
-        this.tooltip.style.top = (e.clientY - 30) + 'px';
+        if (this.tooltipAnchor === 'bottom-right') {
+          this.tooltip.style.transform = 'none';
+          this.tooltip.style.textAlign = 'left';
+          this.tooltip.style.left = (e.clientX + 12) + 'px';
+          this.tooltip.style.top = (e.clientY + 12) + 'px';
+        } else {
+          this.tooltip.style.transform = 'translateX(-50%)';
+          this.tooltip.style.textAlign = 'center';
+          this.tooltip.style.left = e.clientX + 'px';
+          this.tooltip.style.top = (e.clientY - 30) + 'px';
+        }
       } else { this.tooltip.style.display = 'none'; }
     };
     this.canvas.onmouseleave = () => { this.tooltip.style.display = 'none'; };
