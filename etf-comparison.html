@@ -8,7 +8,7 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#f8f7f4;--surface:#fff;--border:#e2e0d8;--border-strong:#c8c5bb;
-  --text:#1a1917;--text-muted:#6b6860;--text-faint:#9c9a94;--danger:#a32d2d;
+  --text:#1a1917;--text-muted:#6b6860;--text-faint:#9c9a94;--danger:#a32d2d;--danger-bg:#fcebeb;
   --accent:#1a6b3c;--accent-bg:#eaf4ee;--warning:#854f0b;--warning-bg:#faeeda;--info:#185fa5;--info-bg:#e6f1fb;
   --r:8px;--rl:12px;
   --mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
@@ -16,6 +16,7 @@
 html,body{height:100%}
 body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;display:flex;flex-direction:column}
 main{max-width:940px;width:100%;margin:0 auto;padding:20px 16px;flex:1;display:flex;flex-direction:column;min-height:0}
+main.wide{max-width:none;padding-left:clamp(16px,4vw,64px);padding-right:clamp(16px,4vw,64px)}
 
 .pills-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .pills{display:flex;gap:6px;flex-wrap:wrap}
@@ -23,11 +24,19 @@ main{max-width:940px;width:100%;margin:0 auto;padding:20px 16px;flex:1;display:f
 .pill:hover{border-color:var(--text-muted)}
 .pill.active{background:#000;color:#fff;border-color:#000}
 .pill.disabled{opacity:.4;cursor:not-allowed}
+.pill-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--danger);margin-left:6px;vertical-align:middle}
 .pills-hint{font-size:11px;color:var(--text-faint)}
+.liquidated-toggle{margin-left:auto;font-size:11px;color:var(--text-muted);background:none;border:none;text-decoration:underline;cursor:pointer;padding:0;font-family:inherit}
+.liquidated-toggle:hover{color:var(--text)}
+.liquidated-toggle.active{color:var(--text);font-weight:600}
 
 .table-container{width:100%;flex:1;min-height:0;overflow-y:auto;border:1px solid var(--border);border-radius:var(--rl);background:var(--surface);scrollbar-width:none;-ms-overflow-style:none}
 .table-container::-webkit-scrollbar{display:none}
 table{width:100%;border-collapse:separate;border-spacing:0;text-align:left}
+@media (min-width: 641px) {
+  table{table-layout:fixed}
+  th:first-child, td:first-child{width:220px}
+}
 th{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#fff;font-weight:500;padding:9px 14px;background:#000;user-select:none;position:sticky;top:0;z-index:1}
 th:first-child{border-top-left-radius:var(--rl)}
 th:last-child{border-top-right-radius:var(--rl)}
@@ -38,6 +47,11 @@ td:first-child{font-weight:600}
 tr:last-child td{border-bottom:none}
 tr:hover td{background:#fafaf8}
 
+.group-row{cursor:pointer}
+.group-row td{background:var(--border);color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.07em;font-weight:600;padding:6px 14px;border-top:1px solid var(--border-strong)}
+.group-row:hover td{background:var(--border-strong)}
+.group-caret{display:inline-block;width:1em;font-size:10px}
+
 .dyn{color:var(--danger);font-size:13px;font-weight:400;vertical-align:super;margin-left:2px;cursor:help}
 .disclaimer{font-size:11px;color:var(--text-faint);padding-top:10px}
 .disclaimer .dyn{margin-left:0;margin-right:3px}
@@ -46,7 +60,9 @@ tr:hover td{background:#fafaf8}
 .tag-info{background:var(--info-bg);color:var(--info)}
 .tag-accent{background:var(--accent-bg);color:var(--accent)}
 .tag-warning{background:var(--warning-bg);color:var(--warning)}
+.tag-danger{background:var(--danger-bg);color:var(--danger)}
 .cell-desc{margin-top:4px}
+.cell-empty{color:var(--text-faint)}
 
 .tooltip{
   position:fixed;background:#1a1917;color:#fff;padding:6px 10px;border-radius:6px;
@@ -69,6 +85,7 @@ tr:hover td{background:#fafaf8}
 <div class="pills-row">
   <div class="pills" id="tickerPills"></div>
   <span class="pills-hint" id="pillsHint"></span>
+  <button class="liquidated-toggle" id="liquidatedToggle" onclick="toggleLiquidated()"></button>
 </div>
 <div class="table-container">
 <table>
@@ -81,21 +98,22 @@ tr:hover td{background:#fafaf8}
 <div id="tooltip" class="tooltip"></div>
 <script>
 const DIMENSIONS = [
-  { key: 'fullName', label: 'Full name' },
-  { key: 'isin', label: 'ISIN' },
-  { key: 'domicile', label: 'Domicile' },
-  { key: 'mgmtStyle', label: 'Management style' },
-  { key: 'strategy', label: 'Strategy (in full)' },
-  { key: 'isAcc', label: 'Is accumulating?' },
-  { key: 'geo', label: 'Geographic scope — top markets', dynamic: true,
+  { key: 'fullName', label: 'Full name', group: 'Identity' },
+  { key: 'isin', label: 'ISIN', group: 'Identity' },
+  { key: 'domicile', label: 'Domicile', group: 'Identity' },
+  { key: 'status', label: 'Status', group: 'Identity', optional: true },
+  { key: 'mgmtStyle', label: 'Management style', group: 'Structure' },
+  { key: 'strategy', label: 'Strategy (in full)', group: 'Structure' },
+  { key: 'isAcc', label: 'Is accumulating?', group: 'Structure' },
+  { key: 'geo', label: 'Geographic scope — top markets', group: 'Composition', dynamic: true,
     tip: 'Shifts with market movements and index rebalancing — verify current figures' },
-  { key: 'ter', label: 'TER', dynamic: true,
+  { key: 'ter', label: 'TER', group: 'Composition', dynamic: true,
     tip: 'Fee levels can change — verify current figures' },
-  { key: 'top10', label: 'Top 10 holdings (%)', dynamic: true,
+  { key: 'top10', label: 'Top 10 holdings (%)', group: 'Composition', dynamic: true,
     tip: 'Shifts with market movements and index rebalancing — verify current figures' },
-  { key: 'sector', label: 'Sector tilt', dynamic: true,
+  { key: 'sector', label: 'Sector tilt', group: 'Composition', dynamic: true,
     tip: 'Shifts with market movements and index rebalancing — verify current figures' },
-  { key: 'numHoldings', label: 'Number of holdings', dynamic: true,
+  { key: 'numHoldings', label: 'Number of holdings', group: 'Composition', dynamic: true,
     tip: 'Shifts with index rebalancing — verify current figures' },
 ];
 
@@ -108,9 +126,9 @@ const FUNDS = [
     mgmtStyle: 'Passive, index-tracking',
     strategy: { tag: 'Cap-weighted', desc: 'Holds the whole global market as-is, no tilt' },
     isAcc: 'Yes',
-    geo: 'Global: ~3,800 holdings across developed + emerging markets',
+    geo: ['US 62%', 'Japan 6%', 'UK 3%', 'Taiwan 3%', 'Canada 3%', 'Other 23%'],
     ter: '0.14%',
-    top10: ['Nvidia 4.7%', 'Apple 4.3%', 'Alphabet 3.8%', 'Microsoft 3.2%', 'Amazon 2.5%', '— top 10 ≈ 24.6% of fund'],
+    top10: ['Nvidia 4.7%', 'Apple 4.3%', 'Alphabet (A) 3.8%', 'Microsoft 3.2%', 'Amazon 2.5%', 'Taiwan Semiconductor 1.8%', 'Broadcom 1.7%', 'Alphabet (C) 1.6%', 'Micron 1.2%', 'Meta Platforms 1.2%', '— top 10 ≈ 24.6% of fund'],
     sector: ['Tech 31%', 'Financials 17%', 'Industrials 11%', 'Consumer Cyclical 9%', 'Healthcare 8%', 'Other 24%'],
     numHoldings: '~3,800',
   },
@@ -136,7 +154,7 @@ const FUNDS = [
     mgmtStyle: 'Passive, index-tracking',
     strategy: { tag: 'Equal weight', desc: 'Every S&amp;P 500 constituent gets ~0.2% regardless of size, no valuation screen at all' },
     isAcc: 'Yes',
-    geo: '100% United States',
+    geo: '100% US',
     ter: '0.15%',
     top10: '~500 holdings, none above ~0.2–0.3% — top 10 ≈ 2–3%',
     sector: 'Naturally de-weights mega-cap tech vs. the cap-weighted S&amp;P 500',
@@ -144,9 +162,11 @@ const FUNDS = [
   },
   {
     ticker: 'VDVA',
+    archived: true,
     fullName: 'Vanguard Global Value Factor UCITS ETF',
     isin: 'IE00BYYR0B57 (Acc)',
     domicile: 'Ireland',
+    status: '<span class="tag tag-danger">Dissolved / liquidated</span> — confirm current status before acting on this row',
     mgmtStyle: '<strong>Active</strong> (index used as reference only)',
     strategy: { tag: 'Value factor', desc: "Stock selection and weighting are at the manager's discretion within that value mandate, not a fixed rules-based index" },
     isAcc: 'Yes',
@@ -167,19 +187,58 @@ const FUNDS = [
     geo: ['Japan 20%', 'UK 12%', 'Canada 12%', 'Switzerland 9%', 'Other 47%'],
     ter: '0.15%',
     top10: ['ASML Holding 2.6%', 'HSBC Holdings 1.4%', 'Roche 1.2%', 'Royal Bank of Canada 1.2%', 'Novartis 1.2%', 'Nestlé 1.2%', 'AstraZeneca 1.0%', 'Shell 1.0%', 'Siemens 1.0%', 'Mitsubishi UFJ 0.9%', '— top 10 ≈ 12.7%'],
-    sector: ['Finance 30%', 'Industrials 15%', 'Technology 11%', 'Healthcare 9%', 'Other 35%'],
+    sector: ['Financials 30%', 'Industrials 15%', 'Tech 11%', 'Healthcare 9%', 'Other 35%'],
     numHoldings: '~735',
   },
 ];
 
 const MOBILE_BREAKPOINT = 640;
 const MIN_SELECTED = 3;
-let selected = new Set(['VWRA', 'IWVL', 'XDEW']);
-let MAX_SELECTED = computeMaxSelected();
+const SELECTED_KEY = 'imago-etf-comparison-selected-tickers';
+const COLLAPSED_KEY = 'imago-etf-comparison-collapsed-groups';
+const SHOW_LIQUIDATED_KEY = 'imago-etf-comparison-show-liquidated';
+
+function loadSet(key, fallback) {
+  try {
+    const raw = JSON.parse(localStorage.getItem(key));
+    return Array.isArray(raw) ? new Set(raw) : new Set(fallback);
+  } catch {
+    return new Set(fallback);
+  }
+}
+
+function saveState() {
+  try {
+    localStorage.setItem(SELECTED_KEY, JSON.stringify([...selected]));
+    localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...collapsedGroups]));
+    localStorage.setItem(SHOW_LIQUIDATED_KEY, showLiquidated ? '1' : '0');
+  } catch {}
+}
+
+function pillFunds() {
+  return FUNDS.filter(f => !f.archived || showLiquidated);
+}
 
 function computeMaxSelected() {
-  return window.innerWidth <= MOBILE_BREAKPOINT ? MIN_SELECTED : FUNDS.length;
+  return window.innerWidth <= MOBILE_BREAKPOINT ? MIN_SELECTED : pillFunds().length;
 }
+
+let showLiquidated = (() => {
+  try { return localStorage.getItem(SHOW_LIQUIDATED_KEY) === '1'; } catch { return false; }
+})();
+
+const VALID_TICKERS = new Set(FUNDS.map(f => f.ticker));
+let selected = loadSet(SELECTED_KEY, ['VWRA', 'IWVL', 'XDEW']);
+selected = new Set([...selected].filter(t => VALID_TICKERS.has(t)));
+if (!showLiquidated) {
+  selected = new Set([...selected].filter(t => !FUNDS.find(f => f.ticker === t)?.archived));
+}
+if (selected.size === 0) selected = new Set(['VWRA', 'IWVL', 'XDEW']);
+let MAX_SELECTED = computeMaxSelected();
+if (selected.size > MAX_SELECTED) {
+  selected = new Set(FUNDS.filter(f => selected.has(f.ticker)).slice(0, MAX_SELECTED).map(f => f.ticker));
+}
+let collapsedGroups = loadSet(COLLAPSED_KEY, []);
 
 const STRATEGY_TAG_CLASS = {
   'Cap-weighted': 'tag-info',
@@ -188,7 +247,8 @@ const STRATEGY_TAG_CLASS = {
 };
 
 function cellHTML(value) {
-  if (value && typeof value === 'object' && !Array.isArray(value)) {
+  if (value === undefined || value === null || value === '') return '<span class="cell-empty">—</span>';
+  if (typeof value === 'object' && !Array.isArray(value)) {
     const cls = STRATEGY_TAG_CLASS[value.tag] || '';
     return `<span class="tag ${cls}">${value.tag}</span><div class="cell-desc">${value.desc}</div>`;
   }
@@ -199,23 +259,43 @@ function renderPills() {
   document.getElementById('pillsHint').textContent = `max ${MAX_SELECTED}`;
   const wrap = document.getElementById('tickerPills');
   wrap.innerHTML = '';
-  FUNDS.forEach(fund => {
+  pillFunds().forEach(fund => {
     const isActive = selected.has(fund.ticker);
     const isDisabled = !isActive && selected.size >= MAX_SELECTED;
     const btn = document.createElement('button');
     btn.className = 'pill' + (isActive ? ' active' : '') + (isDisabled ? ' disabled' : '');
-    btn.textContent = fund.ticker;
+    btn.innerHTML = fund.ticker + (fund.archived ? '<span class="pill-dot" title="Liquidated"></span>' : '');
     btn.onclick = () => {
       if (isActive) {
         if (selected.size > 1) selected.delete(fund.ticker);
       } else if (selected.size < MAX_SELECTED) {
         selected.add(fund.ticker);
       }
+      saveState();
       renderPills();
       renderTable();
     };
     wrap.appendChild(btn);
   });
+
+  const liquidatedBtn = document.getElementById('liquidatedToggle');
+  liquidatedBtn.textContent = showLiquidated ? 'Hide liquidated' : 'Show liquidated';
+  liquidatedBtn.classList.toggle('active', showLiquidated);
+}
+
+function toggleLiquidated() {
+  showLiquidated = !showLiquidated;
+  if (!showLiquidated) {
+    selected = new Set([...selected].filter(t => !FUNDS.find(f => f.ticker === t)?.archived));
+    if (selected.size === 0) selected = new Set(['VWRA', 'IWVL', 'XDEW']);
+  }
+  MAX_SELECTED = computeMaxSelected();
+  if (selected.size > MAX_SELECTED) {
+    selected = new Set(FUNDS.filter(f => selected.has(f.ticker)).slice(0, MAX_SELECTED).map(f => f.ticker));
+  }
+  saveState();
+  renderPills();
+  renderTable();
 }
 
 let resizeTimer;
@@ -226,6 +306,7 @@ window.addEventListener('resize', () => {
     if (selected.size > MAX_SELECTED) {
       const trimmed = FUNDS.filter(f => selected.has(f.ticker)).slice(0, MAX_SELECTED).map(f => f.ticker);
       selected = new Set(trimmed);
+      saveState();
       renderTable();
     }
     renderPills();
@@ -234,17 +315,39 @@ window.addEventListener('resize', () => {
 
 function renderTable() {
   const visibleFunds = FUNDS.filter(f => selected.has(f.ticker));
+  document.querySelector('main').classList.toggle('wide', visibleFunds.length >= 4);
 
   const thead = document.getElementById('tableHead');
   thead.innerHTML = `<tr><th>Dimension</th>${visibleFunds.map(f => `<th>${f.ticker}</th>`).join('')}</tr>`;
 
+  const renderableDims = DIMENSIONS.filter(dim => !dim.optional || visibleFunds.some(f => f[dim.key]));
+
   const tbody = document.getElementById('tableBody');
-  tbody.innerHTML = DIMENSIONS.map(dim => {
+  const colspan = visibleFunds.length + 1;
+  let lastGroup = null;
+  tbody.innerHTML = renderableDims.map(dim => {
+    let groupRow = '';
+    if (dim.group !== lastGroup) {
+      const isCollapsed = collapsedGroups.has(dim.group);
+      const caret = isCollapsed ? '▸' : '▾';
+      groupRow = `<tr class="group-row" data-group="${dim.group}"><td colspan="${colspan}"><span class="group-caret">${caret}</span>${dim.group}</td></tr>`;
+      lastGroup = dim.group;
+    }
+    if (collapsedGroups.has(dim.group)) return groupRow;
     const label = dim.label + (dim.dynamic ? `<sup class="dyn" data-tip="${dim.tip}">*</sup>` : '');
     const cells = visibleFunds.map(f => `<td>${cellHTML(f[dim.key])}</td>`).join('');
-    return `<tr><td>${label}</td>${cells}</tr>`;
+    return groupRow + `<tr><td>${label}</td>${cells}</tr>`;
   }).join('');
 }
+
+document.getElementById('tableBody').addEventListener('click', e => {
+  const row = e.target.closest('.group-row');
+  if (!row) return;
+  const g = row.dataset.group;
+  if (collapsedGroups.has(g)) collapsedGroups.delete(g); else collapsedGroups.add(g);
+  saveState();
+  renderTable();
+});
 
 renderPills();
 renderTable();
