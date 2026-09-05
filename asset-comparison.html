@@ -28,7 +28,7 @@ main.wide{max-width:none;padding-left:clamp(16px,4vw,64px);padding-right:clamp(1
 
 .table-container{width:100%;flex:1;min-height:0;overflow-y:auto;border:1px solid var(--border);border-radius:var(--rl);background:var(--surface);scrollbar-width:none;-ms-overflow-style:none}
 .table-container::-webkit-scrollbar{display:none}
-table{width:100%;border-collapse:separate;border-spacing:0;text-align:left}
+table{width:100%;border-collapse:separate;border-spacing:0;text-align:left;user-select:none}
 @media (min-width: 641px) {
   table{table-layout:fixed}
   th:first-child, td:first-child{width:220px}
@@ -48,7 +48,12 @@ tr:hover td{background:#fafaf8}
 .group-row:hover td{background:var(--border-strong)}
 .group-caret{display:inline-block;width:1em;font-size:10px}
 
-.tip-icon{color:var(--text-faint);font-size:11px;vertical-align:super;margin-left:2px;cursor:help}
+.tip-icon{color:var(--text-faint);font-size:12px;vertical-align:super;margin-left:2px;cursor:pointer;display:inline-block;padding:2px 4px;line-height:1;border-radius:4px}
+.tip-icon:hover,.tip-icon:focus-visible{color:var(--text);background:var(--border)}
+.tip-icon.open{color:var(--text);background:var(--border-strong)}
+.tip-underline{border-bottom:1px dotted #8a5a2b;cursor:pointer;padding-bottom:1px}
+.tip-underline:hover,.tip-underline:focus-visible{border-bottom-color:var(--text)}
+.tip-underline.open{border-bottom-style:solid;border-bottom-color:var(--text)}
 .disclaimer{font-size:11px;color:var(--text-faint);padding-top:10px}
 
 .tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;white-space:nowrap}
@@ -57,12 +62,11 @@ tr:hover td{background:#fafaf8}
 .tag-warning{background:var(--warning-bg);color:var(--warning)}
 .tag-danger{background:var(--danger-bg);color:var(--danger)}
 .cell-value{font-weight:600}
-.cell-desc{margin-top:4px;color:var(--text-muted);font-weight:400}
 .cell-empty{color:var(--text-faint)}
 
 .tooltip{
   position:fixed;background:#1a1917;color:#fff;padding:6px 10px;border-radius:6px;
-  font-size:11px;pointer-events:none;z-index:10000;
+  font-size:11px;z-index:10000;user-select:text;
   display:none;max-width:220px;line-height:1.4;text-align:left;
   box-shadow:0 4px 12px rgba(0,0,0,0.15);font-family:system-ui,-apple-system,sans-serif;
 }
@@ -89,6 +93,7 @@ tr:hover td{background:#fafaf8}
 </table>
 </div>
 <p class="disclaimer">Comparing asset classes in general, not individual funds or tickers — figures are long-run, order-of-magnitude estimates for building intuition, not forecasts, advice, or jurisdiction-specific tax guidance. All columns except Own business and Career assume access as an ETF through IBKR.</p>
+<p class="disclaimer">Cash and time deposits play a different game than the rest of this table — they're not here to compete on return, they always lose that. They're here to answer "how much of my wealth should sit out of growth assets" rather than "which growth asset should I pick."</p>
 </main>
 <div id="tooltip" class="tooltip"></div>
 <script>
@@ -238,14 +243,23 @@ if (selected.size > MAX_SELECTED) {
 }
 let collapsedGroups = loadSet(COLLAPSED_KEY, []);
 
+function escapeAttr(s) {
+  return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+function tipIcon(text) {
+  return `<sup class="tip-icon" role="button" tabindex="0" aria-label="More info" data-tip="${escapeAttr(text)}">ⓘ</sup>`;
+}
+
 function cellHTML(value) {
   if (value === undefined || value === null || value === '') return '<span class="cell-empty">—</span>';
   if (typeof value === 'object' && !Array.isArray(value)) {
+    const attrs = `role="button" tabindex="0" aria-label="More info" data-tip="${escapeAttr(value.desc)}"`;
     if (value.tag) {
       const cls = ROLE_TAG_CLASS[value.tag] || '';
-      return `<span class="tag ${cls}">${value.tag}</span><div class="cell-desc">${value.desc}</div>`;
+      return `<span class="tag ${cls} tip-underline" ${attrs}>${value.tag}</span>`;
     }
-    return `<div class="cell-value">${value.value}</div><div class="cell-desc">${value.desc}</div>`;
+    return `<span class="cell-value tip-underline" ${attrs}>${value.value}</span>`;
   }
   return Array.isArray(value) ? value.join('<br>') : value;
 }
@@ -308,7 +322,7 @@ function renderTable() {
       lastGroup = dim.group;
     }
     if (collapsedGroups.has(dim.group)) return groupRow;
-    const label = dim.label + (dim.tip ? `<sup class="tip-icon" data-tip="${dim.tip}">ⓘ</sup>` : '');
+    const label = dim.label + (dim.tip ? tipIcon(dim.tip) : '');
     const cells = visible.map(a => `<td>${cellHTML(a[dim.key])}</td>`).join('');
     return groupRow + `<tr><td>${label}</td>${cells}</tr>`;
   }).join('');
@@ -327,20 +341,63 @@ renderPills();
 renderTable();
 
 const tip = document.getElementById('tooltip');
-document.addEventListener('mouseover', e => {
-  const el = e.target.closest('.tip-icon[data-tip]');
-  if (!el) return;
+let tipAnchor = null;
+
+function hideTip() {
+  tip.style.display = 'none';
+  if (tipAnchor) tipAnchor.classList.remove('open');
+  tipAnchor = null;
+}
+
+function showTip(el) {
   tip.textContent = el.dataset.tip;
   tip.style.display = 'block';
   const r = el.getBoundingClientRect();
-  tip.style.left = Math.min(r.right + 8, window.innerWidth - 230) + 'px';
-  tip.style.top = r.top + 'px';
+  const tr = tip.getBoundingClientRect();
+  let left = r.right + 8;
+  if (left + tr.width > window.innerWidth - 8) left = Math.max(8, r.left - tr.width - 8);
+  let top = r.top;
+  if (top + tr.height > window.innerHeight - 8) top = Math.max(8, window.innerHeight - tr.height - 8);
+  tip.style.left = left + 'px';
+  tip.style.top = top + 'px';
+  if (tipAnchor) tipAnchor.classList.remove('open');
+  tipAnchor = el;
+  tipAnchor.classList.add('open');
+}
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-tip]');
+  if (el) {
+    e.stopPropagation();
+    if (tipAnchor === el) hideTip();
+    else showTip(el);
+    return;
+  }
+  if (tip.contains(e.target)) return;
+  if (tipAnchor) hideTip();
 });
+
+document.addEventListener('mouseover', e => {
+  const el = e.target.closest('[data-tip]');
+  if (el && tipAnchor !== el) showTip(el);
+});
+
 document.addEventListener('mouseout', e => {
-  const el = e.target.closest('.tip-icon[data-tip]');
-  if (!el) return;
-  tip.style.display = 'none';
+  const el = e.target.closest('[data-tip]');
+  if (el && !el.contains(e.relatedTarget)) hideTip();
 });
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { hideTip(); return; }
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-tip]')) {
+    e.preventDefault();
+    e.target.click();
+  }
+});
+
+document.querySelector('.table-container').addEventListener('scroll', hideTip, { passive: true });
+window.addEventListener('scroll', hideTip, { passive: true });
+window.addEventListener('resize', hideTip);
 </script>
 <script src="pwa-register.js"></script>
 </body>
