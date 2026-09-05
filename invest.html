@@ -467,10 +467,12 @@ function fmtUsd(v) { return '$' + v.toLocaleString(undefined, { maximumFractionD
 function fmtPhp(v) { return '₱' + v.toLocaleString(undefined, { maximumFractionDigits: 0 }); }
 
 // ── Price/FX lookups ──────────────────────────────────────────────────────────
-// Only VWRA has a real price series bundled today (scripts/benchmarks-data.js).
-// Any other ticker symbol falls back to flat cost-basis (no simulated growth)
-// until its own series is added to that file and matched here by symbol.
-let _vwraPoints = [], _fxPoints = [];
+// A ticker's benchmark source key is just its symbol lowercased (matching
+// scripts/fetch-benchmarks.js's convention). Any ticker with no matching
+// source in `benchmarks` (run scripts/fetch-benchmarks.js against its
+// yahooSymbol in scripts/etf-catalog.js to add one) falls back to flat
+// cost-basis in buyValueAt below -- never fabricated performance.
+let _pricesBySource = {}, _fxPoints = [];
 
 function valueAtOrBefore(points, date) {
   if (!points.length) return null;
@@ -482,8 +484,8 @@ function valueAtOrBefore(points, date) {
   return (best || points[0]).value;
 }
 function priceAt(symbol, date) {
-  if (symbol === 'VWRA') return valueAtOrBefore(_vwraPoints, date);
-  return null;
+  const points = _pricesBySource[symbol.toLowerCase()];
+  return points ? valueAtOrBefore(points, date) : null;
 }
 function fxAt(date) { return valueAtOrBefore(_fxPoints, date) ?? 1; }
 
@@ -536,7 +538,12 @@ async function render() {
     db.tickers.toArray(), db.buys.toArray(), realDb.benchmarks.toArray()
   ]);
 
-  _vwraPoints = benchmarks.filter(r => r.source === 'vwra').map(r => ({ date: r.date, value: r.value })).sort((a, b) => a.date.localeCompare(b.date));
+  _pricesBySource = {};
+  benchmarks.forEach(r => {
+    if (r.source === 'usdphp' || r.source === 'phCpi') return;
+    (_pricesBySource[r.source] = _pricesBySource[r.source] || []).push({ date: r.date, value: r.value });
+  });
+  Object.values(_pricesBySource).forEach(points => points.sort((a, b) => a.date.localeCompare(b.date)));
   _fxPoints = benchmarks.filter(r => r.source === 'usdphp').map(r => ({ date: r.date, value: r.value })).sort((a, b) => a.date.localeCompare(b.date));
 
   const tickerById = new Map(tickers.map(t => [t.id, t]));

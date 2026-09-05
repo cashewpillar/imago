@@ -28,7 +28,9 @@ const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..');
 const DATA_PATH = path.join(ROOT, 'scripts', 'benchmarks-data.js');
+const CATALOG_PATH = path.join(ROOT, 'scripts', 'etf-catalog.js');
 const CONSUMER_FILES = ['savings.html', 'expenses.html', 'performance.html', 'invest.html'];
+const BACKFILL_START = '2000-01-01'; // Yahoo clamps to a fund's real inception automatically
 
 const HEADER = fetchedDate => `// Historical benchmark series for performance.html / invest.html, fetched
 // periodically (see scripts/fetch-benchmarks.js) and bundled as static data
@@ -44,20 +46,23 @@ const HEADER = fetchedDate => `// Historical benchmark series for performance.ht
 //   Philippines, all-items index (COICOP_1999=_T), monthly. Only available
 //   from 2010-01 onward in this dataset -- earlier PH CPI history isn't
 //   published here. (c) International Monetary Fund -- see imf.org/external/terms.htm.
-// - vwra: VWRA.L (Vanguard FTSE All-World UCITS ETF, USD-accumulating share
-//   class), priced in USD, traded on the LSE. Fetched from Yahoo Finance's
-//   chart endpoint, resampled to one point per month. Only available from
-//   2019-07 onward -- that's the ETF's actual inception, not a data-source
-//   limitation. This is a raw price LEVEL (not a %), meant for a rebased/
-//   indexed cumulative-growth comparison -- see performance.html's Growth
-//   Comparison chart, not the Yield Trend chart (which is rate-based).
+// - one source per ticker in scripts/etf-catalog.js that has a \`yahooSymbol\`
+//   (source key = that ticker's \`symbol\` lowercased, e.g. VWRA -> 'vwra'),
+//   priced in USD, fetched from Yahoo Finance's chart endpoint and resampled
+//   to one point per month. A ticker with no \`yahooSymbol\` in the catalog
+//   (e.g. a liquidated fund) simply has no source here and no fetch is
+//   attempted for it. Each is a raw price LEVEL (not a %), meant for a
+//   rebased/indexed cumulative-growth comparison, or for invest.html's
+//   per-ticker compounding -- not a yield/rate series.
 //
 // To refresh: run \`node scripts/fetch-benchmarks.js\` -- it fetches only new
 // data since each source's last stored MONTH (re-checking that last month
 // too, since e.g. CPI figures are commonly revised after first publication),
 // merges it in, and bumps \`?v=N\` in the consuming <script> tags automatically
-// when anything actually changed. Values here are still a point-in-time
-// snapshot, not a live feed.
+// when anything actually changed. A ticker newly added to
+// scripts/etf-catalog.js with a \`yahooSymbol\` gets a full historical backfill
+// the first time this runs. Values here are still a point-in-time snapshot,
+// not a live feed.
 //
 // IMPORTANT: this file is loaded via a plain \`<script src="scripts/benchmarks-data.js?v=N">\`
 // tag (savings.html, expenses.html, performance.html, invest.html) -- not the
@@ -66,12 +71,21 @@ const HEADER = fetchedDate => `// Historical benchmark series for performance.ht
 // injected (async-by-default) script tag can't guarantee.
 `;
 
-function loadExisting() {
-  const src = fs.readFileSync(DATA_PATH, 'utf8');
+function loadSandboxed(filePath, globalName) {
+  const src = fs.readFileSync(filePath, 'utf8');
   const sandbox = { window: {} };
   vm.createContext(sandbox);
-  vm.runInContext(src, sandbox, { filename: DATA_PATH });
-  return sandbox.window.BENCHMARKS_DATA;
+  vm.runInContext(src, sandbox, { filename: filePath });
+  return sandbox.window[globalName];
+}
+
+function loadExisting() { return loadSandboxed(DATA_PATH, 'BENCHMARKS_DATA'); }
+
+function loadTickerSources() {
+  const catalog = loadSandboxed(CATALOG_PATH, 'ETF_CATALOG') || [];
+  return new Map(
+    catalog.filter(c => c.yahooSymbol).map(c => [c.symbol.toLowerCase(), c.yahooSymbol])
+  );
 }
 
 function todayStr() { return new Date().toISOString().slice(0, 10); }
@@ -120,12 +134,12 @@ function mergeNewMonthly(existingPoints, newPoints) {
   return { merged, added, revised };
 }
 
-async function fetchVwraDaily(fromDate, toDate) {
+async function fetchYahooDaily(yahooSymbol, fromDate, toDate) {
   const period1 = Math.floor(new Date(fromDate + 'T00:00:00Z').getTime() / 1000);
   const period2 = Math.floor(new Date(toDate + 'T00:00:00Z').getTime() / 1000) + 86400;
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/VWRA.L?period1=${period1}&period2=${period2}&interval=1d`;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?period1=${period1}&period2=${period2}&interval=1d`;
   const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-  if (!res.ok) throw new Error(`Yahoo Finance request failed: ${res.status}`);
+  if (!res.ok) throw new Error(`Yahoo Finance request failed for ${yahooSymbol}: ${res.status}`);
   const json = await res.json();
   const result = json.chart && json.chart.result && json.chart.result[0];
   if (!result) return [];
@@ -198,36 +212,46 @@ function bumpConsumerVersions() {
 
 async function main() {
   const existing = loadExisting();
+  const tickerSources = loadTickerSources();
   const today = todayStr();
   let anyAdded = false;
   const nextData = {};
 
-  for (const source of Object.keys(existing)) {
+  // Union of sources already in the data file and every catalog ticker that
+  // has a yahooSymbol -- so a brand-new ticker (no existing entry yet) gets
+  // picked up and fully backfilled, not just already-tracked sources refreshed.
+  const allSources = [...new Set([...Object.keys(existing), ...tickerSources.keys()])];
+
+  for (const source of allSources) {
+    const existingPoints = existing[source] || [];
+    const isNewSource = existingPoints.length === 0;
     // Re-fetches from the START of the last stored month (not the day after
     // it) so a since-revised figure for that month gets picked up -- see
     // mergeNewMonthly's comment. Cheap either way: this is at most a couple
-    // of months of data, never the full history.
-    const from = firstOfMonth(lastDate(existing[source]));
+    // of months of data, never the full history -- except a brand-new
+    // source, which needs a one-time full backfill.
+    const from = isNewSource ? BACKFILL_START : firstOfMonth(lastDate(existingPoints));
 
     let monthly = [];
     try {
-      if (source === 'vwra') {
-        monthly = resampleMonthly(await fetchVwraDaily(from, today));
+      if (tickerSources.has(source)) {
+        monthly = resampleMonthly(await fetchYahooDaily(tickerSources.get(source), from, today));
       } else if (source === 'usdphp') {
         monthly = resampleMonthly(await fetchUsdPhpDaily(from, today));
       } else if (source === 'phCpi') {
         monthly = await fetchPhCpiMonthly(monthKeyOf(from), monthKeyOf(today));
       } else {
-        nextData[source] = existing[source];
+        nextData[source] = existingPoints;
+        console.log(`${source}: no fetcher configured for this source, left as-is`);
         continue;
       }
     } catch (err) {
       console.error(`${source}: fetch failed — ${err.message}`);
-      nextData[source] = existing[source];
+      nextData[source] = existingPoints;
       continue;
     }
 
-    const { merged, added, revised } = mergeNewMonthly(existing[source], monthly);
+    const { merged, added, revised } = mergeNewMonthly(existingPoints, monthly);
     nextData[source] = merged;
 
     if (added.length || revised.length) {
