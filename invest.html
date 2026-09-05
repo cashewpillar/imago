@@ -115,6 +115,7 @@ td.actions{text-align:right;white-space:nowrap}
 .toast.error{background:var(--danger)}
 .empty{text-align:center;padding:36px;color:var(--text-faint);font-size:13px}
 .no-data-note{font-size:11px;color:var(--text-faint);font-style:italic}
+.rate-note{font-size:11px;color:var(--text-faint)}
 
 .demo-banner{display:none;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;background:var(--warning-bg);color:var(--warning);border-bottom:1px solid var(--border);padding:9px 16px;font-size:12.5px;text-align:center}
 .demo-banner.show{display:flex}
@@ -196,7 +197,13 @@ td.actions{text-align:right;white-space:nowrap}
 
   <div class="chart-card">
     <div class="chart-header">
-      <div class="chart-title">Portfolio value</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="chart-title">Portfolio value</div>
+        <div class="filters" id="currencyFilters">
+          <div class="filter-chip active" data-currency="usd" onclick="changeCurrency('usd', this)">USD</div>
+          <div class="filter-chip" data-currency="php" onclick="changeCurrency('php', this)">PHP</div>
+        </div>
+      </div>
       <div class="filters" id="periodFilters">
         <div class="filter-chip" data-period="3M" onclick="changePeriod('3M', this)">3M</div>
         <div class="filter-chip" data-period="6M" onclick="changePeriod('6M', this)">6M</div>
@@ -204,20 +211,11 @@ td.actions{text-align:right;white-space:nowrap}
         <div class="filter-chip active" data-period="ALL" onclick="changePeriod('ALL', this)">ALL</div>
       </div>
     </div>
-    <div class="chart-wrap" id="usdChartWrap">
-      <imago-chart id="usdChart" style="display:none"></imago-chart>
-      <div class="chart-empty" id="usdChartEmpty">No investments logged yet.</div>
+    <div class="chart-wrap" id="portfolioChartWrap">
+      <imago-chart id="portfolioChart" style="display:none"></imago-chart>
+      <div class="chart-empty" id="portfolioChartEmpty">No investments logged yet.</div>
     </div>
-  </div>
-
-  <div class="chart-card">
-    <div class="chart-header">
-      <div class="chart-title">Portfolio value (₱, converted)</div>
-    </div>
-    <div class="chart-wrap" id="phpChartWrap">
-      <imago-chart id="phpChart" style="display:none"></imago-chart>
-      <div class="chart-empty" id="phpChartEmpty">No investments logged yet.</div>
-    </div>
+    <div class="rate-note" id="phpRateDisclaimer" style="margin-top:10px;display:none">* ₱ values use the historical USD→PHP rate for each month shown, not today's rate.</div>
   </div>
 
   <div class="section-header">
@@ -465,6 +463,7 @@ window.addEventListener('click', e => {
 
 function fmtUsd(v) { return '$' + v.toLocaleString(undefined, { maximumFractionDigits: 0 }); }
 function fmtPhp(v) { return '₱' + v.toLocaleString(undefined, { maximumFractionDigits: 0 }); }
+function fmtRate(rate) { return `₱${rate.toFixed(1)}/$`; }
 
 // ── Price/FX lookups ──────────────────────────────────────────────────────────
 // A ticker's benchmark source key is just its symbol lowercased (matching
@@ -513,6 +512,7 @@ function monthlyTimeline(start, end) {
 
 // ── Chart period filter ───────────────────────────────────────────────────────
 let _period = localStorage.getItem('imago-invest-chart-period') || 'ALL';
+let _currency = localStorage.getItem('imago-invest-chart-currency') || 'usd';
 
 function applyPeriodFilter(points) {
   if (!points || !points.length || _period === 'ALL') return points;
@@ -529,6 +529,13 @@ function changePeriod(period, el) {
   _period = period;
   localStorage.setItem('imago-invest-chart-period', period);
   document.querySelectorAll('#periodFilters .filter-chip').forEach(c => c.classList.toggle('active', c === el));
+  render();
+}
+
+function changeCurrency(currency, el) {
+  _currency = currency;
+  localStorage.setItem('imago-invest-chart-currency', currency);
+  document.querySelectorAll('#currencyFilters .filter-chip').forEach(c => c.classList.toggle('active', c === el));
   render();
 }
 
@@ -568,7 +575,7 @@ function renderSummary(tickers, buys, tickerById, today) {
 
   document.getElementById('sumInvested').textContent = fmtUsd(invested);
   document.getElementById('sumCurrentUsd').textContent = fmtUsd(currentUsd);
-  document.getElementById('sumCurrentPhp').textContent = fmtPhp(currentPhp);
+  document.getElementById('sumCurrentPhp').textContent = `${fmtPhp(currentPhp)} @ ${fmtRate(fxAt(today))}`;
 
   const badge = document.getElementById('sumCurrentReturn');
   if (returnPct == null) {
@@ -590,14 +597,13 @@ function renderSummary(tickers, buys, tickerById, today) {
 }
 
 function renderCharts(buys, tickerById, today) {
-  const usdChart = document.getElementById('usdChart');
-  const usdEmpty = document.getElementById('usdChartEmpty');
-  const phpChart = document.getElementById('phpChart');
-  const phpEmpty = document.getElementById('phpChartEmpty');
+  const chart = document.getElementById('portfolioChart');
+  const empty = document.getElementById('portfolioChartEmpty');
+  const disclaimer = document.getElementById('phpRateDisclaimer');
 
   if (!buys.length) {
-    usdChart.style.display = 'none'; usdEmpty.style.display = 'block';
-    phpChart.style.display = 'none'; phpEmpty.style.display = 'block';
+    chart.style.display = 'none'; empty.style.display = 'block';
+    disclaimer.style.display = 'none';
     return;
   }
 
@@ -612,20 +618,21 @@ function renderCharts(buys, tickerById, today) {
       return sum + buyValueAt(b, t.symbol, d);
     }, 0)
   }));
-  const phpPoints = usdPoints.map(p => ({ date: p.date, value: p.value * fxAt(p.date) }));
 
-  const usdFiltered = applyPeriodFilter(usdPoints);
-  const phpFiltered = applyPeriodFilter(phpPoints);
+  const isPhp = _currency === 'php';
+  const points = isPhp
+    ? usdPoints.map(p => ({ date: p.date, value: p.value * fxAt(p.date) }))
+    : usdPoints;
+  const filtered = applyPeriodFilter(points);
 
-  usdEmpty.style.display = 'none';
-  usdChart.style.display = 'block';
-  usdChart.setAttribute('type', 'line');
-  usdChart.data = { series: [{ label: 'Portfolio (USD)', color: '#3454d1', points: usdFiltered }], unit: 'usd' };
+  empty.style.display = 'none';
+  chart.style.display = 'block';
+  chart.setAttribute('type', 'line');
+  chart.data = isPhp
+    ? { series: [{ label: 'Portfolio (PHP)', color: '#1a6b3c', points: filtered }], unit: 'php' }
+    : { series: [{ label: 'Portfolio (USD)', color: '#3454d1', points: filtered }], unit: 'usd' };
 
-  phpEmpty.style.display = 'none';
-  phpChart.style.display = 'block';
-  phpChart.setAttribute('type', 'line');
-  phpChart.data = { series: [{ label: 'Portfolio (₱)', color: '#1a6b3c', points: phpFiltered }], unit: 'php' };
+  disclaimer.style.display = isPhp ? 'block' : 'none';
 }
 
 function renderTickerTable(tickers, buys, today) {
@@ -654,7 +661,7 @@ function renderTickerTable(tickers, buys, today) {
       <td><span class="ticker-symbol">${t.symbol}</span>${t.label ? `<div class="no-data-note" style="margin-top:3px">${t.label}</div>` : ''}</td>
       <td class="num">${fmtUsd(invested)}</td>
       <td class="num">${fmtUsd(currentUsd)}</td>
-      <td class="num">${fmtPhp(currentPhp)}</td>
+      <td class="num">${fmtPhp(currentPhp)}<div class="rate-note" style="margin-top:3px">@ ${fmtRate(fxAt(today))}</div></td>
       <td>${returnHtml}</td>
       <td class="actions">
         <button class="icon-btn" title="Delete ticker" onclick="deleteTicker('${t.id}')">
