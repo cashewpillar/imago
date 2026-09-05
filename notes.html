@@ -163,9 +163,11 @@ td.actions{width:34px;text-align:right;padding:6px 8px;}
 .md-preview a{color:var(--primary);text-decoration:none;font-weight:600;}
 .md-preview a:hover{text-decoration:underline;}
 .md-preview .md-bullet,.md-preview .md-check{display:flex;gap:8px;margin-bottom:0;align-items:flex-start;}
-.md-preview .md-check{cursor:pointer;padding:2px 4px;margin-left:-4px;border-radius:4px;transition:background .1s;}
+.md-preview .md-check{cursor:pointer;padding:2px 4px;margin-left:-4px;border-radius:4px;transition:background .1s;user-select:none;-webkit-user-select:none;}
 .md-preview .md-check:hover{background:color-mix(in srgb,var(--primary),transparent 92%);}
-.md-preview .md-check input{cursor:pointer;margin-top:4px;accent-color:var(--primary);width:14px;height:14px;}
+.md-preview .md-check input{cursor:pointer;margin-top:4px;accent-color:var(--primary);width:14px;height:14px;touch-action:none;}
+.md-check-grip{color:var(--muted2);font-size:11px;flex-shrink:0;padding-top:3px;cursor:grab;}
+.md-check-grip:active{cursor:grabbing;}
 .md-preview .md-bullet span:first-child{color:var(--primary);font-weight:700;min-width:12px;text-align:center;}
 .md-preview .md-check.is-checked span{text-decoration:line-through;opacity:.6;}
 .fselect option{background:var(--bg3);}

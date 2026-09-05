@@ -581,7 +581,8 @@ function mdRenderHtml(text){
   const lines = text.split('\n');
   let lineStart = 0;
   return lines.map((line,index)=>{
-    const attrsFor = prefixLen => `data-line="${index}" data-raw-start="${lineStart}" data-prefix="${prefixLen}"`;
+    const attrsFor = prefixLen => `data-line="${index}" data-raw-start="${lineStart}" data-prefix="${prefixLen}" ondragover="mdLineDragOver(event,this)" ondrop="mdLineDrop(event)"`;
+    const checkDrag = 'draggable="true" ondragstart="mdCheckDragStart(event,this)" ondragend="mdCheckDragEnd(event)"';
     let out;
     if(line.startsWith('##### ')){
       out=`<h5 ${attrsFor(6)}>${renderMdTokens(tokenizeMdLine(line.substring(6)),c)}</h5>`;
@@ -590,9 +591,9 @@ function mdRenderHtml(text){
     } else if(line.startsWith('### ')){
       out=`<h3 ${attrsFor(4)}>${renderMdTokens(tokenizeMdLine(line.substring(4)),c)}</h3>`;
     } else if(line.startsWith('- [ ] ')){
-      out=`<div class="md-check" ${attrsFor(6)}><input type="checkbox"> <span>${renderMdTokens(tokenizeMdLine(line.substring(6)),c)}</span></div>`;
+      out=`<div class="md-check" ${attrsFor(6)} ${checkDrag}><span class="md-check-grip">⠿</span><input type="checkbox" onpointerdown="mdCheckPaintStart(event,this)" onclick="event.preventDefault();event.stopPropagation();"> <span>${renderMdTokens(tokenizeMdLine(line.substring(6)),c)}</span></div>`;
     } else if(line.startsWith('- [x] ')){
-      out=`<div class="md-check is-checked" ${attrsFor(6)}><input type="checkbox" checked> <span>${renderMdTokens(tokenizeMdLine(line.substring(6)),c)}</span></div>`;
+      out=`<div class="md-check is-checked" ${attrsFor(6)} ${checkDrag}><span class="md-check-grip">⠿</span><input type="checkbox" checked onpointerdown="mdCheckPaintStart(event,this)" onclick="event.preventDefault();event.stopPropagation();"> <span>${renderMdTokens(tokenizeMdLine(line.substring(6)),c)}</span></div>`;
     } else if(line.startsWith('- ')||line.startsWith('* ')){
       out=`<div class="md-bullet" ${attrsFor(2)}><span>•</span> <span>${renderMdTokens(tokenizeMdLine(line.substring(2)),c)}</span></div>`;
     } else if(line){
@@ -624,6 +625,92 @@ function mdRawOffsetFromPoint(x,y){
   const tokenEl = el.closest('[data-raw]');
   const tokenStart = tokenEl ? parseInt(tokenEl.getAttribute('data-raw'))||0 : 0;
   return lineStart+prefixLen+tokenStart+offset;
+}
+let mdCheckDragEl=null, mdCheckDragContainer=null;
+function mdCheckDragStart(e, el){
+  if(e.target.closest('input')){
+    e.preventDefault();
+    return;
+  }
+  mdCheckDragEl = el;
+  mdCheckDragContainer = el.closest('.md-preview');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain','');
+}
+function mdLineDragOver(e, el){
+  if(!mdCheckDragEl || el===mdCheckDragEl) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const rect = el.getBoundingClientRect();
+  const before = (e.clientY-rect.top) < rect.height/2;
+  el.parentNode.insertBefore(mdCheckDragEl, before?el:el.nextSibling);
+}
+function mdLineDrop(e){
+  if(mdCheckDragEl) e.preventDefault();
+}
+function mdCheckDragEnd(){
+  if(mdCheckDragEl && mdCheckDragContainer) commitMdReorder(mdCheckDragContainer);
+  mdCheckDragEl = null;
+  mdCheckDragContainer = null;
+}
+function commitMdReorder(previewEl){
+  const container = previewEl.closest('.md-editor-container');
+  const ta = container.querySelector('textarea');
+  const originalLines = ta.value.split('\n');
+  const newLines = [...previewEl.children].map(child=>{
+    const idx = parseInt(child.getAttribute('data-line'));
+    return Number.isNaN(idx) ? '' : originalLines[idx];
+  });
+  ta.value = newLines.join('\n');
+  updateMdPreview(container);
+  autoGrowTextarea(ta);
+}
+let mdPaintMode=null;
+function mdCheckPaintStart(e, cb){
+  e.preventDefault();
+  const row = cb.closest('.md-check');
+  if(!row) return;
+  const preview = row.closest('.md-preview');
+  const container = row.closest('.md-editor-container');
+  const targetChecked = !row.classList.contains('is-checked');
+  mdPaintMode = { preview, container, targetChecked, touched:new Set() };
+  mdCheckPaintApply(row);
+  document.addEventListener('pointermove', mdCheckPaintMove);
+  document.addEventListener('pointerup', mdCheckPaintEnd);
+  document.addEventListener('pointercancel', mdCheckPaintEnd);
+}
+function mdCheckPaintApply(row){
+  const idx = parseInt(row.getAttribute('data-line'));
+  if(Number.isNaN(idx) || mdPaintMode.touched.has(idx)) return;
+  mdPaintMode.touched.add(idx);
+  row.classList.toggle('is-checked', mdPaintMode.targetChecked);
+  const cb = row.querySelector('input[type=checkbox]');
+  if(cb) cb.checked = mdPaintMode.targetChecked;
+}
+function mdCheckPaintMove(e){
+  if(!mdPaintMode) return;
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  const row = el?.closest?.('.md-check');
+  if(!row || !mdPaintMode.preview.contains(row)) return;
+  mdCheckPaintApply(row);
+}
+function mdCheckPaintEnd(){
+  if(!mdPaintMode) return;
+  document.removeEventListener('pointermove', mdCheckPaintMove);
+  document.removeEventListener('pointerup', mdCheckPaintEnd);
+  document.removeEventListener('pointercancel', mdCheckPaintEnd);
+  const {container, targetChecked, touched} = mdPaintMode;
+  const ta = container.querySelector('textarea');
+  const lines = ta.value.split('\n');
+  touched.forEach(idx=>{
+    const line = lines[idx];
+    if(line===undefined) return;
+    if(targetChecked && line.startsWith('- [ ] ')) lines[idx]=line.replace('- [ ] ','- [x] ');
+    else if(!targetChecked && line.startsWith('- [x] ')) lines[idx]=line.replace('- [x] ','- [ ] ');
+  });
+  ta.value = lines.join('\n');
+  updateMdPreview(container);
+  mdPaintMode = null;
 }
 function updateMdPreview(container){
   const ta = container.querySelector('textarea');
