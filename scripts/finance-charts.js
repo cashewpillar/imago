@@ -118,18 +118,48 @@ class FinanceChart extends HTMLElement {
 
     this._hiddenSeries = new Set();
     this._defaultHiddenApplied = new Set();
+    this._hasPersistedHiddenSeries = false;
     this.legend.addEventListener('click', e => {
       const item = e.target.closest('.legend-item[data-key]');
       if (!item) return;
       const key = item.dataset.key;
       if (this._hiddenSeries.has(key)) this._hiddenSeries.delete(key);
       else this._hiddenSeries.add(key);
+      this._saveHiddenSeries();
       this.render();
     });
   }
 
+  // Persists which legend series are hidden, keyed by this element's id plus
+  // the page path (so two charts on different pages reusing the same id
+  // never collide). Elements without an id aren't persisted -- give a chart
+  // a stable id if its hidden-series choice should survive a reload.
+  _hiddenSeriesKey() {
+    return this.id ? `imago-chart-hidden::${location.pathname}::${this.id}` : null;
+  }
+  _loadHiddenSeries() {
+    const key = this._hiddenSeriesKey();
+    if (!key) return;
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw == null) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        this._hiddenSeries = new Set(parsed);
+        this._hasPersistedHiddenSeries = true;
+      }
+    } catch {}
+  }
+  _saveHiddenSeries() {
+    const key = this._hiddenSeriesKey();
+    if (!key) return;
+    this._hasPersistedHiddenSeries = true;
+    try { localStorage.setItem(key, JSON.stringify([...this._hiddenSeries])); } catch {}
+  }
+
   connectedCallback() {
     this._upgradeProperty('data');
+    this._loadHiddenSeries();
     this._resizeObserver.observe(this);
     this.render();
   }
@@ -162,14 +192,19 @@ class FinanceChart extends HTMLElement {
     this._data = val;
     // Seed default-hidden series exactly once per label -- keeps the user's
     // own toggle sticky across re-renders instead of re-hiding it every time.
-    const seriesArr = val && !Array.isArray(val) ? val.series : val;
-    (seriesArr || []).forEach((s, si) => {
-      if (!s.defaultHidden) return;
-      const key = s.label || ('series-' + si);
-      if (this._defaultHiddenApplied.has(key)) return;
-      this._defaultHiddenApplied.add(key);
-      this._hiddenSeries.add(key);
-    });
+    // Skipped entirely once a persisted hidden-series choice has been loaded
+    // or saved, so a user's explicit "show this" isn't clobbered by the
+    // default on the next page load.
+    if (!this._hasPersistedHiddenSeries) {
+      const seriesArr = val && !Array.isArray(val) ? val.series : val;
+      (seriesArr || []).forEach((s, si) => {
+        if (!s.defaultHidden) return;
+        const key = s.label || ('series-' + si);
+        if (this._defaultHiddenApplied.has(key)) return;
+        this._defaultHiddenApplied.add(key);
+        this._hiddenSeries.add(key);
+      });
+    }
     this.render();
   }
 

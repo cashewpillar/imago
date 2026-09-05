@@ -39,6 +39,14 @@ header h1{font-size:17px;font-weight:600;letter-spacing:-.3px}
 .btn svg{width:13px;height:13px;flex-shrink:0}
 .btn-sm{padding:3px 8px;font-size:11px}
 
+.fab-add{display:none;position:fixed;bottom:18px;right:18px;width:44px;height:44px;border-radius:50%;background:var(--accent);color:#fff;border:none;box-shadow:0 2px 10px rgba(0,0,0,.22);align-items:center;justify-content:center;cursor:pointer;z-index:50}
+.fab-add svg{width:18px;height:18px}
+.fab-add:active{filter:brightness(0.85)}
+@media(max-width:640px){
+  .header-actions .add-buy-btn{display:none}
+  .fab-add{display:flex}
+}
+
 main{max-width:940px;margin:0 auto;padding:20px 16px}
 
 .summary-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px}
@@ -142,7 +150,7 @@ td.actions{text-align:right;white-space:nowrap}
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
       Add ticker
     </button>
-    <button class="btn btn-primary" onclick="openBuyModal()">
+    <button class="btn btn-primary add-buy-btn" onclick="openBuyModal()">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
       Add investment
     </button>
@@ -168,6 +176,10 @@ td.actions{text-align:right;white-space:nowrap}
     </div>
   </div>
 </header>
+
+<button class="fab-add" onclick="openBuyModal()" aria-label="Add investment">
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
+</button>
 
 <div class="demo-banner" id="demoBanner">
   <span>You're exploring with sample data — nothing here is saved yet.</span>
@@ -618,19 +630,26 @@ function renderCharts(buys, tickerById, today) {
       return sum + buyValueAt(b, t.symbol, d);
     }, 0)
   }));
+  const usdCostBasisPoints = timeline.map(d => ({
+    date: d,
+    value: buys.reduce((sum, b) => b.date <= d ? sum + b.amountUsd : sum, 0)
+  }));
 
   const isPhp = _currency === 'php';
-  const points = isPhp
-    ? usdPoints.map(p => ({ date: p.date, value: p.value * fxAt(p.date) }))
-    : usdPoints;
-  const filtered = applyPeriodFilter(points);
+  const toDisplay = isPhp ? p => ({ date: p.date, value: p.value * fxAt(p.date) }) : p => p;
+  const filtered = applyPeriodFilter(usdPoints.map(toDisplay));
+  const costBasisFiltered = applyPeriodFilter(usdCostBasisPoints.map(toDisplay));
 
   empty.style.display = 'none';
   chart.style.display = 'block';
   chart.setAttribute('type', 'line');
-  chart.data = isPhp
-    ? { series: [{ label: 'Portfolio (PHP)', color: '#1a6b3c', points: filtered }], unit: 'php' }
-    : { series: [{ label: 'Portfolio (USD)', color: '#3454d1', points: filtered }], unit: 'usd' };
+  chart.data = {
+    series: [
+      { label: isPhp ? 'Portfolio (PHP)' : 'Portfolio (USD)', color: isPhp ? '#1a6b3c' : '#3454d1', points: filtered },
+      { label: 'Invested (cost basis)', color: '#9c9a94', points: costBasisFiltered },
+    ],
+    unit: isPhp ? 'php' : 'usd',
+  };
 
   disclaimer.style.display = isPhp ? 'block' : 'none';
 }
@@ -844,6 +863,13 @@ async function exportData() {
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────────
+document.querySelectorAll('#currencyFilters .filter-chip').forEach(c => {
+  c.classList.toggle('active', c.dataset.currency === _currency);
+});
+document.querySelectorAll('#periodFilters .filter-chip').forEach(c => {
+  c.classList.toggle('active', c.dataset.period === _period);
+});
+
 (async () => {
   await seedBenchmarksIfNeeded();
   await refreshMode();
