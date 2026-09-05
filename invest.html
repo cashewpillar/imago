@@ -89,6 +89,7 @@ td.actions{text-align:right;white-space:nowrap}
 .icon-btn{background:none;border:none;cursor:pointer;color:var(--text-faint);padding:3px 5px;border-radius:var(--r);display:inline-flex;align-items:center}
 .icon-btn:hover{background:var(--bg);color:var(--danger)}
 .icon-btn svg{width:13px;height:13px}
+.icon-btn.neutral:hover{color:var(--text)}
 
 .history-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px dashed var(--border);font-size:13px;gap:10px}
 .history-item:last-child{border-bottom:none}
@@ -104,6 +105,8 @@ td.actions{text-align:right;white-space:nowrap}
 .form-row label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}
 .form-row input,.form-row select,.form-row textarea{width:100%;padding:7px 10px;border:1px solid var(--border-strong);border-radius:var(--r);font-family:inherit;font-size:13px;color:var(--text);background:var(--surface)}
 .form-row input:focus,.form-row select:focus{outline:2px solid var(--accent-bg);border-color:var(--accent)}
+.form-row .required-mark{color:var(--danger)}
+.form-row input.input-error,.form-row select.input-error{border-color:var(--danger)}
 .form-row textarea{resize:vertical;min-height:100px;font-family:monospace;font-size:11px}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
@@ -144,6 +147,9 @@ td.actions{text-align:right;white-space:nowrap}
   <div class="brand">
     <a href="index.html">← imago</a>
     <h1>Invest</h1>
+    <button class="icon-btn neutral" onclick="openModal('infoModal')" title="Fees &amp; taxes info" aria-label="Fees and taxes info">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="7.2" x2="8" y2="11.3"/><circle cx="8" cy="4.9" r="0.75" fill="currentColor" stroke="none"/></svg>
+    </button>
   </div>
   <div class="header-actions">
     <button class="btn" onclick="openTickerModal()">
@@ -192,6 +198,7 @@ td.actions{text-align:right;white-space:nowrap}
     <div class="sum-card">
       <div class="lbl">Total invested</div>
       <div class="val" id="sumInvested">$0</div>
+      <div class="sub" id="sumInvestedPhp">₱0</div>
     </div>
     <div class="sum-card">
       <div class="lbl">Current value</div>
@@ -261,7 +268,7 @@ td.actions{text-align:right;white-space:nowrap}
   <div class="modal">
     <h2>Add ticker</h2>
     <div class="form-row">
-      <label>Ticker</label>
+      <label>Ticker <span class="required-mark">*</span></label>
       <select id="fSymbol"></select>
     </div>
     <div class="form-grid">
@@ -274,8 +281,22 @@ td.actions{text-align:right;white-space:nowrap}
         <input type="date" id="fStartDate">
       </div>
     </div>
+    <div class="form-grid">
+      <div class="form-row">
+        <label>Broker fee (USD)</label>
+        <input type="number" id="fStartFee" step="0.01" min="0" placeholder="0">
+      </div>
+      <div class="form-row">
+        <label>Conversion date</label>
+        <input type="date" id="fStartConversionDate">
+      </div>
+    </div>
     <div class="form-row">
-      <label>Note (optional)</label>
+      <label>PHP actually paid</label>
+      <input type="number" id="fStartPhpPaid" step="0.01" min="0" placeholder="leave blank to estimate from rate on conversion/buy date">
+    </div>
+    <div class="form-row">
+      <label>Note</label>
       <input type="text" id="fTickerNote" placeholder="">
     </div>
     <div class="modal-actions">
@@ -287,14 +308,14 @@ td.actions{text-align:right;white-space:nowrap}
 
 <div class="modal-backdrop" id="buyModal">
   <div class="modal">
-    <h2>Add investment</h2>
+    <h2 id="buyModalTitle">Add investment</h2>
     <div class="form-row">
-      <label>Ticker</label>
+      <label>Ticker <span class="required-mark">*</span></label>
       <select id="fBuyTicker"></select>
     </div>
     <div class="form-grid">
       <div class="form-row">
-        <label>Amount (USD)</label>
+        <label>Amount (USD) <span class="required-mark">*</span></label>
         <input type="number" id="fBuyAmount" step="0.01" min="0" placeholder="0">
       </div>
       <div class="form-row">
@@ -302,13 +323,27 @@ td.actions{text-align:right;white-space:nowrap}
         <input type="date" id="fBuyDate">
       </div>
     </div>
+    <div class="form-grid">
+      <div class="form-row">
+        <label>Broker fee (USD)</label>
+        <input type="number" id="fBuyFee" step="0.01" min="0" placeholder="0">
+      </div>
+      <div class="form-row">
+        <label>Conversion date</label>
+        <input type="date" id="fBuyConversionDate">
+      </div>
+    </div>
     <div class="form-row">
-      <label>Note (optional)</label>
+      <label>PHP actually paid</label>
+      <input type="number" id="fBuyPhpPaid" step="0.01" min="0" placeholder="leave blank to estimate from rate on conversion/buy date">
+    </div>
+    <div class="form-row">
+      <label>Note</label>
       <input type="text" id="fBuyNote" placeholder="">
     </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('buyModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="submitBuy()">Add investment</button>
+      <button class="btn btn-primary" id="buyModalSubmit" onclick="submitBuy()">Add investment</button>
     </div>
   </div>
 </div>
@@ -326,6 +361,44 @@ td.actions{text-align:right;white-space:nowrap}
       <button class="btn btn-danger" onclick="doImport(true)">Reset &amp; import</button>
       <button class="btn" onclick="closeModal('importModal')">Cancel</button>
       <button class="btn btn-primary" onclick="doImport(false)">Merge import</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="infoModal">
+  <div class="modal" style="width:min(560px,95vw)">
+    <h2>Fees &amp; taxes</h2>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">What these numbers already account for, what they don't yet, and one thing worth flagging as genuinely uncertain rather than guessing at it.</p>
+
+    <div class="section-title" style="margin-bottom:6px">Already reflected in the numbers</div>
+    <ul style="padding-left:18px;font-size:13px;line-height:1.6;margin-bottom:16px">
+      <li><strong>TER</strong> — deducted from the fund's NAV daily by the fund itself. Already baked into every price point used here; a separate "TER drag" line would double-count it.</li>
+      <li><strong>Dividend withholding tax</strong> — these are Ireland-domiciled "Acc" share classes: dividends are reinvested internally, net of source-country withholding tax (reduced under the US-Ireland treaty vs. a US-domiciled fund). Already baked into the price.</li>
+    </ul>
+
+    <div class="section-title" style="margin-bottom:6px">Trackable now</div>
+    <ul style="padding-left:18px;font-size:13px;line-height:1.6;margin-bottom:16px">
+      <li><strong>Broker fee on buy</strong> — optional field on Add ticker / Add investment. Adds to cost basis (what you truly paid) without earning any growth, since a fee never buys fund units.</li>
+      <li><strong>Real PHP cost per buy</strong> — enter the PHP you actually paid to convert (ground truth, since your broker's real rate and spread differ from the bundled reference series) or, if you converted PHP→USD before the buy itself, a conversion date to estimate from instead. Shown per-entry in the history list and totalled on the Total Invested tile.</li>
+    </ul>
+
+    <div class="section-title" style="margin-bottom:6px">Not tracked yet <span class="no-data-note">(dev TODO)</span></div>
+    <ul style="padding-left:18px;font-size:13px;line-height:1.6;margin-bottom:8px">
+      <li>Sell-side commission — no SELL tracking exists in this app at all yet, buy-only.</li>
+      <li>FX conversion spread when funding the account (PHP→USD) — different from the reference USD/PHP rate shown elsewhere here.</li>
+      <li>Bid-ask spread on execution.</li>
+    </ul>
+    <div class="no-data-note" style="margin-bottom:16px">
+      IBKR tiered pricing, for reference (verify against your own account — schedules change): roughly 0.05% of trade value, minimum ≈£1/$1.70, plus a small exchange fee (≈0.0045%, min £0.10) and clearing fee (≈£0.06) — applied the same way to both buy and sell, not a free-buy/paid-sell asymmetry. This is IBKR-specific; a different broker needs its own numbers here.
+    </div>
+
+    <div class="section-title" style="margin-bottom:6px">Philippine tax — not tax advice</div>
+    <div style="font-size:13px;line-height:1.6">
+      PH capital gains tax (NIRC) specifically targets shares of <em>domestic</em> PH corporations and real property — foreign-listed securities like these generally fall outside that regime. Whether frequent trading could get characterized by the BIR as "engaged in the business of buying/selling securities" (taxed as regular income) rather than passive investing is a genuine gray area that depends on individual facts. This app doesn't compute or assert a tax position — talk to a PH tax professional about your specific situation.
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeModal('infoModal')">Got it</button>
     </div>
   </div>
 </div>
@@ -473,6 +546,10 @@ window.addEventListener('click', e => {
   }
 });
 
+function markFieldError(id, hasError) {
+  document.getElementById(id).classList.toggle('input-error', !!hasError);
+}
+
 function fmtUsd(v) { return '$' + v.toLocaleString(undefined, { maximumFractionDigits: 0 }); }
 function fmtPhp(v) { return '₱' + v.toLocaleString(undefined, { maximumFractionDigits: 0 }); }
 function fmtRate(rate) { return `₱${rate.toFixed(1)}/$`; }
@@ -506,6 +583,24 @@ function buyValueAt(buy, symbol, date) {
   const p1 = priceAt(symbol, date);
   if (p0 != null && p1 != null && p0 > 0) return buy.amountUsd * (p1 / p0);
   return buy.amountUsd;
+}
+
+// A broker fee is money spent but never actually converted into fund
+// units, so it inflates cost basis (what you truly paid) without ever
+// earning growth -- buyValueAt above intentionally only ever compounds
+// buy.amountUsd, never the fee.
+function investedAmount(buy) { return buy.amountUsd + (buy.fee || 0); }
+
+// True PHP cost of a buy. `phpPaid` (what you actually paid, if you entered
+// it) is ground truth and always wins -- it captures your broker's real
+// rate and spread, which the bundled reference series can't. Otherwise
+// falls back to the reference rate on the conversion date (the day you
+// actually moved PHP->USD, which can predate the buy itself), or the buy
+// date if no conversion date was given -- an estimate either way.
+function phpCostOf(buy) {
+  if (buy.phpPaid > 0) return { value: buy.phpPaid, exact: true };
+  const rateDate = buy.conversionDate || buy.date;
+  return { value: investedAmount(buy) * fxAt(rateDate), exact: false, rateDate };
 }
 
 function monthlyTimeline(start, end) {
@@ -575,17 +670,23 @@ async function render() {
 }
 
 function renderSummary(tickers, buys, tickerById, today) {
-  let invested = 0, currentUsd = 0;
+  let invested = 0, currentUsd = 0, investedPhp = 0, investedPhpAllExact = true;
   buys.forEach(b => {
     const t = tickerById.get(b.tickerId);
     if (!t) return;
-    invested += b.amountUsd;
+    invested += investedAmount(b);
     currentUsd += buyValueAt(b, t.symbol, today);
+    const php = phpCostOf(b);
+    investedPhp += php.value;
+    if (!php.exact) investedPhpAllExact = false;
   });
   const currentPhp = currentUsd * fxAt(today);
   const returnPct = invested > 0 ? ((currentUsd / invested) - 1) * 100 : null;
 
   document.getElementById('sumInvested').textContent = fmtUsd(invested);
+  document.getElementById('sumInvestedPhp').textContent = buys.length
+    ? `${investedPhpAllExact ? '' : '≈'}${fmtPhp(investedPhp)} actual`
+    : '₱0';
   document.getElementById('sumCurrentUsd').textContent = fmtUsd(currentUsd);
   document.getElementById('sumCurrentPhp').textContent = `${fmtPhp(currentPhp)} @ ${fmtRate(fxAt(today))}`;
 
@@ -632,7 +733,7 @@ function renderCharts(buys, tickerById, today) {
   }));
   const usdCostBasisPoints = timeline.map(d => ({
     date: d,
-    value: buys.reduce((sum, b) => b.date <= d ? sum + b.amountUsd : sum, 0)
+    value: buys.reduce((sum, b) => b.date <= d ? sum + investedAmount(b) : sum, 0)
   }));
 
   const isPhp = _currency === 'php';
@@ -667,7 +768,7 @@ function renderTickerTable(tickers, buys, today) {
 
   tbody.innerHTML = tickers.map(t => {
     const tBuys = buys.filter(b => b.tickerId === t.id);
-    const invested = tBuys.reduce((s, b) => s + b.amountUsd, 0);
+    const invested = tBuys.reduce((s, b) => s + investedAmount(b), 0);
     const currentUsd = tBuys.reduce((s, b) => s + buyValueAt(b, t.symbol, today), 0);
     const currentPhp = currentUsd * fxAt(today);
     const hasData = priceAt(t.symbol, today) != null;
@@ -705,13 +806,22 @@ function renderHistory(buys, tickerById) {
   const sorted = [...buys].sort((a, b) => b.date.localeCompare(a.date));
   wrap.innerHTML = sorted.map(b => {
     const t = tickerById.get(b.tickerId);
+    const php = phpCostOf(b);
+    const phpLabel = php.exact
+      ? `${fmtPhp(php.value)} paid`
+      : `≈${fmtPhp(php.value)} @ ${fmtRate(fxAt(php.rateDate))}${b.conversionDate ? ' on conversion date' : ''}`;
     return `<div class="history-item">
       <div class="history-meta">
         <span><span class="tag">${t ? t.symbol : '?'}</span> ${b.date}</span>
+        ${b.fee ? `<span class="sub">+${fmtUsd(b.fee)} fee</span>` : ''}
+        <span class="sub">${phpLabel}</span>
         ${b.note ? `<span class="sub">${b.note}</span>` : ''}
       </div>
       <div style="display:flex;align-items:center;gap:10px">
         <span class="history-amount">${fmtUsd(b.amountUsd)}</span>
+        <button class="icon-btn neutral" title="Edit" onclick="openBuyModal('${b.id}')">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M11 2l3 3-8 8-3.5 1 1-3.5 8-8z"/></svg>
+        </button>
         <button class="icon-btn" title="Delete" onclick="deleteBuy('${b.id}')">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 5h10M6 5V3.5a1 1 0 011-1h2a1 1 0 011 1V5M5 5l.5 8a1 1 0 001 .9h3a1 1 0 001-.9l.5-8"/></svg>
         </button>
@@ -733,6 +843,7 @@ async function openTickerModal() {
 
   document.getElementById('fSymbol').innerHTML = available.map(c => `<option value="${c.symbol}">${c.symbol} — ${c.label}</option>`).join('');
   document.getElementById('fStartDate').value = todayStr();
+  markFieldError('fSymbol', false);
   openModal('tickerModal');
 }
 
@@ -742,7 +853,11 @@ async function submitTicker() {
   const note = document.getElementById('fTickerNote').value.trim();
   const startAmount = parseFloat(document.getElementById('fStartAmount').value);
   const startDate = document.getElementById('fStartDate').value || todayStr();
+  const startFee = parseFloat(document.getElementById('fStartFee').value) || 0;
+  const startConversionDate = document.getElementById('fStartConversionDate').value || null;
+  const startPhpPaid = parseFloat(document.getElementById('fStartPhpPaid').value) || 0;
 
+  markFieldError('fSymbol', !symbol);
   if (!symbol) { toast('Pick a ticker', true); return; }
 
   const existing = await db.tickers.where('symbol').equals(symbol).count();
@@ -752,12 +867,18 @@ async function submitTicker() {
   await db.tickers.put(ticker);
 
   if (startAmount > 0) {
-    await db.buys.put({ id: uuid(), tickerId: ticker.id, date: startDate, amountUsd: startAmount, note: '', created_at: new Date().toISOString() });
+    await db.buys.put({
+      id: uuid(), tickerId: ticker.id, date: startDate, amountUsd: startAmount, fee: startFee,
+      conversionDate: startConversionDate, phpPaid: startPhpPaid, note: '', created_at: new Date().toISOString(),
+    });
   }
 
   closeModal('tickerModal');
   document.getElementById('fTickerNote').value = '';
   document.getElementById('fStartAmount').value = '';
+  document.getElementById('fStartFee').value = '';
+  document.getElementById('fStartConversionDate').value = '';
+  document.getElementById('fStartPhpPaid').value = '';
   toast('Ticker added');
   render();
 }
@@ -770,7 +891,9 @@ async function deleteTicker(id) {
   render();
 }
 
-async function openBuyModal() {
+let _editingBuyId = null;
+
+async function openBuyModal(buyId) {
   const tickers = await db.tickers.toArray();
   const select = document.getElementById('fBuyTicker');
   if (!tickers.length) {
@@ -778,7 +901,22 @@ async function openBuyModal() {
     return;
   }
   select.innerHTML = tickers.map(t => `<option value="${t.id}">${t.symbol}</option>`).join('');
-  document.getElementById('fBuyDate').value = todayStr();
+
+  _editingBuyId = buyId || null;
+  const editing = await (buyId ? db.buys.get(buyId) : null);
+
+  document.getElementById('buyModalTitle').textContent = editing ? 'Edit investment' : 'Add investment';
+  document.getElementById('buyModalSubmit').textContent = editing ? 'Save changes' : 'Add investment';
+  select.value = editing ? editing.tickerId : select.value;
+  document.getElementById('fBuyAmount').value = editing ? editing.amountUsd : '';
+  document.getElementById('fBuyDate').value = editing ? editing.date : todayStr();
+  document.getElementById('fBuyFee').value = editing && editing.fee ? editing.fee : '';
+  document.getElementById('fBuyConversionDate').value = editing && editing.conversionDate ? editing.conversionDate : '';
+  document.getElementById('fBuyPhpPaid').value = editing && editing.phpPaid ? editing.phpPaid : '';
+  document.getElementById('fBuyNote').value = editing ? (editing.note || '') : '';
+  markFieldError('fBuyTicker', false);
+  markFieldError('fBuyAmount', false);
+
   openModal('buyModal');
 }
 
@@ -786,17 +924,31 @@ async function submitBuy() {
   const tickerId = document.getElementById('fBuyTicker').value;
   const amountUsd = parseFloat(document.getElementById('fBuyAmount').value);
   const date = document.getElementById('fBuyDate').value || todayStr();
+  const fee = parseFloat(document.getElementById('fBuyFee').value) || 0;
+  const conversionDate = document.getElementById('fBuyConversionDate').value || null;
+  const phpPaid = parseFloat(document.getElementById('fBuyPhpPaid').value) || 0;
   const note = document.getElementById('fBuyNote').value.trim();
 
+  markFieldError('fBuyTicker', !tickerId);
+  markFieldError('fBuyAmount', !(amountUsd > 0));
   if (!tickerId) { toast('Pick a ticker', true); return; }
   if (!(amountUsd > 0)) { toast('Enter an amount', true); return; }
 
-  await db.buys.put({ id: uuid(), tickerId, date, amountUsd, note, created_at: new Date().toISOString() });
+  if (_editingBuyId) {
+    await db.buys.update(_editingBuyId, { tickerId, date, amountUsd, fee, conversionDate, phpPaid, note });
+  } else {
+    await db.buys.put({ id: uuid(), tickerId, date, amountUsd, fee, conversionDate, phpPaid, note, created_at: new Date().toISOString() });
+  }
 
+  const wasEditing = !!_editingBuyId;
+  _editingBuyId = null;
   closeModal('buyModal');
   document.getElementById('fBuyAmount').value = '';
+  document.getElementById('fBuyFee').value = '';
+  document.getElementById('fBuyConversionDate').value = '';
+  document.getElementById('fBuyPhpPaid').value = '';
   document.getElementById('fBuyNote').value = '';
-  toast('Investment added');
+  toast(wasEditing ? 'Investment updated' : 'Investment added');
   render();
 }
 
