@@ -1,8 +1,10 @@
-// Historical benchmark series for performance.html, fetched once and bundled
-// as static data (no network calls at runtime) -- seeded into the `benchmarks`
-// IndexedDB table by a one-time migration, same pattern as savings-demo.js.
+// Historical benchmark series for performance.html / invest.html, fetched
+// periodically (see scripts/fetch-benchmarks.js) and bundled as static data
+// (no network calls at runtime) -- seeded into each consumer's own
+// `benchmarks` IndexedDB table by a one-time per-source migration, same
+// pattern as savings-demo.js.
 //
-// Sources (fetched 2026-08-21):
+// Sources (last refreshed 2026-09-05):
 // - usdphp: Frankfurter API (https://frankfurter.dev), ECB reference rates,
 //   USD->PHP, resampled to one point per month (last available trading day).
 //   Free, no API key, no usage restrictions stated for this derived use.
@@ -18,18 +20,18 @@
 //   indexed cumulative-growth comparison -- see performance.html's Growth
 //   Comparison chart, not the Yield Trend chart (which is rate-based).
 //
-// To refresh: re-run the fetch (see scripts/fetch-benchmarks.md if present, or
-// re-derive from the same three sources) and replace this file wholesale --
-// values are a frozen snapshot, not a live feed.
+// To refresh: run `node scripts/fetch-benchmarks.js` -- it fetches only new
+// data since each source's last stored MONTH (re-checking that last month
+// too, since e.g. CPI figures are commonly revised after first publication),
+// merges it in, and bumps `?v=N` in the consuming <script> tags automatically
+// when anything actually changed. Values here are still a point-in-time
+// snapshot, not a live feed.
 //
 // IMPORTANT: this file is loaded via a plain `<script src="scripts/benchmarks-data.js?v=N">`
-// tag (savings.html, expenses.html, performance.html) -- not the Date.now()
-// cache-buster finance-charts.js uses, because seedBenchmarksIfNeeded() needs
-// window.BENCHMARKS_DATA synchronously available, which a dynamically-injected
-// (async-by-default) script tag can't guarantee. Whenever this file's DATA
-// changes (new source, updated values), bump `?v=N` in all three <script> tags
-// -- otherwise browsers that already cached the old file may never see the
-// update, and new sources silently never get seeded for existing visitors.
+// tag (savings.html, expenses.html, performance.html, invest.html) -- not the
+// Date.now() cache-buster finance-charts.js uses, because seedBenchmarksIfNeeded()
+// needs window.BENCHMARKS_DATA synchronously available, which a dynamically-
+// injected (async-by-default) script tag can't guarantee.
 (function () {
   window.BENCHMARKS_DATA = {
     usdphp: [
@@ -308,7 +310,7 @@
     { date: '2021-09-30', value: 51.011 },
     { date: '2021-10-31', value: 50.368 },
     { date: '2021-11-30', value: 50.401 },
-    { date: '2021-12-31', value: 51.0 },
+    { date: '2021-12-31', value: 51 },
     { date: '2022-01-31', value: 51.08 },
     { date: '2022-02-28', value: 51.283 },
     { date: '2022-03-31', value: 51.81 },
@@ -364,7 +366,7 @@
     { date: '2026-05-31', value: 61.572 },
     { date: '2026-06-30', value: 61.358 },
     { date: '2026-07-31', value: 61.269 },
-    { date: '2026-08-31', value: 61.728 },
+    { date: '2026-08-31', value: 62.397 },
     ],
     phCpi: [
     { date: '2010-01-31', value: 77.701 },
@@ -411,7 +413,7 @@
     { date: '2013-06-30', value: 87.233 },
     { date: '2013-07-31', value: 87.403 },
     { date: '2013-08-31', value: 87.574 },
-    { date: '2013-09-30', value: 88.0 },
+    { date: '2013-09-30', value: 88 },
     { date: '2013-10-31', value: 88.085 },
     { date: '2013-11-30', value: 88.511 },
     { date: '2013-12-31', value: 89.192 },
@@ -467,18 +469,18 @@
     { date: '2018-02-28', value: 97.9 },
     { date: '2018-03-31', value: 98.4 },
     { date: '2018-04-30', value: 98.8 },
-    { date: '2018-05-31', value: 99.0 },
+    { date: '2018-05-31', value: 99 },
     { date: '2018-06-30', value: 99.4 },
     { date: '2018-07-31', value: 100.2 },
     { date: '2018-08-31', value: 101.1 },
     { date: '2018-09-30', value: 102.1 },
     { date: '2018-10-31', value: 102.3 },
-    { date: '2018-11-30', value: 102.0 },
+    { date: '2018-11-30', value: 102 },
     { date: '2018-12-31', value: 101.4 },
     { date: '2019-01-31', value: 101.5 },
     { date: '2019-02-28', value: 101.6 },
     { date: '2019-03-31', value: 101.7 },
-    { date: '2019-04-30', value: 102.0 },
+    { date: '2019-04-30', value: 102 },
     { date: '2019-05-31', value: 102.2 },
     { date: '2019-06-30', value: 102.1 },
     { date: '2019-07-31', value: 102.4 },
@@ -521,7 +523,7 @@
     { date: '2022-08-31', value: 116.3 },
     { date: '2022-09-30', value: 116.8 },
     { date: '2022-10-31', value: 117.9 },
-    { date: '2022-11-30', value: 119.0 },
+    { date: '2022-11-30', value: 119 },
     { date: '2022-12-31', value: 119.4 },
     { date: '2023-01-31', value: 121.4 },
     { date: '2023-02-28', value: 121.4 },
@@ -545,7 +547,7 @@
     { date: '2024-08-31', value: 126.6 },
     { date: '2024-09-30', value: 126.3 },
     { date: '2024-10-31', value: 126.5 },
-    { date: '2024-11-30', value: 127.0 },
+    { date: '2024-11-30', value: 127 },
     { date: '2024-12-31', value: 127.7 },
     { date: '2025-01-31', value: 128.4 },
     { date: '2025-02-28', value: 128.1 },
@@ -558,10 +560,10 @@
     { date: '2025-09-30', value: 128.5 },
     { date: '2025-10-31', value: 128.6 },
     { date: '2025-11-30', value: 128.9 },
-    { date: '2025-12-31', value: 130.0 },
-    { date: '2026-01-31', value: 131.0 },
+    { date: '2025-12-31', value: 130 },
+    { date: '2026-01-31', value: 131 },
     { date: '2026-02-28', value: 131.2 },
-    { date: '2026-03-31', value: 133.0 },
+    { date: '2026-03-31', value: 133 },
     { date: '2026-04-30', value: 136.5 },
     { date: '2026-05-31', value: 135.8 },
     { date: '2026-06-30', value: 135.4 },
@@ -628,7 +630,7 @@
     { date: '2024-05-31', value: 127.46 },
     { date: '2024-06-30', value: 133.66 },
     { date: '2024-07-31', value: 128.24 },
-    { date: '2024-08-31', value: 136.0 },
+    { date: '2024-08-31', value: 136 },
     { date: '2024-09-30', value: 138.74 },
     { date: '2024-10-31', value: 138.04 },
     { date: '2024-11-30', value: 141.98 },
@@ -652,7 +654,7 @@
     { date: '2026-05-31', value: 187.36 },
     { date: '2026-06-30', value: 189.82 },
     { date: '2026-07-31', value: 187.42 },
-    { date: '2026-08-31', value: 193.98 },
+    { date: '2026-08-28', value: 195.52 },
     ],
   };
 })();
