@@ -626,7 +626,7 @@ function mdRawOffsetFromPoint(x,y){
   const tokenStart = tokenEl ? parseInt(tokenEl.getAttribute('data-raw'))||0 : 0;
   return lineStart+prefixLen+tokenStart+offset;
 }
-let mdCheckDragEl=null, mdCheckDragContainer=null;
+let mdCheckDragEl=null, mdCheckDragContainer=null, mdDropIndicator=null;
 function mdCheckDragStart(e, el){
   if(e.target.closest('input')){
     e.preventDefault();
@@ -634,6 +634,9 @@ function mdCheckDragStart(e, el){
   }
   mdCheckDragEl = el;
   mdCheckDragContainer = el.closest('.md-preview');
+  el.classList.add('md-line-dragging');
+  mdDropIndicator = document.createElement('div');
+  mdDropIndicator.className = 'md-drop-indicator';
   e.dataTransfer.effectAllowed = 'move';
   e.dataTransfer.setData('text/plain','');
 }
@@ -643,24 +646,31 @@ function mdLineDragOver(e, el){
   e.dataTransfer.dropEffect = 'move';
   const rect = el.getBoundingClientRect();
   const before = (e.clientY-rect.top) < rect.height/2;
-  el.parentNode.insertBefore(mdCheckDragEl, before?el:el.nextSibling);
+  el.parentNode.insertBefore(mdDropIndicator, before?el:el.nextSibling);
 }
 function mdLineDrop(e){
   if(mdCheckDragEl) e.preventDefault();
 }
 function mdCheckDragEnd(){
-  if(mdCheckDragEl && mdCheckDragContainer) commitMdReorder(mdCheckDragContainer);
+  if(mdCheckDragEl){
+    if(mdDropIndicator?.parentNode) mdDropIndicator.parentNode.insertBefore(mdCheckDragEl, mdDropIndicator);
+    mdDropIndicator?.remove();
+    mdCheckDragEl.classList.remove('md-line-dragging');
+    if(mdCheckDragContainer) commitMdReorder(mdCheckDragContainer);
+  } else {
+    mdDropIndicator?.remove();
+  }
   mdCheckDragEl = null;
   mdCheckDragContainer = null;
+  mdDropIndicator = null;
 }
 function commitMdReorder(previewEl){
   const container = previewEl.closest('.md-editor-container');
   const ta = container.querySelector('textarea');
   const originalLines = ta.value.split('\n');
-  const newLines = [...previewEl.children].map(child=>{
-    const idx = parseInt(child.getAttribute('data-line'));
-    return Number.isNaN(idx) ? '' : originalLines[idx];
-  });
+  const newLines = [...previewEl.children]
+    .filter(child=>child.hasAttribute('data-line'))
+    .map(child=>originalLines[parseInt(child.getAttribute('data-line'))] ?? '');
   ta.value = newLines.join('\n');
   updateMdPreview(container);
   autoGrowTextarea(ta);
