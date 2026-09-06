@@ -544,7 +544,7 @@ function autoGrowTextarea(el){
    Every rendered line/token carries data-raw-start / data-prefix / data-raw
    attributes pointing back at its exact offset in the raw textarea value, so
    a click in the preview can place the real caret at the matching spot. */
-const MD_TOKEN_RE = /\[([^\]]+)\]\(([^)]+)\)|\*\*([^*\n]+)\*\*|__([^_\n]+)__|\+\+([^+\n]+)\+\+|\*([^*\n]+)\*|_([^_\n]+)_|(?<=^|\s)#([a-zA-Z0-9_-]+)/g;
+const MD_TOKEN_RE = /\[([^\]]+)\]\(([^)]+)\)|@\[(\d{4}-\d{2}-\d{2})\]|\*\*([^*\n]+)\*\*|__([^_\n]+)__|\+\+([^+\n]+)\+\+|\*([^*\n]+)\*|_([^_\n]+)_|(?<=^|\s)#([a-zA-Z0-9_-]+)/g;
 function tokenizeMdLine(content){
   const tokens=[];
   let last=0, m;
@@ -552,26 +552,34 @@ function tokenizeMdLine(content){
   while((m=MD_TOKEN_RE.exec(content))){
     if(m.index>last) tokens.push({kind:'plain', text:content.slice(last,m.index), rawStart:last});
     if(m[1]!==undefined) tokens.push({kind:'link', text:m[1], href:m[2], rawStart:m.index+1});
-    else if(m[3]!==undefined) tokens.push({kind:'bold', text:m[3], rawStart:m.index+2});
+    else if(m[3]!==undefined) tokens.push({kind:'date', text:m[3], rawStart:m.index, rawLen:m[0].length});
     else if(m[4]!==undefined) tokens.push({kind:'bold', text:m[4], rawStart:m.index+2});
-    else if(m[5]!==undefined) tokens.push({kind:'underline', text:m[5], rawStart:m.index+2});
-    else if(m[6]!==undefined) tokens.push({kind:'italic', text:m[6], rawStart:m.index+1});
+    else if(m[5]!==undefined) tokens.push({kind:'bold', text:m[5], rawStart:m.index+2});
+    else if(m[6]!==undefined) tokens.push({kind:'underline', text:m[6], rawStart:m.index+2});
     else if(m[7]!==undefined) tokens.push({kind:'italic', text:m[7], rawStart:m.index+1});
-    else if(m[8]!==undefined) tokens.push({kind:'tag', text:m[8], rawStart:m.index+1});
+    else if(m[8]!==undefined) tokens.push({kind:'italic', text:m[8], rawStart:m.index+1});
+    else if(m[9]!==undefined) tokens.push({kind:'tag', text:m[9], rawStart:m.index+1});
     last=m.index+m[0].length;
   }
   if(last<content.length) tokens.push({kind:'plain', text:content.slice(last), rawStart:last});
   return tokens;
 }
+function formatIsoDatePill(iso){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if(!m) return iso;
+  const d = new Date(Number(m[1]), Number(m[2])-1, Number(m[3]));
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+}
 function renderMdTokens(tokens,c){
   return tokens.map(t=>{
-    const dr=`data-raw="${t.rawStart}" data-rawlen="${t.text.length}"`;
+    const dr=`data-raw="${t.rawStart}" data-rawlen="${t.rawLen ?? t.text.length}"`;
     const body=esc(t.text);
     if(t.kind==='link') return `<a href="${esc(t.href)}" target="_blank" rel="noopener noreferrer" ${dr}>${body}</a>`;
     if(t.kind==='bold') return `<strong ${dr}>${body}</strong>`;
     if(t.kind==='italic') return `<em ${dr}>${body}</em>`;
     if(t.kind==='underline') return `<u ${dr}>${body}</u>`;
     if(t.kind==='tag') return `<span class="md-tag" style="background:${c.dim};color:${c.val};" ${dr}>#${body}</span>`;
+    if(t.kind==='date') return `<span class="md-date" ${dr}>📅 ${esc(formatIsoDatePill(t.text))}</span>`;
     return `<span ${dr}>${body}</span>`;
   }).join('');
 }
@@ -732,7 +740,23 @@ function initMdEditor(container){
   container.classList.toggle('is-editing', !ta.value);
   autoGrowTextarea(ta);
 }
+const MD_TODAY_SHORTCUT_RE = /(?:^|[\s(])\/today$/;
+function todayIso(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function expandMdShortcuts(ta){
+  const pos = ta.selectionStart;
+  if(pos!==ta.selectionEnd) return;
+  const before = ta.value.slice(0,pos);
+  if(!MD_TODAY_SHORTCUT_RE.test(before)) return;
+  const start = pos-'/today'.length;
+  const token = `@[${todayIso()}]`;
+  ta.value = ta.value.slice(0,start)+token+ta.value.slice(pos);
+  ta.selectionStart = ta.selectionEnd = start+token.length;
+}
 function handleMdInput(ta){
+  expandMdShortcuts(ta);
   autoGrowTextarea(ta);
   updateMdPreview(ta.closest('.md-editor-container'));
 }
@@ -742,7 +766,19 @@ function mdSetEditing(ta, focused){
   if(focused){ container.classList.add('is-editing'); autoGrowTextarea(ta); }
   else if(ta.value){ container.classList.remove('is-editing'); }
 }
+const MD_DATE_PILL_RE = /@\[\d{4}-\d{2}-\d{2}\]$/;
 function handleMdKeydown(e, ta){
+  if(e.key==='Backspace' && ta.selectionStart===ta.selectionEnd && ta.selectionStart>0){
+    const m = MD_DATE_PILL_RE.exec(ta.value.slice(0,ta.selectionStart));
+    if(m){
+      e.preventDefault();
+      const start = ta.selectionStart-m[0].length;
+      ta.value = ta.value.slice(0,start)+ta.value.slice(ta.selectionStart);
+      ta.selectionStart = ta.selectionEnd = start;
+      handleMdInput(ta);
+      return;
+    }
+  }
   if(e.key!=='Enter') return;
   const start=ta.selectionStart, end=ta.selectionEnd, value=ta.value;
   const beforeCursor=value.substring(0,start);
