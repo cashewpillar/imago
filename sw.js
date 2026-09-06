@@ -1,12 +1,14 @@
-const CACHE_NAME = 'imago-shell-v6';
+const CACHE_NAME = 'imago-shell-v9';
 const APP_SHELL = [
   './',
   // BEGIN GENERATED HTML PAGES
   './index.html',
   './archive.html',
   './seldom.html',
-  './asset-comparison.html',
-  './etf-comparison.html',
+  './invest-asset-comparison.html',
+  './invest-etf-comparison.html',
+  './invest-risk-matrix.html',
+  './invest-conviction-statement.html',
   './expenses.html',
   './food-v2.html',
   './invest.html',

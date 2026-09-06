@@ -115,8 +115,10 @@ td.actions{text-align:right;white-space:nowrap}
 .dropdown-content{display:none;position:absolute;right:0;top:100%;background:var(--surface);min-width:200px;box-shadow:0 4px 20px rgba(0,0,0,0.15);border:1px solid var(--border);border-radius:var(--r);z-index:1000;margin-top:8px;overflow:hidden;padding:4px 0}
 .dropdown-content .btn-flat{display:flex;align-items:center;gap:10px;width:100%;padding:10px 16px;border:none;background:none;color:var(--text);font-size:13px;cursor:pointer;text-align:left;text-decoration:none;font-family:inherit;transition:background .12s;white-space:nowrap}
 .dropdown-content .btn-flat:hover{background:var(--bg)}
+.dropdown-content .btn-flat.active{background:var(--bg);font-weight:600;pointer-events:none}
 .dropdown-content svg{width:14px;height:14px;color:var(--text-muted)}
 .dropdown.open .dropdown-content{display:block}
+.dropdown-label{padding:6px 16px 2px;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em}
 
 .import-area{border:2px dashed var(--border-strong);border-radius:var(--r);padding:14px;margin-bottom:10px;font-size:13px;color:var(--text-muted);text-align:center;display:flex;flex-direction:column;gap:6px;align-items:center;justify-content:center;cursor:pointer}
 .import-area:hover{border-color:var(--accent);color:var(--accent)}
@@ -164,6 +166,14 @@ td.actions{text-align:right;white-space:nowrap}
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/></svg>
       </button>
       <div class="dropdown-content">
+        <a href="invest.html" class="btn-flat active">Invest</a>
+        <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
+        <div class="dropdown-label">Pages</div>
+        <a href="invest-conviction-statement.html" class="btn-flat">Conviction Statement</a>
+        <a href="invest-risk-matrix.html" class="btn-flat">Risk Matrix</a>
+        <a href="invest-asset-comparison.html" class="btn-flat">Asset Comparison</a>
+        <a href="invest-etf-comparison.html" class="btn-flat">ETF Comparison</a>
+        <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
         <button class="btn-flat" id="exploreToggleBtn" onclick="toggleExploreMode()">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>
           <span id="exploreToggleLabel">Try demo data</span>
@@ -418,6 +428,12 @@ realDb.version(1).stores({
   tickers: 'id,symbol',
   buys: 'id,tickerId,date',
   benchmarks: 'id,source,date'
+});
+realDb.version(2).stores({
+  tickers: 'id,symbol',
+  buys: 'id,tickerId,date',
+  benchmarks: 'id,source,date',
+  convictionStatement: 'id'
 });
 
 function getDemoDb() {

@@ -18,6 +18,22 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
 main{max-width:940px;width:100%;margin:0 auto;padding:20px 16px;flex:1;display:flex;flex-direction:column;min-height:0}
 main.wide{max-width:none;padding-left:clamp(16px,4vw,64px);padding-right:clamp(16px,4vw,64px)}
 
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header h1{font-size:17px;font-weight:600;letter-spacing:-.3px}
+
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border:1px solid var(--border-strong);border-radius:var(--r);background:var(--surface);color:var(--text);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .12s}
+.btn:hover{background:var(--bg)}
+.btn svg{width:13px;height:13px;flex-shrink:0}
+
+.dropdown{position:relative;display:inline-block}
+.dropdown-content{display:none;position:absolute;right:0;top:100%;background:var(--surface);min-width:200px;box-shadow:0 4px 20px rgba(0,0,0,0.15);border:1px solid var(--border);border-radius:var(--r);z-index:1000;margin-top:8px;overflow:hidden;padding:4px 0}
+.dropdown-content .btn-flat{display:flex;align-items:center;gap:10px;width:100%;padding:10px 16px;border:none;background:none;color:var(--text);font-size:13px;cursor:pointer;text-align:left;text-decoration:none;font-family:inherit;transition:background .12s;white-space:nowrap}
+.dropdown-content .btn-flat:hover{background:var(--bg)}
+.dropdown-content .btn-flat.active{background:var(--bg);font-weight:600;pointer-events:none}
+.dropdown-content svg{width:14px;height:14px;color:var(--text-muted)}
+.dropdown.open .dropdown-content{display:block}
+.dropdown-label{padding:6px 16px 2px;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em}
+
 .pills-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .mode-toggle{display:flex;gap:2px;background:var(--border);padding:3px;border-radius:99px}
 .mode-btn{appearance:none;-webkit-tap-highlight-color:transparent;border:none;padding:4px 10px;border-radius:99px;font-size:11px;font-family:var(--mono);cursor:pointer;background:transparent;color:var(--text-muted);transition:all .12s}
@@ -92,6 +108,23 @@ tr:hover td{background:#fafaf8}
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
 </head>
 <body>
+<header>
+  <h1>Asset Comparison</h1>
+  <div class="dropdown" id="pagesDropdown">
+    <button class="btn" onclick="toggleDropdown('pagesDropdown')">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/></svg>
+    </button>
+    <div class="dropdown-content">
+      <a href="invest.html" class="btn-flat">Invest</a>
+      <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
+      <div class="dropdown-label">Pages</div>
+      <a href="invest-conviction-statement.html" class="btn-flat">Conviction Statement</a>
+      <a href="invest-risk-matrix.html" class="btn-flat">Risk Matrix</a>
+      <a href="invest-asset-comparison.html" class="btn-flat active">Asset Comparison</a>
+      <a href="invest-etf-comparison.html" class="btn-flat">ETF Comparison</a>
+    </div>
+  </div>
+</header>
 <main>
 <div class="pills-row">
   <div class="mode-toggle" id="modeToggle"></div>
@@ -412,6 +445,13 @@ document.addEventListener('keydown', e => {
 document.querySelector('.table-container').addEventListener('scroll', hideTip, { passive: true });
 window.addEventListener('scroll', hideTip, { passive: true });
 window.addEventListener('resize', hideTip);
+
+function toggleDropdown(id) { document.getElementById(id).classList.toggle('open'); }
+document.addEventListener('click', e => {
+  if (!e.target.closest('.dropdown')) {
+    document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('open'));
+  }
+});
 </script>
 <script src="pwa-register.js"></script>
 </body>

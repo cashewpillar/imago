@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Risk Matrix</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f8f7f4;--surface:#fff;--border:#e2e0d8;--border-strong:#c8c5bb;
+  --text:#1a1917;--text-muted:#6b6860;--text-faint:#9c9a94;--danger:#a32d2d;--danger-bg:#fcebeb;
+  --accent:#1a6b3c;--accent-bg:#eaf4ee;--warning:#854f0b;--warning-bg:#faeeda;--info:#185fa5;--info-bg:#e6f1fb;
+  --r:8px;--rl:12px;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+}
+html,body{height:100%}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;display:flex;flex-direction:column}
+main{max-width:940px;width:100%;margin:0 auto;padding:20px 16px;flex:1;display:flex;flex-direction:column;min-height:0}
+
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header h1{font-size:17px;font-weight:600;letter-spacing:-.3px}
+
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border:1px solid var(--border-strong);border-radius:var(--r);background:var(--surface);color:var(--text);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .12s}
+.btn:hover{background:var(--bg)}
+.btn svg{width:13px;height:13px;flex-shrink:0}
+
+.dropdown{position:relative;display:inline-block}
+.dropdown-content{display:none;position:absolute;right:0;top:100%;background:var(--surface);min-width:200px;box-shadow:0 4px 20px rgba(0,0,0,0.15);border:1px solid var(--border);border-radius:var(--r);z-index:1000;margin-top:8px;overflow:hidden;padding:4px 0}
+.dropdown-content .btn-flat{display:flex;align-items:center;gap:10px;width:100%;padding:10px 16px;border:none;background:none;color:var(--text);font-size:13px;cursor:pointer;text-align:left;text-decoration:none;font-family:inherit;transition:background .12s;white-space:nowrap}
+.dropdown-content .btn-flat:hover{background:var(--bg)}
+.dropdown-content .btn-flat.active{background:var(--bg);font-weight:600;pointer-events:none}
+.dropdown-content svg{width:14px;height:14px;color:var(--text-muted)}
+.dropdown.open .dropdown-content{display:block}
+.dropdown-label{padding:6px 16px 2px;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em}
+
+.table-container{width:100%;flex:1;min-height:0;overflow-y:auto;border:1px solid var(--border);border-radius:var(--rl);background:var(--surface);scrollbar-width:none;-ms-overflow-style:none;margin-bottom:12px}
+.table-container::-webkit-scrollbar{display:none}
+table{width:100%;border-collapse:separate;border-spacing:0;text-align:left;user-select:none}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#fff;font-weight:500;padding:9px 14px;background:#000;user-select:none;position:sticky;top:0;z-index:1}
+th:first-child{border-top-left-radius:var(--rl)}
+th:last-child{border-top-right-radius:var(--rl)}
+th:not(:first-child){padding-left:6px;padding-right:6px}
+td{padding:9px 14px;border-bottom:1px solid var(--border);vertical-align:top;font-size:13px}
+td:not(:first-child){padding-left:6px;padding-right:6px}
+td:first-child{font-weight:600}
+th:nth-child(3),td:nth-child(3){width:1%;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#fafaf8}
+
+.tip-underline{border-bottom:1px dotted #8a5a2b;cursor:pointer;padding-bottom:1px}
+.tip-underline:hover,.tip-underline:focus-visible{border-bottom-color:var(--text)}
+.tip-underline.open{border-bottom-style:solid;border-bottom-color:var(--text)}
+.disclaimer{font-size:11px;color:var(--text-faint);padding-top:2px}
+.page-subtitle{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:10px}
+
+.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;white-space:nowrap}
+.tag-info{background:var(--info-bg);color:var(--info)}
+.tag-accent{background:var(--accent-bg);color:var(--accent)}
+.tag-warning{background:var(--warning-bg);color:var(--warning)}
+.cell-value{font-weight:600}
+.cell-empty{color:var(--text-faint)}
+
+.tooltip{
+  position:fixed;background:#1a1917;color:#fff;padding:6px 10px;border-radius:6px;
+  font-size:11px;z-index:10000;user-select:text;
+  display:none;max-width:260px;line-height:1.4;text-align:left;
+  box-shadow:0 4px 12px rgba(0,0,0,0.15);font-family:system-ui,-apple-system,sans-serif;
+}
+.copy-toast{
+  position:fixed;background:#1a1917;color:#fff;padding:4px 9px;border-radius:6px;
+  font-size:11px;z-index:10001;pointer-events:none;opacity:0;transition:opacity .15s;
+  font-family:system-ui,-apple-system,sans-serif;transform:translate(-50%,-100%);
+}
+.copy-toast.show{opacity:1}
+</style>
+<meta name="theme-color" content="#f7f6f2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="imago">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/imago-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+</head>
+<body>
+<header>
+  <h1>Risk Matrix</h1>
+  <div class="dropdown" id="pagesDropdown">
+    <button class="btn" onclick="toggleDropdown('pagesDropdown')">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/></svg>
+    </button>
+    <div class="dropdown-content">
+      <a href="invest.html" class="btn-flat">Invest</a>
+      <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
+      <div class="dropdown-label">Pages</div>
+      <a href="invest-conviction-statement.html" class="btn-flat">Conviction Statement</a>
+      <a href="invest-risk-matrix.html" class="btn-flat active">Risk Matrix</a>
+      <a href="invest-asset-comparison.html" class="btn-flat">Asset Comparison</a>
+      <a href="invest-etf-comparison.html" class="btn-flat">ETF Comparison</a>
+    </div>
+  </div>
+</header>
+<main>
+<p class="page-subtitle">Risk matrix for VWRA via IBKR (Philippine investor)</p>
+<div class="table-container">
+<table>
+  <thead id="tableHead"></thead>
+  <tbody id="tableBody"></tbody>
+</table>
+</div>
+<p class="disclaimer">Click or tap any underlined value for the full detail.</p>
+<p class="disclaimer">The regulatory risk row is the most time-sensitive item here: it's an active, evolving situation, not a settled one. Worth checking IBKR's Philippine access status periodically rather than treating this matrix as a one-time exercise.</p>
+</main>
+<div id="tooltip" class="tooltip"></div>
+<div id="copyToast" class="copy-toast"></div>
+<script>
+// Static reference table -- no filtering/pivoting like invest-asset-comparison.html.
+// Each `value`/`desc` pair follows the same collapse-to-headline-with-tooltip
+// convention used there: `value` is the concise on-screen text (dotted
+// underline), `desc` is the full detail shown in the tooltip and copied to
+// clipboard on click.
+
+const CLASSIFICATION_TAG_CLASS = {
+  'Act on it': 'tag-warning',
+  'Act on it (already done)': 'tag-accent',
+  'Know the limit': 'tag-info',
+  'Know / partially hedge via timing': 'tag-info',
+  'Just know about it': 'tag-info',
+  'Know / accept': 'tag-info',
+  'Already mitigated by fund choice': 'tag-accent',
+  'Know about it': 'tag-info',
+};
+
+// Higher = more action still needed from you right now. Rows render sorted
+// descending by this so open, unresolved items float to the top.
+const CLASSIFICATION_ACTION_PRIORITY = {
+  'Act on it': 5,
+  'Act on it (already done)': 4,
+  'Know the limit': 3,
+  'Know / partially hedge via timing': 3,
+  'Know / accept': 2,
+  'Know about it': 2,
+  'Just know about it': 1,
+  'Already mitigated by fund choice': 0,
+};
+
+const RISK_ROWS = [
+  {
+    risk: 'Regulatory / SEC status',
+    whatItIs: { value: 'Not SEC-licensed in PH; access blocked once, since restored', desc: 'IBKR is not SEC-licensed as a broker in the Philippines. Access was blocked by telcos (Dec 2025) on SEC/NTC directive, later restored, but legal status remains unresolved.' },
+    classification: { tag: 'Act on it' },
+    response: { value: 'Monitor SEC/NTC updates; keep a backup broker in mind', desc: "Monitor SEC/NTC updates regularly. Consider a licensed local or regional backup broker as a contingency. Don't assume access is permanent." },
+  },
+  {
+    risk: 'Custody / broker failure',
+    whatItIs: { value: 'SIPC covers $500k/account ($250k cash sub-limit), not investment losses', desc: 'If IBKR fails, SIPC covers up to $500,000 (securities + cash sub-limit $250,000) per account, not investment losses.' },
+    classification: { tag: 'Know the limit', label: 'Know limit' },
+    response: { value: 'Stay within the SIPC ceiling; open a second broker if you exceed it', desc: 'Keep total assets at IBKR within comfortable range of this ceiling; open a second broker if you exceed it.' },
+  },
+  {
+    risk: 'Market risk',
+    whatItIs: { value: 'Markets can fall 30–40%+ and stay down for years', desc: 'Broad equity markets can fall 30–40%+ and stay down for years.' },
+    classification: { tag: 'Act on it (already done)', label: 'Act on it' },
+    response: { value: 'Conviction statement + no-panic-sell rule', desc: 'Your conviction statement + no-panic-sell rule is the mitigation.' },
+  },
+  {
+    risk: 'Currency risk: PHP to USD',
+    whatItIs: { value: 'PHP↔USD conversion exposes you to FX movement', desc: 'Converting pesos to invest, and back out to spend, exposes you to PHP/USD movement.' },
+    classification: { tag: 'Know / partially hedge via timing', label: 'Partial hedge' },
+    response: { value: 'Spread conversions (DCA) instead of one lump sum', desc: 'Consider spreading conversions (DCA) rather than converting a lump sum at one FX rate.' },
+  },
+  {
+    risk: 'Currency risk: inside VWRA',
+    whatItIs: { value: 'Fund holds JPY/EUR/GBP etc. under the hood', desc: 'Fund holds JPY, EUR, GBP, etc. under the hood, despite trading in USD.' },
+    classification: { tag: 'Just know about it', label: 'Just know' },
+    response: { value: "Not something to hedge; it's diversification", desc: "Not something to hedge; it's diversification, not a flaw." },
+  },
+  {
+    risk: 'Concentration risk',
+    whatItIs: { value: 'Heavy US / mega-cap tech exposure from cap-weighting', desc: 'Global cap-weighting still means heavy US / mega-cap tech exposure.' },
+    classification: { tag: 'Know / accept', label: 'Accept' },
+    response: { value: 'Consistent with your no-factor-tilts decision', desc: 'Consistent with your "no factor tilts" decision; revisit only if conviction changes.' },
+  },
+  {
+    risk: 'Estate tax exposure',
+    whatItIs: { value: 'US-domiciled ETFs risk US estate tax; VWRA (Ireland) avoids it', desc: 'US-domiciled ETFs expose non-US persons to US estate tax (up to 40% over $60k). VWRA is Ireland-domiciled, which avoids this.' },
+    classification: { tag: 'Already mitigated by fund choice', label: 'Mitigated' },
+    response: { value: 'VWRA over a US-listed fund is the safer structural pick', desc: 'Confirms VWRA (over a US-listed S&P 500 fund) is the safer structural pick for you.' },
+  },
+  {
+    risk: 'Platform / execution risk',
+    whatItIs: { value: 'Outages or access blocks at a bad moment', desc: 'Outages, access blocks, or technical issues at a bad moment.' },
+    classification: { tag: 'Know about it', label: 'Aware' },
+    response: { value: "Don't rely on perfect access during a crisis trade", desc: 'Not fixable, just a reason not to rely on IBKR access working perfectly during a crisis trade.' },
+  },
+  {
+    risk: 'Behavioral / psychological risk',
+    whatItIs: { value: 'Untested conviction under a real drawdown', desc: 'Untested conviction under a real drawdown; risk of panic-selling.' },
+    classification: { tag: 'Act on it (already done)', label: 'Act on it' },
+    response: { value: 'Pre-committed no-sell rule in your conviction statement', desc: 'Pre-committed no-sell rule in your conviction statement is the direct mitigation.' },
+  },
+];
+
+function escapeAttr(s) {
+  return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+function tagHTML(value, rowLabel) {
+  if (value === undefined || value === null || value === '') return '<span class="cell-empty">–</span>';
+  const cls = CLASSIFICATION_TAG_CLASS[value.tag] || '';
+  const text = value.label || value.tag;
+  if (!value.label) return `<span class="tag ${cls}">${text}</span>`;
+  const attrs = `role="button" tabindex="0" aria-label="More info" data-tip="${escapeAttr(value.tag)}" `
+    + `data-row="${escapeAttr(rowLabel)}" data-col="Classification" data-title="${escapeAttr(text)}"`;
+  return `<span class="tag ${cls}" ${attrs}>${text}</span>`;
+}
+
+function cellHTML(value, rowLabel, colLabel) {
+  if (value === undefined || value === null || value === '') return '<span class="cell-empty">–</span>';
+  const attrs = `role="button" tabindex="0" aria-label="More info" data-tip="${escapeAttr(value.desc)}" `
+    + `data-row="${escapeAttr(rowLabel)}" data-col="${escapeAttr(colLabel)}" data-title="${escapeAttr(value.value)}"`;
+  return `<span class="cell-value tip-underline" ${attrs}>${value.value}</span>`;
+}
+
+function renderTable() {
+  const thead = document.getElementById('tableHead');
+  thead.innerHTML = '<tr><th>Risk</th><th>What It Is</th><th>Classification</th><th>Suggested Response</th></tr>';
+
+  const sortedRows = [...RISK_ROWS].sort((a, b) =>
+    (CLASSIFICATION_ACTION_PRIORITY[b.classification.tag] ?? 0) - (CLASSIFICATION_ACTION_PRIORITY[a.classification.tag] ?? 0)
+  );
+
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = sortedRows.map(row => `<tr>
+      <td>${row.risk}</td>
+      <td>${cellHTML(row.whatItIs, row.risk, 'What It Is')}</td>
+      <td>${tagHTML(row.classification, row.risk)}</td>
+      <td>${cellHTML(row.response, row.risk, 'Suggested Response')}</td>
+    </tr>`).join('');
+}
+
+renderTable();
+
+const tip = document.getElementById('tooltip');
+let tipAnchor = null;
+
+function hideTip() {
+  tip.style.display = 'none';
+  if (tipAnchor) tipAnchor.classList.remove('open');
+  tipAnchor = null;
+}
+
+function showTip(el) {
+  tip.textContent = el.dataset.tip;
+  tip.style.display = 'block';
+  const r = el.getBoundingClientRect();
+  const tr = tip.getBoundingClientRect();
+  let left = r.right + 8;
+  if (left + tr.width > window.innerWidth - 8) left = Math.max(8, r.left - tr.width - 8);
+  let top = r.top;
+  if (top + tr.height > window.innerHeight - 8) top = Math.max(8, window.innerHeight - tr.height - 8);
+  tip.style.left = left + 'px';
+  tip.style.top = top + 'px';
+  if (tipAnchor) tipAnchor.classList.remove('open');
+  tipAnchor = el;
+  tipAnchor.classList.add('open');
+}
+
+function copyText(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(() => fallbackCopyText(text));
+  } else {
+    fallbackCopyText(text);
+  }
+}
+
+function fallbackCopyText(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); } catch {}
+  document.body.removeChild(ta);
+}
+
+let copyToastTimer;
+function showCopyToast(x, y) {
+  const toast = document.getElementById('copyToast');
+  toast.textContent = 'Copied';
+  toast.style.left = x + 'px';
+  toast.style.top = (y - 10) + 'px';
+  toast.classList.add('show');
+  clearTimeout(copyToastTimer);
+  copyToastTimer = setTimeout(() => toast.classList.remove('show'), 900);
+}
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-tip]');
+  if (el) {
+    e.stopPropagation();
+    if (tipAnchor === el) hideTip();
+    else showTip(el);
+    if (el.dataset.row) {
+      const md = `${el.dataset.row}\n---\n${el.dataset.col}:\n${el.dataset.title}\n---\n${el.dataset.tip}`;
+      copyText(md);
+      showCopyToast(e.clientX, e.clientY);
+    }
+    return;
+  }
+  if (tip.contains(e.target)) return;
+  if (tipAnchor) hideTip();
+});
+
+document.addEventListener('mouseover', e => {
+  const el = e.target.closest('[data-tip]');
+  if (el && tipAnchor !== el) showTip(el);
+});
+
+document.addEventListener('mouseout', e => {
+  const el = e.target.closest('[data-tip]');
+  if (el && !el.contains(e.relatedTarget)) hideTip();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { hideTip(); return; }
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-tip]')) {
+    e.preventDefault();
+    e.target.click();
+  }
+});
+
+document.querySelector('.table-container').addEventListener('scroll', hideTip, { passive: true });
+window.addEventListener('scroll', hideTip, { passive: true });
+window.addEventListener('resize', hideTip);
+
+function toggleDropdown(id) { document.getElementById(id).classList.toggle('open'); }
+document.addEventListener('click', e => {
+  if (!e.target.closest('.dropdown')) {
+    document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('open'));
+  }
+});
+</script>
+<script src="pwa-register.js"></script>
+</body>
+</html>

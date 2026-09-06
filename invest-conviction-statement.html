@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conviction Statement</title>
+<script src="scripts/dexie.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f8f7f4;--surface:#fff;--border:#e2e0d8;--border-strong:#c8c5bb;
+  --text:#1a1917;--text-muted:#6b6860;--text-faint:#9c9a94;--danger:#a32d2d;--danger-bg:#fcebeb;
+  --accent:#1a6b3c;--accent-bg:#eaf4ee;--warning:#854f0b;--warning-bg:#faeeda;--info:#185fa5;--info-bg:#e6f1fb;
+  --r:8px;--rl:12px;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+}
+html,body{height:100%}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;display:flex;flex-direction:column}
+main{max-width:680px;width:100%;margin:0 auto;padding:20px 16px 40px;flex:1}
+
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header h1{font-size:17px;font-weight:600;letter-spacing:-.3px;display:flex;align-items:center;gap:10px}
+
+.save-status{font-size:11px;color:var(--text-faint);font-weight:400;opacity:0;transition:opacity .3s}
+.save-status.show{opacity:1}
+
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border:1px solid var(--border-strong);border-radius:var(--r);background:var(--surface);color:var(--text);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .12s}
+.btn:hover{background:var(--bg)}
+.btn svg{width:13px;height:13px;flex-shrink:0}
+
+.dropdown{position:relative;display:inline-block}
+.dropdown-content{display:none;position:absolute;right:0;top:100%;background:var(--surface);min-width:200px;box-shadow:0 4px 20px rgba(0,0,0,0.15);border:1px solid var(--border);border-radius:var(--r);z-index:1000;margin-top:8px;overflow:hidden;padding:4px 0}
+.dropdown-content .btn-flat{display:flex;align-items:center;gap:10px;width:100%;padding:10px 16px;border:none;background:none;color:var(--text);font-size:13px;cursor:pointer;text-align:left;text-decoration:none;font-family:inherit;transition:background .12s;white-space:nowrap}
+.dropdown-content .btn-flat:hover{background:var(--bg)}
+.dropdown-content .btn-flat.active{background:var(--bg);font-weight:600;pointer-events:none}
+.dropdown-content svg{width:14px;height:14px;color:var(--text-muted)}
+.dropdown.open .dropdown-content{display:block}
+.dropdown-label{padding:6px 16px 2px;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em}
+
+.disclaimer{font-size:11px;color:var(--text-faint);margin-bottom:6px}
+.last-updated{font-size:11px;color:var(--text-muted);margin-bottom:20px;display:block}
+
+.field-block{margin-bottom:20px}
+.field-label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);font-weight:600;margin-bottom:6px}
+.field-label.has-hint{margin-bottom:2px}
+.field-hint{display:block;font-size:11px;color:var(--text-faint);font-weight:400;margin-bottom:6px}
+.field-block textarea{width:100%;padding:10px 12px;border:1px solid var(--border-strong);border-radius:var(--r);font-family:inherit;font-size:14px;color:var(--text);background:var(--surface);resize:none;overflow:hidden;line-height:1.55}
+.field-block textarea:focus{outline:2px solid var(--accent-bg);border-color:var(--accent)}
+.field-block textarea::placeholder{color:var(--text-faint)}
+#headlineField{font-weight:600}
+
+.reset-row{margin-top:8px}
+.reset-row .btn{font-size:11px;padding:4px 10px}
+</style>
+<meta name="theme-color" content="#f7f6f2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="imago">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/imago-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+</head>
+<body>
+<header>
+  <h1>Conviction Statement <span class="save-status" id="saveStatus">Saved</span></h1>
+  <div class="dropdown" id="pagesDropdown">
+    <button class="btn" onclick="toggleDropdown('pagesDropdown')">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/></svg>
+    </button>
+    <div class="dropdown-content">
+      <a href="invest.html" class="btn-flat">Invest</a>
+      <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
+      <div class="dropdown-label">Pages</div>
+      <a href="invest-conviction-statement.html" class="btn-flat active">Conviction Statement</a>
+      <a href="invest-risk-matrix.html" class="btn-flat">Risk Matrix</a>
+      <a href="invest-asset-comparison.html" class="btn-flat">Asset Comparison</a>
+      <a href="invest-etf-comparison.html" class="btn-flat">ETF Comparison</a>
+    </div>
+  </div>
+</header>
+<main>
+<p class="disclaimer">A written commitment to your own investing plan — for the version of you tempted to deviate mid-drawdown. Autosaves to this browser as you type; nothing here is shared or uploaded. The greyed-out text in each field is an example, not your data.</p>
+<span class="last-updated" id="lastUpdated"></span>
+
+<div class="field-block">
+  <label class="field-label" for="headlineField">Headline</label>
+  <textarea id="headlineField" rows="2"></textarea>
+</div>
+
+<div class="field-block">
+  <label class="field-label has-hint" for="whyField">Why</label>
+  <span class="field-hint">Separate reasons with a blank line</span>
+  <textarea id="whyField" rows="10"></textarea>
+</div>
+
+<div class="field-block">
+  <label class="field-label has-hint" for="deviateField">What would make me deviate</label>
+  <span class="field-hint">Separate triggers with a blank line</span>
+  <textarea id="deviateField" rows="7"></textarea>
+</div>
+
+<div class="field-block">
+  <label class="field-label" for="crashRuleField">My pre-committed rule for a crash</label>
+  <textarea id="crashRuleField" rows="4"></textarea>
+</div>
+
+<div class="field-block">
+  <label class="field-label" for="noteField">Closing note</label>
+  <textarea id="noteField" rows="2"></textarea>
+</div>
+
+<div class="reset-row">
+  <button class="btn" onclick="resetStatement()">Clear all fields</button>
+</div>
+</main>
+<script>
+// Example placeholder copy shown (greyed out) when a field is empty -- never
+// saved, purely illustrative so a fresh install has something to model a
+// good conviction statement on. Edit these strings to change the examples.
+const PLACEHOLDERS = {
+  headlineField: "I'm 25, with no dependents and decades ahead of me, so I'm investing 100% in global equities for long-term growth — everything else stays in cash for the short term (emergency fund, fun fund).",
+  whyField: `Time horizon is my edge. With this much runway, short-term volatility matters less than long-term compounding.
+
+Liquidity is already handled. My emergency fund covers unexpected needs, so my equity allocation is free to stay fully invested.
+
+No fixed goal, no fixed deadline. This is general wealth-building, which favors staying simple over segmenting into buckets.
+
+Simplicity over complexity. A laddered or multi-asset split would add complexity without solving a problem I actually have.`,
+  deviateField: `A specific, dated financial goal emerges (e.g., a house down payment within 3–5 years, or a wedding next year).
+
+I take on dependents or major financial obligations.
+
+I'm within ~5–10 years of actually needing a large chunk of this money.`,
+  crashRuleField: "If the market drops 30–40%+, I will not sell. I haven't lived through a real crash yet, so this rule exists for the version of me that might panic when it happens. Past-me has already decided: no selling out of fear. If anything, keep contributing on schedule.",
+  noteField: "Written to hold myself accountable — not a plan I'll second-guess mid-drawdown.",
+};
+
+const db = new Dexie('InvestTrackerV1');
+db.version(1).stores({
+  tickers: 'id,symbol',
+  buys: 'id,tickerId,date',
+  benchmarks: 'id,source,date'
+});
+db.version(2).stores({
+  tickers: 'id,symbol',
+  buys: 'id,tickerId,date',
+  benchmarks: 'id,source,date',
+  convictionStatement: 'id'
+});
+
+const RECORD_ID = 'main';
+const FIELD_IDS = ['headlineField', 'whyField', 'deviateField', 'crashRuleField', 'noteField'];
+
+FIELD_IDS.forEach(id => { document.getElementById(id).placeholder = PLACEHOLDERS[id]; });
+
+// If another tab still has an older-version connection to this same db open
+// (e.g. invest.html), the version upgrade above stalls until that tab closes --
+// db.get/put calls would otherwise just hang silently with no error.
+db.on('blocked', () => {
+  document.getElementById('lastUpdated').textContent =
+    'Waiting on another open imago tab to finish using this data — close other imago tabs and reload.';
+});
+
+function formatUpdatedAt(iso) {
+  const d = new Date(iso);
+  const datePart = d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  const timePart = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  return `Last updated ${datePart} · ${timePart}`;
+}
+
+function showLastUpdated(iso) {
+  document.getElementById('lastUpdated').textContent = iso ? formatUpdatedAt(iso) : 'Not saved yet — start typing to save automatically.';
+}
+
+function autoGrow(el) {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+
+async function loadStatement() {
+  try {
+    const record = await db.convictionStatement.get(RECORD_ID);
+    if (record) {
+      document.getElementById('headlineField').value = record.headline || '';
+      document.getElementById('whyField').value = record.why || '';
+      document.getElementById('deviateField').value = record.deviate || '';
+      document.getElementById('crashRuleField').value = record.crashRule || '';
+      document.getElementById('noteField').value = record.note || '';
+      showLastUpdated(record.updatedAt);
+    } else {
+      showLastUpdated(null);
+    }
+  } catch (err) {
+    console.error('Failed to load conviction statement:', err);
+    document.getElementById('lastUpdated').textContent = 'Could not load saved data — see console for details.';
+  }
+  FIELD_IDS.forEach(id => autoGrow(document.getElementById(id)));
+}
+
+let saveTimer;
+let saveStatusTimer;
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveStatement, 500);
+}
+
+async function saveStatement() {
+  const updatedAt = new Date().toISOString();
+  try {
+    await db.convictionStatement.put({
+      id: RECORD_ID,
+      headline: document.getElementById('headlineField').value,
+      why: document.getElementById('whyField').value,
+      deviate: document.getElementById('deviateField').value,
+      crashRule: document.getElementById('crashRuleField').value,
+      note: document.getElementById('noteField').value,
+      updatedAt,
+    });
+    showLastUpdated(updatedAt);
+    const status = document.getElementById('saveStatus');
+    status.classList.add('show');
+    clearTimeout(saveStatusTimer);
+    saveStatusTimer = setTimeout(() => status.classList.remove('show'), 1200);
+  } catch (err) {
+    console.error('Failed to save conviction statement:', err);
+    document.getElementById('lastUpdated').textContent = 'Could not save — see console for details.';
+  }
+}
+
+function resetStatement() {
+  if (!confirm('Clear all fields on this page? This only clears this browser\'s saved copy.')) return;
+  FIELD_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    el.value = '';
+    autoGrow(el);
+  });
+  saveStatement();
+}
+
+FIELD_IDS.forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('input', () => { autoGrow(el); scheduleSave(); });
+});
+
+loadStatement();
+
+function toggleDropdown(id) { document.getElementById(id).classList.toggle('open'); }
+document.addEventListener('click', e => {
+  if (!e.target.closest('.dropdown')) {
+    document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('open'));
+  }
+});
+</script>
+<script src="pwa-register.js"></script>
+</body>
+</html>

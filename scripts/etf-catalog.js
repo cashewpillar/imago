@@ -1,6 +1,6 @@
 // Shared ticker catalog (symbol + full name + liquidation status + Yahoo
 // Finance symbol for price history), sourced from the research done for
-// etf-comparison.html. Single source of truth so other pages (e.g.
+// invest-etf-comparison.html. Single source of truth so other pages (e.g.
 // invest.html) and scripts/fetch-benchmarks.js don't re-enter this data by
 // hand -- `yahooSymbol` is what fetch-benchmarks.js uses to pull real price
 // history for a ticker; omit it (as VDVA does) for a liquidated fund with no

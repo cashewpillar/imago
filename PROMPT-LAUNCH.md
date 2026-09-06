@@ -11,6 +11,20 @@
 5. Give it its own hand-drawn-style SVG icon (simple, on-brand, not a copy of imago's) — rasterize to the PNG sizes both manifest and `apple-touch-icon` need (`sips -s format png -z <h> <w> in.svg --out out.png` works fine on macOS, no extra tooling required).
 6. `git init`, but stop there — stage/commit/push only when told to.
 
+## How a page signals it's part of a cluster
+
+There's no enforced coupling in a static-HTML playground — pages don't declare dependencies. Two things stand in for that:
+
+- **Mutual cross-links.** Pages meant to travel together link to their siblings — either a header `.nav-links` bar (savings/expenses/performance) or a "Pages" group inside each page's burger/settings dropdown (invest/asset-comparison/etf-comparison). If page A links to B and C, that's the signal they're a unit — extract A, extract B and C with it.
+- **This doc's cluster list below.** Cross-links show *that* pages are coupled but not *what files* that pulls in (shared `scripts/*.js`, data files). Always re-trace those per the numbered steps above rather than trusting memory of what a page needs.
+
+## Known clusters
+
+| Cluster | Status |
+|---|---|
+| `savings.html`, `expenses.html`, `performance.html` | Extracted to `~/Dev/apps/fin/` |
+| `invest.html`, `invest-asset-comparison.html`, `invest-etf-comparison.html`, `invest-risk-matrix.html`, `invest-conviction-statement.html` | Still in imago, cross-linked via each page's burger dropdown ("Pages" group). Conviction statement shares invest.html's `InvestTrackerV1` Dexie db (`convictionStatement` store) — extracting one without the other breaks that. |
+
 ## Reference: the fin extraction
 
 First run of this: `savings.html`, `expenses.html`, `performance.html` (+ the data `performance.html` reads — `scripts/benchmarks-data.js`, its refresh script `scripts/fetch-benchmarks.js`, and the `scripts/etf-catalog.js` it depends on, trimmed to just the ticker actually used) extracted from imago into `~/Dev/apps/fin/`, meant for deploy via a private repo on one of the free-tier platforms above.
