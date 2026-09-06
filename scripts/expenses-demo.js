@@ -30,8 +30,8 @@
   ].map(e => ({ ...e, logId: null, updated_at: new Date().toISOString() }));
 
   const incomes = [
-    { id: 'demo-inc-1', name: 'Salary', amount: 45000, frequency: 'monthly', payoutDays: '15,30', startDate: null, endDate: null },
-    { id: 'demo-inc-2', name: 'Freelance project', amount: 20000, frequency: 'quarterly', payoutDays: '15', startDate: null, endDate: null },
+    { id: 'demo-inc-1', name: 'Salary', amount: 30000, frequency: 'monthly', payoutDays: '15,30', startDate: null, endDate: null },
+    { id: 'demo-inc-2', name: 'Freelance project', amount: 20000, frequency: 'quarterly', payoutDays: '3', startDate: null, endDate: null },
   ].map(i => ({ ...i, updated_at: new Date().toISOString() }));
 
   window.EXPENSES_DEMO_DATA = { expenseTypes, expenses, incomes };

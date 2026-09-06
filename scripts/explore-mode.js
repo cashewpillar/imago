@@ -13,11 +13,11 @@ let db, realDb, demoDb;
 const EXPLORE_FLAG = 'imago-explore-mode';
 const EXPLORE_DISMISSED_FLAG = 'imago-explore-dismissed';
 
-// Bump this whenever the demo data files' content changes, so a user
-// already sitting in demo mode gets re-seeded with the new data on their
-// next visit instead of keeping whatever was bulkPut into their persistent
-// demo IndexedDB store the first time they explored.
-const DEMO_DATA_VERSION = 1;
+// Bump this whenever savings-demo.js/expenses-demo.js content changes, so a
+// user already sitting in demo mode gets re-seeded with the new data on
+// their next visit instead of keeping whatever was bulkPut into their
+// persistent demo IndexedDB store the first time they explored.
+const DEMO_DATA_VERSION = 2;
 const DEMO_VERSION_KEY = 'imago-demo-data-version';
 
 function getDemoDb() {

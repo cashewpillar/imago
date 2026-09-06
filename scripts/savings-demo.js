@@ -4,11 +4,10 @@
 (function () {
   const accounts = [
     { id: 'acc-006b9592-1a4b-4f36-abf8-aec8ab31555f', key: 'BANKO',  label: 'BanKo',       balance: 25000, rate: 5,    tags: ['savings'], maturity: null,       note: null, updated_at: '2026-05-23T00:56:13.830Z' },
-    { id: 'acc-bdo',     key: 'BDO',      label: 'BDO',          balance: 0,      rate: 0,    tags: ['buffer'],   maturity: null,       note: 'Target 100 - emergency' },
-    { id: 'acc-beacon',  key: 'BEACON',   label: 'Rent',   balance: 8500,   rate: null, tags: ['illiquid'], maturity: null,       note: 'Held, illiquid', updated_at: '2026-05-17T03:02:06.414Z' },
-    { id: 'acc-bp',      key: 'BP',       label: 'BPI',          balance: 26250,  rate: 0,    tags: ['buffer'],   maturity: null,       note: 'For emergencry', updated_at: '2026-05-22T23:54:52.370Z' },
+    { id: 'acc-beacon',  key: 'BEACON',   label: 'Rent - Security deposit', balance: 8500,   rate: null, tags: ['receivable'], maturity: null,       note: 'Held, illiquid', updated_at: '2026-05-17T03:02:06.414Z' },
+    { id: 'acc-bp',      key: 'BP',       label: 'BPI',          balance: 26250,  rate: 0,    tags: ['savings'],   maturity: null,       note: 'For emergencry', updated_at: '2026-05-22T23:54:52.370Z' },
     { id: 'acc-bpcc',    key: 'BP_CC',    label: 'BPI Gold',     balance: -14500, rate: 0,    tags: ['credit'],   maturity: null,       note: null, updated_at: '2026-05-17T03:32:03.449Z' },
-    { id: 'acc-caff27de-6c8a-4ed7-ad8c-b40c5cb151b1', key: 'BOND', label: 'Friend owes', balance: 5000, rate: null, tags: ['illiquid'], maturity: null, note: null, updated_at: '2026-05-17T03:32:38.601Z' },
+    { id: 'acc-caff27de-6c8a-4ed7-ad8c-b40c5cb151b1', key: 'BOND', label: 'Friend owes', balance: 5000, rate: null, tags: ['receivable'], maturity: null, note: null, updated_at: '2026-05-17T03:32:38.601Z' },
     { id: 'acc-cash',    key: 'CASH',     label: 'Cash',         balance: 7500,   rate: 0,    tags: ['cash'],     maturity: null,       note: null, updated_at: '2026-05-17T03:13:21.146Z' },
     { id: 'acc-cb1',     key: 'CB_TD1',   label: 'CIMB TD 1',    balance: 38250,  rate: 4.75, tags: ['td'],       maturity: '2026-05-28', note: null, updated_at: '2026-05-23T00:08:40.576Z' },
     { id: 'acc-cb2',     key: 'CB_TD2',   label: 'CIMB TD 2',    balance: 12500,  rate: 4.25, tags: ['td'],       maturity: '2026-06-09', note: null, updated_at: '2026-05-23T00:08:56.067Z' },
@@ -17,7 +16,8 @@
     { id: 'acc-maya',    key: 'MAYA_TD1', label: 'Maya TD 1',    balance: 40500,  rate: 6,    tags: ['td'],       maturity: '2026-05-31', note: null, updated_at: '2026-05-17T03:28:56.597Z' },
     { id: 'acc-sb',      key: 'SB',       label: 'MariBank',     balance: 30500,  rate: 3.25, tags: ['savings'],  maturity: null,       note: null, updated_at: '2026-05-22T23:26:30.783Z' },
     { id: 'acc-tk1',     key: 'TK_TD',    label: 'Tonik TD',     balance: 25000,  rate: 6,    tags: ['td'],       maturity: '2026-10-31', note: null, updated_at: '2026-05-17T03:51:06.755Z' },
-    { id: 'acc-tk2',     key: 'TK_STSH',  label: 'Tonik Stash',  balance: 20000,  rate: 4,    tags: ['savings'],  maturity: null,       note: null, updated_at: '2026-05-17T03:02:39.824Z' },
+    { id: 'acc-tk2',     key: 'TK_STSH',  label: 'Tonik Stash',  balance: 20000,  rate: 4,    tags: ['savings', 'fun'],  maturity: null,       note: 'Travel fund', updated_at: '2026-05-17T03:02:39.824Z' },
+    { id: 'acc-vwra',    key: 'VWRA',     label: 'VWRA (Global Equities)', balance: 45000, rate: null, tags: ['equities'], maturity: null, note: 'Vanguard FTSE All-World UCITS ETF', updated_at: '2026-05-17T03:02:39.824Z' },
   ];
 
   const history = [

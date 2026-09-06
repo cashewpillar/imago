@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Expenses</title>
+<script src="scripts/feature-flags.js"></script>
 <script src="scripts/dexie.min.js"></script>
 <script src="scripts/explore-mode.js"></script>
 <script src="scripts/privacy-mask.js?v=2"></script>
@@ -21,6 +22,7 @@
 }
 body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh}
 
+.sticky-top{position:sticky;top:0;z-index:10}
 header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 header h1{font-size:17px;font-weight:600;letter-spacing:-.3px}
 .header-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
@@ -58,6 +60,10 @@ header h1{font-size:17px;font-weight:600;letter-spacing:-.3px}
   .exp-detail-field.exp-detail-edit{flex:0 0 auto}
   .exp-detail-label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}
   .exp-detail-field select.tag,.exp-detail-field .tag{width:fit-content}
+}
+@media(max-width:480px){
+  .demo-banner{gap:6px;padding:8px 10px;font-size:11px}
+  .demo-banner .btn{padding:2px 6px;font-size:10px}
 }
 
 main{max-width:940px;margin:0 auto;padding:20px 16px}
@@ -123,6 +129,10 @@ select.tag.type{
 .modal-backdrop.open{display:flex}
 .modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:22px;width:min(480px,95vw);max-height:90vh;overflow-y:auto}
 .modal h2{font-size:17px;font-weight:600;margin-bottom:16px}
+@media(max-width:640px){
+  .modal-backdrop{align-items:flex-end}
+  .modal{width:100%;max-width:100%;border-radius:var(--rl) var(--rl) 0 0;max-height:85vh}
+}
 .form-row{display:flex;flex-direction:column;gap:3px;margin-bottom:10px}
 .form-row label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}
 .form-row input,.form-row select,.form-row textarea{width:100%;padding:7px 10px;border:1px solid var(--border-strong);border-radius:var(--r);font-family:inherit;font-size:13px;color:var(--text);background:var(--surface)}
@@ -155,7 +165,7 @@ select.tag.type{
 .toast.error{background:var(--danger)}
 .empty{text-align:center;padding:36px;color:var(--text-faint);font-size:13px}
 
-.demo-banner{display:none;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;background:var(--warning-bg);color:var(--warning);border-bottom:1px solid var(--border);padding:9px 16px;font-size:12.5px;text-align:center}
+.demo-banner{display:none;align-items:center;justify-content:center;gap:10px;flex-wrap:nowrap;background:var(--warning-bg);color:var(--warning);border-bottom:1px solid var(--border);padding:9px 16px;font-size:12.5px;text-align:center}
 .demo-banner.show{display:flex}
 .demo-banner button{flex-shrink:0}
 </style>
@@ -178,8 +188,9 @@ select.tag.type{
 </head>
 <body>
 
+<div class="sticky-top">
 <header>
-  <h1>fin</h1>
+  <h1>imago</h1>
   <div class="header-actions">
     <button class="btn btn-primary add-expense-btn" onclick="openAddExpense()">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
@@ -189,8 +200,13 @@ select.tag.type{
     <div class="nav-links">
       <a href="savings.html" class="nav-link">Savings</a>
       <a href="expenses.html" class="nav-link active">Expenses</a>
-      <a href="performance.html" class="nav-link">Performance</a>
+      <a href="performance.html" class="nav-link" id="performanceNavLink">Performance</a>
     </div>
+    <script>
+      if (!isFeatureEnabled(FEATURE_FLAGS.performancePage)) {
+        document.getElementById('performanceNavLink').remove();
+      }
+    </script>
 
     <div class="dropdown" id="settingsDropdown">
       <button class="btn" onclick="toggleDropdown('settingsDropdown')">
@@ -200,6 +216,10 @@ select.tag.type{
         <button class="btn-flat" id="exploreToggleBtn" onclick="toggleExploreMode()">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>
           <span id="exploreToggleLabel">Try demo data</span>
+        </button>
+        <button class="btn-flat" onclick="openInstallModal()">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="2" width="10" height="12" rx="1.5"/><line x1="6" y1="12" x2="10" y2="12"/><path d="M6 6l2 2 2-2"/><line x1="8" y1="4" x2="8" y2="8"/></svg>
+          Install app
         </button>
         <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
         <button class="btn-flat" onclick="openImport()">
@@ -229,9 +249,10 @@ select.tag.type{
 </header>
 
 <div class="demo-banner" id="demoBanner">
-  <span>You're exploring with sample data — nothing here is saved yet.</span>
+  <span style="white-space:nowrap">You're exploring with sample data</span>
   <button class="btn btn-sm btn-primary" onclick="adoptDemoData()">Use this data</button>
   <button class="btn btn-sm" onclick="exitExploreMode()">Exit demo</button>
+</div>
 </div>
 
 <button class="fab-add" onclick="openAddExpense()" aria-label="Add expense">
@@ -258,8 +279,8 @@ select.tag.type{
   <div class="chart-card">
     <div class="chart-header">
       <div class="filters" id="chartViewFilters">
-        <span class="filter-chip" data-view="income-expense" onclick="changeChartView('income-expense', this)">Income vs Expenses</span>
         <span class="filter-chip" data-view="by-type" onclick="changeChartView('by-type', this)">Expenses by Type</span>
+        <span class="filter-chip" data-view="income-expense" onclick="changeChartView('income-expense', this)">Income vs Expenses</span>
       </div>
     </div>
     <div id="chartWrap">
@@ -279,8 +300,8 @@ select.tag.type{
   <!-- Expenses Table Section -->
   <div class="section-header">
     <div class="section-title">Expenses Log</div>
-    <div class="filters" id="typeFilterBar"></div>
   </div>
+  <div class="filters" id="typeFilterBar" style="margin-bottom:10px"></div>
 
   <div class="table-container">
     <table>
@@ -387,6 +408,7 @@ select.tag.type{
         <label id="payoutDayLabel">Payout Day(s) of Month</label>
         <input type="text" id="fIncPayoutDays" placeholder="e.g. 15, 30">
         <input type="date" id="fIncDate" style="display:none">
+        <span id="quarterlyNote" style="display:none;font-size:11px;color:var(--text-muted)">Repeats every 3 months from this month</span>
       </div>
     </div>
     <div class="form-grid">
@@ -400,7 +422,7 @@ select.tag.type{
       </div>
     </div>
     <div style="display:flex;justify-content:flex-end;margin-top:4px">
-      <button class="btn btn-primary" onclick="saveIncome()">Add / Update Income</button>
+      <button class="btn btn-primary" id="incomeSubmitBtn" onclick="saveIncome()">Add Income</button>
     </div>
     <div class="history-section" style="margin-top:16px">
       <h3>Configured Incomes</h3>
@@ -408,6 +430,18 @@ select.tag.type{
     </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('incomeModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Install App Modal -->
+<div class="modal-backdrop" id="installModal">
+  <div class="modal" style="width:min(380px,95vw)">
+    <h2>Install imago</h2>
+    <div id="installModalBody"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('installModal')">Close</button>
+      <button class="btn btn-primary" id="installModalActionBtn" style="display:none" onclick="triggerInstallPrompt()">Install</button>
     </div>
   </div>
 </div>
@@ -553,25 +587,34 @@ let _activeTypeFilter = (() => {
   try { return JSON.parse(localStorage.getItem('imago-expenses-active-type-filter-v2')) || ['all']; }
   catch { return ['all']; }
 })();
-// Transient drill-down filter set by clicking a chart bar — not persisted,
-// so the table doesn't stay filtered on an unrelated visit later.
-let _activeDateRange = null; // { start: 'YYYY-MM-DD', end: 'YYYY-MM-DD', label }
-let _chartView = localStorage.getItem('imago-expenses-chart-view') || 'income-expense';
-let _chartPeriod = localStorage.getItem('imago-expenses-chart-period') || '6M';
+// Drill-down filter set by clicking a chart bar. Persisted so it survives a
+// refresh, same as the other table/chart filters.
+let _activeDateRange = (() => {
+  try { return JSON.parse(localStorage.getItem('imago-expenses-active-date-range')); }
+  catch { return null; }
+})(); // { start: 'YYYY-MM-DD', end: 'YYYY-MM-DD', label }
+let _chartView = localStorage.getItem('imago-expenses-chart-view') || 'by-type';
+let _chartPeriod = localStorage.getItem('imago-expenses-chart-period') || '3M';
 let _chartTypeFilter = (() => {
   try { return JSON.parse(localStorage.getItem('imago-expenses-chart-type-filter-v2')) || ['all']; }
   catch { return ['all']; }
 })();
+let _showIncome = localStorage.getItem('imago-expenses-chart-show-income') !== '0';
 let _allAccounts = [];
 let _allTypes = [];
 let _allExpenses = [];
 let _allIncomes = [];
-// Session-only memory: forgets on page close/refresh
-let _lastExpenseDefaults = null;
+const LAST_EXPENSE_KEY = 'imago-last-expense-defaults';
+function getLastExpenseDefaults() {
+  try { return JSON.parse(localStorage.getItem(LAST_EXPENSE_KEY)); } catch { return null; }
+}
+function setLastExpenseDefaults(defaults) {
+  localStorage.setItem(LAST_EXPENSE_KEY, JSON.stringify(defaults));
+}
 
 // Auto-assigned expense type colors — deterministic (sorted by name) so a
 // given type always lands on the same color without storing one per record.
-const TYPE_PALETTE = ['#1a6b3c', '#a32d2d', '#8a6d1f', '#2d5f8a', '#6b3fa0', '#a34e8a', '#3f8a7c', '#8a5a2d'];
+const TYPE_PALETTE = ['#1baf7a', '#eb6834', '#2a78d6', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'];
 const GENERAL_COLOR = '#9c9a94';
 function typeColor(typeId) {
   if (!typeId) return GENERAL_COLOR;
@@ -927,7 +970,7 @@ async function loadData() {
 
 async function render() {
   // Adjust chart period visual filter state on load synchronously to avoid flickering
-  const savedPeriod = localStorage.getItem('imago-expenses-chart-period') || 'MONTH';
+  const savedPeriod = localStorage.getItem('imago-expenses-chart-period') || '3M';
   _chartPeriod = savedPeriod;
   document.querySelectorAll('#chartPeriodFilters .filter-chip').forEach(c => {
     const onclickAttr = c.getAttribute('onclick') || '';
@@ -955,23 +998,31 @@ function renderChartTypeFilter() {
   if (!bar) return;
 
   const hasGeneral = _allExpenses.some(e => !e.typeId);
+  const allIds = [..._allTypes.map(t => t.id), ...(hasGeneral ? ['__general__'] : [])];
 
-  // Validate saved filters still exist
-  const validIds = new Set(_allTypes.map(t => t.id));
-  let cleanFilters = _chartTypeFilter.filter(id =>
-    id === 'all' || validIds.has(id) || (id === '__general__' && hasGeneral)
-  );
-  if (cleanFilters.length === 0) {
-    cleanFilters = ['all'];
-  }
-  _chartTypeFilter = cleanFilters;
+  // Validate saved filters still exist. A leftover 'all' sentinel (older
+  // stored format, or the initial default) means "everything selected", and
+  // so does an empty result after cleanup -- otherwise a stale
+  // all-deselected choice (or a first-ever visit before any types existed
+  // yet) would make the chart look permanently empty instead of recovering.
+  const validIds = new Set(allIds);
+  _chartTypeFilter = _chartTypeFilter.includes('all')
+    ? [...allIds]
+    : _chartTypeFilter.filter(id => validIds.has(id));
+  if (_chartTypeFilter.length === 0) _chartTypeFilter = [...allIds];
   localStorage.setItem('imago-expenses-chart-type-filter-v2', JSON.stringify(_chartTypeFilter));
 
-  const chips = [{ id: 'all', name: 'All types' }, ..._allTypes];
+  // "All types" is active exactly when every individual type is selected --
+  // not a separate stored state -- so unchecking one type always drops it.
+  const allSelected = allIds.length > 0 && allIds.every(id => _chartTypeFilter.includes(id));
+
+  // The Income toggle only makes sense for the Income vs Expenses view --
+  // Expenses by Type never shows income at all.
+  const chips = [{ id: 'all', name: 'All types' }, ...(_chartView === 'income-expense' ? [{ id: 'income', name: 'Income' }] : []), ..._allTypes];
   if (hasGeneral) chips.push({ id: '__general__', name: 'General' });
   bar.innerHTML = chips.map(t => {
-    const isActive = _chartTypeFilter.includes(t.id);
-    const dot = t.id === 'all' ? '' : `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${typeColor(t.id === '__general__' ? null : t.id)};margin-right:5px;vertical-align:middle"></span>`;
+    const isActive = t.id === 'all' ? allSelected : t.id === 'income' ? _showIncome : _chartTypeFilter.includes(t.id);
+    const dot = (t.id === 'all' || t.id === 'income') ? '' : `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${typeColor(t.id === '__general__' ? null : t.id)};margin-right:5px;vertical-align:middle"></span>`;
     return `
       <span class="filter-chip ${isActive ? 'active' : ''}"
             onclick="toggleChartTypeFilter('${t.id}')">
@@ -982,26 +1033,33 @@ function renderChartTypeFilter() {
 }
 
 function toggleChartTypeFilter(typeId) {
+  if (typeId === 'income') {
+    _showIncome = !_showIncome;
+    localStorage.setItem('imago-expenses-chart-show-income', _showIncome ? '1' : '0');
+    renderChartTypeFilter();
+    renderChart();
+    return;
+  }
+
+  const hasGeneral = _allExpenses.some(e => !e.typeId);
+  const allIds = [..._allTypes.map(t => t.id), ...(hasGeneral ? ['__general__'] : [])];
+
   if (typeId === 'all') {
-    _chartTypeFilter = ['all'];
+    // Selecting "All types" turns every individual type on -- same as the
+    // table's "All" chip, which has no deselect-everything toggle either.
+    _chartTypeFilter = [...allIds];
   } else {
-    // Remove 'all' if selected
-    _chartTypeFilter = _chartTypeFilter.filter(id => id !== 'all');
-    
     if (_chartTypeFilter.includes(typeId)) {
-      // Toggle off
+      // Toggle off -- this also drops "All types" out of the active set,
+      // since it's derived from every type being selected. If this empties
+      // the filter, renderChartTypeFilter() recovers it back to everything.
       _chartTypeFilter = _chartTypeFilter.filter(id => id !== typeId);
     } else {
       // Toggle on
       _chartTypeFilter.push(typeId);
     }
-    
-    // If empty, fallback to 'all'
-    if (_chartTypeFilter.length === 0) {
-      _chartTypeFilter = ['all'];
-    }
   }
-  
+
   localStorage.setItem('imago-expenses-chart-type-filter-v2', JSON.stringify(_chartTypeFilter));
   renderChartTypeFilter();
   renderChart();
@@ -1028,8 +1086,18 @@ function incomeAmountForMonth(inc, monthKey) {
   const amt = Number(inc.amount) || 0;
   if (inc.frequency === 'one-time') return 0; // handled separately
   if (inc.frequency === 'monthly')   return amt;
-  if (inc.frequency === 'quarterly' || inc.frequency === 'annual') {
-    const month = parseInt(monthKey.slice(5, 7), 10);
+  const month = parseInt(monthKey.slice(5, 7), 10);
+  if (inc.frequency === 'quarterly') {
+    // payoutDays holds a single start month; the other 3 payout months are
+    // every 3 months from there. Reading just the first comma-separated
+    // token also self-heals a record saved in the old multi-month-list
+    // format, and an invalid/missing value falls back to a calendar quarter
+    // instead of never matching any month (the original bug).
+    const raw = parseInt(String(inc.payoutDays || '').split(',')[0], 10);
+    const startMonth = (!isNaN(raw) && raw >= 1 && raw <= 12) ? raw : 3;
+    return ((month - startMonth) % 3 + 3) % 3 === 0 ? amt : 0;
+  }
+  if (inc.frequency === 'annual') {
     const payoutMonths = (inc.payoutDays || '')
       .split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
     return payoutMonths.includes(month) ? amt : 0;
@@ -1065,12 +1133,12 @@ function renderSummary() {
     </div>
     <div class="sum-card">
       <div class="lbl">This Month's Spent</div>
-      <div class="val col-neg">₱${fmtk(monthExpenses)}</div>
+      <div class="val col-neg">${maskedAmount('₱' + fmtk(monthExpenses))}</div>
       <div class="sub">${currentMonthStr}</div>
     </div>
     <div class="sum-card">
       <div class="lbl">Net Cashflow</div>
-      <div class="val ${netMonthly >= 0 ? 'col-pos' : 'col-neg'}">₱${fmtk(netMonthly)}</div>
+      <div class="val ${netMonthly >= 0 ? 'col-pos' : 'col-neg'}">${maskedAmount('₱' + fmtk(netMonthly))}</div>
       <div class="sub">Savings Rate: ${netSavingsRate.toFixed(1)}%</div>
     </div>
   `;
@@ -1089,6 +1157,7 @@ function changeChartView(view, el) {
   localStorage.setItem('imago-expenses-chart-view', view);
   document.querySelectorAll('#chartViewFilters .filter-chip').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
+  renderChartTypeFilter();
   renderChart();
 }
 
@@ -1096,11 +1165,21 @@ function renderChart() {
   const chart = document.getElementById('expenseChart');
   const empty = document.getElementById('chartEmpty');
 
-  const isFiltered = !_chartTypeFilter.includes('all');
+  // renderChartTypeFilter() (called just before this, on every path) always
+  // normalizes _chartTypeFilter to a concrete list of selected ids -- when
+  // everything is selected, that list already matches every expense.
+  const filteredExpenses = _allExpenses.filter(exp => _chartTypeFilter.includes(exp.typeId || '__general__'));
 
-  const filteredExpenses = !isFiltered
-    ? _allExpenses
-    : _allExpenses.filter(exp => _chartTypeFilter.includes(exp.typeId || '__general__'));
+  // Income isn't attributable to a specific expense type, so it's gated by
+  // its own "Income" chip rather than the per-type filters.
+  const isFiltered = !_showIncome;
+
+  // Distinguish "nothing logged at all" from "records exist, current filter
+  // selection just excludes them" -- the empty state reads differently for each.
+  const hasAnyRecords = _allExpenses.length > 0 || _allIncomes.length > 0;
+  const emptyMessage = hasAnyRecords
+    ? 'No data for the selected filters — try enabling more types or Income above.'
+    : 'No expense or income records yet.';
 
   // Tally each period bucket's expense total into a byType map alongside
   // its .expense total, so the by-type chart stays in sync automatically.
@@ -1149,7 +1228,11 @@ function renderChart() {
             const w = weeks.find(w => day >= w.startDay && day <= w.endDay) || weeks[3];
             if (w) w.income += share;
           });
-        } else if (inc.frequency === 'quarterly' || inc.frequency === 'annual') {
+        } else if (inc.frequency === 'quarterly') {
+          const raw = parseInt(String(inc.payoutDays || '').split(',')[0], 10);
+          const startMonth = (!isNaN(raw) && raw >= 1 && raw <= 12) ? raw : 3;
+          if (((curMonth - startMonth) % 3 + 3) % 3 === 0 && weeks[2]) weeks[2].income += amt;
+        } else if (inc.frequency === 'annual') {
           const payoutMonths = (inc.payoutDays || '')
             .split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
           if (payoutMonths.includes(curMonth) && weeks[2]) weeks[2].income += amt;
@@ -1248,8 +1331,7 @@ function renderChart() {
     const typeOrder = Object.keys(totalByType).sort((a, b) => totalByType[b] - totalByType[a]);
 
     const typeChartData = chartData.map(item => ({
-      label: item.label,
-      key: item.key,
+      ...item,
       segments: typeOrder.map(typeId => ({
         id: typeId,
         name: typeId === '__general__' ? 'General' : (_allTypes.find(t => t.id === typeId)?.name || 'Unknown'),
@@ -1261,6 +1343,7 @@ function renderChart() {
     const hasData = typeChartData.some(d => d.segments.some(s => s.value > 0));
     if (!hasData) {
       chart.style.display = 'none';
+      empty.textContent = emptyMessage;
       empty.style.display = 'block';
     } else {
       empty.style.display = 'none';
@@ -1272,6 +1355,7 @@ function renderChart() {
     const hasData = chartData.some(d => d.income > 0 || d.expense > 0);
     if (!hasData) {
       chart.style.display = 'none';
+      empty.textContent = emptyMessage;
       empty.style.display = 'block';
     } else {
       empty.style.display = 'none';
@@ -1289,12 +1373,21 @@ function renderFilterBar() {
   const types = [{ id: 'all', name: 'All' }];
   if (hasGeneral) types.push({ id: '__general__', name: 'General' });
   types.push(..._allTypes);
+  const allIds = types.filter(t => t.id !== 'all').map(t => t.id);
 
-  const validIds = new Set(types.map(t => t.id));
-  let cleanFilters = _activeTypeFilter.filter(id => validIds.has(id));
-  if (cleanFilters.length === 0) cleanFilters = ['all'];
+  // A leftover 'all' sentinel (older stored format, or the initial default)
+  // means "everything selected".
+  const validIds = new Set(allIds);
+  let cleanFilters = _activeTypeFilter.includes('all')
+    ? [...allIds]
+    : _activeTypeFilter.filter(id => validIds.has(id));
+  if (cleanFilters.length === 0) cleanFilters = [...allIds];
   _activeTypeFilter = cleanFilters;
   localStorage.setItem('imago-expenses-active-type-filter-v2', JSON.stringify(_activeTypeFilter));
+
+  // "All" is active exactly when every individual type is selected -- not a
+  // separate stored state -- so unchecking one type always drops it.
+  const allSelected = allIds.length > 0 && allIds.every(id => _activeTypeFilter.includes(id));
 
   const dateChip = _activeDateRange ? `
     <span class="filter-chip active" onclick="clearDateRangeFilter()">
@@ -1303,23 +1396,28 @@ function renderFilterBar() {
   ` : '';
 
   bar.innerHTML = types.map(t => `
-    <span class="filter-chip ${_activeTypeFilter.includes(t.id) ? 'active' : ''}" onclick="toggleTypeFilter('${t.id}')">
+    <span class="filter-chip ${(t.id === 'all' ? allSelected : _activeTypeFilter.includes(t.id)) ? 'active' : ''}" onclick="toggleTypeFilter('${t.id}')">
       ${esc(t.name)}
     </span>
   `).join('') + dateChip;
 }
 
 function toggleTypeFilter(typeId) {
+  const hasGeneral = _allExpenses.some(e => !e.typeId);
+  const allIds = [..._allTypes.map(t => t.id), ...(hasGeneral ? ['__general__'] : [])];
+
   if (typeId === 'all') {
-    _activeTypeFilter = ['all'];
+    // Selecting "All" turns every individual type on.
+    _activeTypeFilter = [...allIds];
   } else {
-    _activeTypeFilter = _activeTypeFilter.filter(id => id !== 'all');
     if (_activeTypeFilter.includes(typeId)) {
+      // Toggle off -- this also drops "All" out of the active set, since
+      // it's derived from every type being selected.
       _activeTypeFilter = _activeTypeFilter.filter(id => id !== typeId);
     } else {
       _activeTypeFilter.push(typeId);
     }
-    if (_activeTypeFilter.length === 0) _activeTypeFilter = ['all'];
+    if (_activeTypeFilter.length === 0) _activeTypeFilter = [...allIds];
   }
   localStorage.setItem('imago-expenses-active-type-filter-v2', JSON.stringify(_activeTypeFilter));
   renderFilterBar();
@@ -1328,15 +1426,17 @@ function toggleTypeFilter(typeId) {
 
 function clearDateRangeFilter() {
   _activeDateRange = null;
+  localStorage.removeItem('imago-expenses-active-date-range');
   renderFilterBar();
   renderTable();
 }
 
 function renderTable() {
   const tbody = document.getElementById('expensesTbody');
-  let filtered = _activeTypeFilter.includes('all')
-    ? _allExpenses
-    : _allExpenses.filter(e => _activeTypeFilter.includes(e.typeId || '__general__'));
+  // renderFilterBar() (called just before this, on every path) always
+  // normalizes _activeTypeFilter to a concrete list of selected ids -- when
+  // everything is selected, that list already matches every expense.
+  let filtered = _allExpenses.filter(e => _activeTypeFilter.includes(e.typeId || '__general__'));
 
   if (_activeDateRange) {
     filtered = filtered.filter(e => e.date >= _activeDateRange.start && e.date <= _activeDateRange.end);
@@ -1427,11 +1527,11 @@ function populateDropdowns() {
     ? '<option value="">(No types defined yet)</option>'
     : sortedTypes.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('');
 
-  // Only allow deducting from liquid spending accounts: savings, cash, buffer (exclude TD, equities, illiquid)
+  // Only allow deducting from liquid spending accounts: savings, cash (exclude TD, equities, receivable)
   const spendableAccounts = _allAccounts
     .filter(a => {
       const tags = a.tags || [];
-      const isLocked = tags.some(t => t === 'td' || t === 'equities' || t === 'illiquid');
+      const isLocked = tags.some(t => t === 'td' || t === 'equities' || t === 'receivable');
       return !isLocked;
     })
     .sort((a, b) => {
@@ -1452,12 +1552,13 @@ function openAddExpense() {
   document.getElementById('fExpDate').value = new Date().toISOString().split('T')[0];
   document.getElementById('fExpNote').value = '';
   document.getElementById('btnDeleteExpense').style.display = 'none';
-  // Restore last session defaults
-  if (_lastExpenseDefaults) {
-    document.getElementById('fExpName').value = _lastExpenseDefaults.name || '';
-    document.getElementById('fExpAmount').value = _lastExpenseDefaults.amount || '';
-    document.getElementById('fExpType').value = _lastExpenseDefaults.typeId || '';
-    document.getElementById('fExpSource').value = _lastExpenseDefaults.accountId || '';
+  // Restore last-used defaults
+  const lastDefaults = getLastExpenseDefaults();
+  if (lastDefaults) {
+    document.getElementById('fExpName').value = lastDefaults.name || '';
+    document.getElementById('fExpAmount').value = lastDefaults.amount || '';
+    document.getElementById('fExpType').value = lastDefaults.typeId || '';
+    document.getElementById('fExpSource').value = lastDefaults.accountId || '';
   } else {
     document.getElementById('fExpName').value = '';
     document.getElementById('fExpAmount').value = '';
@@ -1566,9 +1667,9 @@ async function saveExpense() {
     updated_at: new Date().toISOString()
   });
 
-  // Remember last-used fields for this session (Add only, not Edit)
+  // Remember last-used fields (Add only, not Edit)
   if (!_editExpenseId) {
-    _lastExpenseDefaults = { name, amount, typeId, accountId };
+    setLastExpenseDefaults({ name, amount, typeId, accountId });
   }
 
   closeModal('expenseModal');
@@ -1672,23 +1773,31 @@ function onIncomeFreqChange() {
   const inputDays = document.getElementById('fIncPayoutDays');
   const inputDate = document.getElementById('fIncDate');
   const label = document.getElementById('payoutDayLabel');
-  
+  const quarterlyNote = document.getElementById('quarterlyNote');
+
+  inputDays.style.display = 'none';
+  inputDate.style.display = 'none';
+  quarterlyNote.style.display = 'none';
+
   if (freq === 'one-time') {
     label.textContent = 'Payout Date';
-    inputDays.style.display = 'none';
     inputDate.style.display = 'block';
     if (!inputDate.value) {
       inputDate.value = new Date().toISOString().slice(0, 10);
     }
   } else {
     inputDays.style.display = 'block';
-    inputDate.style.display = 'none';
     if (freq === 'monthly') {
       label.textContent = 'Payout Day (e.g. 15 or 30)';
       inputDays.placeholder = '15';
     } else if (freq === 'quarterly') {
-      label.textContent = 'Payout Month(s) (1-12)';
-      inputDays.placeholder = 'e.g. 3, 6, 9, 12';
+      // Single start month -- the other 3 payout months are every 3 months
+      // from there, not user-entered, so this can't be left as a multi-month
+      // list with an invalid/missing value (that's what silently broke
+      // quarterly incomes before).
+      label.textContent = 'First Payout Month (1-12)';
+      inputDays.placeholder = 'e.g. 2';
+      quarterlyNote.style.display = 'inline';
     } else if (freq === 'annual') {
       label.textContent = 'Payout Month (1-12)';
       inputDays.placeholder = 'e.g. 12';
@@ -1697,6 +1806,19 @@ function onIncomeFreqChange() {
 }
 
 function openIncomeModal() {
+  // Reset to "add new" state in case the modal was last closed mid-edit
+  // (the Close button doesn't clear that on its own).
+  _editingIncomeId = null;
+  document.getElementById('fIncName').value = '';
+  document.getElementById('fIncAmount').value = '';
+  document.getElementById('fIncPayoutDays').value = '';
+  document.getElementById('fIncDate').value = '';
+  document.getElementById('fIncStartDate').value = '';
+  document.getElementById('fIncEndDate').value = '';
+  document.getElementById('fIncFreq').value = 'monthly';
+  onIncomeFreqChange();
+  document.getElementById('incomeSubmitBtn').textContent = 'Add Income';
+
   renderIncomesList();
   openModal('incomeModal');
 }
@@ -1731,7 +1853,13 @@ function renderIncomesList() {
       const days = inc.payoutDays || '15';
       let suffix = '';
       if (inc.frequency === 'monthly')   suffix = `Day ${days}`;
-      else if (inc.frequency === 'quarterly') suffix = `Months: ${days}`;
+      else if (inc.frequency === 'quarterly') {
+        const raw = parseInt(String(days).split(',')[0], 10);
+        const startMonth = (!isNaN(raw) && raw >= 1 && raw <= 12) ? raw : 3;
+        const abbr = s => s.charAt(0).toUpperCase() + s.slice(1, 3);
+        const months = [0, 3, 6, 9].map(off => ((startMonth - 1 + off) % 12) + 1).sort((a, b) => a - b);
+        suffix = months.map(m => abbr(monthNames[m - 1])).join(', ');
+      }
       else if (inc.frequency === 'annual')    suffix = `Month: ${days}`;
 
       const isActive = isIncomeActiveInMonth(inc, currentMonthKey);
@@ -1799,12 +1927,20 @@ function editIncome(id) {
   document.getElementById('fIncFreq').value = inc.frequency;
   if (inc.frequency === 'one-time') {
     document.getElementById('fIncDate').value = inc.payoutDays || new Date().toISOString().slice(0, 10);
-  } else {
+  } else if (inc.frequency === 'monthly') {
     document.getElementById('fIncPayoutDays').value = inc.payoutDays || '15';
+  } else if (inc.frequency === 'quarterly') {
+    // Migrate an old-format multi-month list (or the earlier invalid "15"
+    // default) down to just its first token as the inferred start month.
+    const first = parseInt(String(inc.payoutDays || '').split(',')[0], 10);
+    document.getElementById('fIncPayoutDays').value = (!isNaN(first) && first >= 1 && first <= 12) ? String(first) : '';
+  } else {
+    document.getElementById('fIncPayoutDays').value = inc.payoutDays || '';
   }
   document.getElementById('fIncStartDate').value = inc.startDate || '';
   document.getElementById('fIncEndDate').value   = inc.endDate   || '';
   onIncomeFreqChange();
+  document.getElementById('incomeSubmitBtn').textContent = 'Update Income';
 }
 
 async function saveIncome() {
@@ -1817,8 +1953,30 @@ async function saveIncome() {
 
   if (frequency === 'one-time') {
     payoutDays = document.getElementById('fIncDate').value || new Date().toISOString().slice(0, 10);
-  } else {
+  } else if (frequency === 'monthly') {
     payoutDays = document.getElementById('fIncPayoutDays').value.trim() || '15';
+  } else if (frequency === 'quarterly') {
+    // Single start month, 1-12; incomeAmountForMonth() derives the other 3
+    // payout months as every 3 months from here. This field used to mean a
+    // full comma-separated month list and silently defaulted to an invalid
+    // "15" when left blank -- a single required number can't do that.
+    const startMonth = parseInt(document.getElementById('fIncPayoutDays').value.trim(), 10);
+    if (isNaN(startMonth) || startMonth < 1 || startMonth > 12) {
+      toast('Please enter a valid first payout month (1-12).', true);
+      return;
+    }
+    payoutDays = String(startMonth);
+  } else {
+    // Annual: this field means payout MONTH(S) 1-12, not a day of month, so
+    // falling back to "15" (monthly's default) silently produced an invalid
+    // month that never matched -- the income was never credited.
+    const raw = document.getElementById('fIncPayoutDays').value.trim();
+    const months = raw.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+    if (!months.length || months.some(m => m < 1 || m > 12)) {
+      toast('Please enter a valid payout month (1-12).', true);
+      return;
+    }
+    payoutDays = months.join(',');
   }
 
   if (!name || isNaN(amount) || amount <= 0) {
@@ -1844,6 +2002,7 @@ async function saveIncome() {
   document.getElementById('fIncDate').value = '';
   document.getElementById('fIncStartDate').value = '';
   document.getElementById('fIncEndDate').value = '';
+  document.getElementById('incomeSubmitBtn').textContent = 'Add Income';
   toast('Income saved.');
   await render();
   renderIncomesList();
@@ -1887,6 +2046,7 @@ document.getElementById('expenseChart').addEventListener('bar-click', e => {
   }
 
   _activeDateRange = { start, end, label: rangeLabel };
+  localStorage.setItem('imago-expenses-active-date-range', JSON.stringify(_activeDateRange));
 
   // Mirror the chart's own type-filter selection onto the table's type pills,
   // so the drill-down matches what the chart was actually showing.
@@ -1898,7 +2058,7 @@ document.getElementById('expenseChart').addEventListener('bar-click', e => {
 });
 
 // enterExploreMode/exitExploreMode/toggleExploreMode/adoptDemoData/refreshMode
-// live in scripts/explore-mode.js (shared with savings.html).
+// live in scripts/explore-mode.js (shared with index.html).
 
 // Initial render
 refreshMode();

@@ -1,12 +1,15 @@
 // Shared "privacy mask" for sensitive summary-tile numbers, used by
-// savings.html and expenses.html. All masked numbers blur by default and
-// share one reveal toggle — clicking any masked/unmasked number (or its eye
-// icon) reveals/hides all of them at once. State persists in localStorage
-// across reloads and pages.
+// index.html and expenses.html. Each masked number has an eye icon that
+// toggles it (and every other masked number) between shown and blurred.
+// The choice persists in localStorage across reloads and pages. New users
+// (no stored choice yet) start unmasked.
 const MASK_REVEAL_KEY = 'imago-mask-revealed';
 
 function isMaskRevealed() {
-  try { return localStorage.getItem(MASK_REVEAL_KEY) === '1'; } catch { return false; }
+  try {
+    const v = localStorage.getItem(MASK_REVEAL_KEY);
+    return v === null ? true : v === '1';
+  } catch { return true; }
 }
 
 function toggleMaskReveal() {
@@ -31,13 +34,3 @@ function maskedAmount(valueHtml) {
     </span>
   `;
 }
-
-// Re-mask the moment the app leaves focus (tab switch, app switch, screen
-// lock) so revealed numbers aren't left on-screen in the app switcher/thumbnail.
-function reMaskOnLeave() {
-  if (!isMaskRevealed()) return;
-  try { localStorage.setItem(MASK_REVEAL_KEY, '0'); } catch {}
-  if (typeof render === 'function') render();
-}
-document.addEventListener('visibilitychange', () => { if (document.hidden) reMaskOnLeave(); });
-window.addEventListener('blur', reMaskOnLeave);

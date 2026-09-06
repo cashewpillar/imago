@@ -913,7 +913,7 @@ class FinanceChart extends HTMLElement {
 
         drawnBars.push({
           x, y, w: barWidth, h: barH,
-          label: `${item.label || ''} Income`,
+          label: `${item.label || ''} · Income`,
           value: incomeVal,
           color: '#1a6b3c',
           item
@@ -937,7 +937,7 @@ class FinanceChart extends HTMLElement {
 
         drawnBars.push({
           x, y, w: barWidth, h: barH,
-          label: `${item.label || ''} Expenses`,
+          label: `${item.label || ''} · Expenses`,
           value: expenseVal,
           color: '#a32d2d',
           item
@@ -952,7 +952,7 @@ class FinanceChart extends HTMLElement {
       const mx = clientX - rect.left;
       const my = clientY - rect.top;
 
-      const hovered = drawnBars.find(b => mx >= b.x && mx <= b.x + b.w && my >= b.y - 10 && my <= b.y + b.h);
+      const hovered = drawnBars.find(b => mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h);
 
       if (hovered) {
         this.canvas.style.cursor = 'pointer';
@@ -999,8 +999,9 @@ class FinanceChart extends HTMLElement {
   }
 
   // items: [{ label, key, segments: [{ id, name, color, value }] }]
-  // One bar per item, segments stacked bottom-to-top. Hover-tooltip only —
-  // no click handling, since this chart has no drill-down.
+  // One bar per item, segments stacked bottom-to-top. Click behavior mirrors
+  // _renderBarChart's drill-down (dispatches 'bar-click' with the clicked
+  // segment's item/value).
   _renderStackedBarChart(items, W, H) {
     if (!Array.isArray(items) || items.length === 0) {
       this._drawMessage('No data');
@@ -1087,11 +1088,12 @@ class FinanceChart extends HTMLElement {
       const hovered = drawnBars.find(b => mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h);
 
       if (hovered) {
-        this.canvas.style.cursor = 'default';
+        this.canvas.style.cursor = 'pointer';
         this.tooltip.textContent = `${hovered.label} · ₱${this._fmtk(hovered.value)}`;
         this.tooltip.style.display = 'block';
         this._positionTooltip(rect.left + hovered.x + hovered.w / 2, rect.top + hovered.y);
       } else {
+        this.canvas.style.cursor = 'default';
         this.tooltip.style.display = 'none';
       }
     };
@@ -1100,10 +1102,33 @@ class FinanceChart extends HTMLElement {
     this.canvas.ontouchmove = handlePointer;
     this.canvas.ontouchstart = handlePointer;
 
-    const hideTooltip = () => { this.tooltip.style.display = 'none'; };
+    this.canvas.onclick = e => {
+      const rect = this.canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+
+      const clickedBar = drawnBars.find(b => mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h);
+      if (clickedBar) {
+        this.tooltip.style.display = 'none';
+        this.canvas.style.cursor = 'default';
+        this.dispatchEvent(new CustomEvent('bar-click', {
+          detail: {
+            label: clickedBar.label,
+            value: clickedBar.value,
+            item: clickedBar.item
+          },
+          bubbles: true,
+          composed: true
+        }));
+      }
+    };
+
+    const hideTooltip = () => {
+      this.tooltip.style.display = 'none';
+      this.canvas.style.cursor = 'default';
+    };
     this.canvas.onmouseleave = hideTooltip;
     this.canvas.ontouchend = hideTooltip;
-    this.canvas.onclick = null;
   }
 }
 

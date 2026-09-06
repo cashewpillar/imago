@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Savings</title>
+<script src="scripts/feature-flags.js"></script>
 <script src="scripts/dexie.min.js"></script>
 <script src="scripts/explore-mode.js"></script>
 <script src="scripts/privacy-mask.js?v=2"></script>
@@ -20,6 +21,7 @@
 }
 body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh}
 
+.sticky-top{position:sticky;top:0;z-index:10}
 header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 header h1{font-size:17px;font-weight:600;letter-spacing:-.3px}
 .header-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
@@ -35,6 +37,7 @@ header h1{font-size:17px;font-weight:600;letter-spacing:-.3px}
 .btn-primary:hover{background:#333}
 .btn-danger{color:var(--danger);border-color:#f7c1c1}
 .btn-danger:hover{background:var(--danger-bg)}
+.btn-sm{padding:3px 8px;font-size:11px}
 .btn svg{width:13px;height:13px;flex-shrink:0}
 
 main{max-width:940px;margin:0 auto;padding:20px 16px}
@@ -69,9 +72,8 @@ main{max-width:940px;margin:0 auto;padding:20px 16px}
 .filter-chip.tag-td.active{background:var(--accent);border-color:var(--accent)}
 .filter-chip.tag-savings.active{background:#3b6d11;border-color:#3b6d11}
 .filter-chip.tag-equities.active{background:var(--info);border-color:var(--info)}
-.filter-chip.tag-buffer.active{background:var(--warning);border-color:var(--warning)}
 .filter-chip.tag-credit.active{background:var(--danger);border-color:var(--danger)}
-.filter-chip.tag-illiquid.active{background:#5f5e5a;border-color:#5f5e5a}
+.filter-chip.tag-receivable.active{background:#5f5e5a;border-color:#5f5e5a}
 .filter-chip.tag-cash.active{background:#444;border-color:#444}
 
 .table-container {
@@ -93,7 +95,9 @@ table th, table td {
   white-space: nowrap;
 }
 table td:nth-child(1) {
-  word-break: break-word;
+  min-width: 150px;
+  max-width: 220px;
+  white-space: normal;
 }
 th{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);font-weight:500;padding:9px 14px;text-align:left;border-bottom:1px solid var(--border);background:var(--bg);cursor:pointer;user-select:none;transition:background .12s}
 th:not(:first-child){padding-left:6px;padding-right:6px}
@@ -112,8 +116,7 @@ td.actions{text-align:right;white-space:nowrap}
 .tag.td{background:var(--accent-bg);color:var(--accent)}
 .tag.savings{background:#edf4e8;color:#3b6d11}
 .tag.equities{background:var(--info-bg);color:var(--info)}
-.tag.buffer{background:var(--warning-bg);color:var(--warning)}
-.tag.illiquid{background:#f1efe8;color:#5f5e5a}
+.tag.receivable{background:#f1efe8;color:#5f5e5a}
 .tag.credit{background:var(--danger-bg);color:var(--danger)}
 .tag.cash{background:#f1efe8;color:#444}
 .bal-pos{font-weight:500}
@@ -159,6 +162,8 @@ td.actions{text-align:right;white-space:nowrap}
   .fab-add{display:flex}
 }
 @media(max-width:480px){
+  .demo-banner{gap:6px;padding:8px 10px;font-size:11px}
+  .demo-banner .btn{padding:2px 6px;font-size:10px}
   .target-row{grid-template-columns:22px 1fr auto 70px;grid-template-rows:auto auto;gap:6px 8px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)}
   .target-row .lock-btn{grid-column:1;grid-row:1}
   .target-row label{grid-column:2;grid-row:1}
@@ -180,6 +185,10 @@ td.actions{text-align:right;white-space:nowrap}
 .modal-backdrop.open{display:flex}
 .modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:22px;width:min(480px,95vw);max-height:90vh;overflow-y:auto}
 .modal h2{font-size:17px;font-weight:600;margin-bottom:16px}
+@media(max-width:640px){
+  .modal-backdrop{align-items:flex-end}
+  .modal{width:100%;max-width:100%;border-radius:var(--rl) var(--rl) 0 0;max-height:85vh}
+}
 .form-row{display:flex;flex-direction:column;gap:3px;margin-bottom:10px}
 .form-row label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}
 .form-row input,.form-row select,.form-row textarea{width:100%;padding:7px 10px;border:1px solid var(--border-strong);border-radius:var(--r);font-family:inherit;font-size:13px;color:var(--text);background:var(--surface)}
@@ -212,7 +221,7 @@ td.actions{text-align:right;white-space:nowrap}
 .toast.error{background:var(--danger)}
 .empty{text-align:center;padding:36px;color:var(--text-faint);font-size:13px}
 
-.demo-banner{display:none;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;background:var(--warning-bg);color:var(--warning);border-bottom:1px solid var(--border);padding:9px 16px;font-size:12.5px;text-align:center}
+.demo-banner{display:none;align-items:center;justify-content:center;gap:10px;flex-wrap:nowrap;background:var(--warning-bg);color:var(--warning);border-bottom:1px solid var(--border);padding:9px 16px;font-size:12.5px;text-align:center}
 .demo-banner.show{display:flex}
 .demo-banner button{flex-shrink:0}
 .info-icon{display:inline-flex;align-items:center;margin-left:4px;color:var(--text-faint);vertical-align:middle;cursor:help}
@@ -238,8 +247,9 @@ td.actions{text-align:right;white-space:nowrap}
 </head>
 <body>
 
+<div class="sticky-top">
 <header>
-  <h1>fin</h1>
+  <h1>imago</h1>
   <div class="header-actions">
     <button class="btn btn-primary add-account-btn" onclick="openAddAccount()">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
@@ -249,8 +259,13 @@ td.actions{text-align:right;white-space:nowrap}
     <div class="nav-links">
       <a href="savings.html" class="nav-link active">Savings</a>
       <a href="expenses.html" class="nav-link">Expenses</a>
-      <a href="performance.html" class="nav-link">Performance</a>
+      <a href="performance.html" class="nav-link" id="performanceNavLink">Performance</a>
     </div>
+    <script>
+      if (!isFeatureEnabled(FEATURE_FLAGS.performancePage)) {
+        document.getElementById('performanceNavLink').remove();
+      }
+    </script>
 
     <div class="dropdown" id="settingsDropdown">
       <button class="btn" onclick="toggleDropdown('settingsDropdown')">
@@ -260,6 +275,10 @@ td.actions{text-align:right;white-space:nowrap}
         <button class="btn-flat" id="exploreToggleBtn" onclick="toggleExploreMode()">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>
           <span id="exploreToggleLabel">Try demo data</span>
+        </button>
+        <button class="btn-flat" onclick="openInstallModal()">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="2" width="10" height="12" rx="1.5"/><line x1="6" y1="12" x2="10" y2="12"/><path d="M6 6l2 2 2-2"/><line x1="8" y1="4" x2="8" y2="8"/></svg>
+          Install app
         </button>
         <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
         <button class="btn-flat" onclick="openImport()">
@@ -285,9 +304,10 @@ td.actions{text-align:right;white-space:nowrap}
 </header>
 
 <div class="demo-banner" id="demoBanner">
-  <span>You're exploring with sample data — nothing here is saved yet.</span>
+  <span style="white-space:nowrap">You're exploring with sample data</span>
   <button class="btn btn-sm btn-primary" onclick="adoptDemoData()">Use this data</button>
   <button class="btn btn-sm" onclick="exitExploreMode()">Exit demo</button>
+</div>
 </div>
 
 <button class="fab-add" onclick="openAddAccount()" aria-label="Add account">
@@ -300,11 +320,11 @@ td.actions{text-align:right;white-space:nowrap}
   <div class="chart-card">
     <div class="chart-header">
       <div class="filters" id="chartTypeFilters">
+        <span class="filter-chip" data-type="goals" onclick="changeChartType('goals', this)">Fund Goals</span>
         <span class="filter-chip" data-type="donut" onclick="changeChartType('donut', this)">Asset Allocation</span>
         <span class="filter-chip" data-type="line" onclick="changeChartType('line', this)">Balance History</span>
         <span class="filter-chip" data-type="liquidity" onclick="changeChartType('liquidity', this)">Liquidity</span>
         <span class="filter-chip" data-type="yield" onclick="changeChartType('yield', this)">Yield</span>
-        <span class="filter-chip" data-type="goals" onclick="changeChartType('goals', this)">Fund Goals</span>
       </div>
     </div>
     <div id="chartWrap" style="display:flex; gap:20px; align-items:stretch;">
@@ -333,6 +353,8 @@ td.actions{text-align:right;white-space:nowrap}
       <span class="filter-chip" data-period="1Y" onclick="changePeriod('1Y', this)">1Y</span>
       <span class="filter-chip" data-period="ALL" onclick="changePeriod('ALL', this)">All</span>
     </div>
+    <div id="chartColorLegend" style="display:none; gap:6px 14px; flex-wrap:wrap; font-size:11px; color:var(--text-faint); margin-top:10px;"></div>
+    <div id="fundGoalsReceivableNote" style="display:none; font-size:11px; color:var(--text-faint); margin-top:6px;">Receivable balances aren't included above.</div>
   </div>
 
   <div class="section-header">
@@ -353,6 +375,7 @@ td.actions{text-align:right;white-space:nowrap}
       <tbody id="accountsTbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
     </table>
   </div>
+  <div id="fundGroupLegend" style="display:flex; gap:6px 14px; flex-wrap:wrap; font-size:11px; color:var(--text-faint); margin:8px 0 16px;"></div>
 
   <div class="section-header" id="closedTdHeader" style="display:none">
     <span class="section-title">Closed TDs</span>
@@ -378,19 +401,18 @@ td.actions{text-align:right;white-space:nowrap}
     <h2 id="accountModalTitle">Add account</h2>
     <div class="form-row"><label>Label</label><input type="text" id="fLabel" placeholder="Maya Savings" oninput="onLabelInput()"></div>
     <div class="form-grid">
-      <div class="form-row"><label>Balance</label><div style="display:flex;gap:6px;align-items:center"><button type="button" id="fBalanceSign" onclick="toggleBalanceSign()" style="flex-shrink:0;width:32px;height:32px;border:1px solid var(--border-strong);border-radius:var(--r);background:var(--surface);color:var(--text);font-size:15px;cursor:pointer;font-family:var(--mono);line-height:1;transition:background .15s,color .15s" title="Toggle sign">+</button><input type="number" id="fBalance" step="0.01" placeholder="0" min="0" style="flex:1"></div></div>
+      <div class="form-row"><label>Balance</label><input type="number" id="fBalance" step="0.01" placeholder="0" min="0"></div>
       <div class="form-row"><label>Rate (%)</label><input type="number" id="fRate" step="0.01" placeholder="0"></div>
     </div>
     <div class="form-grid">
-      <div class="form-row"><label>Tag</label>
-        <select id="fTag" onchange="syncBalanceSign(this.value==='credit'); onLabelInput(); onTagChange()">
+      <div class="form-row"><label>Account Type</label>
+        <select id="fTag" onchange="onLabelInput(); onTagChange()">
           <option value="savings">savings</option>
           <option value="equities">equities</option>
           <option value="td">time deposit</option>
-          <option value="buffer">buffer</option>
           <option value="cash">cash</option>
           <option value="credit">credit</option>
-          <option value="illiquid">illiquid</option>
+          <option value="receivable">receivable</option>
         </select>
       </div>
       <div class="form-row"><label>Open Date</label><input type="date" id="fOpenDate" oninput="onTermChange()"></div>
@@ -418,6 +440,13 @@ td.actions{text-align:right;white-space:nowrap}
     </div>
     <div class="form-row" id="tdCloseRow" style="display:none">
       <button type="button" class="btn btn-danger" onclick="closeTD(_editId)">Close TD &amp; roll over</button>
+    </div>
+    <div class="form-row" id="fFunRow">
+      <label style="display:flex; align-items:center; gap:6px; cursor:pointer; text-transform:none; font-size:13px; color:var(--text)">
+        <input type="checkbox" id="fFun" style="width:14px;height:14px">
+        For Fun
+      </label>
+      <span style="font-size:11px;color:var(--text-faint)">For living life: travel, eating out with friends, experiences.</span>
     </div>
     <div class="form-row"><label>Note</label><input type="text" id="fNote" placeholder="General account notes"></div>
     <div class="form-row">
@@ -461,6 +490,18 @@ td.actions{text-align:right;white-space:nowrap}
       <button class="btn btn-danger" onclick="doImport(true)">Reset &amp; import</button>
       <button class="btn" onclick="closeModal('importModal')">Cancel</button>
       <button class="btn btn-primary" onclick="doImport(false)">Merge import</button>
+    </div>
+  </div>
+</div>
+
+<!-- Install App Modal -->
+<div class="modal-backdrop" id="installModal">
+  <div class="modal" style="width:min(380px,95vw)">
+    <h2>Install imago</h2>
+    <div id="installModalBody"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('installModal')">Close</button>
+      <button class="btn btn-primary" id="installModalActionBtn" style="display:none" onclick="triggerInstallPrompt()">Install</button>
     </div>
   </div>
 </div>
@@ -637,26 +678,43 @@ async function seedBenchmarksIfNeeded() {
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let _editId   = null;
-let _activeTag = localStorage.getItem('imago-finance-active-tag') || 'all';
-let _sortCol   = _activeTag === 'td' ? 'maturity' : 'balance';
+let _activeTag = localStorage.getItem('imago-finance-active-tag') || 'savings';
+let _sortCol   = _activeTag === 'td' ? 'maturity' : _activeTag === 'savings' ? 'rate' : 'balance';
 let _sortDir   = _activeTag === 'td' ? 'asc' : 'desc';
 let _excludeTD = false;
-let _chartType   = localStorage.getItem('imago-finance-chart-type')   || 'donut';
-let _chartPeriod = localStorage.getItem('imago-finance-chart-period') || '3M';
-const DEFAULT_TARGETS = {"savings":11.2,"equities":44.5,"td":33.6,"buffer":3.4,"cash":4.0,"illiquid":3.3};
+let _chartType   = localStorage.getItem('imago-finance-chart-type')   || 'goals';
+let _chartPeriod = localStorage.getItem('imago-finance-chart-period') || '6M';
+const DEFAULT_TARGETS = {"savings":14.6,"equities":44.5,"td":33.6,"cash":4.0,"receivable":3.3};
 let _targets   = JSON.parse(localStorage.getItem('imago-finance-targets') || JSON.stringify(DEFAULT_TARGETS));
+// Migrate legacy "buffer" allocation (tag removed from the product) into savings.
+if ('buffer' in _targets) {
+  _targets.savings = (_targets.savings || 0) + _targets.buffer;
+  delete _targets.buffer;
+  localStorage.setItem('imago-finance-targets', JSON.stringify(_targets));
+}
+// Migrate legacy "illiquid" allocation key to its new name, "receivable".
+if ('illiquid' in _targets) {
+  _targets.receivable = _targets.illiquid;
+  delete _targets.illiquid;
+  localStorage.setItem('imago-finance-targets', JSON.stringify(_targets));
+}
 let _targetsSnapshot = null;
 let _lockedTags = JSON.parse(localStorage.getItem('imago-finance-locked-tags') || '{}');
 window._allAccounts = [];
 
 // Life-priority grouping (Emergency/Growth/Fun) layered on top of the per-tag
-// targets above. Fun has no backing tags — it's a goal-only bucket that
-// always shows ₱0 on the "current" side.
+// targets above. "Fun" isn't a primary account type -- it's a secondary tag
+// (alongside the account's real type, e.g. savings/td) that an account opts
+// into via the add/edit form, so its balance counts toward Fun instead of
+// Emergency/Growth.
 const GROUP_TAGS = {
-  emergency: ['savings', 'buffer', 'cash', 'td'],
-  growth:    ['equities', 'illiquid'],
+  emergency: ['savings', 'cash', 'td'],
+  growth:    ['equities'],
   fun:       [],
 };
+// receivable (money owed to you, security deposits) isn't emergency, growth,
+// or fun -- it's not intentional money serving any of the three, so it's
+// excluded from Fund Goals entirely rather than forced into growth.
 const DEFAULT_FUND_GOALS = {emergency: 40, growth: 40, fun: 20};
 let _fundGoals = JSON.parse(localStorage.getItem('imago-finance-fund-goals') || JSON.stringify(DEFAULT_FUND_GOALS));
 let _fundGoalsSnapshot = null;
@@ -666,10 +724,9 @@ const TAG_COLORS = {
   savings:  '#1a6b3c',
   equities: '#185fa5',
   td:       '#2d8f5e',
-  buffer:   '#b87b1a',
-  cash:     '#5f5e5a',
-  illiquid: '#8a8780',
-  liquid:   '#4f8c6d',
+  cash:       '#5f5e5a',
+  receivable: '#8a8780',
+  liquid:     '#4f8c6d',
   credit:   '#a32d2d',
 };
 
@@ -685,12 +742,47 @@ const FUND_GROUP_LABELS = {
   fun:       'Fun',
 };
 
+function colorLegendHTML(labels, colors, order) {
+  return order.map(key => `
+    <span style="display:inline-flex;align-items:center;gap:5px">
+      <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${colors[key]};flex-shrink:0"></span>${labels[key]}
+    </span>
+  `).join('');
+}
+
+// Shared dot-color legend markup -- used below the accounts table and below
+// the Fund Goals chart, so both always match FUND_GROUP_COLORS exactly.
+function fundGroupLegendHTML() {
+  return colorLegendHTML(FUND_GROUP_LABELS, FUND_GROUP_COLORS, ['emergency', 'growth', 'fun']);
+}
+
+// Same legend pattern, for Asset Allocation's per-account-type colors.
+function assetTagLegendHTML() {
+  // No 'credit' entry -- a credit account's negative balance nets straight
+  // into the savings slice below, so credit never appears as its own slice.
+  const labels = { savings: 'savings', equities: 'equities', td: 'time deposit', cash: 'cash', receivable: 'receivable' };
+  return colorLegendHTML(labels, TAG_COLORS, Object.keys(labels));
+}
+
+// Which fund-goals bucket an account's balance counts toward -- same
+// grouping computeFundSplit() uses, so the table dot always matches the
+// donut's colors. Credit follows emergency (its debt nets into that bucket
+// there too).
+function fundGroupOf(a) {
+  if ((a.tags || []).includes('fun')) return 'fun';
+  const tag = (a.tags && a.tags[0]) || 'savings';
+  if (tag === 'credit' || GROUP_TAGS.emergency.includes(tag)) return 'emergency';
+  if (GROUP_TAGS.growth.includes(tag)) return 'growth';
+  return null;
+}
+
 function computeFundSplit(accounts) {
   const split = { emergency: 0, growth: 0, fun: 0 };
   (accounts || []).forEach(a => {
     const tag = (a.tags && a.tags[0]) || 'savings';
     if (a.balance > 0) {
-      if (GROUP_TAGS.emergency.includes(tag)) split.emergency += a.balance;
+      if ((a.tags || []).includes('fun')) split.fun += a.balance;
+      else if (GROUP_TAGS.emergency.includes(tag)) split.emergency += a.balance;
       else if (GROUP_TAGS.growth.includes(tag)) split.growth += a.balance;
     } else if (tag === 'credit') {
       split.emergency += a.balance; // net credit into emergency, same convention as donut/liquidity modes
@@ -702,7 +794,7 @@ function computeFundSplit(accounts) {
 function openTargetModal() {
   _targetsSnapshot = JSON.parse(JSON.stringify(_targets)); // snapshot for cancel
   const container = document.getElementById('targetInputs');
-  const tags = ['equities', 'td', 'savings', 'buffer', 'cash', 'illiquid'];
+  const tags = ['equities', 'td', 'savings', 'cash', 'receivable'];
   container.innerHTML = tags.map(t => `
     <div class="target-row" data-tag="${t}">
       <button class="lock-btn ${(_lockedTags[t] ? 'active' : '')}" onclick="toggleLock('${t}', this)" title="Lock amount">
@@ -754,7 +846,7 @@ function onTargetChange(tag, val, source) {
   let parsedVal = parseFloat(val) || 0;
   if (parsedVal > 100) parsedVal = 100;
 
-  const tags = ['savings', 'equities', 'td', 'buffer', 'cash', 'illiquid'];
+  const tags = ['savings', 'equities', 'td', 'cash', 'receivable'];
   const others = tags.filter(t => t !== tag);
   
   // Calculate fixed sum from locked "others" (ensure missing keys are 0)
@@ -817,7 +909,7 @@ function updateTargetTotalDisplay() {
   
   // Refresh amounts on initial open too
   const totalNW = window._allAccounts.reduce((s,a) => s + (a.balance||0), 0);
-  const tags = ['savings', 'equities', 'td', 'buffer', 'cash', 'illiquid'];
+  const tags = ['savings', 'equities', 'td', 'cash', 'receivable'];
   tags.forEach(t => {
     const amtEl = document.getElementById(`amt-${t}`);
     if (amtEl) amtEl.textContent = '₱' + fmtk(totalNW * ((_targets[t]||0) / 100));
@@ -850,8 +942,8 @@ function cancelTargets() {
 
 async function copyTargetTable() {
   const totalNW = window._allAccounts.reduce((s,a) => s + (a.balance||0), 0);
-  const tags = ['savings', 'equities', 'td', 'buffer', 'cash', 'illiquid'];
-  
+  const tags = ['savings', 'equities', 'td', 'cash', 'receivable'];
+
   let md = '| Asset Class | Percent | Amount |\n| :--- | :--- | :--- |\n';
   
   tags.forEach(t => {
@@ -1095,6 +1187,14 @@ function toast(msg, err=false) {
 }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 function openModal(id)  { document.getElementById(id).classList.add('open'); }
+
+function toggleAccountHistoryRest(btn) {
+  const rest = document.getElementById('accountHistoryRest');
+  if (!rest) return;
+  const isHidden = rest.style.display === 'none';
+  rest.style.display = isHidden ? 'block' : 'none';
+  btn.textContent = isHidden ? 'View less' : `View ${btn.dataset.remaining} more`;
+}
 document.querySelectorAll('.modal-backdrop').forEach(bd =>
   bd.addEventListener('click', e => { if (e.target===bd) bd.classList.remove('open'); })
 );
@@ -1130,6 +1230,20 @@ async function autoSnapshot() {
 // ── Main render ───────────────────────────────────────────────────────────────
 async function render() {
   const allAccounts = await db.accounts.toArray();
+  // Migrate legacy "buffer" tag (removed from the product) to "savings".
+  for (const a of allAccounts) {
+    if ((a.tags || []).includes('buffer')) {
+      a.tags = a.tags.map(t => t === 'buffer' ? 'savings' : t);
+      await db.accounts.put(a);
+    }
+  }
+  // Migrate legacy "illiquid" tag to its new name, "receivable".
+  for (const a of allAccounts) {
+    if ((a.tags || []).includes('illiquid')) {
+      a.tags = a.tags.map(t => t === 'illiquid' ? 'receivable' : t);
+      await db.accounts.put(a);
+    }
+  }
   const accounts = allAccounts.filter(a => a.status !== 'closed');
   const closedTDs = allAccounts.filter(a => a.status === 'closed');
   const history  = await db.history.orderBy('date').toArray();
@@ -1158,7 +1272,7 @@ function renderClosedTDs(closedTDs) {
   document.getElementById('closedTdTbody').innerHTML = closedTDs.map(a => {
     const closedDate = a.closedDate ? new Date(a.closedDate).toLocaleDateString(undefined, {day:'numeric', month:'short', year:'numeric'}) : '—';
     return `<tr onclick="editAccount('${esc(a.id)}')" style="cursor:pointer">
-      <td>${esc(a.label||a.key)}</td>
+      <td>${esc(a.label||a.key)}${fundGroupOf(a) ? ` <span title="${FUND_GROUP_LABELS[fundGroupOf(a)]}" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${FUND_GROUP_COLORS[fundGroupOf(a)]};vertical-align:middle"></span>` : ''}</td>
       <td class="num">₱${fmtk(a.balance||0)}</td>
       <td><span class="rate-badge">${a.rate!=null ? a.rate+'%' : '—'}</span></td>
       <td>${closedDate}</td>
@@ -1171,14 +1285,14 @@ function renderSummary(accounts) {
   const total  = accounts.reduce((s,a) => s + (a.balance||0), 0);
   const liab   = accounts.filter(a => a.balance < 0).reduce((s,a) => s + a.balance, 0);
   
-  const cash   = accounts.filter(a => !a.tags?.includes('illiquid') && !a.tags?.includes('td') && !a.tags?.includes('equities') && a.balance > 0);
+  const cash   = accounts.filter(a => !a.tags?.includes('receivable') && !a.tags?.includes('td') && !a.tags?.includes('equities') && a.balance > 0);
   const cashTotal = cash.reduce((s,a) => s + a.balance, 0);
 
   const equities = accounts.filter(a => a.tags?.includes('equities'));
   const equitiesTotal = equities.reduce((s,a) => s + Math.max(0, a.balance||0), 0);
 
-  const illiqOnly = accounts.filter(a => a.tags?.includes('illiquid'));
-  const illiqOnlyTotal = illiqOnly.reduce((s,a) => s + Math.max(0, a.balance||0), 0);
+  const receivableOnly = accounts.filter(a => a.tags?.includes('receivable'));
+  const receivableOnlyTotal = receivableOnly.reduce((s,a) => s + Math.max(0, a.balance||0), 0);
   
   const tdOnly = accounts.filter(a => a.tags?.includes('td'));
   const tdOnlyTotal = tdOnly.reduce((s,a) => s + Math.max(0, a.balance||0), 0);
@@ -1204,7 +1318,7 @@ function renderSummary(accounts) {
         <div style="display:flex; justify-content:space-between;"><span>Cash/Sav</span> <span>+₱${fmtk(cashTotal)}</span></div>
         <div style="display:flex; justify-content:space-between;"><span>Equities</span> <span>+₱${fmtk(equitiesTotal)}</span></div>
         <div style="display:flex; justify-content:space-between;"><span>TD</span> <span>+₱${fmtk(tdOnlyTotal)}</span></div>
-        <div style="display:flex; justify-content:space-between;"><span>Illiquid</span> <span>+₱${fmtk(illiqOnlyTotal)}</span></div>
+        <div style="display:flex; justify-content:space-between;"><span>Receivable</span> <span>+₱${fmtk(receivableOnlyTotal)}</span></div>
         <div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border-strong); padding-bottom:2px; margin-bottom:2px;"><span>Credit</span> <span class="col-neg">-₱${fmtk(Math.abs(credTotal))}</span></div>
         <div style="display:flex; justify-content:space-between; font-weight:600; color:var(--text);"><span>Total</span> <span>₱${fmtk(total)}</span></div>
       </div>
@@ -1214,7 +1328,7 @@ function renderSummary(accounts) {
       <div class="val col-pos">${maskedAmount('₱' + fmtk(cashTotal + credTotal))}</div>
       <div style="margin-top:10px; padding-top:8px; border-top:1px dashed var(--border); font-family:var(--mono); font-size:10px; line-height:1.6; color:var(--text-muted);">
         <div style="display:flex; justify-content:space-between;"><span>Total NW</span> <span>₱${fmtk(total)}</span></div>
-        <div style="display:flex; justify-content:space-between;"><span>- Illiquid</span> <span class="col-neg">-₱${fmtk(illiqOnlyTotal)}</span></div>
+        <div style="display:flex; justify-content:space-between;"><span>- Receivable</span> <span class="col-neg">-₱${fmtk(receivableOnlyTotal)}</span></div>
         <div style="display:flex; justify-content:space-between;"><span>- TD</span> <span class="col-neg">-₱${fmtk(tdOnlyTotal)}</span></div>
         <div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border-strong); padding-bottom:2px; margin-bottom:2px;"><span>- Equities</span> <span class="col-neg">-₱${fmtk(equitiesTotal)}</span></div>
         <div style="display:flex; justify-content:space-between; font-weight:600; color:var(--accent);"><span>Stable</span> <span>₱${fmtk(cashTotal + credTotal)}</span></div>
@@ -1274,6 +1388,8 @@ function renderChart(history) {
     currentWrap.style.display = 'none';
     targetWrap.style.display  = 'none';
     chart.style.display = 'none';
+    document.getElementById('chartColorLegend').style.display = 'none';
+    document.getElementById('fundGoalsReceivableNote').style.display = 'none';
 
     if (_chartType === 'line' || _chartType === 'yield') {
       // Show & sync period filter chips
@@ -1332,6 +1448,10 @@ function renderChart(history) {
         return;
       }
 
+      const legendEl = document.getElementById('chartColorLegend');
+      legendEl.innerHTML = assetTagLegendHTML();
+      legendEl.style.display = 'flex';
+
       currentWrap.style.display = 'flex';
       targetWrap.style.display  = 'flex';
       chart.style.display = 'block';
@@ -1360,10 +1480,17 @@ function renderChart(history) {
         label: FUND_GROUP_LABELS[label] || label, value, color: FUND_GROUP_COLORS[label] || '#999'
       })).filter(d => d.value > 0).sort((a,b) => b.value - a.value);
 
+      document.getElementById('fundGoalsReceivableNote').style.display =
+        accounts.some(a => (a.tags||[]).includes('receivable')) ? 'block' : 'none';
+
       if (currentData.length === 0) {
         empty.style.display = 'block';
         return;
       }
+
+      const legendEl = document.getElementById('chartColorLegend');
+      legendEl.innerHTML = fundGroupLegendHTML();
+      legendEl.style.display = 'flex';
 
       currentWrap.style.display = 'flex';
       targetWrap.style.display  = 'flex';
@@ -1371,7 +1498,11 @@ function renderChart(history) {
       chart.setAttribute('type', 'donut');
       chart.data = currentData;
 
-      const totalBalance = Object.values(currentSplit).reduce((s, v) => s + v, 0);
+      // Sum the already-filtered (positive-only) buckets, same as Asset
+      // Allocation's total -- summing the raw split would let a negative
+      // bucket (heavy credit debt) silently shrink the total below what's
+      // actually shown, while the two charts' totals should always agree.
+      const totalBalance = currentData.reduce((s, d) => s + d.value, 0);
       const goalData = Object.entries(_fundGoals).map(([label, pct]) => ({
         label: FUND_GROUP_LABELS[label] || label,
         value: totalBalance * (pct / 100),
@@ -1390,12 +1521,13 @@ function renderChart(history) {
       const accounts = window._allAccounts || [];
       const liquid   = { label: 'Liquid',   color: TAG_COLORS.savings,  value: 0, items: [] };
       const equities = { label: 'Equities', color: TAG_COLORS.equities, value: 0, items: [] };
-      const illiquid = { label: 'Illiquid', color: TAG_COLORS.illiquid, value: 0, items: [] };
+      // "Illiquid" here means not readily available: term-locked (td) or owed-to-you (receivable).
+      const illiquid = { label: 'Illiquid', color: TAG_COLORS.receivable, value: 0, items: [] };
       let credTotal = 0;
-      
+
       accounts.forEach(a => {
         if (a.balance > 0) {
-          const isIlliq  = (a.tags || []).some(t => t === 'illiquid' || t === 'td');
+          const isIlliq  = (a.tags || []).some(t => t === 'receivable' || t === 'td');
           const isEquity = (a.tags || []).includes('equities');
           const target = isIlliq ? illiquid : isEquity ? equities : liquid;
           target.value += a.balance;
@@ -1431,11 +1563,13 @@ function renderChart(history) {
 }
 
 // ── Filter bar ────────────────────────────────────────────────────────────────
-const TAG_ORDER = ['all', 'savings', 'td', 'equities', 'credit'];
+const TAG_ORDER = ['all', 'savings', 'td', 'equities', 'credit', 'cash', 'receivable'];
 function renderFilterBar(accounts) {
   const seen = new Set(accounts.flatMap(a => a.tags||[]));
-  const rest = [...seen].filter(t => !TAG_ORDER.includes(t));
-  const tags = ['all', ...TAG_ORDER.filter(t => t !== 'all' && seen.has(t)), ...rest];
+  // "fun" is a secondary tag layered on top of an account's real type, not
+  // a filterable type itself -- exclude it from the type filter bar.
+  const rest = [...seen].filter(t => !TAG_ORDER.includes(t) && t !== 'fun');
+  const tags = [...TAG_ORDER.filter(t => t !== 'all' && (seen.has(t) || t === 'receivable')), ...rest, 'all'];
   const bar  = document.getElementById('filterBar');
   bar.innerHTML = tags.map(t => {
     const active = _activeTag === t ? 'active' : '';
@@ -1447,10 +1581,14 @@ function renderFilterBar(accounts) {
       const prev = _activeTag;
       _activeTag = chip.dataset.tag;
       localStorage.setItem('imago-finance-active-tag', _activeTag);
-      // Auto-sort by maturity when entering td, revert when leaving
+      // Auto-sort by maturity when entering td, by rate when entering
+      // savings, reverting to balance when leaving either for a tag with
+      // no special default.
       if (_activeTag === 'td' && prev !== 'td') {
         _sortCol = 'maturity'; _sortDir = 'asc';
-      } else if (_activeTag !== 'td' && prev === 'td') {
+      } else if (_activeTag === 'savings' && prev !== 'savings') {
+        _sortCol = 'rate'; _sortDir = 'desc';
+      } else if ((prev === 'td' || prev === 'savings') && _activeTag !== 'td' && _activeTag !== 'savings') {
         _sortCol = 'balance'; _sortDir = 'desc';
       }
       render().then(() => {
@@ -1506,9 +1644,12 @@ function renderTable(allAccounts) {
   document.getElementById('thMaturity').style.display = showMaturityCol ? '' : 'none';
   const colCount = showMaturityCol ? 5 : 4;
 
+  document.getElementById('fundGroupLegend').style.display = accounts.length === 0 ? 'none' : 'flex';
+
   const tbody = document.getElementById('accountsTbody');
   if (accounts.length===0) {
-    tbody.innerHTML = `<tr><td colspan="${colCount}" class="empty">No accounts${_activeTag!=='all' ? ' tagged "'+esc(_activeTag)+'"' : ''}.</td></tr>`;
+    const hint = _activeTag === 'receivable' ? ' — money owed to you, e.g. a security deposit or a loan to a friend' : '';
+    tbody.innerHTML = `<tr><td colspan="${colCount}" class="empty">No accounts${_activeTag!=='all' ? ' tagged "'+esc(_activeTag)+'"' : ''}${hint}.</td></tr>`;
     return;
   }
   tbody.innerHTML = accounts.map(a => {
@@ -1559,9 +1700,10 @@ function renderTable(allAccounts) {
 
     return `<tr onclick="editAccount('${esc(a.id)}')" style="cursor:pointer">
       <td>
-        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-          <span style="font-weight:500">${esc(a.label||a.key)}</span>
-          ${_activeTag === 'all' ? `<span class="tag ${tag}" style="font-size:10px; padding:1px 6px;">${tag === 'td' ? 'time deposit' : tag}</span>` : ''}
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:nowrap; min-width:0;">
+          <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;">${esc(a.label||a.key)}</span>
+          ${fundGroupOf(a) ? `<span title="${FUND_GROUP_LABELS[fundGroupOf(a)]}" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${FUND_GROUP_COLORS[fundGroupOf(a)]};flex-shrink:0"></span>` : ''}
+          ${_activeTag === 'all' ? `<span class="tag ${tag}" style="font-size:10px; padding:1px 6px; flex-shrink:0;">${tag === 'td' ? 'time deposit' : tag}</span>` : ''}
         </div>
         ${a.note ? `<div class="note-text" style="margin-top:2px;">${esc(a.note)}</div>` : ''}
       </td>
@@ -1577,20 +1719,6 @@ function renderTable(allAccounts) {
       <td>${openDisp}</td>
     </tr>`;
   }).join('');
-}
-
-// ── Balance sign toggle ───────────────────────────────────────────────────────
-function toggleBalanceSign() {
-  const btn = document.getElementById('fBalanceSign');
-  const isNeg = btn.textContent === '−';
-  syncBalanceSign(!isNeg);
-}
-function syncBalanceSign(negative) {
-  const btn = document.getElementById('fBalanceSign');
-  btn.textContent = negative ? '−' : '+';
-  btn.style.background = negative ? 'var(--danger, #a32d2d)' : 'var(--surface)';
-  btn.style.color       = negative ? '#fff' : 'var(--text)';
-  btn.style.borderColor = negative ? 'var(--danger, #a32d2d)' : 'var(--border-strong)';
 }
 
 // ── Account CRUD ──────────────────────────────────────────────────────────────
@@ -1613,6 +1741,12 @@ function onTagChange() {
     (tag === 'td' && _editId && _editAccountStatus !== 'closed') ? 'block' : 'none';
   document.getElementById('maturityFieldRow').style.display =
     (tag === 'td' || tag === 'equities') ? 'block' : 'none';
+
+  // Equities are for growth, not discretionary spending, so "For Fun"
+  // doesn't apply -- hide it and clear any stale checked state.
+  const allowFun = tag !== 'equities';
+  document.getElementById('fFunRow').style.display = allowFun ? 'flex' : 'none';
+  if (!allowFun) document.getElementById('fFun').checked = false;
 }
 
 function currentTermValue() {
@@ -1661,6 +1795,7 @@ function openAddAccount() {
   _maturityManuallyEdited = false;
   document.getElementById('accountModalTitle').textContent = 'Add account';
   ['fKey','fLabel','fBalance','fRate','fMaturity','fNote','fChangeNote'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('fFun').checked = false;
   document.getElementById('fTag').value = 'savings';
   document.getElementById('fOpenDate').value = new Date().toISOString().slice(0,10);
   applyTermValue(null);
@@ -1668,7 +1803,6 @@ function openAddAccount() {
   document.getElementById('rateHistorySection').style.display = 'none';
   document.getElementById('changeReasonRow').style.display = 'none';
   document.getElementById('btnDeleteAccount').style.display = 'none';
-  syncBalanceSign(false);
   onTagChange();
   openModal('accountModal');
   document.getElementById('fLabel').focus();
@@ -1689,13 +1823,13 @@ async function editAccount(id) {
   document.getElementById('fMaturity').value = a.maturity||'';
   document.getElementById('fNote').value     = a.note||'';
   document.getElementById('fChangeNote').value = '';
+  document.getElementById('fFun').checked    = (a.tags||[]).includes('fun');
   document.getElementById('fTag').value      = (a.tags||['savings'])[0];
   document.getElementById('fOpenDate').value = a.openDate || '';
   applyTermValue(a.term || null);
   document.getElementById('changeReasonRow').style.display = 'block';
   document.getElementById('btnDeleteAccount').style.display = 'inline-block';
   onTagChange();
-  syncBalanceSign((a.balance??0) < 0);
 
   // Render per-account history
   let history = await db.logs.where('accountId').equals(id).toArray();
@@ -1706,7 +1840,7 @@ async function editAccount(id) {
   
   if (history.length > 0) {
     section.style.display = 'block';
-    list.innerHTML = history.map(h => {
+    const itemHtml = h => {
       const date = new Date(h.date).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit'});
       const diff = h.change || 0;
       const diffStr = diff > 0 ? `+₱${fmtk(diff)}` : diff < 0 ? `-₱${fmtk(Math.abs(diff))}` : 'no change';
@@ -1721,7 +1855,15 @@ async function editAccount(id) {
           <div style="font-size:10px;color:var(--text-faint)">New balance: ₱${fmtk(h.balance||0)}</div>
         </div>
       `;
-    }).join('');
+    };
+    const rest = history.slice(3);
+    list.innerHTML = history.slice(0, 3).map(itemHtml).join('') + (rest.length ? `
+      <div id="accountHistoryRest" style="display:none">${rest.map(itemHtml).join('')}</div>
+      <button type="button" data-remaining="${rest.length}" onclick="toggleAccountHistoryRest(this)"
+              style="background:none;border:none;padding:6px 0;font-size:11px;color:var(--accent);cursor:pointer;font-family:inherit">
+        View ${rest.length} more
+      </button>
+    ` : '');
   } else {
     section.style.display = 'none';
   }
@@ -1762,15 +1904,18 @@ async function saveAccount() {
   const key   = document.getElementById('fKey').value.trim();
   const label = document.getElementById('fLabel').value.trim();
   const balRaw  = parseFloat(document.getElementById('fBalance').value);
-  const balSign = document.getElementById('fBalanceSign').textContent === '−' ? -1 : 1;
-  const bal     = isNaN(balRaw) ? 0 : Math.abs(balRaw) * balSign;
   const rate  = parseFloat(document.getElementById('fRate').value);
   const tag   = document.getElementById('fTag').value;
+  // Only credit is ever a liability -- its balance is always stored negative,
+  // every other type always positive. No manual sign toggle needed.
+  const balSign = tag === 'credit' ? -1 : 1;
+  const bal     = isNaN(balRaw) ? 0 : Math.abs(balRaw) * balSign;
   const term  = tag === 'td' ? currentTermValue() : null;
   const showMaturity = tag === 'td' || tag === 'equities';
   const note  = document.getElementById('fNote').value.trim();
   const changeNote = document.getElementById('fChangeNote').value.trim();
   const openDate = document.getElementById('fOpenDate').value.trim();
+  const isFun = tag !== 'equities' && document.getElementById('fFun').checked;
 
   if (!key||!label) { toast('Key and label required.', true); return; }
 
@@ -1789,7 +1934,7 @@ async function saveAccount() {
     id, key, label,
     balance:    newBal,
     rate:       newRate,
-    tags:       [tag],
+    tags:       isFun ? [tag, 'fun'] : [tag],
     term,
     maturity:   mat||null,
     openDate:   openDate || existing?.openDate || null,
@@ -1843,7 +1988,7 @@ async function closeTD(id) {
   applyTermValue(a.term || null);
   document.getElementById('fRate').value = a.rate ?? '';
   document.getElementById('fBalance').value = Math.abs(a.balance || 0) || '';
-  syncBalanceSign((a.balance||0) < 0);
+  document.getElementById('fFun').checked = (a.tags||[]).includes('fun');
   _keyManuallyEdited = false;
   onTagChange();
   onLabelInput();
@@ -2051,6 +2196,11 @@ function openYieldBreakdown() {
 // ── Init ──────────────────────────────────────────────────────────────────────
 // enterExploreMode/exitExploreMode/toggleExploreMode/adoptDemoData/refreshMode
 // live in scripts/explore-mode.js (shared with expenses.html).
+
+// Static legend for the fund-goals dot shown beside each account name --
+// doesn't depend on account data, so it's built once rather than per render.
+document.getElementById('fundGroupLegend').innerHTML = fundGroupLegendHTML();
+
 refreshMode();
 seedBenchmarksIfNeeded();
 window.addEventListener('resize', () =>
