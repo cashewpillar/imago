@@ -13,6 +13,13 @@ let db, realDb, demoDb;
 const EXPLORE_FLAG = 'imago-explore-mode';
 const EXPLORE_DISMISSED_FLAG = 'imago-explore-dismissed';
 
+// Bump this whenever the demo data files' content changes, so a user
+// already sitting in demo mode gets re-seeded with the new data on their
+// next visit instead of keeping whatever was bulkPut into their persistent
+// demo IndexedDB store the first time they explored.
+const DEMO_DATA_VERSION = 1;
+const DEMO_VERSION_KEY = 'imago-demo-data-version';
+
 function getDemoDb() {
   if (!demoDb) {
     demoDb = new Dexie('FinanceTrackerDemoPreview');
@@ -68,6 +75,7 @@ async function enterExploreMode() {
 
   db = dDb;
   sessionStorage.setItem(EXPLORE_FLAG, '1');
+  localStorage.setItem(DEMO_VERSION_KEY, String(DEMO_DATA_VERSION));
   updateDemoUI();
 }
 
@@ -120,7 +128,11 @@ function updateDemoUI() {
 
 async function refreshMode() {
   if (isExploreMode()) {
-    db = getDemoDb();
+    if (localStorage.getItem(DEMO_VERSION_KEY) !== String(DEMO_DATA_VERSION)) {
+      await enterExploreMode(); // demo content changed since last seeded -- refresh it
+    } else {
+      db = getDemoDb();
+    }
   } else {
     db = realDb;
     if (await realDb.accounts.count() === 0 && !localStorage.getItem(EXPLORE_DISMISSED_FLAG)) {

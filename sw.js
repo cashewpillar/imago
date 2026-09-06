@@ -1,4 +1,4 @@
-const CACHE_NAME = 'imago-shell-v9';
+const CACHE_NAME = 'imago-shell-v10';
 const APP_SHELL = [
   './',
   // BEGIN GENERATED HTML PAGES
@@ -87,37 +87,26 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  if (sameOrigin && request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then(response => {
+  // Network-first for every same-origin GET, not just navigations -- a
+  // cache-first strategy here meant a script/data file, once cached, was
+  // served stale forever regardless of how many times it changed on the
+  // server (the only way back to fresh was bumping CACHE_NAME, easy to
+  // forget). Falling back to cache only when the network is unavailable
+  // keeps offline support while making freshness-when-online the default.
+  event.respondWith(
+    fetch(request)
+      .then(response => {
+        if (response && response.status === 200 && response.type === 'basic') {
           const copy = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
-          return response;
-        })
-        .catch(async () => {
-          const cachedPage = await caches.match(request);
-          return cachedPage || caches.match('./index.html');
-        })
-    );
-    return;
-  }
-
-  event.respondWith(
-    caches.match(request).then(cached => {
-      if (cached) {
-        return cached;
-      }
-
-      return fetch(request).then(response => {
-        if (!response || response.status !== 200 || response.type !== 'basic') {
-          return response;
         }
-
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
         return response;
-      }).catch(() => cached);
-    })
+      })
+      .catch(async () => {
+        const cached = await caches.match(request);
+        if (cached) return cached;
+        if (request.mode === 'navigate') return caches.match('./index.html');
+        return Response.error();
+      })
   );
 });

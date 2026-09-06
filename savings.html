@@ -1263,8 +1263,6 @@ function renderChart(history) {
 
     currentLbl.textContent = 'Current';
     targetLbl.textContent  = 'Target';
-    chart.tooltipAnchor = 'top';
-    targetChart.tooltipAnchor = 'top';
 
     // Update active pill state
     document.querySelectorAll('#chartTypeFilters .filter-chip').forEach(c => {
@@ -1371,7 +1369,6 @@ function renderChart(history) {
       targetWrap.style.display  = 'flex';
       chart.style.display = 'block';
       chart.setAttribute('type', 'donut');
-      chart.tooltipAnchor = 'bottom-right';
       chart.data = currentData;
 
       const totalBalance = Object.values(currentSplit).reduce((s, v) => s + v, 0);
@@ -1383,7 +1380,6 @@ function renderChart(history) {
 
       targetChart.style.display = 'block';
       targetChart.setAttribute('type', 'donut');
-      targetChart.tooltipAnchor = 'bottom-right';
       targetChart.data = goalData;
 
       currentLbl.textContent = 'Current Split';

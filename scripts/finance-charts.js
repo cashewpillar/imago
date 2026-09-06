@@ -9,8 +9,7 @@ class FinanceChart extends HTMLElement {
     this.attachShadow({ mode: 'open' });
     this._data = [];
     this._type = 'line';
-    this.tooltipAnchor = 'top'; // 'top' (centered above cursor) | 'bottom-right' (offset below-right)
-    
+
     this.shadowRoot.innerHTML = `
       <style>
         :host { display: block; width: 100%; height: 100%; position: relative; overflow: hidden; }
@@ -92,11 +91,10 @@ class FinanceChart extends HTMLElement {
           font-size: 11px;
           pointer-events: none;
           z-index: 10000;
-          transform: translateX(-50%);
           display: none;
           max-width: 200px;
           line-height: 1.4;
-          text-align: center;
+          text-align: left;
           box-shadow: 0 4px 12px rgba(0,0,0,0.15);
           font-family: system-ui, -apple-system, sans-serif;
         }
@@ -116,6 +114,13 @@ class FinanceChart extends HTMLElement {
     this.ctx = this.canvas.getContext('2d');
 
     this._resizeObserver = new ResizeObserver(() => this.render());
+
+    // iOS/WebKit can discard a backgrounded page's canvas bitmap to free
+    // memory (e.g. after the PWA sits switched-away-from for a while); since
+    // nothing else changes size or data on return, nothing else would
+    // trigger a redraw and the chart would stay blank until some unrelated
+    // interaction happened to call render() again.
+    this._onVisible = () => { if (!document.hidden) this.render(); };
 
     this._hiddenSeries = new Set();
     this._defaultHiddenApplied = new Set();
@@ -162,6 +167,8 @@ class FinanceChart extends HTMLElement {
     this._upgradeProperty('data');
     this._loadHiddenSeries();
     this._resizeObserver.observe(this);
+    document.addEventListener('visibilitychange', this._onVisible);
+    window.addEventListener('pageshow', this._onVisible);
     this.render();
   }
 
@@ -175,6 +182,8 @@ class FinanceChart extends HTMLElement {
 
   disconnectedCallback() {
     this._resizeObserver.disconnect();
+    document.removeEventListener('visibilitychange', this._onVisible);
+    window.removeEventListener('pageshow', this._onVisible);
   }
 
   static get observedAttributes() {
@@ -276,6 +285,27 @@ class FinanceChart extends HTMLElement {
         this._drawMessage('Render Error');
       }
     });
+  }
+
+  // Positions the tooltip below a point in viewport coordinates, the same
+  // way for every chart type: the point always sits at one of the tooltip's
+  // top corners (never centered above/below it), extending right-and-down
+  // by default, flipped to extend left-and-down instead when that would
+  // clip the right edge of a narrow viewport. Vertical placement never
+  // flips -- the tooltip is always anchored below its source point.
+  _positionTooltip(x, y, gap = 10) {
+    const el = this.tooltip;
+    const margin = 6;
+    // Measure the natural (unwrapped) width off-screen first -- reading it
+    // at the real `left` would feed back into the browser's shrink-to-fit
+    // sizing and could force a wrap near the right edge even though the
+    // corner-anchor logic below has plenty of room to extend leftward there.
+    el.style.left = '-9999px';
+    const w = el.offsetWidth;
+
+    const left = (x + gap + w > window.innerWidth - margin) ? (x - gap - w) : (x + gap);
+    el.style.left = left + 'px';
+    el.style.top = (y + gap) + 'px';
   }
 
   _drawMessage(msg) {
@@ -400,9 +430,7 @@ class FinanceChart extends HTMLElement {
       
       this.tooltip.textContent = dates[ci] + ' · ₱' + this._fmtk(values[ci]);
       this.tooltip.style.display = 'block';
-      this.tooltip.style.left = (rect.left + xOf(ci)) + 'px';
-      const py = rect.top + yOf(values[ci]);
-      this.tooltip.style.top = (py - this.tooltip.offsetHeight - 8 < 10) ? (py + 18) + 'px' : (py - this.tooltip.offsetHeight - 8) + 'px';
+      this._positionTooltip(rect.left + xOf(ci), rect.top + yOf(values[ci]));
     };
 
     this.canvas.onmousemove = handlePointer;
@@ -813,17 +841,7 @@ class FinanceChart extends HTMLElement {
       if (s) {
         this.tooltip.textContent = s.label + ' · ₱' + this._fmtk(s.value) + ' (' + (s.value / total * 100).toFixed(1) + '%)';
         this.tooltip.style.display = 'block';
-        if (this.tooltipAnchor === 'bottom-right') {
-          this.tooltip.style.transform = 'none';
-          this.tooltip.style.textAlign = 'left';
-          this.tooltip.style.left = (e.clientX + 12) + 'px';
-          this.tooltip.style.top = (e.clientY + 12) + 'px';
-        } else {
-          this.tooltip.style.transform = 'translateX(-50%)';
-          this.tooltip.style.textAlign = 'center';
-          this.tooltip.style.left = e.clientX + 'px';
-          this.tooltip.style.top = (e.clientY - 30) + 'px';
-        }
+        this._positionTooltip(e.clientX, e.clientY);
       } else { this.tooltip.style.display = 'none'; }
     };
     this.canvas.onmouseleave = () => { this.tooltip.style.display = 'none'; };
@@ -940,9 +958,7 @@ class FinanceChart extends HTMLElement {
         this.canvas.style.cursor = 'pointer';
         this.tooltip.textContent = `${hovered.label} · ₱${this._fmtk(hovered.value)}`;
         this.tooltip.style.display = 'block';
-        this.tooltip.style.left = (rect.left + hovered.x + hovered.w / 2) + 'px';
-        const py = rect.top + hovered.y;
-        this.tooltip.style.top = (py - this.tooltip.offsetHeight - 8 < 10) ? (py + hovered.h + 10) + 'px' : (py - this.tooltip.offsetHeight - 8) + 'px';
+        this._positionTooltip(rect.left + hovered.x + hovered.w / 2, rect.top + hovered.y);
       } else {
         this.canvas.style.cursor = 'default';
         this.tooltip.style.display = 'none';
@@ -1074,9 +1090,7 @@ class FinanceChart extends HTMLElement {
         this.canvas.style.cursor = 'default';
         this.tooltip.textContent = `${hovered.label} · ₱${this._fmtk(hovered.value)}`;
         this.tooltip.style.display = 'block';
-        this.tooltip.style.left = (rect.left + hovered.x + hovered.w / 2) + 'px';
-        const py = rect.top + hovered.y;
-        this.tooltip.style.top = (py - this.tooltip.offsetHeight - 8 < 10) ? (py + hovered.h + 10) + 'px' : (py - this.tooltip.offsetHeight - 8) + 'px';
+        this._positionTooltip(rect.left + hovered.x + hovered.w / 2, rect.top + hovered.y);
       } else {
         this.tooltip.style.display = 'none';
       }
