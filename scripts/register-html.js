@@ -78,6 +78,13 @@ function getBodyScriptForFile(file) {
   return `<script src="${prefix}pwa-register.js"></script>`;
 }
 
+// Satellite pages reachable only from their parent page's own nav, not
+// listed on the home page. invest.html itself still gets a launcher link.
+const HIDDEN_FROM_LAUNCHER = [/^invest-.*\.html$/];
+function isHiddenFromLauncher(file) {
+  return HIDDEN_FROM_LAUNCHER.some(re => re.test(file));
+}
+
 const generatedIndexStart = '            <!-- BEGIN GENERATED PROTOTYPE LINKS -->';
 const generatedIndexEnd = '            <!-- END GENERATED PROTOTYPE LINKS -->';
 
@@ -198,7 +205,7 @@ function updateLaunchers(rootFiles, archiveFiles, seldomFiles) {
     return next;
   }
 
-  const rootItems = generateListItems(rootFiles);
+  const rootItems = generateListItems(rootFiles.filter(file => !isHiddenFromLauncher(file)));
   const archiveItems = generateListItems(archiveFiles);
   const seldomItems = generateListItems(seldomFiles);
 
