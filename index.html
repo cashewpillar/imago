@@ -142,6 +142,9 @@
                 background: rgba(255, 255, 255, 0.13);
             }
         }
+
+        .toast{position:fixed;bottom:20px;right:20px;background:var(--text);color:var(--bg);padding:9px 16px;border-radius:var(--radius);font-size:13px;z-index:200;opacity:0;transform:translateY(6px);transition:all .18s;pointer-events:none}
+        .toast.show{opacity:1;transform:translateY(0)}
     </style>
 </head>
 <body>
@@ -231,6 +234,17 @@
             <!-- END GENERATED PROTOTYPE LINKS -->
         </ul>
     </main>
+    <div class="toast" id="toast"></div>
+    <script>
+        function toast(msg) {
+            const el = document.getElementById('toast');
+            el.textContent = msg;
+            el.className = 'toast show';
+            clearTimeout(el._t);
+            el._t = setTimeout(() => el.className = 'toast', 2800);
+        }
+    </script>
+    <script src="scripts/owner-mode.js"></script>
     <script src="pwa-register.js"></script>
 </body>
 </html>
