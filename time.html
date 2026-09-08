@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Time</title>
+<script src="scripts/feature-flags.js"></script>
+<script src="scripts/dexie.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f8f7f4;--surface:#fff;--border:#e2e0d8;--border-strong:#c8c5bb;
+  --text:#1a1917;--text-muted:#6b6860;--text-faint:#9c9a94;
+  --accent:#3d5a99;--accent-bg:#eaeef7;--accent-light:#d3ddf0;
+  --danger:#a32d2d;--danger-bg:#fcebeb;
+  --warning:#854f0b;--warning-bg:#faeeda;
+  --info:#185fa5;--info-bg:#e6f1fb;
+  --r:8px;--rl:12px;
+}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh}
+
+.sticky-top{position:sticky;top:0;z-index:10}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header h1{font-size:17px;font-weight:600;letter-spacing:-.3px}
+.header-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border:1px solid var(--border-strong);border-radius:var(--r);background:var(--surface);color:var(--text);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .12s}
+.btn:hover{background:var(--bg)}
+.btn-primary{background:var(--text);color:#fff;border-color:var(--text)}
+.btn-primary:hover{background:#333}
+.btn-danger{color:var(--danger);border-color:#f7c1c1}
+.btn-danger:hover{background:var(--danger-bg)}
+.btn-sm{padding:3px 8px;font-size:11px}
+.btn svg{width:13px;height:13px;flex-shrink:0}
+
+main{max-width:940px;margin:0 auto;padding:20px 16px}
+
+.page-actions{display:flex;gap:8px;align-items:center;justify-content:flex-start;margin-bottom:16px;flex-wrap:wrap}
+
+.summary-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px}
+.sum-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px}
+.sum-card .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:4px}
+.sum-card .val{font-size:22px;font-weight:600;letter-spacing:-.5px}
+.sum-card .sub{font-size:11px;color:var(--text-faint);margin-top:2px}
+.col-pos{color:var(--accent)}
+.col-neg{color:var(--danger)}
+
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:16px 18px;margin-bottom:18px}
+.chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+.chart-title{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted)}
+#chartWrap{position:relative;height:170px}
+.chart-empty{display:none;text-align:center;color:var(--text-faint);font-size:13px;padding:50px 0}
+
+.section-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.section-title{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-right:4px}
+.filters{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.filter-chip{padding:3px 10px;border:1px solid var(--border-strong);border-radius:99px;font-size:11px;cursor:pointer;background:var(--surface);color:var(--text-muted);transition:all .12s;user-select:none;text-transform:capitalize}
+.filter-chip:hover{border-color:var(--text-muted)}
+.filter-chip.active{background:var(--text);color:#fff;border-color:var(--text)}
+
+.table-container{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:20px;border:1px solid var(--border);border-radius:var(--rl);background:var(--surface)}
+table{width:auto;min-width:100%;border-collapse:collapse}
+table th,table td{white-space:nowrap}
+table td:nth-child(4){min-width:120px;max-width:260px;white-space:normal}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);font-weight:500;padding:9px 14px;text-align:left;border-bottom:1px solid var(--border);background:var(--bg)}
+th:not(:first-child){padding-left:6px;padding-right:6px}
+th.num{text-align:left}
+td{padding:9px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+td:not(:first-child){padding-left:6px;padding-right:6px}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#fafaf8}
+td.num{text-align:left;font-variant-numeric:tabular-nums}
+
+.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;text-transform:capitalize}
+.note-text{font-size:11px;color:var(--text-faint);font-style:italic;white-space:normal;word-break:break-word}
+
+.fab-add{display:none;position:fixed;bottom:18px;right:18px;width:44px;height:44px;border-radius:50%;background:var(--text);color:#fff;border:none;box-shadow:0 2px 10px rgba(0,0,0,.22);align-items:center;justify-content:center;cursor:pointer;z-index:50}
+.fab-add svg{width:18px;height:18px}
+.fab-add:active{background:#333}
+@media(max-width:640px){
+  .header-actions .add-log-btn{display:none}
+  .fab-add{display:flex}
+}
+
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:100;align-items:center;justify-content:center}
+.modal-backdrop.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:22px;width:min(440px,95vw);max-height:90vh;overflow-y:auto}
+.modal h2{font-size:17px;font-weight:600;margin-bottom:16px}
+@media(max-width:640px){
+  .modal-backdrop{align-items:flex-end}
+  .modal{width:100%;max-width:100%;border-radius:var(--rl) var(--rl) 0 0;max-height:85vh}
+}
+.form-row{display:flex;flex-direction:column;gap:3px;margin-bottom:10px}
+.form-row label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}
+.form-row input,.form-row select,.form-row textarea{width:100%;padding:7px 10px;border:1px solid var(--border-strong);border-radius:var(--r);font-family:inherit;font-size:13px;color:var(--text);background:var(--surface)}
+.form-row input:focus,.form-row select:focus{outline:2px solid var(--accent-light);border-color:var(--accent)}
+.form-row textarea{resize:vertical;min-height:70px;font-family:inherit;font-size:13px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.quick-durations{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
+.import-area{border:2px dashed var(--border-strong);border-radius:var(--r);padding:14px;margin-bottom:10px;font-size:13px;color:var(--text-muted);text-align:center;display:flex;flex-direction:column;gap:6px;align-items:center;justify-content:center;cursor:pointer}
+.import-area:hover{border-color:var(--accent);color:var(--accent)}
+
+.color-swatch{width:26px;height:26px;padding:0;border:1px solid var(--border-strong);border-radius:6px;cursor:pointer;background:none;flex-shrink:0}
+.color-suggestions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.color-suggestions .swatch-label{font-size:10px;color:var(--text-faint);margin-right:2px}
+.color-suggestions .swatch-btn{width:20px;height:20px;border-radius:6px;border:2px solid transparent;cursor:pointer;padding:0}
+.color-suggestions .swatch-btn.selected{border-color:var(--text)}
+.type-pill-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.type-pill-item{display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r)}
+.type-pill-item input[type="text"]{flex:1;border:none;background:none;font-size:13px;font-family:inherit;color:var(--text);padding:3px 2px}
+.type-pill-item input[type="text"]:focus{outline:none;background:var(--surface);border-radius:4px}
+.type-pill-item button{background:none;border:none;color:var(--text-faint);cursor:pointer;display:inline-flex;align-items:center;padding:2px;flex-shrink:0}
+.type-pill-item button:hover{color:var(--danger)}
+
+.dropdown{position:relative;display:inline-block}
+.dropdown-content{display:none;position:absolute;right:0;top:100%;background:var(--surface);min-width:190px;box-shadow:0 4px 20px rgba(0,0,0,0.15);border:1px solid var(--border);border-radius:var(--r);z-index:1000;margin-top:8px;overflow:hidden;padding:4px 0}
+.dropdown-content .btn-flat{display:flex;align-items:center;gap:10px;width:100%;padding:10px 16px;border:none;background:none;color:var(--text);font-size:13px;cursor:pointer;text-align:left;text-decoration:none;font-family:inherit;transition:background .12s;white-space:nowrap}
+.dropdown-content .btn-flat:hover{background:var(--bg)}
+.dropdown-content svg{width:14px;height:14px;color:var(--text-muted)}
+.dropdown.open .dropdown-content{display:block}
+
+.toast{position:fixed;bottom:20px;right:20px;background:var(--text);color:#fff;padding:9px 16px;border-radius:var(--r);font-size:13px;z-index:200;opacity:0;transform:translateY(6px);transition:all .18s;pointer-events:none}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.error{background:var(--danger)}
+.empty{text-align:center;padding:36px;color:var(--text-faint);font-size:13px}
+</style>
+<meta name="theme-color" content="#f7f6f2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="imago">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/imago-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<script src="scripts/time-chart.js"></script>
+</head>
+<body>
+
+<div class="sticky-top">
+<header>
+  <h1>time</h1>
+  <div class="header-actions">
+    <button class="btn btn-primary add-log-btn" onclick="openAddLog()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
+      Add log
+    </button>
+
+    <div class="dropdown" id="settingsDropdown">
+      <button class="btn" onclick="toggleDropdown('settingsDropdown')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/></svg>
+      </button>
+      <div class="dropdown-content">
+        <button class="btn-flat" onclick="openImport()">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,10 3,13 13,13 13,10"/><polyline points="5,7 8,10 11,7"/><line x1="8" y1="3" x2="8" y2="10"/></svg>
+          Import
+        </button>
+        <button class="btn-flat" onclick="exportData()">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,6 3,3 13,3 13,6"/><polyline points="5,9 8,6 11,9"/><line x1="8" y1="13" x2="8" y2="6"/></svg>
+          Export data
+        </button>
+        <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
+        <button class="btn-flat" onclick="clearAllDataPrompt()" style="color:var(--danger)">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,4 13,4"/><path d="M5,4 V3 a1,1 0 0 1 1,-1 h4 a1,1 0 0 1 1,1 v1"/><path d="M4,4 l0.6,9 a1,1 0 0 0 1,1 h4.8 a1,1 0 0 0 1,-1 l0.6,-9"/></svg>
+          Clear all data
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+</div>
+
+<button class="fab-add" onclick="openAddLog()" aria-label="Add log">
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
+</button>
+
+<main>
+  <div class="summary-row" id="summaryRow" style="display:none"></div>
+
+  <div class="page-actions">
+    <button class="btn" onclick="openCategoriesModal()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="10" height="10" rx="2"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
+      Categories
+    </button>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="filters" id="periodFilters">
+        <span class="filter-chip" data-period="day" onclick="changePeriod('day', this)">Today</span>
+        <span class="filter-chip" data-period="week" onclick="changePeriod('week', this)">This Week</span>
+      </div>
+      <span class="chart-title" id="chartPeriod"></span>
+    </div>
+    <div id="chartWrap">
+      <div class="chart-empty" id="chartEmpty">No time logged yet — add a log to see the breakdown.</div>
+      <time-chart id="mainChart" style="display:none"></time-chart>
+    </div>
+  </div>
+
+  <div class="section-header">
+    <span class="section-title">Log</span>
+    <div class="filters" id="filterBar"></div>
+  </div>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Category</th>
+          <th class="num">Duration</th>
+          <th>Note</th>
+        </tr>
+      </thead>
+      <tbody id="logsTbody"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</main>
+
+<!-- Log Modal -->
+<div class="modal-backdrop" id="logModal">
+  <div class="modal">
+    <h2 id="logModalTitle">Add log</h2>
+    <div class="form-grid">
+      <div class="form-row"><label>Date</label><input type="date" id="fDate"></div>
+      <div class="form-row"><label>Category</label>
+        <select id="fCategory"></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Duration (hours)</label>
+      <input type="number" id="fHours" step="0.25" min="0.25" placeholder="1.5">
+      <div class="quick-durations" id="quickDurations"></div>
+    </div>
+    <div class="form-row"><label>Note</label><input type="text" id="fNote" placeholder="Optional"></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="btnDeleteLog" onclick="deleteLog(_editId)" style="margin-right:auto; display:none;">Delete</button>
+      <button class="btn" onclick="closeModal('logModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveLog()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Categories Modal -->
+<div class="modal-backdrop" id="categoriesModal">
+  <div class="modal">
+    <h2>Categories</h2>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Add, rename, recolor, or delete categories. Logs keep whatever category they were logged under, even if you delete it later.</p>
+    <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center">
+      <input type="color" class="color-swatch" id="newCategoryColor" value="#3d5a99">
+      <input type="text" id="newCategoryName" placeholder="New category name" style="flex:1;padding:7px 10px;border:1px solid var(--border-strong);border-radius:var(--r)">
+      <button class="btn btn-primary" onclick="addCategory()">Add</button>
+    </div>
+    <div class="color-suggestions" id="colorSuggestions"></div>
+    <div class="type-pill-list" id="categoryPillsList"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('categoriesModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import Modal -->
+<div class="modal-backdrop" id="importModal">
+  <div class="modal">
+    <h2>Import data</h2>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px">Duplicates are skipped. Reset import wipes existing data first.</p>
+    <div class="import-area" ondragover="event.preventDefault()" ondrop="handleDrop(event)">
+      <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,10 3,13 13,13 13,10"/><polyline points="5,7 8,10 11,7"/><line x1="8" y1="3" x2="8" y2="10"/></svg>
+      Drop JSON file here or <label style="color:var(--accent);cursor:pointer;text-decoration:underline">browse<input type="file" accept=".json" style="display:none" onchange="handleFileInput(event)"></label>
+    </div>
+    <div class="form-row"><textarea id="importJson" placeholder="…or paste JSON here"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" onclick="doImport(true)">Reset &amp; import</button>
+      <button class="btn" onclick="closeModal('importModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="doImport(false)">Merge import</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Dropdown ──────────────────────────────────────────────────────────────────
+function toggleDropdown(id) { document.getElementById(id).classList.toggle('open'); }
+window.addEventListener('click', e => {
+  if (!e.target.closest('.dropdown')) {
+    document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('open'));
+  }
+});
+
+// ── DB ────────────────────────────────────────────────────────────────────────
+const db = new Dexie('TimeTrackerV1');
+db.version(1).stores({ logs: 'id,date,category,createdAt' });
+db.version(2).stores({ logs: 'id,date,category,createdAt', categories: 'id' });
+
+// ── Categories ────────────────────────────────────────────────────────────────
+// Seeded once into the `categories` table the first time it's empty (rather
+// than a version .upgrade(), which never runs for a brand-new database) --
+// after that they're just normal rows the user can rename, recolor, add to,
+// or delete via the Categories modal.
+const DEFAULT_CATEGORIES = [
+  { id: 'work',          label: 'Work',                  color: '#3d5a99', order: 0 },
+  { id: 'volunteering',  label: 'Volunteering',          color: '#2b9c72', order: 1 },
+  { id: 'housekeeping',  label: 'Housekeeping',          color: '#c98a2c', order: 2 },
+  { id: 'social',        label: 'Social & Community',    color: '#b8546b', order: 3 },
+  { id: 'sleep',         label: 'Sleep',                 color: '#6b5b95', order: 4 },
+  { id: 'travel',        label: 'Travel & Exploration',  color: '#2ba6c9', order: 5 },
+];
+const DEFAULT_PALETTE = DEFAULT_CATEGORIES.map(c => c.color);
+let _categories = [];
+let CATEGORY_MAP = {};
+
+async function loadCategories() {
+  let cats = await db.categories.toArray();
+  if (cats.length === 0) {
+    await db.categories.bulkAdd(DEFAULT_CATEGORIES);
+    cats = await db.categories.toArray();
+  }
+  cats.sort((a,b) => (a.order??0) - (b.order??0));
+  _categories = cats;
+  CATEGORY_MAP = Object.fromEntries(cats.map(c => [c.id, c]));
+}
+
+const FALLBACK_COLOR = '#c8c5bb'; // for a log whose category was since deleted
+const QUICK_DURATIONS = [0.25, 0.5, 1, 2, 4, 8];
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let _editId = null;
+let _period = localStorage.getItem('imago-time-chart-period') || 'day';
+let _activeCategory = localStorage.getItem('imago-time-active-category') || 'all';
+window._allLogs = [];
+
+// ── Util ──────────────────────────────────────────────────────────────────────
+function uuid() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function toast(msg, err=false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (err ? ' error' : '');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.className='toast', 2800);
+}
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+document.querySelectorAll('.modal-backdrop').forEach(bd =>
+  bd.addEventListener('click', e => { if (e.target===bd) bd.classList.remove('open'); })
+);
+
+// Human-readable duration: minutes under 1h, hours(+minutes) under 1d, then
+// days(+hours) beyond that -- e.g. 36h reads as "1d 12h", not "36h".
+function fmtHours(v) {
+  v = parseFloat(v) || 0;
+  if (v <= 0) return '0h';
+  const totalMinutes = Math.round(v * 60);
+  if (totalMinutes < 60) return totalMinutes + 'm';
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  if (days > 0) return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+  const minutes = totalMinutes % 60;
+  return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+}
+
+// Date-only strings (YYYY-MM-DD) are local-calendar dates, not UTC -- unlike
+// savings.html/expenses.html (plain calendar fields with no time-of-day
+// math), this page computes "hours elapsed today" and "hours left today"
+// against the clock, so "today"/"this week" have to follow the user's own
+// midnight, not UTC's. A <input type="date"> already stores/reads local
+// dates with no timezone conversion, so this matches it for free.
+function localDateParts(d) { return [d.getFullYear(), d.getMonth()+1, d.getDate()]; }
+function todayStr() {
+  const [y,m,d] = localDateParts(new Date());
+  return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+function dateStrToLocalDate(dateStr) {
+  const [y,m,d] = dateStr.split('-').map(Number);
+  return new Date(y, m-1, d);
+}
+function addDaysToDateStr(dateStr, days) {
+  const d = dateStrToLocalDate(dateStr);
+  d.setDate(d.getDate() + days);
+  const [y,m,dd] = localDateParts(d);
+  return `${y}-${String(m).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;
+}
+function startOfWeekStr() {
+  const today = todayStr();
+  const dow = dateStrToLocalDate(today).getDay(); // 0 Sun .. 6 Sat, local
+  return addDaysToDateStr(today, -((dow + 6) % 7));
+}
+function fmtDateDisplay(dateStr) {
+  return dateStrToLocalDate(dateStr).toLocaleDateString(undefined, { day:'numeric', month:'short', year:'numeric' });
+}
+
+// ── Main render ───────────────────────────────────────────────────────────────
+async function render() {
+  const logs = await db.logs.toArray();
+  window._allLogs = logs;
+  const stats = computeStats(logs);
+  if (isFeatureEnabled(FEATURE_FLAGS.timeSummaryTiles)) {
+    document.getElementById('summaryRow').style.display = '';
+    renderSummary(stats);
+  }
+  renderChart(stats);
+  renderTable(logs);
+}
+
+function computeStats(logs) {
+  const now = new Date();
+  const today = todayStr();
+  const weekStart = startOfWeekStr();
+  const todayLogs = logs.filter(l => l.date === today);
+  const weekLogs = logs.filter(l => l.date >= weekStart && l.date <= today);
+  const todayLogged = todayLogs.reduce((s,l) => s + (l.hours||0), 0);
+  const weekLogged = weekLogs.reduce((s,l) => s + (l.hours||0), 0);
+
+  const elapsedTodayHours = (now - dateStrToLocalDate(today)) / 3600000;
+  const elapsedWeekHours = Math.min(168, Math.max(0, (now - dateStrToLocalDate(weekStart)) / 3600000));
+
+  // A plain clock countdown to midnight/week's end -- independent of how
+  // much you've logged, so it stays meaningful regardless of when (or
+  // whether) a day's hours get fully logged.
+  const todayRemaining = Math.max(0, 24 - elapsedTodayHours);
+  const weekRemaining = Math.max(0, 168 - elapsedWeekHours);
+
+  return { today, weekStart, todayLogs, weekLogs, todayLogged, weekLogged, todayRemaining, weekRemaining };
+}
+
+// ── Summary cards ─────────────────────────────────────────────────────────────
+function renderSummary(stats) {
+  document.getElementById('summaryRow').innerHTML = `
+    <div class="sum-card">
+      <div class="lbl">Today logged</div>
+      <div class="val col-pos">${fmtHours(stats.todayLogged)}</div>
+      <div class="sub">so far today</div>
+    </div>
+    <div class="sum-card">
+      <div class="lbl">Time left today</div>
+      <div class="val">${fmtHours(stats.todayRemaining)}</div>
+      <div class="sub">${stats.todayRemaining > 0.01 ? 'until midnight' : 'day complete'}</div>
+    </div>
+    <div class="sum-card">
+      <div class="lbl">This week logged</div>
+      <div class="val col-pos">${fmtHours(stats.weekLogged)}</div>
+      <div class="sub">so far this week</div>
+    </div>
+    <div class="sum-card">
+      <div class="lbl">Time left this week</div>
+      <div class="val">${fmtHours(stats.weekRemaining)}</div>
+      <div class="sub">${stats.weekRemaining > 0.01 ? 'until week ends' : 'week complete'}</div>
+    </div>
+  `;
+}
+
+// ── Chart ─────────────────────────────────────────────────────────────────────
+// Grouped straight off the logs (not off _categories) so hours logged under
+// a since-deleted category still count toward the period total instead of
+// silently vanishing from the chart.
+function categoryBreakdown(logs) {
+  const totals = {};
+  logs.forEach(l => { totals[l.category] = (totals[l.category]||0) + (l.hours||0); });
+  return Object.entries(totals).filter(([,v]) => v > 0).map(([catId, value]) => {
+    const c = CATEGORY_MAP[catId];
+    return { label: c ? c.label : catId, value, color: c ? c.color : FALLBACK_COLOR };
+  }).sort((a,b) => b.value - a.value);
+}
+
+function renderChart(stats) {
+  document.querySelectorAll('#periodFilters .filter-chip').forEach(c => c.classList.toggle('active', c.dataset.period === _period));
+
+  const chart = document.getElementById('mainChart');
+  const empty = document.getElementById('chartEmpty');
+  const periodLbl = document.getElementById('chartPeriod');
+
+  let slices;
+  if (_period === 'day') {
+    slices = categoryBreakdown(stats.todayLogs);
+    periodLbl.textContent = fmtDateDisplay(stats.today);
+  } else {
+    slices = categoryBreakdown(stats.weekLogs);
+    periodLbl.textContent = fmtDateDisplay(stats.weekStart) + ' – ' + fmtDateDisplay(stats.today);
+  }
+
+  if (!slices.length) {
+    chart.style.display = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  chart.style.display = 'block';
+  chart.data = slices;
+}
+
+function changePeriod(period, el) {
+  _period = period;
+  localStorage.setItem('imago-time-chart-period', period);
+  render();
+}
+
+// ── Filter bar ────────────────────────────────────────────────────────────────
+function renderFilterBar() {
+  const bar = document.getElementById('filterBar');
+  const chips = [{ id: 'all', label: 'all', color: null }, ..._categories];
+  bar.innerHTML = chips.map(c => {
+    const active = _activeCategory === c.id;
+    const style = active && c.color ? `style="background:${c.color};border-color:${c.color}"` : '';
+    return `<span class="filter-chip ${active ? 'active' : ''}" data-cat="${esc(c.id)}" ${style}>${esc(c.label)}</span>`;
+  }).join('');
+  bar.querySelectorAll('.filter-chip').forEach(chip =>
+    chip.addEventListener('click', () => {
+      _activeCategory = chip.dataset.cat;
+      localStorage.setItem('imago-time-active-category', _activeCategory);
+      renderFilterBar();
+      renderTable(window._allLogs);
+    })
+  );
+}
+
+// ── Log table ─────────────────────────────────────────────────────────────────
+function renderTable(allLogs) {
+  let logs = _activeCategory === 'all' ? allLogs : allLogs.filter(l => l.category === _activeCategory);
+  logs = [...logs].sort((a,b) => b.date === a.date ? (b.createdAt||'').localeCompare(a.createdAt||'') : b.date.localeCompare(a.date));
+
+  const tbody = document.getElementById('logsTbody');
+  if (logs.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" class="empty">No time logged${_activeCategory!=='all' ? ' for "'+esc(_activeCategory)+'"' : ''} yet.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = logs.map(l => {
+    const cat = CATEGORY_MAP[l.category];
+    return `<tr onclick="editLog('${esc(l.id)}')" style="cursor:pointer">
+      <td>${fmtDateDisplay(l.date)}</td>
+      <td><span class="tag" style="background:${cat ? cat.color+'22' : '#eee'};color:${cat ? cat.color : '#666'}">${esc(cat ? cat.label : l.category)}</span></td>
+      <td class="num">${fmtHours(l.hours)}</td>
+      <td>${l.note ? `<span class="note-text">${esc(l.note)}</span>` : ''}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Log CRUD ──────────────────────────────────────────────────────────────────
+function populateCategorySelect() {
+  document.getElementById('fCategory').innerHTML = _categories.map(c => `<option value="${c.id}">${esc(c.label)}</option>`).join('');
+}
+function populateQuickDurations() {
+  document.getElementById('quickDurations').innerHTML = QUICK_DURATIONS.map(h =>
+    `<button type="button" class="btn btn-sm" onclick="document.getElementById('fHours').value=${h}">${fmtHours(h)}</button>`
+  ).join('');
+}
+
+function openAddLog() {
+  _editId = null;
+  document.getElementById('logModalTitle').textContent = 'Add log';
+  document.getElementById('fDate').value = todayStr();
+  document.getElementById('fCategory').value = _categories[0]?.id || '';
+  document.getElementById('fHours').value = '';
+  document.getElementById('fNote').value = '';
+  document.getElementById('btnDeleteLog').style.display = 'none';
+  openModal('logModal');
+}
+
+async function editLog(id) {
+  const l = await db.logs.get(id);
+  if (!l) return;
+  _editId = id;
+  document.getElementById('logModalTitle').textContent = 'Edit log';
+  document.getElementById('fDate').value = l.date || todayStr();
+  document.getElementById('fCategory').value = l.category || (_categories[0]?.id || '');
+  document.getElementById('fHours').value = l.hours ?? '';
+  document.getElementById('fNote').value = l.note || '';
+  document.getElementById('btnDeleteLog').style.display = 'inline-block';
+  openModal('logModal');
+}
+
+async function saveLog() {
+  const date = document.getElementById('fDate').value;
+  const category = document.getElementById('fCategory').value;
+  const hours = parseFloat(document.getElementById('fHours').value);
+  const note = document.getElementById('fNote').value.trim();
+
+  if (!date) { toast('Date required.', true); return; }
+  if (isNaN(hours) || hours <= 0) { toast('Duration required.', true); return; }
+
+  const id = _editId || 'log-'+uuid();
+  const existing = _editId ? await db.logs.get(_editId) : null;
+  await db.logs.put({
+    ...(existing || {}),
+    id, date, category, hours,
+    note: note || null,
+    createdAt: existing?.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  });
+
+  closeModal('logModal');
+  toast(_editId ? 'Updated.' : 'Log added.');
+  render();
+}
+
+async function deleteLog(id) {
+  if (!confirm('Delete this log entry?')) return;
+  await db.logs.delete(id);
+  closeModal('logModal');
+  toast('Deleted.');
+  render();
+}
+
+// ── Category CRUD ─────────────────────────────────────────────────────────────
+function openCategoriesModal() {
+  document.getElementById('settingsDropdown').classList.remove('open');
+  renderCategoryPills();
+  renderColorSuggestions();
+  openModal('categoriesModal');
+}
+
+// Suggests the default palette colors that no current category is using
+// yet, so a new category doesn't visually collide with an existing one.
+// Falls back to just the plain color-picker swatch once they're all taken.
+function renderColorSuggestions() {
+  const container = document.getElementById('colorSuggestions');
+  const colorInput = document.getElementById('newCategoryColor');
+  const used = new Set(_categories.map(c => c.color));
+  const unused = DEFAULT_PALETTE.filter(c => !used.has(c));
+
+  if (unused.length === 0) { container.innerHTML = ''; return; }
+  if (!unused.includes(colorInput.value)) colorInput.value = unused[0];
+
+  container.innerHTML = `<span class="swatch-label">Suggested:</span>` + unused.map(c => `
+    <button type="button" class="swatch-btn ${c === colorInput.value ? 'selected' : ''}" style="background:${c}" onclick="pickSuggestedColor('${c}')" title="${c}"></button>
+  `).join('');
+}
+
+function pickSuggestedColor(color) {
+  document.getElementById('newCategoryColor').value = color;
+  renderColorSuggestions();
+}
+
+function renderCategoryPills() {
+  const container = document.getElementById('categoryPillsList');
+  if (_categories.length === 0) {
+    container.innerHTML = '<span style="font-size:12px;color:var(--text-faint)">No categories defined yet.</span>';
+    return;
+  }
+  container.innerHTML = _categories.map(c => `
+    <div class="type-pill-item">
+      <input type="color" class="color-swatch" value="${c.color}" onchange="updateCategory('${c.id}', 'color', this.value)">
+      <input type="text" value="${esc(c.label)}" onchange="updateCategory('${c.id}', 'label', this.value)">
+      <button onclick="deleteCategory('${c.id}')" title="Delete category">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>
+      </button>
+    </div>
+  `).join('');
+}
+
+async function afterCategoriesChanged() {
+  await loadCategories();
+  renderCategoryPills();
+  renderColorSuggestions();
+  populateCategorySelect();
+  renderFilterBar();
+  render();
+}
+
+async function addCategory() {
+  const nameInput = document.getElementById('newCategoryName');
+  const colorInput = document.getElementById('newCategoryColor');
+  const label = nameInput.value.trim();
+  if (!label) return;
+
+  const order = _categories.reduce((m,c) => Math.max(m, c.order||0), -1) + 1;
+  await db.categories.add({ id: 'cat-'+uuid(), label, color: colorInput.value, order });
+  nameInput.value = '';
+  toast(`Category "${label}" added.`);
+  await afterCategoriesChanged();
+}
+
+async function updateCategory(id, field, value) {
+  if (field === 'label') {
+    value = value.trim();
+    if (!value) { renderCategoryPills(); return; } // reject a blank rename
+  }
+  await db.categories.update(id, { [field]: value });
+  await afterCategoriesChanged();
+}
+
+async function deleteCategory(id) {
+  if (_categories.length <= 1) { toast('You need at least one category.', true); return; }
+  const inUse = window._allLogs.filter(l => l.category === id).length;
+  const label = CATEGORY_MAP[id]?.label || id;
+  const msg = inUse > 0
+    ? `Delete "${label}"? ${inUse} log ${inUse===1 ? 'entry uses' : 'entries use'} it and will keep showing under its old name.`
+    : `Delete "${label}"?`;
+  if (!confirm(msg)) return;
+  await db.categories.delete(id);
+  toast('Category deleted.');
+  await afterCategoriesChanged();
+}
+
+// ── Import / Export ───────────────────────────────────────────────────────────
+function openImport() {
+  document.getElementById('importJson').value = '';
+  document.getElementById('settingsDropdown').classList.remove('open');
+  openModal('importModal');
+}
+function handleDrop(e) { e.preventDefault(); readFile(e.dataTransfer.files[0]); }
+function handleFileInput(e) { readFile(e.target.files[0]); }
+function readFile(f) {
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => { document.getElementById('importJson').value = ev.target.result; };
+  r.readAsText(f);
+}
+
+async function clearAllDataPrompt() {
+  if (!confirm('This will permanently delete all logged time and custom categories. Continue?')) return;
+  document.getElementById('settingsDropdown').classList.remove('open');
+  await db.logs.clear();
+  await db.categories.clear(); // repopulated with the defaults on next loadCategories()
+  toast('All data cleared.');
+  await afterCategoriesChanged();
+}
+
+async function doImport(reset) {
+  let raw;
+  try { raw = JSON.parse(document.getElementById('importJson').value.trim()); }
+  catch { toast('Invalid JSON.', true); return; }
+
+  if (reset) {
+    if (!confirm('This will overwrite all existing data. Continue?')) return;
+    await db.logs.clear();
+    await db.categories.clear();
+  }
+
+  for (const c of (raw.categories||[])) {
+    if (!c.id) c.id = 'cat-'+uuid();
+    const ex = await db.categories.get(c.id);
+    if (!ex) await db.categories.put(c);
+  }
+
+  for (const l of (raw.logs||[])) {
+    if (!l.id) l.id = 'log-'+uuid();
+    const ex = await db.logs.get(l.id);
+    if (!ex) await db.logs.put(l);
+  }
+
+  closeModal('importModal');
+  toast(reset ? 'Reset & imported.' : 'Merged.');
+  await afterCategoriesChanged();
+}
+
+async function exportData() {
+  const logs = await db.logs.toArray();
+  const categories = await db.categories.toArray();
+  const out = { version: 2, exported_at: new Date().toISOString(), logs, categories };
+  const blob = new Blob([JSON.stringify(out,null,2)], {type:'application/json'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href=url; a.download='time_'+todayStr()+'.json';
+  a.click(); URL.revokeObjectURL(url);
+  toast('Exported.');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+(async function init() {
+  await loadCategories();
+  populateCategorySelect();
+  populateQuickDurations();
+  renderFilterBar();
+  render();
+})();
+</script>
+  <script src="pwa-register.js"></script>
+</body>
+</html>

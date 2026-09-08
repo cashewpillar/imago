@@ -17,6 +17,7 @@ const APP_SHELL = [
   './performance.html',
   './savings.html',
   './scratchspace.html',
+  './time.html',
   './archive/architect.html',
   './archive/commonplace.html',
   './archive/day.html',
