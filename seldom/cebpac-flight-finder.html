@@ -5,9 +5,9 @@
 <title>CebPac</title>
 <style>
   :root{
-    --bg:#0f1115; --panel:#171a21; --panel2:#1f2330; --border:#2a2f3d;
-    --text:#e7e9ee; --muted:#9aa2b1; --accent:#5b9dff; --good:#37c979;
-    --tier1:#37c979; --tier2:#5b9dff; --tier3:#b47bff;
+    --bg:#f7f6f2; --panel:#ffffff; --panel2:#f0efe9; --border:#dcdad2;
+    --text:#1c1e22; --muted:#6b7280; --accent:#2f6fed; --good:#1a9e5c;
+    --tier1:#1a9e5c; --tier2:#2f6fed; --tier3:#8b5cf6;
   }
   *{box-sizing:border-box;}
   body{
@@ -31,7 +31,7 @@
     border-radius:8px; padding:8px 10px; font-size:14px; width:140px;
   }
   button{
-    background:var(--accent); color:#08101f; border:none; border-radius:8px;
+    background:var(--accent); color:#fff; border:none; border-radius:8px;
     padding:10px 20px; font-weight:600; font-size:14px; cursor:pointer;
   }
   button:hover{filter:brightness(1.08);}
@@ -47,6 +47,22 @@
   .price{font-weight:700; color:var(--good);}
   .muted{color:var(--muted);}
   .rank{color:var(--muted); font-variant-numeric: tabular-nums;}
+
+  @media print{
+    body{padding:0; background:#fff;}
+    h1, p.sub, .layout, .config, #error{display:none;}
+    #results{margin:0; max-width:none;}
+    table{border:1px solid #ccc;}
+    th, td{border-bottom:1px solid #ccc;}
+  }
+
+  .bookmarklet-btn{
+    display:inline-block; vertical-align:middle; margin-left:10px;
+    background:var(--accent); color:#fff; text-decoration:none;
+    font-size:11px; font-weight:600; padding:4px 10px; border-radius:999px;
+    cursor:grab; user-select:none;
+  }
+  .bookmarklet-btn:active{cursor:grabbing;}
 </style>
 <meta name="theme-color" content="#f7f6f2">
 <meta name="mobile-web-app-capable" content="yes">
@@ -59,7 +75,7 @@
 </head>
 <body>
 
-<h1>Cheapest Flight Finder - CebPac</h1>
+<h1>Cheapest Flight Finder - CebPac<a id="cebpac-bookmarklet" class="bookmarklet-btn" href="javascript:void(0)" draggable="true" title="Drag this to your bookmarks bar. Then, while browsing fares on the airline site, click it to start capturing real seat availability.">Availability</a><a id="cebpac-bookmarklet-fq" class="bookmarklet-btn" href="javascript:void(0)" draggable="true" title="Drag this to your bookmarks bar. Click it once both fare cache directions have loaded to get a queue of cheapest date combinations to check.">Queue</a></h1>
 <p class="sub">Paste the two fare JSON blobs (route keys like "DGTMNL|PHP"), set your trip preferences, and find the cheapest valid combinations.</p>
 
 <div class="layout">
@@ -76,7 +92,7 @@
 <div class="config">
   <div class="field">
     <label>Source (3-letter code)</label>
-    <input type="text" id="source" maxlength="3" placeholder="e.g. MNL">
+    <input type="text" id="source" maxlength="3" placeholder="e.g. MNL" value="MNL">
   </div>
   <div class="field">
     <label>Min days away</label>
@@ -95,6 +111,745 @@
 <div id="results"></div>
 
 <script>
+function cebpacBookmarkletPayload(){
+  var PANEL_ID = 'cebpac-cap-panel-e1a9';
+  var STYLE_ID = 'cebpac-cap-style-e1a9';
+  var STORAGE_KEY = 'cebpac_availability_capture_v1';
+
+  function loadData(){
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+    catch(e){ return {}; }
+  }
+  function saveData(d){
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); } catch(e){}
+  }
+  function dateOnly(s){ return String(s || '').slice(0, 10); }
+
+  var reqSeq = 0;
+
+  function ingest(data, seq){
+    if(!data || !Array.isArray(data.routes)) return;
+    var store = loadData();
+    var currency = data.currencyCode || '';
+    data.routes.forEach(function(route){
+      var fares = route.lowFares || [];
+      var seenDates = {};
+      fares.forEach(function(lf){
+        if(lf.fareTotal == null) return;
+        var d = dateOnly(lf.departureDate);
+        seenDates[d] = true;
+        var key = route.origin + '|' + route.destination + '|' + d;
+        var existing = store[key];
+        if(existing && existing.seq != null && seq != null && seq < existing.seq) return;
+        store[key] = {
+          origin: route.origin,
+          destination: route.destination,
+          departureDate: lf.departureDate,
+          fareTotal: lf.fareTotal,
+          availableCount: lf.availableCount,
+          currency: currency,
+          capturedAt: Date.now(),
+          seq: seq
+        };
+      });
+
+      var seenDays = Object.keys(seenDates);
+      if(seenDays.length){
+        var minD = seenDays.reduce(function(a, b){ return a < b ? a : b; });
+        var maxD = seenDays.reduce(function(a, b){ return a > b ? a : b; });
+        Object.keys(store).forEach(function(key){
+          var entry = store[key];
+          if(entry.origin !== route.origin || entry.destination !== route.destination) return;
+          var d = dateOnly(entry.departureDate);
+          if(d < minD || d > maxD || seenDates[d]) return;
+          if(entry.seq != null && seq != null && seq < entry.seq) return;
+          delete store[key];
+        });
+      }
+    });
+    saveData(store);
+    renderPanel();
+  }
+
+  function patchNetwork(){
+    if(window.__cebpacCapPatched) return;
+    window.__cebpacCapPatched = true;
+
+    var origFetch = window.fetch;
+    if(origFetch){
+      window.fetch = function(){
+        var args = arguments;
+        var urlArg = args[0];
+        var url = (urlArg && urlArg.url) ? urlArg.url : urlArg;
+        var seq = ++reqSeq;
+        return origFetch.apply(this, args).then(function(res){
+          try{
+            if(typeof url === 'string' && url.indexOf('availability') !== -1){
+              res.clone().json().then(function(data){ ingest(data, seq); }).catch(function(){});
+            }
+          }catch(e){}
+          return res;
+        });
+      };
+    }
+
+    var origOpen = XMLHttpRequest.prototype.open;
+    var origSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function(method, url){
+      this.__cebpacUrl = url;
+      this.__cebpacSeq = ++reqSeq;
+      return origOpen.apply(this, arguments);
+    };
+    XMLHttpRequest.prototype.send = function(){
+      var xhr = this;
+      xhr.addEventListener('load', function(){
+        try{
+          if(xhr.__cebpacUrl && String(xhr.__cebpacUrl).indexOf('availability') !== -1){
+            ingest(JSON.parse(xhr.responseText), xhr.__cebpacSeq);
+          }
+        }catch(e){}
+      });
+      return origSend.apply(this, arguments);
+    };
+  }
+
+  function ensureStyle(){
+    if(document.getElementById(STYLE_ID)) return;
+    var style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent =
+      '#' + PANEL_ID + '{position:fixed;top:12px;right:12px;width:560px;max-height:80vh;' +
+      'background:#fff;color:#1c1e22;border:1px solid #ccc;border-radius:10px;' +
+      'box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:2147483647;' +
+      'font:12px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;' +
+      'display:flex;flex-direction:column;overflow:hidden;}' +
+      '#' + PANEL_ID + ' .cc-head{background:#2f6fed;color:#fff;padding:8px 10px;' +
+      'display:flex;align-items:center;justify-content:space-between;cursor:move;font-weight:600;flex-shrink:0;}' +
+      '#' + PANEL_ID + ' .cc-head-actions{display:flex;align-items:center;gap:6px;}' +
+      '#' + PANEL_ID + '.cc-collapsed .cc-body,#' + PANEL_ID + '.cc-collapsed .cc-foot{display:none;}' +
+      '#' + PANEL_ID + ' .cc-body{padding:8px 10px;overflow:auto;}' +
+      '#' + PANEL_ID + ' .cc-controls{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;}' +
+      '#' + PANEL_ID + ' .cc-controls label{display:flex;align-items:center;gap:4px;color:#444;}' +
+      '#' + PANEL_ID + ' input[type=number]{width:44px;padding:2px 4px;border:1px solid #ccc;border-radius:4px;}' +
+      '#' + PANEL_ID + ' .cc-table-wrap{overflow-x:auto;margin-bottom:10px;}' +
+      '#' + PANEL_ID + ' table{width:100%;border-collapse:collapse;}' +
+      '#' + PANEL_ID + ' th,#' + PANEL_ID + ' td{padding:4px 8px;border-bottom:1px solid #eee;text-align:left;white-space:nowrap;}' +
+      '#' + PANEL_ID + ' th{background:#f0efe9;font-size:10px;text-transform:uppercase;color:#666;}' +
+      '#' + PANEL_ID + ' .cc-close,#' + PANEL_ID + ' .cc-collapse{cursor:pointer;background:none;border:none;color:#fff;font-size:16px;line-height:1;}' +
+      '#' + PANEL_ID + ' .cc-note{color:#888;font-size:11px;margin-top:4px;}' +
+      '#' + PANEL_ID + ' .cc-section-title{font-weight:700;margin:6px 0 4px;}' +
+      '#' + PANEL_ID + ' .cc-route-head{font-weight:700;font-size:11px;text-transform:uppercase;' +
+      'letter-spacing:.03em;color:#2f6fed;margin:10px 0 4px;}' +
+      '#' + PANEL_ID + ' .cc-empty{color:#888;padding:8px 0;}' +
+      '#' + PANEL_ID + ' .cc-stale{color:#a15c00;background:#fff8ec;}' +
+      '#' + PANEL_ID + ' .cc-meets-min td{font-weight:600;}' +
+      '#' + PANEL_ID + ' .cc-foot{border-top:1px solid #eee;background:#f7f6f2;padding:8px 10px;' +
+      'flex-shrink:0;font-size:11px;color:#333;line-height:1.5;}' +
+      '#' + PANEL_ID + ' .cc-foot strong{color:#1c1e22;}';
+    document.head.appendChild(style);
+  }
+
+  function makeDraggable(panel, handle){
+    var dragging = false, offX = 0, offY = 0;
+    handle.addEventListener('mousedown', function(e){
+      dragging = true;
+      var rect = panel.getBoundingClientRect();
+      offX = e.clientX - rect.left;
+      offY = e.clientY - rect.top;
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', function(e){
+      if(!dragging) return;
+      panel.style.left = (e.clientX - offX) + 'px';
+      panel.style.top = (e.clientY - offY) + 'px';
+      panel.style.right = 'auto';
+    });
+    document.addEventListener('mouseup', function(){ dragging = false; });
+  }
+
+  function fmtMoney(n, cur){
+    if(n == null) return '';
+    return (cur || '') + ' ' + Math.round(n).toLocaleString();
+  }
+  function fmtDate(s){
+    var d = new Date(s);
+    if(isNaN(d.getTime())) return s;
+    return d.toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric'});
+  }
+
+  var STALE_MS = 5 * 60 * 1000;
+  function fmtAgo(ts){
+    var mins = Math.round((Date.now() - ts) / 60000);
+    if(mins < 1) return 'just now';
+    if(mins < 60) return mins + 'm ago';
+    var hrs = Math.round(mins / 60);
+    return hrs + 'h ago';
+  }
+
+  function buildPanel(){
+    ensureStyle();
+    var panel = document.createElement('div');
+    panel.id = PANEL_ID;
+    panel.innerHTML =
+      '<div class="cc-head"><span>CebPac Availability Capture</span><div class="cc-head-actions">' +
+        '<button class="cc-collapse" title="Collapse">-</button>' +
+        '<button class="cc-close" title="Close">\u00d7</button>' +
+      '</div></div>' +
+      '<div class="cc-body">' +
+        '<div class="cc-controls">' +
+          '<label>Min seats <input type="number" class="cc-min-seats" value="4" min="1"></label>' +
+          '<label><input type="checkbox" class="cc-pair-toggle"> 2\u00d72 helper</label>' +
+          '<label>Max gap (days) <input type="number" class="cc-pair-gap" value="2" min="0"></label>' +
+          '<button class="cc-clear" title="Clear captured data">Clear</button>' +
+        '</div>' +
+        '<div class="cc-direct"></div>' +
+        '<div class="cc-pairs"></div>' +
+        '<div class="cc-note">Captures availability/ responses as you browse. Data persists in this browser.</div>' +
+      '</div>' +
+      '<div class="cc-foot"></div>';
+    document.body.appendChild(panel);
+    panel.querySelector('.cc-close').addEventListener('click', function(){ panel.remove(); });
+    panel.querySelector('.cc-collapse').addEventListener('click', function(){
+      panel.classList.toggle('cc-collapsed');
+      panel.querySelector('.cc-collapse').textContent = panel.classList.contains('cc-collapsed') ? '+' : '-';
+    });
+    panel.querySelector('.cc-clear').addEventListener('click', function(){
+      if(confirm('Clear all captured availability data?')){
+        saveData({});
+        renderPanel();
+      }
+    });
+    panel.querySelector('.cc-min-seats').addEventListener('input', function(){ updateTable(panel); });
+    panel.querySelector('.cc-pair-toggle').addEventListener('change', function(){
+      panel.__cebpacPairTouched = true;
+      updateTable(panel);
+    });
+    panel.querySelector('.cc-pair-gap').addEventListener('input', function(){ updateTable(panel); });
+    makeDraggable(panel, panel.querySelector('.cc-head'));
+    return panel;
+  }
+
+  function updateTable(panel){
+    var store = loadData();
+    var rows = Object.keys(store).map(function(k){ return store[k]; });
+    rows.sort(function(a, b){ return new Date(a.departureDate) - new Date(b.departureDate); });
+
+    if(panel.__cebpacSelection){
+      panel.__cebpacSelection = panel.__cebpacSelection.filter(function(s){
+        return rows.some(function(r){ return r.origin + '|' + r.destination === s.key && r.departureDate === s.row.departureDate; });
+      });
+    }
+
+    var minSeats = parseInt(panel.querySelector('.cc-min-seats').value, 10) || 1;
+    var pairOn = panel.querySelector('.cc-pair-toggle').checked;
+    var maxGap = parseInt(panel.querySelector('.cc-pair-gap').value, 10);
+    if(isNaN(maxGap)) maxGap = 2;
+
+    var direct = rows.slice();
+    direct.sort(function(a, b){ return a.fareTotal - b.fareTotal; });
+    var meetsCount = direct.filter(function(r){ return r.availableCount >= minSeats; }).length;
+    if(direct.length > 0 && meetsCount === 0 && !panel.__cebpacPairTouched){
+      pairOn = true;
+      panel.querySelector('.cc-pair-toggle').checked = true;
+    }
+
+    var directEl = panel.querySelector('.cc-direct');
+    directEl.innerHTML = '<div class="cc-section-title">' + direct.length + ' flight(s) captured (' + meetsCount + ' with ' + minSeats + '+ seats). Check a flight per route to compare.</div>';
+    if(direct.length === 0){
+      directEl.innerHTML += '<div class="cc-empty">None yet - keep browsing dates on the airline site.</div>';
+    } else {
+      var groups = {};
+      var groupOrder = [];
+      direct.forEach(function(r){
+        var gk = r.origin + '|' + r.destination;
+        if(!groups[gk]){ groups[gk] = []; groupOrder.push(gk); }
+        groups[gk].push(r);
+      });
+      groupOrder.forEach(function(routeKey){
+        var groupRows = groups[routeKey];
+        var head = document.createElement('div');
+        head.className = 'cc-route-head';
+        head.textContent = groupRows[0].origin + ' \u2192 ' + groupRows[0].destination + ' (' + groupRows.length + ')';
+        directEl.appendChild(head);
+
+        var wrap = document.createElement('div');
+        wrap.className = 'cc-table-wrap';
+        var t = document.createElement('table');
+        t.innerHTML = '<thead><tr><th></th><th>Date</th><th>Fare</th><th>Seats</th><th>Captured</th></tr></thead>';
+        var tbody = document.createElement('tbody');
+        groupRows.forEach(function(r){
+          var tr = document.createElement('tr');
+          var stale = r.capturedAt && (Date.now() - r.capturedAt) > STALE_MS;
+          var classes = [];
+          if(stale) classes.push('cc-stale');
+          if(r.availableCount >= minSeats) classes.push('cc-meets-min');
+          if(classes.length) tr.className = classes.join(' ');
+          var tdCheck = document.createElement('td');
+          var cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.checked = isSelected(panel, routeKey, r);
+          cb.title = 'Select for round-trip comparison';
+          cb.addEventListener('change', function(){ toggleSelect(panel, routeKey, r); });
+          tdCheck.appendChild(cb);
+          tr.appendChild(tdCheck);
+          tr.insertAdjacentHTML('beforeend',
+            '<td>' + fmtDate(r.departureDate) + '</td>' +
+            '<td>' + fmtMoney(r.fareTotal, r.currency) + '</td>' +
+            '<td>' + r.availableCount + '</td>' +
+            '<td>' + (stale ? '\u26a0 ' : '') + fmtAgo(r.capturedAt) + '</td>');
+          tbody.appendChild(tr);
+        });
+        t.appendChild(tbody);
+        wrap.appendChild(t);
+        directEl.appendChild(wrap);
+      });
+    }
+
+    updateFooter(panel);
+
+    var pairsEl = panel.querySelector('.cc-pairs');
+    pairsEl.innerHTML = '';
+    if(pairOn){
+      var candidates = rows.filter(function(r){ return r.availableCount >= 2; });
+      var byRoute = {};
+      candidates.forEach(function(r){
+        var rk = r.origin + '|' + r.destination;
+        (byRoute[rk] = byRoute[rk] || []).push(r);
+      });
+      var pairs = [];
+      Object.keys(byRoute).forEach(function(rk){
+        var list = byRoute[rk];
+        for(var i = 0; i < list.length; i++){
+          for(var j = i + 1; j < list.length; j++){
+            var a = list[i], b = list[j];
+            var gapDays = Math.abs(new Date(a.departureDate) - new Date(b.departureDate)) / 86400000;
+            if(gapDays <= maxGap){
+              pairs.push({ a: a, b: b, gapDays: Math.round(gapDays), total: a.fareTotal + b.fareTotal });
+            }
+          }
+        }
+      });
+      pairs.sort(function(x, y){ return x.total - y.total; });
+      pairs = pairs.slice(0, 10);
+
+      pairsEl.innerHTML = '<div class="cc-section-title">2\u00d72 pairing suggestions (\u2264 ' + maxGap + 'd apart)</div>';
+      if(pairs.length === 0){
+        pairsEl.innerHTML += '<div class="cc-empty">No 2-seat pairs within range yet.</div>';
+      } else {
+        var pwrap = document.createElement('div');
+        pwrap.className = 'cc-table-wrap';
+        var pt = document.createElement('table');
+        pt.innerHTML = '<thead><tr><th>Route</th><th>Flight A</th><th>Flight B</th><th>Gap</th><th>Combined</th></tr></thead>';
+        var pbody = document.createElement('tbody');
+        pairs.forEach(function(p){
+          var tr = document.createElement('tr');
+          tr.innerHTML = '<td>' + p.a.origin + '\u2192' + p.a.destination + '</td>' +
+            '<td>' + fmtDate(p.a.departureDate) + '<br>' + fmtMoney(p.a.fareTotal, p.a.currency) + ' (' + p.a.availableCount + ')</td>' +
+            '<td>' + fmtDate(p.b.departureDate) + '<br>' + fmtMoney(p.b.fareTotal, p.b.currency) + ' (' + p.b.availableCount + ')</td>' +
+            '<td>' + p.gapDays + 'd</td>' +
+            '<td>' + fmtMoney(p.total, p.a.currency) + '</td>';
+          pbody.appendChild(tr);
+        });
+        pt.appendChild(pbody);
+        pwrap.appendChild(pt);
+        pairsEl.appendChild(pwrap);
+      }
+    }
+  }
+
+  function isSelected(panel, routeKey, row){
+    var sel = panel.__cebpacSelection || [];
+    return sel.some(function(s){ return s.key === routeKey && s.row.departureDate === row.departureDate; });
+  }
+
+  function toggleSelect(panel, routeKey, row){
+    var sel = panel.__cebpacSelection || (panel.__cebpacSelection = []);
+    var idx = sel.findIndex(function(s){ return s.key === routeKey; });
+    if(idx !== -1){
+      var sameRow = sel[idx].row.departureDate === row.departureDate;
+      sel.splice(idx, 1);
+      if(!sameRow) sel.push({ key: routeKey, row: row });
+    } else {
+      sel.push({ key: routeKey, row: row });
+      if(sel.length > 2) sel.shift();
+    }
+    updateTable(panel);
+  }
+
+  function updateFooter(panel){
+    var footEl = panel.querySelector('.cc-foot');
+    var sel = panel.__cebpacSelection || [];
+    if(sel.length < 2){
+      footEl.innerHTML = '<span class="cc-empty">Select 2 flights (different routes) to compare a round trip.</span>';
+      return;
+    }
+    var a = sel[0].row, b = sel[1].row;
+    var dA = new Date(a.departureDate), dB = new Date(b.departureDate);
+    var from = dA <= dB ? a : b;
+    var to = dA <= dB ? b : a;
+    var days = Math.round(Math.abs(dB - dA) / 86400000);
+    var combined = a.fareTotal + b.fareTotal;
+    footEl.innerHTML =
+      '<div><strong>' + a.origin + '\u2192' + a.destination + '</strong> ' + fmtDate(a.departureDate) +
+      ' (' + fmtMoney(a.fareTotal, a.currency) + ')' +
+      ' &nbsp;+&nbsp; <strong>' + b.origin + '\u2192' + b.destination + '</strong> ' + fmtDate(b.departureDate) +
+      ' (' + fmtMoney(b.fareTotal, b.currency) + ')</div>' +
+      '<div>' + fmtDate(from.departureDate) + ' \u2192 ' + fmtDate(to.departureDate) +
+      ' &nbsp;\u00b7&nbsp; ' + days + ' day' + (days === 1 ? '' : 's') +
+      ' &nbsp;\u00b7&nbsp; Combined ' + fmtMoney(combined, a.currency) + '</div>';
+  }
+
+  function renderPanel(){
+    var panel = document.getElementById(PANEL_ID);
+    if(!panel) panel = buildPanel();
+    updateTable(panel);
+  }
+
+  patchNetwork();
+  renderPanel();
+}
+
+function cebpacFareQueuePayload(){
+  var PANEL_ID = 'cebpac-fq-toolbar-e1a9';
+  var STYLE_ID = 'cebpac-fq-style-e1a9';
+  var STORAGE_KEY = 'cebpac_farecache_v1';
+
+  function loadData(){
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+    catch(e){ return {}; }
+  }
+  function saveData(d){
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); } catch(e){}
+  }
+
+  function parsePrice(str){
+    str = String(str).trim();
+    if(/k$/i.test(str)) return parseFloat(str) * 1000;
+    return parseFloat(str);
+  }
+
+  function parseFareBlob(data){
+    if(!data || typeof data !== 'object') return null;
+    var key = Object.keys(data)[0];
+    if(!key) return null;
+    var parts = key.split('|');
+    var route = parts[0], currency = parts[1] || '';
+    if(!route || route.length !== 6) return null;
+    var from = route.slice(0, 3).toUpperCase();
+    var to = route.slice(3, 6).toUpperCase();
+    var datesObj = data[key];
+    var entries = Object.keys(datesObj).map(function(dtStr){
+      return { dateStr: dtStr, price: parsePrice(datesObj[dtStr]) };
+    }).filter(function(e){ return !isNaN(e.price) && !isNaN(new Date(e.dateStr).getTime()); });
+    return { from: from, to: to, currency: currency, entries: entries };
+  }
+
+  var fqSeq = 0;
+
+  function ingest(data, seq){
+    var parsed = parseFareBlob(data);
+    if(!parsed) return;
+    var store = loadData();
+    var key = parsed.from + '|' + parsed.to;
+    var existing = store.routes && store.routes[key];
+    if(existing && existing.seq != null && seq != null && seq < existing.seq) return;
+    store.routes = store.routes || {};
+    store.routes[key] = {
+      from: parsed.from,
+      to: parsed.to,
+      currency: parsed.currency,
+      entries: parsed.entries,
+      capturedAt: Date.now(),
+      seq: seq
+    };
+    saveData(store);
+    renderToolbar(true);
+  }
+
+  function patchNetwork(){
+    if(window.__cebpacFqPatched) return;
+    window.__cebpacFqPatched = true;
+
+    var origFetch = window.fetch;
+    if(origFetch){
+      window.fetch = function(){
+        var args = arguments;
+        var urlArg = args[0];
+        var url = (urlArg && urlArg.url) ? urlArg.url : urlArg;
+        var seq = ++fqSeq;
+        return origFetch.apply(this, args).then(function(res){
+          try{
+            if(typeof url === 'string' && url.indexOf('farecache') !== -1){
+              res.clone().json().then(function(data){ ingest(data, seq); }).catch(function(){});
+            }
+          }catch(e){}
+          return res;
+        });
+      };
+    }
+
+    var origOpen = XMLHttpRequest.prototype.open;
+    var origSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function(method, url){
+      this.__cebpacFqUrl = url;
+      this.__cebpacFqSeq = ++fqSeq;
+      return origOpen.apply(this, arguments);
+    };
+    XMLHttpRequest.prototype.send = function(){
+      var xhr = this;
+      xhr.addEventListener('load', function(){
+        try{
+          if(xhr.__cebpacFqUrl && String(xhr.__cebpacFqUrl).indexOf('farecache') !== -1){
+            ingest(JSON.parse(xhr.responseText), xhr.__cebpacFqSeq);
+          }
+        }catch(e){}
+      });
+      return origSend.apply(this, arguments);
+    };
+  }
+
+  function ensureStyle(){
+    if(document.getElementById(STYLE_ID)) return;
+    var style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent =
+      '#' + PANEL_ID + '{position:fixed;bottom:12px;right:12px;width:520px;max-height:80vh;' +
+      'background:#fff;color:#1c1e22;border:1px solid #ccc;border-radius:10px;' +
+      'box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:2147483647;' +
+      'font:12px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;' +
+      'display:flex;flex-direction:column;overflow:hidden;}' +
+      '#' + PANEL_ID + ' .fq-head{background:#2f6fed;color:#fff;padding:6px 10px;' +
+      'display:flex;align-items:center;justify-content:space-between;cursor:move;font-weight:600;flex-shrink:0;}' +
+      '#' + PANEL_ID + ' .fq-head-actions{display:flex;align-items:center;gap:6px;}' +
+      '#' + PANEL_ID + ' .fq-close,#' + PANEL_ID + ' .fq-collapse{cursor:pointer;background:none;border:none;color:#fff;font-size:16px;line-height:1;}' +
+      '#' + PANEL_ID + '.fq-collapsed .fq-body{display:none;}' +
+      '#' + PANEL_ID + ' .fq-body{padding:8px 10px;overflow:auto;display:flex;flex-wrap:wrap;align-items:center;gap:12px;}' +
+      '#' + PANEL_ID + ' .fq-settings{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}' +
+      '#' + PANEL_ID + ' .fq-settings label{display:flex;align-items:center;gap:4px;color:#444;}' +
+      '#' + PANEL_ID + ' .fq-settings input{width:44px;padding:2px 4px;border:1px solid #ccc;border-radius:4px;}' +
+      '#' + PANEL_ID + ' button{background:#2f6fed;color:#fff;border:none;border-radius:6px;' +
+      'padding:4px 10px;font-weight:600;cursor:pointer;font-size:11px;}' +
+      '#' + PANEL_ID + ' .fq-combo{flex:1;min-width:260px;}' +
+      '#' + PANEL_ID + ' .fq-nav{display:flex;align-items:center;gap:8px;}' +
+      '#' + PANEL_ID + ' .fq-page{width:44px;padding:2px 4px;border:1px solid #ccc;border-radius:4px;text-align:center;}' +
+      '#' + PANEL_ID + ' .fq-pos-total{color:#666;font-variant-numeric:tabular-nums;}' +
+      '#' + PANEL_ID + ' .fq-empty{color:#888;}';
+    document.head.appendChild(style);
+  }
+
+  function makeDraggable(panel, handle){
+    var dragging = false, offX = 0, offY = 0;
+    handle.addEventListener('mousedown', function(e){
+      dragging = true;
+      var rect = panel.getBoundingClientRect();
+      offX = e.clientX - rect.left;
+      offY = e.clientY - rect.top;
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', function(e){
+      if(!dragging) return;
+      panel.style.left = (e.clientX - offX) + 'px';
+      panel.style.top = (e.clientY - offY) + 'px';
+      panel.style.right = 'auto';
+      panel.style.bottom = 'auto';
+    });
+    document.addEventListener('mouseup', function(){ dragging = false; });
+  }
+
+  function fmtMoney(n, cur){
+    if(n == null || isNaN(n)) return '';
+    return (cur || '') + ' ' + Math.round(n).toLocaleString();
+  }
+  function fmtDate(s){
+    var d = new Date(s);
+    if(isNaN(d.getTime())) return s;
+    return d.toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric'});
+  }
+
+  function computeQueue(store){
+    var meta = store.meta || {};
+    var source = (meta.source || 'MNL').toUpperCase();
+    var minDays = meta.minDays != null ? meta.minDays : 2;
+    var maxDays = meta.maxDays != null ? meta.maxDays : 7;
+    var maxTotal = meta.maxTotal != null ? meta.maxTotal : 500;
+    var routes = store.routes || {};
+    var outbound = null, inbound = null;
+    Object.keys(routes).forEach(function(k){
+      var r = routes[k];
+      if(r.from === source) outbound = r;
+      if(r.to === source) inbound = r;
+    });
+    var result = { combos: [], outbound: outbound, inbound: inbound, source: source, minDays: minDays, maxDays: maxDays, maxTotal: maxTotal };
+    if(!outbound || !inbound || outbound === inbound) return result;
+    outbound.entries.forEach(function(o){
+      inbound.entries.forEach(function(i){
+        var diffDays = Math.round((new Date(i.dateStr) - new Date(o.dateStr)) / 86400000);
+        var total = o.price + i.price;
+        if(diffDays >= minDays && diffDays <= maxDays && total < maxTotal){
+          result.combos.push({ out: o, ret: i, diffDays: diffDays, total: total });
+        }
+      });
+    });
+    result.combos.sort(function(a, b){ return a.total - b.total; });
+    return result;
+  }
+
+  function updateMeta(el){
+    var store = loadData();
+    store.meta = store.meta || {};
+    store.meta.source = (el.querySelector('.fq-source').value || 'MNL').trim().toUpperCase();
+    var minV = parseInt(el.querySelector('.fq-min').value, 10);
+    var maxV = parseInt(el.querySelector('.fq-max').value, 10);
+    var maxTotalV = parseFloat(el.querySelector('.fq-max-total').value);
+    store.meta.minDays = isNaN(minV) ? 2 : minV;
+    store.meta.maxDays = isNaN(maxV) ? 7 : maxV;
+    store.meta.maxTotal = isNaN(maxTotalV) ? 500 : maxTotalV;
+    saveData(store);
+  }
+
+  function step(delta){
+    var el = document.getElementById(PANEL_ID);
+    if(!el) return;
+    var q = computeQueue(loadData());
+    if(!q.combos.length) return;
+    var idx = (el.__cebpacFqIndex || 0) + delta;
+    el.__cebpacFqIndex = Math.max(0, Math.min(q.combos.length - 1, idx));
+    renderToolbar(false);
+  }
+
+  function goToPage(page){
+    var el = document.getElementById(PANEL_ID);
+    if(!el) return;
+    var q = computeQueue(loadData());
+    if(!q.combos.length) return;
+    var idx = (parseInt(page, 10) || 1) - 1;
+    el.__cebpacFqIndex = Math.max(0, Math.min(q.combos.length - 1, idx));
+    renderToolbar(false);
+  }
+
+  function buildToolbar(){
+    ensureStyle();
+    var el = document.createElement('div');
+    el.id = PANEL_ID;
+    el.innerHTML =
+      '<div class="fq-head"><span>Fare Queue</span><div class="fq-head-actions">' +
+        '<button class="fq-collapse" title="Collapse">-</button>' +
+        '<button class="fq-close" title="Close">\u00d7</button>' +
+      '</div></div>' +
+      '<div class="fq-body">' +
+        '<div class="fq-settings">' +
+          '<label>Source <input type="text" class="fq-source" maxlength="3" value="MNL"></label>' +
+          '<label>Min days <input type="number" class="fq-min" value="2" min="0"></label>' +
+          '<label>Max days <input type="number" class="fq-max" value="7" min="0"></label>' +
+          '<label>Max total <input type="number" class="fq-max-total" value="500" min="0"></label>' +
+          '<button class="fq-recompute">Recompute</button>' +
+          '<button class="fq-clear">Clear</button>' +
+        '</div>' +
+        '<div class="fq-combo"></div>' +
+        '<div class="fq-nav">' +
+          '<button class="fq-prev">Prev</button>' +
+          '<input type="number" class="fq-page" min="1" title="Jump to page">' +
+          '<span class="fq-pos-total"></span>' +
+          '<button class="fq-next">Next</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(el);
+    el.querySelector('.fq-close').addEventListener('click', function(){ el.remove(); });
+    el.querySelector('.fq-collapse').addEventListener('click', function(){
+      el.classList.toggle('fq-collapsed');
+      el.querySelector('.fq-collapse').textContent = el.classList.contains('fq-collapsed') ? '+' : '-';
+    });
+    el.querySelector('.fq-clear').addEventListener('click', function(){
+      if(confirm('Clear captured fare cache data?')){ saveData({}); renderToolbar(true); }
+    });
+    el.querySelector('.fq-source').addEventListener('input', function(){ updateMeta(el); renderToolbar(true); });
+    el.querySelector('.fq-min').addEventListener('input', function(){ updateMeta(el); renderToolbar(true); });
+    el.querySelector('.fq-max').addEventListener('input', function(){ updateMeta(el); renderToolbar(true); });
+    el.querySelector('.fq-max-total').addEventListener('input', function(){ updateMeta(el); renderToolbar(true); });
+    el.querySelector('.fq-recompute').addEventListener('click', function(){ renderToolbar(true); });
+    el.querySelector('.fq-prev').addEventListener('click', function(){ step(-1); });
+    el.querySelector('.fq-next').addEventListener('click', function(){ step(1); });
+    el.querySelector('.fq-page').addEventListener('change', function(){ goToPage(this.value); });
+    el.querySelector('.fq-page').addEventListener('keydown', function(e){
+      if(e.key === 'Enter') goToPage(this.value);
+    });
+    makeDraggable(el, el.querySelector('.fq-head'));
+    return el;
+  }
+
+  function renderToolbar(resetIndex){
+    var el = document.getElementById(PANEL_ID);
+    var isNew = !el;
+    if(!el) el = buildToolbar();
+    if(isNew || resetIndex) el.__cebpacFqIndex = 0;
+
+    var store = loadData();
+    var meta = store.meta || {};
+    if(meta.source) el.querySelector('.fq-source').value = meta.source;
+    if(meta.minDays != null) el.querySelector('.fq-min').value = meta.minDays;
+    if(meta.maxDays != null) el.querySelector('.fq-max').value = meta.maxDays;
+    if(meta.maxTotal != null) el.querySelector('.fq-max-total').value = meta.maxTotal;
+
+    var q = computeQueue(store);
+    var comboEl = el.querySelector('.fq-combo');
+    var pageEl = el.querySelector('.fq-page');
+    var totalEl = el.querySelector('.fq-pos-total');
+
+    if(!q.outbound || !q.inbound){
+      comboEl.innerHTML = '<span class="fq-empty">Waiting for both fare cache directions for source ' + q.source + '...</span>';
+      pageEl.value = '';
+      pageEl.disabled = true;
+      totalEl.textContent = '';
+      return;
+    }
+    if(q.combos.length === 0){
+      comboEl.innerHTML = '<span class="fq-empty">No combos under ' + q.maxTotal + ' in the ' + q.minDays + '-' + q.maxDays + ' day window.</span>';
+      pageEl.value = '';
+      pageEl.disabled = true;
+      totalEl.textContent = '';
+      return;
+    }
+
+    pageEl.disabled = false;
+    pageEl.max = q.combos.length;
+
+    var idx = Math.max(0, Math.min(q.combos.length - 1, el.__cebpacFqIndex || 0));
+    el.__cebpacFqIndex = idx;
+    var combo = q.combos[idx];
+    comboEl.innerHTML =
+      '<strong>' + q.outbound.from + '\u2192' + q.outbound.to + '</strong> ' + fmtDate(combo.out.dateStr) +
+      ' (' + fmtMoney(combo.out.price, q.outbound.currency) + ')' +
+      ' &nbsp;+&nbsp; <strong>' + q.inbound.from + '\u2192' + q.inbound.to + '</strong> ' + fmtDate(combo.ret.dateStr) +
+      ' (' + fmtMoney(combo.ret.price, q.inbound.currency) + ')' +
+      ' &nbsp;\u00b7&nbsp; ' + combo.diffDays + 'd \u00b7 Total ' + fmtMoney(combo.total, q.outbound.currency);
+    pageEl.value = idx + 1;
+    totalEl.textContent = '/ ' + q.combos.length;
+  }
+
+  patchNetwork();
+  renderToolbar(true);
+}
+
+(function(){
+  function minifyFn(fn){
+    return fn.toString()
+      .split('\n')
+      .map(function(line){ return line.trim(); })
+      .filter(function(line){ return line.length > 0 && line.slice(0, 2) !== '//'; })
+      .join(' ');
+  }
+
+  var link = document.getElementById('cebpac-bookmarklet');
+  if(link){
+    link.href = 'javascript:(' + minifyFn(cebpacBookmarkletPayload) + ')();';
+  }
+
+  var linkFq = document.getElementById('cebpac-bookmarklet-fq');
+  if(linkFq){
+    linkFq.href = 'javascript:(' + minifyFn(cebpacFareQueuePayload) + ')();';
+  }
+})();
+
 function parsePrice(str){
   str = String(str).trim();
   if(/k$/i.test(str)){
