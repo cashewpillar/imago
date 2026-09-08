@@ -69,12 +69,13 @@
         }
 
         li {
+            position: relative;
             margin-bottom: 0.75rem;
         }
 
         a {
             display: block;
-            padding: 1rem 1.25rem;
+            padding: 1rem 2.5rem 1rem 1.25rem;
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: var(--radius);
@@ -86,6 +87,38 @@
         a:hover {
             border-color: var(--text);
             transform: translateY(-1px);
+        }
+
+        .pin-btn {
+            position: absolute;
+            top: 50%;
+            right: 0.6rem;
+            transform: translateY(-50%);
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 5px;
+            background: none;
+            border: none;
+            color: var(--muted);
+            cursor: pointer;
+        }
+
+        .pin-btn:hover {
+            color: var(--text);
+        }
+
+        .pin-btn.pinned {
+            color: #c9971f;
+        }
+
+        .pin-btn.pinned svg {
+            fill: currentColor;
+        }
+
+        li.pinned a {
+            border-color: #c9971f;
         }
 
         .meta {
@@ -227,6 +260,7 @@
         }
     </script>
     <script src="scripts/owner-mode.js"></script>
+    <script src="scripts/pin-items.js"></script>
     <script src="pwa-register.js"></script>
 </body>
 </html>
