@@ -188,13 +188,6 @@ main{max-width:940px;margin:0 auto;padding:20px 16px}
 <main>
   <div class="summary-row" id="summaryRow" style="display:none"></div>
 
-  <div class="page-actions">
-    <button class="btn" onclick="openCategoriesModal()">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="10" height="10" rx="2"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
-      Categories
-    </button>
-  </div>
-
   <div class="chart-card">
     <div class="chart-header">
       <div class="filters" id="periodFilters">
@@ -207,6 +200,13 @@ main{max-width:940px;margin:0 auto;padding:20px 16px}
       <div class="chart-empty" id="chartEmpty">No time logged yet — place a block on the timeline below to see the breakdown.</div>
       <time-chart id="mainChart" style="display:none"></time-chart>
     </div>
+  </div>
+
+  <div class="page-actions">
+    <button class="btn" onclick="openCategoriesModal()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="10" height="10" rx="2"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
+      Categories
+    </button>
   </div>
 
   <div class="chart-card" id="timelineCard">
