@@ -33,13 +33,6 @@ class TimeChart extends HTMLElement {
           border-left: 1px solid #e2e0d8;
           min-width: 0;
         }
-        :host([legend-bottom]) .chart-container { flex-direction: column; gap: 10px; }
-        :host([legend-bottom]) .canvas-wrap { flex: 1 1 0; width: 100%; height: auto; min-height: 0; }
-        :host([legend-bottom]) .legend {
-          flex: 0 0 auto; width: 100%; flex-direction: row; flex-wrap: wrap;
-          justify-content: center; gap: 6px 16px; max-height: none; overflow: visible;
-          border-left: none; border-top: 1px solid #e2e0d8; padding-left: 0; padding-top: 10px;
-        }
         .legend-item { display: flex; align-items: center; gap: 8px; font-size: 11px; padding: 3px 0; }
         .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
         .legend-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #1a1917; text-transform: capitalize; }
@@ -64,10 +57,7 @@ class TimeChart extends HTMLElement {
     this.legend = this.shadowRoot.getElementById('legend');
     this.tooltip = this.shadowRoot.getElementById('tooltip');
     this.ctx = this.canvas.getContext('2d');
-    this._resizeObserver = new ResizeObserver(() => {
-      this.toggleAttribute('legend-bottom', this.clientWidth < 380);
-      this.render();
-    });
+    this._resizeObserver = new ResizeObserver(() => this.render());
     this._onVisible = () => { if (!document.hidden) this.render(); };
   }
 
