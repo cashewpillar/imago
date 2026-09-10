@@ -590,6 +590,28 @@
   }
   .price-pill:hover{ border-color:var(--sage); color:var(--sage); }
   .price-pill.active{ background:var(--sage-dim); border-color:var(--sage); color:var(--sage); }
+
+  /* ---------- Tags ---------- */
+  .tag-row{ display:flex; align-items:center; gap:8px; padding:6px 8px; background:var(--bg-inset); border:1px solid var(--line); border-radius:9px; }
+  .tag-row input[type="color"]{ width:26px; height:26px; padding:0; border:1px solid var(--line-strong); border-radius:6px; cursor:pointer; flex:none; }
+  .tag-row input[type="text"]{ flex:1; border:none; background:none; font-size:13.5px; font-family:inherit; color:var(--chalk); padding:3px 2px; width:auto; }
+  .tag-row input[type="text"]:focus{ outline:none; background:var(--bg-raised); border-radius:5px; }
+  .tag-row .tag-count{ font-size:11px; color:var(--chalk-faint); flex:none; white-space:nowrap; }
+  .tag-row button{ background:none; border:none; color:var(--chalk-faint); cursor:pointer; display:flex; align-items:center; padding:2px; flex:none; }
+  .tag-row button:hover{ color:var(--rust); }
+
+  .tag-pick{
+    display:inline-flex; align-items:center; gap:5px; padding:5px 10px; border-radius:14px;
+    border:1.5px solid var(--line-strong); background:var(--bg-inset); color:var(--chalk-dim);
+    font-size:12.5px; font-weight:600; cursor:pointer; user-select:none; transition:all .12s;
+  }
+  .tag-pick .dot{ width:8px; height:8px; border-radius:50%; flex:none; }
+
+  .tag-chip{
+    display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:600;
+    padding:2px 8px; border-radius:12px; white-space:nowrap; background:var(--bg-inset); border:1px solid var(--line);
+  }
+  .tag-chip .dot{ width:6px; height:6px; border-radius:50%; flex:none; }
   .btn{
     flex:1; padding:11px; border-radius:10px; border:none; font-weight:600; font-size:14px;
     cursor:pointer; font-family:'Work Sans',sans-serif;
@@ -734,13 +756,30 @@
       </div>
     </div>
     <div class="field">
-      <label>Tag / Category <span style="text-transform:none;letter-spacing:0;color:var(--chalk-faint);">(optional)</span></label>
-      <input type="text" id="ingTagInput" list="pantryTagList" placeholder="e.g. Produce, Spices, Dairy, Staples">
-      <datalist id="pantryTagList"></datalist>
+      <label>Tags <span style="text-transform:none;letter-spacing:0;color:var(--chalk-faint);">(optional, select any)</span></label>
+      <div id="ingTagPicker" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+      <button type="button" id="manageTagsFromIngBtn" style="margin-top:8px;background:none;border:none;color:var(--accent);font-size:12px;font-weight:600;cursor:pointer;padding:0;">+ Manage tags</button>
     </div>
     <div class="modal-actions">
       <button class="btn ghost" id="cancelIngBtn">Cancel</button>
       <button class="btn primary" id="saveIngBtn">Save ingredient</button>
+    </div>
+  </div>
+</div>
+
+<!-- Tags management modal -->
+<div class="overlay" id="tagsOverlay">
+  <div class="modal" style="max-width:420px;">
+    <h2>Manage Tags</h2>
+    <p style="font-size:12.5px;color:var(--chalk-faint);margin:-8px 0 14px;">Tags group pantry ingredients — an ingredient can carry several.</p>
+    <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;">
+      <input type="color" id="newTagColor" value="#4f6a40">
+      <input type="text" id="newTagName" placeholder="New tag name" style="flex:1;">
+      <button class="btn primary" id="addTagBtn" style="flex:none;width:auto;padding:0 14px;">Add</button>
+    </div>
+    <div id="tagPillsList" style="display:flex;flex-direction:column;gap:6px;"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="closeTagsBtn">Close</button>
     </div>
   </div>
 </div>
@@ -794,6 +833,10 @@
       <button class="io-btn" id="importBtn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 21V9m0 0l-4 4m4-4l4 4M5 3h14"/></svg>
         <span>Import data<small>Merge a JSON file — existing records are updated in place</small></span>
+      </button>
+      <button class="io-btn" id="clearDataBtn" style="border-color:var(--rust-dim);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="color:var(--rust);"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6"/></svg>
+        <span>Clear all data<small>Wipe dishes, ingredients, tags &amp; grocery list — export first if you want a backup</small></span>
       </button>
       <input type="file" accept="application/json" class="hidden-file" id="importFile">
     </div>
@@ -875,6 +918,40 @@
     purchaseHistory: 'id, ingredientId, date, updatedAt'
   });
 
+  // Tags become a managed, many-to-many concept: ingredients.tag (one free-text
+  // string) is replaced by a `tags` table plus an `ingredientTags` join table,
+  // mirroring the itemIngredients pattern already used for dish/ingredient links.
+  const TAG_PALETTE = ['#4f6a40','#b9812e','#a1454c','#3d5a99','#8a5fb0','#2b8a94','#c9a227','#6b5b95'];
+  db.version(7).stores({
+    items: 'id, name, type, isPlanned, stockStatus, lastPrepared, updatedAt',
+    ingredients: 'id, &nameKey, stockStatus, updatedAt',
+    itemIngredients: 'id, itemId, ingredientId, updatedAt',
+    customGrocery: 'id, name, bought, updatedAt',
+    purchaseHistory: 'id, ingredientId, date, updatedAt',
+    tags: 'id, order',
+    ingredientTags: 'id, ingredientId, tagId'
+  }).upgrade(async tx => {
+    const ingredients = await tx.ingredients.toArray();
+    const tagIdByLabel = {};
+    let order = 0;
+    for(const ing of ingredients){
+      const raw = (ing.tag || '').trim();
+      if(raw){
+        const key = raw.toLowerCase();
+        let tagId = tagIdByLabel[key];
+        if(!tagId){
+          tagId = 'tag-' + uuid();
+          tagIdByLabel[key] = tagId;
+          await tx.tags.put({ id: tagId, label: raw, color: TAG_PALETTE[order % TAG_PALETTE.length], order });
+          order++;
+        }
+        await tx.ingredientTags.put({ id: uuid(), ingredientId: ing.id, tagId });
+      }
+      delete ing.tag;
+    }
+    await tx.ingredients.bulkPut(ingredients);
+  });
+
   const uuid = () => (crypto.randomUUID ? crypto.randomUUID() :
     'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
       const r = Math.random()*16|0, v = c === 'x' ? r : (r&0x3|0x8);
@@ -887,7 +964,6 @@
   let currentTab = 'dishes'; // 'dishes', 'ingredients', 'grocery'
   let dishFilter = 'all'; // 'all', 'planned', 'dishes', 'snacks'
   let pantryFilter = 'all'; // 'all', 'planned', 'in_stock', 'low', 'out'
-  let groupByTag = true;
   const collapsedTags = new Set();
   const collapsedGroceryTags = new Set();
   const expandedDishRows = new Set();
@@ -896,6 +972,8 @@
   let editingIngId = null;
   let currentType = 'dish';
   let confirmAction = null;
+  let _tags = [];
+  const _ingSelectedTagIds = new Set();
 
 
   /* ---------------- Helpers ---------------- */
@@ -924,13 +1002,129 @@
 
   /* ---------------- Data access ---------------- */
   async function getAllData(){
-    const [items, ingredients, itemIngredients, customGrocery] = await Promise.all([
+    const [items, ingredients, itemIngredients, customGrocery, tags, ingredientTags] = await Promise.all([
       db.items.toArray(),
       db.ingredients.toArray(),
       db.itemIngredients.toArray(),
-      db.customGrocery ? db.customGrocery.toArray() : Promise.resolve([])
+      db.customGrocery ? db.customGrocery.toArray() : Promise.resolve([]),
+      db.tags.toArray(),
+      db.ingredientTags.toArray()
     ]);
-    return { items, ingredients, itemIngredients, customGrocery };
+    return { items, ingredients, itemIngredients, customGrocery, tags, ingredientTags };
+  }
+
+  // ingredientId -> its tags (sorted by tag order), for chip display and grouping
+  function buildTagsByIngredient(tags, ingredientTags){
+    const tagById = Object.fromEntries(tags.map(t => [t.id, t]));
+    const map = {};
+    ingredientTags.forEach(link => {
+      const tag = tagById[link.tagId];
+      if(!tag) return;
+      (map[link.ingredientId] ||= []).push(tag);
+    });
+    Object.values(map).forEach(list => list.sort((a,b) => (a.order??0) - (b.order??0)));
+    return map;
+  }
+
+  /* ---------------- Tag CRUD ---------------- */
+  async function loadTags(){
+    _tags = await db.tags.toArray();
+    _tags.sort((a,b) => (a.order??0) - (b.order??0));
+  }
+
+  function nextTagColor(){
+    const used = new Set(_tags.map(t => t.color));
+    const unused = TAG_PALETTE.find(c => !used.has(c));
+    return unused || TAG_PALETTE[_tags.length % TAG_PALETTE.length];
+  }
+
+  async function addTag(label, color){
+    label = label.trim();
+    if(!label) return null;
+    const order = _tags.reduce((m,t) => Math.max(m, t.order||0), -1) + 1;
+    const tag = { id: 'tag-'+uuid(), label, color: color || nextTagColor(), order };
+    await db.tags.add(tag);
+    await loadTags();
+    toast(`Tag "${label}" added`);
+    return tag;
+  }
+
+  async function updateTag(id, field, value){
+    if(field === 'label'){
+      value = value.trim();
+      if(!value){ renderTagsModal(); return; } // reject a blank rename
+    }
+    await db.tags.update(id, { [field]: value });
+    await loadTags();
+  }
+
+  async function deleteTag(id){
+    const tag = _tags.find(t => t.id === id);
+    if(!tag) return;
+    const links = await db.ingredientTags.where('tagId').equals(id).toArray();
+    openConfirm('Delete tag?', `"${tag.label}" will be removed from ${links.length} ingredient(s). This can't be undone.`, async () => {
+      await db.ingredientTags.bulkDelete(links.map(l => l.id));
+      await db.tags.delete(id);
+      await loadTags();
+      toast(`Deleted "${tag.label}"`);
+      renderTagsModal();
+      if(document.getElementById('ingOverlay').classList.contains('show')) renderIngTagPicker();
+      render();
+    });
+  }
+
+  /* ---------------- Tags Management Modal ---------------- */
+  async function renderTagsModal(){
+    const container = document.getElementById('tagPillsList');
+    if(!container) return;
+    const links = await db.ingredientTags.toArray();
+    const countByTag = {};
+    links.forEach(l => { countByTag[l.tagId] = (countByTag[l.tagId]||0) + 1; });
+
+    if(_tags.length === 0){
+      container.innerHTML = '<span style="font-size:12px;color:var(--chalk-faint);">No tags yet — add one above.</span>';
+      return;
+    }
+
+    container.innerHTML = _tags.map(t => {
+      const count = countByTag[t.id] || 0;
+      return `<div class="tag-row" data-tag-id="${t.id}">
+        <input type="color" value="${t.color}" data-tag-color title="Tag color">
+        <input type="text" value="${escapeHtml(t.label)}" data-tag-label>
+        <span class="tag-count">${count} item${count === 1 ? '' : 's'}</span>
+        <button data-tag-delete title="Delete tag" aria-label="Delete tag">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="width:11px;height:11px;"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>
+        </button>
+      </div>`;
+    }).join('');
+
+    container.querySelectorAll('.tag-row').forEach(row => {
+      const id = row.dataset.tagId;
+      row.querySelector('[data-tag-color]').addEventListener('change', async e => {
+        await updateTag(id, 'color', e.target.value);
+        renderTagsModal();
+        render();
+      });
+      row.querySelector('[data-tag-label]').addEventListener('change', async e => {
+        await updateTag(id, 'label', e.target.value);
+        renderTagsModal();
+        if(document.getElementById('ingOverlay').classList.contains('show')) renderIngTagPicker();
+        render();
+      });
+      row.querySelector('[data-tag-delete]').addEventListener('click', () => deleteTag(id));
+    });
+  }
+
+  async function openTagsModal(){
+    await loadTags();
+    document.getElementById('newTagName').value = '';
+    document.getElementById('newTagColor').value = nextTagColor();
+    await renderTagsModal();
+    document.getElementById('tagsOverlay').classList.add('show');
+  }
+
+  function closeTagsModal(){
+    document.getElementById('tagsOverlay').classList.remove('show');
   }
 
   async function findOrCreateIngredient(name){
@@ -1182,29 +1376,61 @@
   }
 
   /* ---------------- Ingredient Edit / Delete ---------------- */
+  // Replaces an ingredient's tag assignments outright with `tagIds`.
+  async function setIngredientTags(ingredientId, tagIds){
+    const existing = await db.ingredientTags.where('ingredientId').equals(ingredientId).toArray();
+    await db.ingredientTags.bulkDelete(existing.map(l => l.id));
+    for(const tagId of tagIds){
+      await db.ingredientTags.put({ id: uuid(), ingredientId, tagId });
+    }
+  }
+
+  function renderIngTagPicker(){
+    const container = document.getElementById('ingTagPicker');
+    if(!container) return;
+    if(_tags.length === 0){
+      container.innerHTML = `<span style="font-size:12px;color:var(--chalk-faint);">No tags yet.</span>`;
+      return;
+    }
+    container.innerHTML = _tags.map(t => {
+      const selected = _ingSelectedTagIds.has(t.id);
+      const style = selected
+        ? `border-color:${t.color};color:${t.color};background:${t.color}1f;`
+        : '';
+      return `<span class="tag-pick ${selected ? 'selected' : ''}" data-tag-id="${t.id}" style="${style}">
+        <span class="dot" style="background:${t.color}"></span>${escapeHtml(t.label)}
+      </span>`;
+    }).join('');
+    container.querySelectorAll('.tag-pick').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const id = chip.dataset.tagId;
+        if(_ingSelectedTagIds.has(id)) _ingSelectedTagIds.delete(id);
+        else _ingSelectedTagIds.add(id);
+        renderIngTagPicker();
+      });
+    });
+  }
+
   async function openIngModal(ingId){
     editingIngId = ingId || null;
     document.getElementById('ingModalTitle').textContent = ingId ? 'Edit ingredient' : 'New ingredient';
 
-    const allIngs = await db.ingredients.toArray();
-    const uniqueTags = Array.from(new Set(allIngs.map(i => i.tag).filter(Boolean))).sort();
-    const datalist = document.getElementById('pantryTagList');
-    if(datalist){
-      datalist.innerHTML = uniqueTags.map(t => `<option value="${escapeHtml(t)}">`).join('');
-    }
-    
+    await loadTags();
+    _ingSelectedTagIds.clear();
+
     if(ingId){
       const ing = await db.ingredients.get(ingId);
       if(ing){
         document.getElementById('ingNameInput').value = ing.name;
-        document.getElementById('ingTagInput').value = ing.tag || '';
         setIngStockSegmented(ing.stockStatus || 'out');
+        const links = await db.ingredientTags.where('ingredientId').equals(ingId).toArray();
+        links.forEach(l => _ingSelectedTagIds.add(l.tagId));
       }
     } else {
       document.getElementById('ingNameInput').value = '';
-      document.getElementById('ingTagInput').value = '';
       setIngStockSegmented('out');
     }
+    renderIngTagPicker();
 
     document.getElementById('ingOverlay').classList.add('show');
     document.getElementById('ingNameInput').focus();
@@ -1225,7 +1451,7 @@
     const name = document.getElementById('ingNameInput').value.trim();
     if(!name){ toast('Provide an ingredient name'); return; }
 
-    const tag = document.getElementById('ingTagInput').value.trim();
+    const tagIds = Array.from(_ingSelectedTagIds);
     const activeBtn = document.querySelector('#ingStockSegmented button.active');
     const stockStatus = activeBtn ? activeBtn.dataset.status : 'out';
     const key = normalize(name);
@@ -1235,12 +1461,15 @@
       // Creating brand new ingredient directly
       let existing = await db.ingredients.where('nameKey').equals(key).first();
       if(existing){
-        await db.ingredients.update(existing.id, { stockStatus, tag, updatedAt: ts });
+        await db.ingredients.update(existing.id, { stockStatus, updatedAt: ts });
+        await setIngredientTags(existing.id, tagIds);
         toast(`Updated existing "${existing.name}"`);
       } else {
+        const newId = uuid();
         await db.ingredients.put({
-          id: uuid(), name, nameKey: key, stockStatus, tag, createdAt: ts, updatedAt: ts
+          id: newId, name, nameKey: key, stockStatus, createdAt: ts, updatedAt: ts
         });
+        await setIngredientTags(newId, tagIds);
         toast('Ingredient added');
       }
     } else {
@@ -1253,7 +1482,11 @@
           for(const j of joins){
             await db.itemIngredients.update(j.id, { ingredientId: existing.id, updatedAt: ts });
           }
-          await db.ingredients.update(existing.id, { stockStatus, tag: tag || existing.tag || '', updatedAt: ts });
+          const existingTagLinks = await db.ingredientTags.where('ingredientId').equals(existing.id).toArray();
+          const mergedTagIds = new Set([...existingTagLinks.map(l => l.tagId), ...tagIds]);
+          await db.ingredients.update(existing.id, { stockStatus, updatedAt: ts });
+          await setIngredientTags(existing.id, Array.from(mergedTagIds));
+          await setIngredientTags(editingIngId, []);
           await db.ingredients.delete(editingIngId);
           closeIngModal();
           toast(`Merged into "${existing.name}"`);
@@ -1264,8 +1497,9 @@
       }
 
       await db.ingredients.update(editingIngId, {
-        name, nameKey: key, stockStatus, tag, updatedAt: ts
+        name, nameKey: key, stockStatus, updatedAt: ts
       });
+      await setIngredientTags(editingIngId, tagIds);
       toast('Ingredient updated');
     }
 
@@ -1283,6 +1517,7 @@
 
     openConfirm('Delete ingredient?', `"${ing.name}" will be removed. ${usageCount > 0 ? `It is used in ${usageCount} dish(es).` : ''}`, async () => {
       await db.itemIngredients.bulkDelete(joins.map(j => j.id));
+      await setIngredientTags(ingId, []);
       await db.ingredients.delete(ingId);
       toast(`Deleted "${ing.name}"`);
       updateHeaderBadge();
@@ -1672,7 +1907,8 @@
 
   /* ---------------- Render: Pantry Stock Tracker (Ingredients) tab ---------------- */
   async function renderIngredientsTab(container, openIngId){
-    const { items, ingredients, itemIngredients } = await getAllData();
+    const { items, ingredients, itemIngredients, tags, ingredientTags } = await getAllData();
+    const tagsByIngredient = buildTagsByIngredient(tags, ingredientTags);
     const itemsById = Object.fromEntries(items.map(i => [i.id, i]));
     const plannedDishes = items.filter(i => i.isPlanned);
     const plannedDishIds = new Set(plannedDishes.map(i => i.id));
@@ -1715,7 +1951,7 @@
           <div style="display:flex; align-items:center; gap:8px;">
             <span class="count-badge">${totalCount} total items</span>
           </div>
-          <button class="filter-pill ${groupByTag ? 'active' : ''}" id="toggleGroupTagBtn" style="font-size:12px; height:auto; padding:4px 10px; cursor:pointer;">🏷️ Group by Tag</button>
+          <button class="filter-pill" id="manageTagsBtn" style="font-size:12px; height:auto; padding:4px 10px; cursor:pointer;">Manage Tags</button>
         </div>
         <div class="filter-bar" style="margin:0 0 12px;">
           <button class="filter-pill ${pantryFilter==='all'?'active':''}" data-pfilter="all">All (${totalCount})</button>
@@ -1740,25 +1976,26 @@
           render();
         });
       });
-      const groupBtn = container.querySelector('#toggleGroupTagBtn');
-      if(groupBtn){ groupBtn.addEventListener('click', () => { groupByTag = !groupByTag; saveUIState(); render(); }); }
+      const manageBtn = container.querySelector('#manageTagsBtn');
+      if(manageBtn){ manageBtn.addEventListener('click', openTagsModal); }
       return;
     }
 
     function renderIngRow(ing){
       const stock = ing.stockStatus || 'out';
       const reqForPlan = plannedDemand[ing.id];
+      const ingTags = tagsByIngredient[ing.id] || [];
 
       const isExpanded = expandedIngRows.has(ing.id);
-      return `<div class="ing-row ${groupByTag ? 'is-draggable' : ''} ${isExpanded ? 'expanded' : ''}" data-ing-id="${ing.id}" ${groupByTag ? 'draggable="true"' : ''}>
+      return `<div class="ing-row is-draggable ${isExpanded ? 'expanded' : ''}" data-ing-id="${ing.id}" draggable="true">
         <div class="ing-row-top">
           <div class="ing-info" title="Click to see purchase history and status">
-            ${groupByTag ? `<span class="drag-handle" title="Drag to reorder tag">⋮⋮</span>` : ''}
+            <span class="drag-handle" title="Drag to reassign tag">⋮⋮</span>
             <span class="stock-dot ${stock}"></span>
             <div style="min-width: 0; flex: 1;">
               <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                 <span class="ing-name">${escapeHtml(ing.name)}</span>
-                ${ing.tag && !groupByTag ? `<span class="ing-tag-chip" style="font-size:10px; font-weight:600; padding:1px 6px; border-radius:10px; background:var(--bg-inset); border:1px solid var(--line); color:var(--chalk-dim);">🏷️ ${escapeHtml(ing.tag)}</span>` : ''}
+                ${ingTags.map(t => `<span class="tag-chip"><span class="dot" style="background:${t.color}"></span>${escapeHtml(t.label)}</span>`).join('')}
               </div>
               ${reqForPlan ? `<div class="needed-for-collapsed" style="font-size:11px; color:var(--accent); font-weight:600; margin-top:2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Needed for: ${escapeHtml(reqForPlan.map(d=>d.dishName).join(', '))}</div>` : ''}
             </div>
@@ -1804,44 +2041,49 @@
     }
 
     if(openIngId){
-      const targetIng = ingredients.find(i => i.id === openIngId);
-      if(targetIng){
-        const tName = targetIng.tag ? targetIng.tag.trim() : 'Untagged';
-        collapsedTags.delete(tName);
-      }
+      const openIngTags = tagsByIngredient[openIngId] || [];
+      if(openIngTags.length === 0) collapsedTags.delete('untagged');
+      else openIngTags.forEach(t => collapsedTags.delete(t.id));
     }
 
+    // A multi-tagged ingredient repeats under every tag group it belongs to.
     let itemsListHtml = '';
-    if(!groupByTag){
-      itemsListHtml = `<div class="ing-list">${list.map(renderIngRow).join('')}</div>`;
-    } else {
-      const groups = {};
-      list.forEach(ing => {
-        const t = ing.tag ? ing.tag.trim() : 'Untagged';
-        (groups[t] ||= []).push(ing);
-      });
+    const groups = {};
+    list.forEach(ing => {
+      const ingTags = tagsByIngredient[ing.id] || [];
+      if(ingTags.length === 0){
+        (groups['untagged'] ||= { tag: null, items: [] }).items.push(ing);
+      } else {
+        ingTags.forEach(tag => {
+          (groups[tag.id] ||= { tag, items: [] }).items.push(ing);
+        });
+      }
+    });
 
-      const sortedTagNames = Object.keys(groups).sort((a,b) => {
-        if(a === 'Untagged') return 1;
-        if(b === 'Untagged') return -1;
-        return a.localeCompare(b);
-      });
+    const sortedKeys = Object.keys(groups).sort((a,b) => {
+      if(a === 'untagged') return 1;
+      if(b === 'untagged') return -1;
+      return (groups[a].tag.order??0) - (groups[b].tag.order??0);
+    });
 
-      itemsListHtml = sortedTagNames.map(tagName => {
-        const itemsInGroup = groups[tagName];
-        const isCollapsed = collapsedTags.has(tagName);
-        return `<div class="tag-group ${isCollapsed ? 'collapsed' : ''}" data-tag="${escapeHtml(tagName)}" style="margin-bottom:14px;">
-          <div class="tag-group-title" data-tag-title="${escapeHtml(tagName)}" style="font-family:'Kalam', cursive; font-size:16px; font-weight:700; color:var(--chalk); margin:10px 0 8px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px dashed var(--line); padding-bottom:4px; cursor:pointer; user-select:none;">
+    itemsListHtml = sortedKeys.map(key => {
+      const { tag, items: itemsInGroup } = groups[key];
+      const isCollapsed = collapsedTags.has(key);
+      const label = tag ? tag.label : 'Untagged';
+      const iconHtml = tag
+        ? `<span class="dot" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${tag.color};"></span>`
+        : '🏷️';
+      return `<div class="tag-group ${isCollapsed ? 'collapsed' : ''}" data-tag-key="${key}" style="margin-bottom:14px;">
+          <div class="tag-group-title" data-tag-title="${key}" style="font-family:'Kalam', cursive; font-size:16px; font-weight:700; color:var(--chalk); margin:10px 0 8px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px dashed var(--line); padding-bottom:4px; cursor:pointer; user-select:none;">
             <div style="display:flex; align-items:center; gap:6px;">
               <span class="chevron" style="font-size:11px; font-family:'Work Sans',sans-serif; color:var(--chalk-faint); font-weight:600; width:12px; display:inline-block;">${isCollapsed ? '▶' : '▼'}</span>
-              <span>🏷️ ${escapeHtml(tagName)}</span>
+              <span style="display:inline-flex; align-items:center; gap:6px;">${iconHtml}${escapeHtml(label)}</span>
             </div>
             <span style="font-family:'Work Sans',sans-serif; font-size:11px; color:var(--chalk-faint); font-weight:600;">${itemsInGroup.length} ${itemsInGroup.length===1?'item':'items'}</span>
           </div>
           <div class="ing-list" style="${isCollapsed ? 'display:none;' : ''}">${itemsInGroup.map(renderIngRow).join('')}</div>
         </div>`;
-      }).join('');
-    }
+    }).join('');
 
     container.innerHTML = headerOpen + itemsListHtml + headerClose;
 
@@ -1853,14 +2095,8 @@
       });
     });
 
-    const groupBtn = container.querySelector('#toggleGroupTagBtn');
-    if(groupBtn){
-      groupBtn.addEventListener('click', () => {
-        groupByTag = !groupByTag;
-        saveUIState();
-        render();
-      });
-    }
+    const manageBtn = container.querySelector('#manageTagsBtn');
+    if(manageBtn){ manageBtn.addEventListener('click', openTagsModal); }
 
     container.querySelectorAll('.tag-group-title').forEach(title => {
       title.addEventListener('click', () => {
@@ -1898,51 +2134,56 @@
       }
     });
 
-    if(groupByTag){
-      container.querySelectorAll('.ing-row[draggable="true"]').forEach(row => {
-        row.addEventListener('dragstart', e => {
-          e.dataTransfer.setData('text/plain', row.dataset.ingId);
-          e.dataTransfer.effectAllowed = 'move';
-          row.classList.add('dragging');
-        });
-
-        row.addEventListener('dragend', () => {
-          row.classList.remove('dragging');
-          container.querySelectorAll('.tag-group').forEach(g => g.classList.remove('drag-over'));
-        });
+    container.querySelectorAll('.ing-row[draggable="true"]').forEach(row => {
+      row.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', row.dataset.ingId);
+        e.dataTransfer.effectAllowed = 'move';
+        row.classList.add('dragging');
       });
 
-      container.querySelectorAll('.tag-group').forEach(group => {
-        group.addEventListener('dragover', e => {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = 'move';
-          group.classList.add('drag-over');
-        });
+      row.addEventListener('dragend', () => {
+        row.classList.remove('dragging');
+        container.querySelectorAll('.tag-group').forEach(g => g.classList.remove('drag-over'));
+      });
+    });
 
-        group.addEventListener('dragleave', e => {
-          if(!group.contains(e.relatedTarget)){
-            group.classList.remove('drag-over');
-          }
-        });
+    container.querySelectorAll('.tag-group').forEach(group => {
+      group.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        group.classList.add('drag-over');
+      });
 
-        group.addEventListener('drop', async e => {
-          e.preventDefault();
+      group.addEventListener('dragleave', e => {
+        if(!group.contains(e.relatedTarget)){
           group.classList.remove('drag-over');
-          const ingId = e.dataTransfer.getData('text/plain');
-          if(!ingId) return;
-
-          const targetTag = group.dataset.tag === 'Untagged' ? '' : group.dataset.tag;
-          const ing = ingredients.find(i => i.id === ingId);
-
-          if(ing && (ing.tag || '') !== targetTag){
-            await db.ingredients.update(ingId, { tag: targetTag, updatedAt: nowISO() });
-            saveUIState();
-            toast(`Moved "${ing.name}" to ${targetTag || 'Untagged'}`);
-            render();
-          }
-        });
+        }
       });
-    }
+
+      group.addEventListener('drop', async e => {
+        e.preventDefault();
+        group.classList.remove('drag-over');
+        const ingId = e.dataTransfer.getData('text/plain');
+        if(!ingId) return;
+
+        const ing = ingredients.find(i => i.id === ingId);
+        if(!ing) return;
+        const key = group.dataset.tagKey;
+
+        if(key === 'untagged'){
+          if((tagsByIngredient[ingId]||[]).length === 0) return;
+          await setIngredientTags(ingId, []);
+          toast(`Cleared tags on "${ing.name}"`);
+        } else {
+          const currentIds = (tagsByIngredient[ingId] || []).map(t => t.id);
+          if(currentIds.includes(key)) return; // already has this tag
+          await setIngredientTags(ingId, [...currentIds, key]);
+          toast(`Added "${ing.name}" to ${groups[key].tag.label}`);
+        }
+        saveUIState();
+        render();
+      });
+    });
 
     if(openIngId){
       const target = container.querySelector(`.ing-row[data-ing-id="${openIngId}"]`);
@@ -1962,7 +2203,8 @@
 
   /* ---------------- Render: Grocery Tab ---------------- */
   async function renderGroceryTab(container){
-    const { items, ingredients, itemIngredients, customGrocery } = await getAllData();
+    const { items, ingredients, itemIngredients, customGrocery, tags, ingredientTags } = await getAllData();
+    const tagsByIngredient = buildTagsByIngredient(tags, ingredientTags);
     const itemsById = Object.fromEntries(items.map(i => [i.id, i]));
     const ingById = Object.fromEntries(ingredients.map(i => [i.id, i]));
 
@@ -2003,15 +2245,18 @@
 
     const totalToBuyCount = toBuyIngredients.length + activeCustomToBuy.length;
 
+    // Groups keyed by tag id (real tags), plus sentinels for the untagged and
+    // custom-item buckets. A multi-tagged ingredient repeats under every tag
+    // group it belongs to, same as the Pantry tab.
+    const UNTAGGED_KEY = '__untagged__';
+    const EXTRA_KEY = '__extra__';
     const groceryGroups = {};
 
     toBuyIngredients.forEach(item => {
-      const t = item.ing.tag ? item.ing.tag.trim() : 'Untagged';
       const dishNames = item.demandList.map(d => d.dishName).join(', ');
       const qtys = item.demandList.map(d => [d.qty, d.unit].filter(Boolean).join(' ')).filter(Boolean).join(' + ');
 
-      (groceryGroups[t] ||= []).push({
-        html: `<div class="buy-item-row" data-ing-id="${item.ing.id}">
+      const html = `<div class="buy-item-row" data-ing-id="${item.ing.id}">
           <div class="buy-item-left">
             <button class="buy-item-check mark-bought-btn" title="Mark as bought (adds to pantry stock)">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg>
@@ -2023,13 +2268,20 @@
               </div>
             </div>
           </div>
-        </div>`
-      });
+        </div>`;
+
+      const ingTags = tagsByIngredient[item.ing.id] || [];
+      if(ingTags.length === 0){
+        (groceryGroups[UNTAGGED_KEY] ||= { tag: null, label: 'Untagged', items: [] }).items.push({ html });
+      } else {
+        ingTags.forEach(tag => {
+          (groceryGroups[tag.id] ||= { tag, label: tag.label, items: [] }).items.push({ html });
+        });
+      }
     });
 
     activeCustomToBuy.forEach(g => {
-      const t = 'Extra Grocery Items';
-      (groceryGroups[t] ||= []).push({
+      (groceryGroups[EXTRA_KEY] ||= { tag: null, label: 'Extra Grocery Items', items: [] }).items.push({
         html: `<div class="buy-item-row" data-custom-id="${g.id}">
           <div class="buy-item-left">
             <button class="buy-item-check toggle-custom-btn" title="Toggle bought">
@@ -2045,25 +2297,28 @@
       });
     });
 
-    const sortedGroceryTags = Object.keys(groceryGroups).sort((a,b) => {
-      if(a === 'Extra Grocery Items') return 1;
-      if(b === 'Extra Grocery Items') return -1;
-      if(a === 'Untagged') return 1;
-      if(b === 'Untagged') return -1;
-      return a.localeCompare(b);
+    const sortedGroceryKeys = Object.keys(groceryGroups).sort((a,b) => {
+      if(a === EXTRA_KEY) return 1;
+      if(b === EXTRA_KEY) return -1;
+      if(a === UNTAGGED_KEY) return 1;
+      if(b === UNTAGGED_KEY) return -1;
+      return (groceryGroups[a].tag.order??0) - (groceryGroups[b].tag.order??0);
     });
 
     const shoppingListItemsHtml = totalToBuyCount === 0 ? `
       <div style="text-align:center; padding:14px; color:var(--sage); font-weight:600; font-size:14px;">
         🎉 All ingredients for your planned meals are currently in stock!
-      </div>` : sortedGroceryTags.map(tagName => {
-        const itemsInGroup = groceryGroups[tagName];
-        const isCollapsed = collapsedGroceryTags.has(tagName);
+      </div>` : sortedGroceryKeys.map(key => {
+        const { tag, label, items: itemsInGroup } = groceryGroups[key];
+        const isCollapsed = collapsedGroceryTags.has(key);
+        const iconHtml = tag
+          ? `<span class="dot" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${tag.color};"></span>`
+          : (key === EXTRA_KEY ? '🛒' : '🏷️');
         return `<div class="grocery-tag-group ${isCollapsed ? 'collapsed' : ''}" style="margin-bottom:14px;">
-          <div class="grocery-tag-title" data-grocery-tag="${escapeHtml(tagName)}" style="font-family:'Kalam', cursive; font-size:15px; font-weight:700; color:var(--chalk); margin:10px 0 6px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px dashed var(--line); padding-bottom:4px; cursor:pointer; user-select:none;">
+          <div class="grocery-tag-title" data-grocery-tag="${key}" style="font-family:'Kalam', cursive; font-size:15px; font-weight:700; color:var(--chalk); margin:10px 0 6px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px dashed var(--line); padding-bottom:4px; cursor:pointer; user-select:none;">
             <div style="display:flex; align-items:center; gap:6px;">
               <span class="chevron" style="font-size:11px; font-family:'Work Sans',sans-serif; color:var(--chalk-faint); font-weight:600; width:12px; display:inline-block;">${isCollapsed ? '▶' : '▼'}</span>
-              <span>🏷️ ${escapeHtml(tagName)}</span>
+              <span style="display:inline-flex; align-items:center; gap:6px;">${iconHtml}${escapeHtml(label)}</span>
             </div>
             <span style="font-family:'Work Sans',sans-serif; font-size:11px; color:var(--chalk-faint); font-weight:600;">${itemsInGroup.length} ${itemsInGroup.length===1?'item':'items'}</span>
           </div>
@@ -2205,7 +2460,6 @@
       currentTab,
       dishFilter,
       pantryFilter,
-      groupByTag,
       expandedDishRows: Array.from(expandedDishRows),
       expandedIngRows: Array.from(expandedIngRows),
       collapsedTags: Array.from(collapsedTags),
@@ -2223,7 +2477,6 @@
       if(s.currentTab) currentTab = s.currentTab;
       if(s.dishFilter) dishFilter = s.dishFilter;
       if(s.pantryFilter) pantryFilter = s.pantryFilter;
-      if(typeof s.groupByTag === 'boolean') groupByTag = s.groupByTag;
       if(Array.isArray(s.expandedDishRows)){ expandedDishRows.clear(); s.expandedDishRows.forEach(id => expandedDishRows.add(id)); }
       if(Array.isArray(s.expandedIngRows)){ expandedIngRows.clear(); s.expandedIngRows.forEach(id => expandedIngRows.add(id)); }
       if(Array.isArray(s.collapsedTags)){ collapsedTags.clear(); s.collapsedTags.forEach(t => collapsedTags.add(t)); }
@@ -2238,12 +2491,14 @@
     const data = await getAllData();
     const payload = {
       app: 'food',
-      version: 2,
+      version: 3,
       exportedAt: nowISO(),
       items: data.items,
       ingredients: data.ingredients,
       itemIngredients: data.itemIngredients,
-      customGrocery: data.customGrocery
+      customGrocery: data.customGrocery,
+      tags: data.tags,
+      ingredientTags: data.ingredientTags
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -2267,6 +2522,8 @@
       const ingredients = Array.isArray(data.ingredients) ? data.ingredients : [];
       const itemIngredients = Array.isArray(data.itemIngredients) ? data.itemIngredients : [];
       const customGrocery = Array.isArray(data.customGrocery) ? data.customGrocery : [];
+      const importedTags = Array.isArray(data.tags) ? data.tags : [];
+      const importedIngredientTags = Array.isArray(data.ingredientTags) ? data.ingredientTags : [];
 
       const cleanItems = items.filter(i => i && i.id && i.name).map(i => ({
         id: i.id, name: i.name, type: i.type === 'snack' ? 'snack' : 'dish',
@@ -2277,7 +2534,6 @@
       const cleanIngredients = ingredients.filter(i => i && i.id && i.name).map(i => ({
         id: i.id, name: i.name, nameKey: i.nameKey || normalize(i.name),
         stockStatus: i.stockStatus || 'out',
-        tag: i.tag || '',
         createdAt: i.createdAt || nowISO(), updatedAt: i.updatedAt || nowISO()
       }));
       const cleanJoins = itemIngredients.filter(j => j && j.id && j.itemId && j.ingredientId).map(j => ({
@@ -2289,18 +2545,62 @@
         id: g.id, name: g.name, bought: !!g.bought, updatedAt: g.updatedAt || nowISO()
       }));
 
+      // Tags: dedupe against locally-existing tags by label (case-insensitive),
+      // remapping imported tag ids onto the local ones where they collide.
+      await loadTags();
+      const localTagIdByLabel = Object.fromEntries(_tags.map(t => [t.label.toLowerCase(), t.id]));
+      const tagIdRemap = {};
+      const cleanTags = [];
+      importedTags.filter(t => t && t.id && t.label).forEach(t => {
+        const key = t.label.toLowerCase();
+        const localId = localTagIdByLabel[key];
+        if(localId){
+          tagIdRemap[t.id] = localId;
+        } else {
+          const color = t.color || TAG_PALETTE[(_tags.length + cleanTags.length) % TAG_PALETTE.length];
+          cleanTags.push({ id: t.id, label: t.label, color, order: t.order ?? _tags.length + cleanTags.length });
+          localTagIdByLabel[key] = t.id;
+        }
+      });
+
+      let cleanIngredientTags = importedIngredientTags
+        .filter(l => l && l.id && l.ingredientId && l.tagId)
+        .map(l => ({ id: l.id, ingredientId: l.ingredientId, tagId: tagIdRemap[l.tagId] || l.tagId }));
+
+      // Legacy export format (pre-tags-table): ingredients carried a single free-text
+      // `tag` string. Convert it into a tag + join row so old export files still work.
+      if(importedTags.length === 0){
+        for(const ing of ingredients){
+          const raw = (ing && ing.tag || '').trim();
+          if(!raw || !ing.id) continue;
+          const key = raw.toLowerCase();
+          let tagId = localTagIdByLabel[key];
+          if(!tagId){
+            tagId = 'tag-'+uuid();
+            localTagIdByLabel[key] = tagId;
+            const color = TAG_PALETTE[(_tags.length + cleanTags.length) % TAG_PALETTE.length];
+            cleanTags.push({ id: tagId, label: raw, color, order: _tags.length + cleanTags.length });
+          }
+          cleanIngredientTags.push({ id: uuid(), ingredientId: ing.id, tagId });
+        }
+      }
+
       for(const ing of cleanIngredients){
         const existingByKey = await db.ingredients.where('nameKey').equals(ing.nameKey).first();
         if(existingByKey && existingByKey.id !== ing.id){
           cleanJoins.forEach(j => { if(j.ingredientId === ing.id) j.ingredientId = existingByKey.id; });
+          cleanIngredientTags.forEach(l => { if(l.ingredientId === ing.id) l.ingredientId = existingByKey.id; });
           continue;
         }
         await db.ingredients.put(ing);
       }
       await db.items.bulkPut(cleanItems);
       await db.itemIngredients.bulkPut(cleanJoins);
+      if(cleanTags.length > 0) await db.tags.bulkPut(cleanTags);
+      if(cleanIngredientTags.length > 0) await db.ingredientTags.bulkPut(cleanIngredientTags);
       if(db.customGrocery && cleanCustom.length > 0) await db.customGrocery.bulkPut(cleanCustom);
 
+      await loadTags();
       toast(`Imported ${cleanItems.length} dish(es), ${cleanIngredients.length} ingredient(s)`);
       closeIo();
       updateHeaderBadge();
@@ -2313,6 +2613,26 @@
 
   function openIo(){ document.getElementById('ioOverlay').classList.add('show'); }
   function closeIo(){ document.getElementById('ioOverlay').classList.remove('show'); }
+
+  async function clearAllData(){
+    closeIo();
+    openConfirm('Clear all data?', 'This permanently deletes every dish, ingredient, tag, purchase history entry, and grocery item. Export a backup first if you want to keep anything.', async () => {
+      await Promise.all([
+        db.items.clear(),
+        db.ingredients.clear(),
+        db.itemIngredients.clear(),
+        db.customGrocery.clear(),
+        db.purchaseHistory.clear(),
+        db.tags.clear(),
+        db.ingredientTags.clear()
+      ]);
+      localStorage.removeItem('larderUIState');
+      await loadTags();
+      toast('All data cleared');
+      updateHeaderBadge();
+      render();
+    });
+  }
 
   /* ---------------- Wire up events ---------------- */
   document.getElementById('tabDishes').addEventListener('click', () => { currentTab='dishes'; saveUIState(); updateTabUI(); render(); });
@@ -2349,6 +2669,21 @@
   document.querySelectorAll('#ingStockSegmented button').forEach(b => {
     b.addEventListener('click', () => setIngStockSegmented(b.dataset.status));
   });
+  document.getElementById('manageTagsFromIngBtn').addEventListener('click', openTagsModal);
+
+  document.getElementById('addTagBtn').addEventListener('click', async () => {
+    const nameInput = document.getElementById('newTagName');
+    const colorInput = document.getElementById('newTagColor');
+    const tag = await addTag(nameInput.value, colorInput.value);
+    if(tag){
+      nameInput.value = '';
+      colorInput.value = nextTagColor();
+      renderTagsModal();
+      if(document.getElementById('ingOverlay').classList.contains('show')) renderIngTagPicker();
+      render();
+    }
+  });
+  document.getElementById('closeTagsBtn').addEventListener('click', closeTagsModal);
 
   document.getElementById('confirmCancelBtn').addEventListener('click', closeConfirm);
   document.getElementById('confirmOkBtn').addEventListener('click', () => { const fn = confirmAction; closeConfirm(); if(fn) fn(); });
@@ -2360,19 +2695,21 @@
   document.getElementById('closeIoBtn').addEventListener('click', closeIo);
   document.getElementById('exportBtn').addEventListener('click', exportData);
   document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
+  document.getElementById('clearDataBtn').addEventListener('click', clearAllData);
   document.getElementById('importFile').addEventListener('change', e => {
     const file = e.target.files[0];
     if(file) importData(file);
     e.target.value = '';
   });
 
-  [document.getElementById('dishOverlay'), document.getElementById('ingOverlay'), document.getElementById('confirmOverlay'), document.getElementById('ioOverlay'), document.getElementById('purchaseOverlay')].forEach(ov => {
+  [document.getElementById('dishOverlay'), document.getElementById('ingOverlay'), document.getElementById('confirmOverlay'), document.getElementById('ioOverlay'), document.getElementById('purchaseOverlay'), document.getElementById('tagsOverlay')].forEach(ov => {
     ov.addEventListener('click', e => { if(e.target === ov){ ov.classList.remove('show'); } });
   });
 
   /* ---------------- Init ---------------- */
   loadUIState();
   updateTabUI();
+  loadTags();
   updateHeaderBadge();
   render();
 })();
