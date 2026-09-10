@@ -221,6 +221,10 @@ main{max-width:940px;margin:0 auto;padding:20px 16px}
       <span>Total</span>
       <span id="allocTotalPct">0%</span>
     </div>
+    <label id="propagateRow" style="display:none; align-items:center; gap:6px; margin-top:12px; font-size:11px; color:var(--text-muted); cursor:pointer;">
+      <input type="checkbox" id="propagateToggle" style="width:13px;height:13px">
+      Propagate locked categories to Week &amp; Month (same %, re-locked there)
+    </label>
     <div class="modal-actions">
       <button class="btn" onclick="cancelAllocation()">Cancel</button>
       <button class="btn btn-primary" onclick="saveAllocation()">Save</button>
@@ -443,6 +447,9 @@ function openAllocationModal(role) {
   _locked = loadLocked(role, _period);
   document.getElementById('allocModalTitle').textContent =
     `${role === 'current' ? 'Current' : 'Target'} Allocation — ${PERIOD_LABELS[_period]} (%)`;
+  const propagateRow = document.getElementById('propagateRow');
+  propagateRow.style.display = _period === 'day' ? 'flex' : 'none';
+  document.getElementById('propagateToggle').checked = false;
   renderAllocInputs();
   openModal('allocModal');
 }
@@ -560,8 +567,51 @@ function saveAllocation() {
     _alloc[ids[ids.length-1]] = Math.round((_alloc[ids[ids.length-1]] + (100 - sum)) * 10) / 10;
   }
   saveAllocData(_allocRole, _period, _alloc);
+  saveLocked(_allocRole, _period, _locked);
+
+  if (_period === 'day' && document.getElementById('propagateToggle').checked) {
+    propagateLockedToOtherPeriods(_allocRole, _alloc, _locked);
+  }
+
   closeModal('allocModal');
   renderCharts();
+}
+
+// A category held at a consistent N% of a day is also N% of a week or month
+// (both scale by the same day-count, so the percentage doesn't move) --
+// propagating just copies the locked day % as-is into week/month and
+// re-locks it there, then redistributes the unlocked remainder in each.
+function propagateLockedToOtherPeriods(role, dayAlloc, dayLocked) {
+  const ids = _categories.map(c => c.id);
+  const lockedIds = ids.filter(id => dayLocked[id]);
+  if (!lockedIds.length) { toast('No locked categories in Day to propagate.', true); return; }
+
+  ['week', 'month'].forEach(period => {
+    const alloc = loadAlloc(role, period);
+    const locked = loadLocked(role, period);
+    lockedIds.forEach(id => { alloc[id] = dayAlloc[id]; locked[id] = true; });
+    redistributeUnlocked(alloc, locked, ids);
+    saveAllocData(role, period, alloc);
+    saveLocked(role, period, locked);
+  });
+
+  toast('Propagated locked categories to Week & Month.');
+}
+
+// Rescales every unlocked id in `alloc` so the whole set sums to 100 again,
+// leaving locked ids untouched -- proportional to their existing values, or
+// split evenly if the unlocked set is currently all zero.
+function redistributeUnlocked(alloc, locked, ids) {
+  const unlockedIds = ids.filter(id => !locked[id]);
+  if (!unlockedIds.length) return; // fully locked; nothing left to redistribute into
+  const lockedSum = ids.filter(id => locked[id]).reduce((s,id) => s + (alloc[id]||0), 0);
+  const remaining = Math.max(0, 100 - lockedSum);
+  const unlockedSum = unlockedIds.reduce((s,id) => s + (alloc[id]||0), 0);
+  if (unlockedSum > 0) {
+    unlockedIds.forEach(id => { alloc[id] = (alloc[id]||0) / unlockedSum * remaining; });
+  } else {
+    unlockedIds.forEach(id => { alloc[id] = remaining / unlockedIds.length; });
+  }
 }
 
 function cancelAllocation() {
