@@ -10,7 +10,7 @@ const indexPath = path.join(root, 'index.html');
 function getRootHtmlFiles() {
   return fs
     .readdirSync(root, { withFileTypes: true })
-    .filter(entry => entry.isFile() && entry.name.endsWith('.html') && entry.name !== 'index.html' && entry.name !== 'archive.html' && entry.name !== 'seldom.html')
+    .filter(entry => entry.isFile() && entry.name.endsWith('.html') && entry.name !== 'index.html' && entry.name !== 'archive.html' && entry.name !== 'seldom.html' && entry.name !== 'offline.html')
     .map(entry => entry.name)
     .sort((a, b) => a.localeCompare(b));
 }
@@ -130,9 +130,13 @@ function updateHtmlFile(file) {
   }
 }
 
-function updateServiceWorker(htmlFiles) {
+// Only the launcher shell is precached; every other page is runtime-cached
+// on first open. See the APP_SHELL comment in sw.js.
+const PRECACHED_PAGES = ['index.html', 'archive.html', 'seldom.html'];
+
+function updateServiceWorker() {
   const sw = fs.readFileSync(swPath, 'utf8');
-  const generatedBlock = htmlFiles
+  const generatedBlock = PRECACHED_PAGES
     .map(file => `  './${file}',`)
     .join('\n');
   const markerPattern = /(\s*\/\/ BEGIN GENERATED HTML PAGES\n)[\s\S]*?(\n\s*\/\/ END GENERATED HTML PAGES)/;
@@ -249,7 +253,7 @@ function main() {
     }
   });
 
-  updateServiceWorker(['index.html', 'archive.html', 'seldom.html', ...allFiles]);
+  updateServiceWorker();
   updateLaunchers(rootFiles, archiveFiles, seldomFiles);
 
   console.log('\nRegistered HTML pages:');

@@ -1,42 +1,15 @@
-const CACHE_NAME = 'imago-shell-v10';
+const CACHE_NAME = 'imago-shell-v11';
+// Only the launcher shell is precached. Every other page is cached the
+// first time it's opened online (see the fetch handler's runtime cache),
+// so an install stays small no matter how many prototypes pile up here.
 const APP_SHELL = [
   './',
   // BEGIN GENERATED HTML PAGES
   './index.html',
   './archive.html',
   './seldom.html',
-  './expenses.html',
-  './food-v2.html',
-  './invest-asset-comparison.html',
-  './invest-conviction-statement.html',
-  './invest-etf-comparison.html',
-  './invest-risk-matrix.html',
-  './invest.html',
-  './journal.html',
-  './notes.html',
-  './performance.html',
-  './savings.html',
-  './scratchspace.html',
-  './time.html',
-  './archive/architect.html',
-  './archive/commonplace.html',
-  './archive/day.html',
-  './archive/filling-up.html',
-  './archive/food.html',
-  './archive/journal.html',
-  './archive/mobile-database.html',
-  './archive/pollination.html',
-  './archive/story.html',
-  './archive/storygraph.html',
-  './archive/tablevault.html',
-  './archive/thoughtgraph.html',
-  './archive/thoughtweb.html',
-  './seldom/4d-playground.html',
-  './seldom/cebpac-flight-finder.html',
-  './seldom/meralco-multi-account.html',
-  './seldom/time.html',
-  './seldom/ulam-spiral.html',
   // END GENERATED HTML PAGES
+  './offline.html',
   './scripts/dexie.min.js',
   './scripts/finance-charts.js',
   './imago-export.js',
@@ -107,7 +80,9 @@ self.addEventListener('fetch', event => {
       .catch(async () => {
         const cached = await caches.match(request);
         if (cached) return cached;
-        if (request.mode === 'navigate') return caches.match('./index.html');
+        if (request.mode === 'navigate') {
+          return (await caches.match('./offline.html')) || caches.match('./index.html');
+        }
         return Response.error();
       })
   );
