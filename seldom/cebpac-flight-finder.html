@@ -14,8 +14,18 @@
     margin:0; padding:24px; background:var(--bg); color:var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
-  h1{font-size:20px; margin:0 0 4px;}
-  p.sub{color:var(--muted); margin:0 0 20px; font-size:13px;}
+  h1{font-size:20px; margin:0;}
+  .topbar{display:flex; align-items:center; justify-content:space-between; gap:16px; max-width:1100px; margin:0 auto;}
+  .bookmarklet-row{display:flex; gap:8px; flex-wrap:wrap; max-width:1100px; margin:10px auto 20px;}
+  .mode-tabs{display:flex; gap:8px; max-width:1100px; margin:0 auto; border-bottom:1px solid var(--border);}
+  .mode-tab{
+    background:none; color:var(--muted); border:none; border-bottom:2px solid transparent;
+    border-radius:0; padding:8px 4px; font-weight:600; font-size:14px; cursor:pointer; margin-bottom:-1px;
+  }
+  .mode-tab.active{color:var(--accent); border-bottom-color:var(--accent);}
+  .mode-tab:hover{filter:none; color:var(--accent);}
+  .mode-toolbar{max-width:1100px; margin:16px auto 0; display:flex; justify-content:flex-end; gap:8px;}
+  p.sub{color:var(--muted); margin:16px 0 20px; font-size:13px;}
   .layout{display:grid; grid-template-columns: 1fr 1fr; gap:16px; max-width:1100px; margin:0 auto;}
   @media (max-width:800px){.layout{grid-template-columns:1fr;}}
   .card{background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px;}
@@ -26,7 +36,7 @@
   }
   .config{max-width:1100px; margin:16px auto; display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;}
   .field{display:flex; flex-direction:column; gap:6px;}
-  input[type=number], input[type=text]{
+  input[type=number], input[type=text], select{
     background:var(--panel2); color:var(--text); border:1px solid var(--border);
     border-radius:8px; padding:8px 10px; font-size:14px; width:140px;
   }
@@ -35,11 +45,15 @@
     padding:10px 20px; font-weight:600; font-size:14px; cursor:pointer;
   }
   button:hover{filter:brightness(1.08);}
-  #error{max-width:1100px; margin:12px auto; color:#ff6b6b; font-size:13px; white-space:pre-wrap;}
-  #results{max-width:1100px; margin:24px auto;}
+  #error, #availError{max-width:1100px; margin:12px auto; color:#ff6b6b; font-size:13px; white-space:pre-wrap;}
+  #importStatus, #availImportStatus{max-width:1100px; margin:12px auto; color:var(--good); font-size:13px; white-space:pre-wrap;}
+  #results, #availResults{max-width:1100px; margin:24px auto;}
   .tier{margin-bottom:24px;}
-  .tier-title{font-size:14px; font-weight:700; margin-bottom:8px; display:flex; align-items:center; gap:8px;}
+  .tier-title{font-size:14px; font-weight:700; margin-bottom:8px; display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none;}
   .tier-dot{width:10px; height:10px; border-radius:50%;}
+  .tier-toggle{margin-left:auto; color:var(--muted); font-size:11px; transition:transform .15s;}
+  .tier.collapsed .tier-toggle{transform:rotate(-90deg);}
+  .tier.collapsed table{display:none;}
   table{width:100%; border-collapse:collapse; background:var(--panel); border:1px solid var(--border); border-radius:8px; overflow:hidden;}
   th, td{padding:10px 12px; text-align:left; font-size:13px; border-bottom:1px solid var(--border);}
   th{background:var(--panel2); color:var(--muted); font-weight:600; text-transform:uppercase; font-size:11px; letter-spacing:.03em;}
@@ -50,14 +64,15 @@
 
   @media print{
     body{padding:0; background:#fff;}
-    h1, p.sub, .layout, .config, #error{display:none;}
-    #results{margin:0; max-width:none;}
+    .topbar, .bookmarklet-row, .mode-tabs, .mode-toolbar, p.sub, .layout, .config,
+    #error, #importStatus, #availError, #availImportStatus{display:none;}
+    #results, #availResults{margin:0; max-width:none;}
     table{border:1px solid #ccc;}
     th, td{border-bottom:1px solid #ccc;}
   }
 
   .bookmarklet-btn{
-    display:inline-block; vertical-align:middle; margin-left:10px;
+    display:inline-block;
     background:var(--accent); color:#fff; text-decoration:none;
     font-size:11px; font-weight:600; padding:4px 10px; border-radius:999px;
     cursor:grab; user-select:none;
@@ -75,46 +90,111 @@
 </head>
 <body>
 
-<h1>Cheapest Flight Finder - CebPac<a id="cebpac-bookmarklet" class="bookmarklet-btn" href="javascript:void(0)" draggable="true" title="Drag this to your bookmarks bar. Then, while browsing fares on the airline site, click it to start capturing real seat availability.">Availability</a><a id="cebpac-bookmarklet-fq" class="bookmarklet-btn" href="javascript:void(0)" draggable="true" title="Drag this to your bookmarks bar. Click it once both fare cache directions have loaded to get a queue of cheapest date combinations to check.">Queue</a></h1>
-<p class="sub">Paste the two fare JSON blobs (route keys like "DGTMNL|PHP"), set your trip preferences, and find the cheapest valid combinations.</p>
-
-<div class="layout">
-  <div class="card">
-    <label>Fare data — paste JSON blob 1</label>
-    <textarea id="json1" placeholder='{"DGTMNL|PHP": {"2026-08-09T00:00:00": "9.4K", ...}}'></textarea>
-  </div>
-  <div class="card">
-    <label>Fare data — paste JSON blob 2</label>
-    <textarea id="json2" placeholder='{"MNLDGT|PHP": {"2026-08-10T00:00:00": "3K", ...}}'></textarea>
-  </div>
+<div class="topbar">
+  <h1>Cheapest Flight Finder - CebPac</h1>
+</div>
+<div class="bookmarklet-row">
+  <a id="cebpac-bookmarklet" class="bookmarklet-btn" href="javascript:void(0)" draggable="true" title="Drag this to your bookmarks bar. Click it to start capturing availability/ responses (fares under ₱6,000 only) as you browse, then use its Copy button.">Availability</a>
+  <a id="cebpac-bookmarklet-scraper" class="bookmarklet-btn" href="javascript:void(0)" draggable="true" title="Drag this to your bookmarks bar. Click it to start capturing farecache/ responses (dates under ₱600 only) as you browse, then use its Copy button and paste into Import scraped data below.">Overview</a>
 </div>
 
-<div class="config">
-  <div class="field">
-    <label>Source (3-letter code)</label>
-    <input type="text" id="source" maxlength="3" placeholder="e.g. MNL" value="MNL">
-  </div>
-  <div class="field">
-    <label>Min days away</label>
-    <input type="number" id="minDays" value="2" min="0">
-  </div>
-  <div class="field">
-    <label>Max days away</label>
-    <input type="number" id="maxDays" value="7" min="0">
-  </div>
-  <div class="field">
-    <button onclick="run()">Find cheapest flights</button>
-  </div>
+<div class="mode-tabs">
+  <button type="button" class="mode-tab" data-mode="fare" onclick="switchMode('fare')">Fare Search</button>
+  <button type="button" class="mode-tab" data-mode="availability" onclick="switchMode('availability')">Availability Details</button>
 </div>
 
-<div id="error"></div>
-<div id="results"></div>
+<div id="fareSearchMode">
+  <p class="sub">Paste the two fare JSON blobs (route keys like "DGTMNL|PHP"), set your trip preferences, and find the cheapest valid combinations.</p>
+
+  <div class="mode-toolbar">
+    <button onclick="importScrapedData()" title="Paste the JSON array copied from the Scraper bookmarklet">Import scraped data</button>
+  </div>
+
+  <div class="layout">
+    <div class="card">
+      <label>Fare data — paste JSON blob 1</label>
+      <textarea id="json1" placeholder='{"DGTMNL|PHP": {"2026-08-09T00:00:00": "9.4K", ...}}'></textarea>
+    </div>
+    <div class="card">
+      <label>Fare data — paste JSON blob 2</label>
+      <textarea id="json2" placeholder='{"MNLDGT|PHP": {"2026-08-10T00:00:00": "3K", ...}}'></textarea>
+    </div>
+  </div>
+
+  <div class="config">
+    <div class="field">
+      <label>Source (3-letter code)</label>
+      <input type="text" id="source" maxlength="3" placeholder="e.g. MNL" value="MNL">
+    </div>
+    <div class="field">
+      <label>Destination</label>
+      <select id="destSelect"><option value="">— choose —</option></select>
+    </div>
+    <div class="field">
+      <label>Min days away</label>
+      <input type="number" id="minDays" value="2" min="0">
+    </div>
+    <div class="field">
+      <label>Max days away</label>
+      <input type="number" id="maxDays" value="7" min="0">
+    </div>
+    <div class="field">
+      <button onclick="run()">Find cheapest flights</button>
+    </div>
+  </div>
+
+  <div id="error"></div>
+  <div id="importStatus"></div>
+  <div id="results"></div>
+</div>
+
+<div id="availabilityMode" hidden>
+  <p class="sub">Import captured availability/ responses (actual flights with live seat counts, fares under ₱6,000) and find round-trip combinations that fit your group.</p>
+
+  <div class="mode-toolbar">
+    <button onclick="importAvailabilityData()" title="Paste the JSON object copied from the Availability bookmarklet">Import availability data</button>
+    <button onclick="exportAvailabilityData()" title="Download the captured availability data as a JSON file">Export availability data</button>
+    <button onclick="clearEstimateAvailability()" title="Remove old day-level estimate data, keeping real captured flights">Clear estimates</button>
+  </div>
+
+  <div class="config">
+    <div class="field">
+      <label>Source (3-letter code)</label>
+      <input type="text" id="availSource" maxlength="3" placeholder="e.g. MNL" value="MNL">
+    </div>
+    <div class="field">
+      <label>Destination</label>
+      <select id="availDestSelect"><option value="">— choose —</option></select>
+    </div>
+    <div class="field">
+      <label>Travelers</label>
+      <input type="number" id="availPeople" min="1" placeholder="e.g. 4">
+    </div>
+    <div class="field">
+      <label>Min days away</label>
+      <input type="number" id="availMinDays" value="2" min="0">
+    </div>
+    <div class="field">
+      <label>Max days away</label>
+      <input type="number" id="availMaxDays" value="7" min="0">
+    </div>
+    <div class="field">
+      <label>Max gap (hours)</label>
+      <input type="number" id="availMaxGapHours" min="0" value="24">
+    </div>
+  </div>
+
+  <div id="availError"></div>
+  <div id="availImportStatus"></div>
+  <div id="availResults"></div>
+</div>
 
 <script>
-function cebpacBookmarkletPayload(){
-  var PANEL_ID = 'cebpac-cap-panel-e1a9';
-  var STYLE_ID = 'cebpac-cap-style-e1a9';
-  var STORAGE_KEY = 'cebpac_availability_capture_v1';
+function cebpacAvailabilityScraperPayload(){
+  var PANEL_ID = 'cebpac-avs-panel-e1a9';
+  var STYLE_ID = 'cebpac-avs-style-e1a9';
+  var STORAGE_KEY = 'cebpac_availability_scraper_v1';
+  var MAX_FARE = 6000;
 
   function loadData(){
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
@@ -125,55 +205,97 @@ function cebpacBookmarkletPayload(){
   }
   function dateOnly(s){ return String(s || '').slice(0, 10); }
 
-  var reqSeq = 0;
+  var seq = 0;
 
-  function ingest(data, seq){
+  // Each route in an availability/ response carries two different things:
+  // `lowFares` is a ~7-day calendar strip around the searched date, one
+  // row per day (no flight time, no fare class -- just that day's cheapest
+  // fare + seats). `journeys` is the real flight list for the ONE date that
+  // was actually searched: actual departure times, fare classes, and each
+  // flight's own seat count -- often several distinct flights per date.
+  // Real journeys are ground truth, so they're kept keyed by the airline's
+  // own per-flight journeyKey (never collide, never overwrite each other),
+  // and any coarse lowFares entry for a date that now has real data gets
+  // dropped so the two don't both show up as if they were separate options.
+  function ingest(data, s){
     if(!data || !Array.isArray(data.routes)) return;
     var store = loadData();
+    store.routes = store.routes || {};
     var currency = data.currencyCode || '';
     data.routes.forEach(function(route){
+      var origin = route.origin, destination = route.destination;
+      if(!origin || !destination) return;
+      var routeKey = origin + destination;
+      var routeEntry = store.routes[routeKey] || { origin: origin, destination: destination, currency: currency, journeys: {} };
+      routeEntry.currency = currency;
+      routeEntry.journeys = routeEntry.journeys || {};
+
+      var preciseDates = {};
+      (route.journeys || []).forEach(function(j){
+        if(j.fareTotal == null || j.fareTotal >= MAX_FARE) return;
+        if(!j.journeyKey || !j.designator || !j.designator.departure) return;
+        var d = dateOnly(j.designator.departure);
+        preciseDates[d] = true;
+        var journeyKey = routeKey + '|' + j.journeyKey;
+        var existing = routeEntry.journeys[journeyKey];
+        if(existing && existing.seq != null && s != null && s < existing.seq) return;
+        var segments = Array.isArray(j.segments) ? j.segments : [];
+        var flightNumbers = segments.map(function(seg){
+          var id = seg.identifier || {};
+          return (id.carrierCode || '') + (id.identifier || '');
+        }).join('/');
+        routeEntry.journeys[journeyKey] = {
+          journeyKey: journeyKey,
+          origin: origin,
+          destination: destination,
+          departureDate: j.designator.departure,
+          fareClass: j.fareClass || null,
+          fareTotal: j.fareTotal,
+          availableCount: j.availableCount,
+          stops: segments.length ? segments.length - 1 : null,
+          flightNumbers: flightNumbers || null,
+          currency: currency,
+          capturedAt: Date.now(),
+          seq: s
+        };
+      });
+      // A date that just got precise entries above may still be holding an
+      // old coarse (date-only-keyed) entry from an earlier capture -- clear
+      // it so the two don't both linger.
+      Object.keys(preciseDates).forEach(function(d){
+        delete routeEntry.journeys[routeKey + '|' + d];
+      });
+
       var fares = route.lowFares || [];
-      var seenDates = {};
       fares.forEach(function(lf){
-        if(lf.fareTotal == null) return;
+        if(lf.fareTotal == null || lf.fareTotal >= MAX_FARE) return;
         var d = dateOnly(lf.departureDate);
-        seenDates[d] = true;
-        var key = route.origin + '|' + route.destination + '|' + d;
-        var existing = store[key];
-        if(existing && existing.seq != null && seq != null && seq < existing.seq) return;
-        store[key] = {
-          origin: route.origin,
-          destination: route.destination,
+        // date already has a real flight from above -- skip the coarse one
+        if(preciseDates[d]) return;
+        var journeyKey = routeKey + '|' + d;
+        var existing = routeEntry.journeys[journeyKey];
+        if(existing && existing.seq != null && s != null && s < existing.seq) return;
+        routeEntry.journeys[journeyKey] = {
+          journeyKey: journeyKey,
+          origin: origin,
+          destination: destination,
           departureDate: lf.departureDate,
           fareTotal: lf.fareTotal,
           availableCount: lf.availableCount,
           currency: currency,
           capturedAt: Date.now(),
-          seq: seq
+          seq: s
         };
       });
-
-      var seenDays = Object.keys(seenDates);
-      if(seenDays.length){
-        var minD = seenDays.reduce(function(a, b){ return a < b ? a : b; });
-        var maxD = seenDays.reduce(function(a, b){ return a > b ? a : b; });
-        Object.keys(store).forEach(function(key){
-          var entry = store[key];
-          if(entry.origin !== route.origin || entry.destination !== route.destination) return;
-          var d = dateOnly(entry.departureDate);
-          if(d < minD || d > maxD || seenDates[d]) return;
-          if(entry.seq != null && seq != null && seq < entry.seq) return;
-          delete store[key];
-        });
-      }
+      store.routes[routeKey] = routeEntry;
     });
     saveData(store);
     renderPanel();
   }
 
   function patchNetwork(){
-    if(window.__cebpacCapPatched) return;
-    window.__cebpacCapPatched = true;
+    if(window.__cebpacAvsPatched) return;
+    window.__cebpacAvsPatched = true;
 
     var origFetch = window.fetch;
     if(origFetch){
@@ -181,11 +303,11 @@ function cebpacBookmarkletPayload(){
         var args = arguments;
         var urlArg = args[0];
         var url = (urlArg && urlArg.url) ? urlArg.url : urlArg;
-        var seq = ++reqSeq;
+        var s = ++seq;
         return origFetch.apply(this, args).then(function(res){
           try{
             if(typeof url === 'string' && url.indexOf('availability') !== -1){
-              res.clone().json().then(function(data){ ingest(data, seq); }).catch(function(){});
+              res.clone().json().then(function(data){ ingest(data, s); }).catch(function(){});
             }
           }catch(e){}
           return res;
@@ -196,16 +318,16 @@ function cebpacBookmarkletPayload(){
     var origOpen = XMLHttpRequest.prototype.open;
     var origSend = XMLHttpRequest.prototype.send;
     XMLHttpRequest.prototype.open = function(method, url){
-      this.__cebpacUrl = url;
-      this.__cebpacSeq = ++reqSeq;
+      this.__cebpacAvsUrl = url;
+      this.__cebpacAvsSeq = ++seq;
       return origOpen.apply(this, arguments);
     };
     XMLHttpRequest.prototype.send = function(){
       var xhr = this;
       xhr.addEventListener('load', function(){
         try{
-          if(xhr.__cebpacUrl && String(xhr.__cebpacUrl).indexOf('availability') !== -1){
-            ingest(JSON.parse(xhr.responseText), xhr.__cebpacSeq);
+          if(xhr.__cebpacAvsUrl && String(xhr.__cebpacAvsUrl).indexOf('availability') !== -1){
+            ingest(JSON.parse(xhr.responseText), xhr.__cebpacAvsSeq);
           }
         }catch(e){}
       });
@@ -218,428 +340,23 @@ function cebpacBookmarkletPayload(){
     var style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent =
-      '#' + PANEL_ID + '{position:fixed;top:12px;right:12px;width:560px;max-height:80vh;' +
+      '#' + PANEL_ID + '{position:fixed;top:12px;left:12px;' +
       'background:#fff;color:#1c1e22;border:1px solid #ccc;border-radius:10px;' +
-      'box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:2147483647;' +
+      'box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:2147483647;padding:8px 10px;' +
       'font:12px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;' +
-      'display:flex;flex-direction:column;overflow:hidden;}' +
-      '#' + PANEL_ID + ' .cc-head{background:#2f6fed;color:#fff;padding:8px 10px;' +
-      'display:flex;align-items:center;justify-content:space-between;cursor:move;font-weight:600;flex-shrink:0;}' +
-      '#' + PANEL_ID + ' .cc-head-actions{display:flex;align-items:center;gap:6px;}' +
-      '#' + PANEL_ID + '.cc-collapsed .cc-body,#' + PANEL_ID + '.cc-collapsed .cc-foot{display:none;}' +
-      '#' + PANEL_ID + ' .cc-body{padding:8px 10px;overflow:auto;}' +
-      '#' + PANEL_ID + ' .cc-controls{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;}' +
-      '#' + PANEL_ID + ' .cc-controls label{display:flex;align-items:center;gap:4px;color:#444;}' +
-      '#' + PANEL_ID + ' input[type=number]{width:44px;padding:2px 4px;border:1px solid #ccc;border-radius:4px;}' +
-      '#' + PANEL_ID + ' .cc-table-wrap{overflow-x:auto;margin-bottom:10px;}' +
-      '#' + PANEL_ID + ' table{width:100%;border-collapse:collapse;}' +
-      '#' + PANEL_ID + ' th,#' + PANEL_ID + ' td{padding:4px 8px;border-bottom:1px solid #eee;text-align:left;white-space:nowrap;}' +
-      '#' + PANEL_ID + ' th{background:#f0efe9;font-size:10px;text-transform:uppercase;color:#666;}' +
-      '#' + PANEL_ID + ' .cc-close,#' + PANEL_ID + ' .cc-collapse{cursor:pointer;background:none;border:none;color:#fff;font-size:16px;line-height:1;}' +
-      '#' + PANEL_ID + ' .cc-note{color:#888;font-size:11px;margin-top:4px;}' +
-      '#' + PANEL_ID + ' .cc-section-title{font-weight:700;margin:6px 0 4px;}' +
-      '#' + PANEL_ID + ' .cc-route-head{font-weight:700;font-size:11px;text-transform:uppercase;' +
-      'letter-spacing:.03em;color:#2f6fed;margin:10px 0 4px;}' +
-      '#' + PANEL_ID + ' .cc-empty{color:#888;padding:8px 0;}' +
-      '#' + PANEL_ID + ' .cc-stale{color:#a15c00;background:#fff8ec;}' +
-      '#' + PANEL_ID + ' .cc-meets-min td{font-weight:600;}' +
-      '#' + PANEL_ID + ' .cc-foot{border-top:1px solid #eee;background:#f7f6f2;padding:8px 10px;' +
-      'flex-shrink:0;font-size:11px;color:#333;line-height:1.5;}' +
-      '#' + PANEL_ID + ' .cc-foot strong{color:#1c1e22;}';
-    document.head.appendChild(style);
-  }
-
-  function makeDraggable(panel, handle){
-    var dragging = false, offX = 0, offY = 0;
-    handle.addEventListener('mousedown', function(e){
-      dragging = true;
-      var rect = panel.getBoundingClientRect();
-      offX = e.clientX - rect.left;
-      offY = e.clientY - rect.top;
-      e.preventDefault();
-    });
-    document.addEventListener('mousemove', function(e){
-      if(!dragging) return;
-      panel.style.left = (e.clientX - offX) + 'px';
-      panel.style.top = (e.clientY - offY) + 'px';
-      panel.style.right = 'auto';
-    });
-    document.addEventListener('mouseup', function(){ dragging = false; });
-  }
-
-  function fmtMoney(n, cur){
-    if(n == null) return '';
-    return (cur || '') + ' ' + Math.round(n).toLocaleString();
-  }
-  function fmtDate(s){
-    var d = new Date(s);
-    if(isNaN(d.getTime())) return s;
-    return d.toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric'});
-  }
-
-  var STALE_MS = 5 * 60 * 1000;
-  function fmtAgo(ts){
-    var mins = Math.round((Date.now() - ts) / 60000);
-    if(mins < 1) return 'just now';
-    if(mins < 60) return mins + 'm ago';
-    var hrs = Math.round(mins / 60);
-    return hrs + 'h ago';
-  }
-
-  function buildPanel(){
-    ensureStyle();
-    var panel = document.createElement('div');
-    panel.id = PANEL_ID;
-    panel.innerHTML =
-      '<div class="cc-head"><span>CebPac Availability Capture</span><div class="cc-head-actions">' +
-        '<button class="cc-collapse" title="Collapse">-</button>' +
-        '<button class="cc-close" title="Close">\u00d7</button>' +
-      '</div></div>' +
-      '<div class="cc-body">' +
-        '<div class="cc-controls">' +
-          '<label>Min seats <input type="number" class="cc-min-seats" value="4" min="1"></label>' +
-          '<label><input type="checkbox" class="cc-pair-toggle"> 2\u00d72 helper</label>' +
-          '<label>Max gap (days) <input type="number" class="cc-pair-gap" value="2" min="0"></label>' +
-          '<button class="cc-clear" title="Clear captured data">Clear</button>' +
-        '</div>' +
-        '<div class="cc-direct"></div>' +
-        '<div class="cc-pairs"></div>' +
-        '<div class="cc-note">Captures availability/ responses as you browse. Data persists in this browser.</div>' +
-      '</div>' +
-      '<div class="cc-foot"></div>';
-    document.body.appendChild(panel);
-    panel.querySelector('.cc-close').addEventListener('click', function(){ panel.remove(); });
-    panel.querySelector('.cc-collapse').addEventListener('click', function(){
-      panel.classList.toggle('cc-collapsed');
-      panel.querySelector('.cc-collapse').textContent = panel.classList.contains('cc-collapsed') ? '+' : '-';
-    });
-    panel.querySelector('.cc-clear').addEventListener('click', function(){
-      if(confirm('Clear all captured availability data?')){
-        saveData({});
-        renderPanel();
-      }
-    });
-    panel.querySelector('.cc-min-seats').addEventListener('input', function(){ updateTable(panel); });
-    panel.querySelector('.cc-pair-toggle').addEventListener('change', function(){
-      panel.__cebpacPairTouched = true;
-      updateTable(panel);
-    });
-    panel.querySelector('.cc-pair-gap').addEventListener('input', function(){ updateTable(panel); });
-    makeDraggable(panel, panel.querySelector('.cc-head'));
-    return panel;
-  }
-
-  function updateTable(panel){
-    var store = loadData();
-    var rows = Object.keys(store).map(function(k){ return store[k]; });
-    rows.sort(function(a, b){ return new Date(a.departureDate) - new Date(b.departureDate); });
-
-    if(panel.__cebpacSelection){
-      panel.__cebpacSelection = panel.__cebpacSelection.filter(function(s){
-        return rows.some(function(r){ return r.origin + '|' + r.destination === s.key && r.departureDate === s.row.departureDate; });
-      });
-    }
-
-    var minSeats = parseInt(panel.querySelector('.cc-min-seats').value, 10) || 1;
-    var pairOn = panel.querySelector('.cc-pair-toggle').checked;
-    var maxGap = parseInt(panel.querySelector('.cc-pair-gap').value, 10);
-    if(isNaN(maxGap)) maxGap = 2;
-
-    var direct = rows.slice();
-    direct.sort(function(a, b){ return a.fareTotal - b.fareTotal; });
-    var meetsCount = direct.filter(function(r){ return r.availableCount >= minSeats; }).length;
-    if(direct.length > 0 && meetsCount === 0 && !panel.__cebpacPairTouched){
-      pairOn = true;
-      panel.querySelector('.cc-pair-toggle').checked = true;
-    }
-
-    var directEl = panel.querySelector('.cc-direct');
-    directEl.innerHTML = '<div class="cc-section-title">' + direct.length + ' flight(s) captured (' + meetsCount + ' with ' + minSeats + '+ seats). Check a flight per route to compare.</div>';
-    if(direct.length === 0){
-      directEl.innerHTML += '<div class="cc-empty">None yet - keep browsing dates on the airline site.</div>';
-    } else {
-      var groups = {};
-      var groupOrder = [];
-      direct.forEach(function(r){
-        var gk = r.origin + '|' + r.destination;
-        if(!groups[gk]){ groups[gk] = []; groupOrder.push(gk); }
-        groups[gk].push(r);
-      });
-      groupOrder.forEach(function(routeKey){
-        var groupRows = groups[routeKey];
-        var head = document.createElement('div');
-        head.className = 'cc-route-head';
-        head.textContent = groupRows[0].origin + ' \u2192 ' + groupRows[0].destination + ' (' + groupRows.length + ')';
-        directEl.appendChild(head);
-
-        var wrap = document.createElement('div');
-        wrap.className = 'cc-table-wrap';
-        var t = document.createElement('table');
-        t.innerHTML = '<thead><tr><th></th><th>Date</th><th>Fare</th><th>Seats</th><th>Captured</th></tr></thead>';
-        var tbody = document.createElement('tbody');
-        groupRows.forEach(function(r){
-          var tr = document.createElement('tr');
-          var stale = r.capturedAt && (Date.now() - r.capturedAt) > STALE_MS;
-          var classes = [];
-          if(stale) classes.push('cc-stale');
-          if(r.availableCount >= minSeats) classes.push('cc-meets-min');
-          if(classes.length) tr.className = classes.join(' ');
-          var tdCheck = document.createElement('td');
-          var cb = document.createElement('input');
-          cb.type = 'checkbox';
-          cb.checked = isSelected(panel, routeKey, r);
-          cb.title = 'Select for round-trip comparison';
-          cb.addEventListener('change', function(){ toggleSelect(panel, routeKey, r); });
-          tdCheck.appendChild(cb);
-          tr.appendChild(tdCheck);
-          tr.insertAdjacentHTML('beforeend',
-            '<td>' + fmtDate(r.departureDate) + '</td>' +
-            '<td>' + fmtMoney(r.fareTotal, r.currency) + '</td>' +
-            '<td>' + r.availableCount + '</td>' +
-            '<td>' + (stale ? '\u26a0 ' : '') + fmtAgo(r.capturedAt) + '</td>');
-          tbody.appendChild(tr);
-        });
-        t.appendChild(tbody);
-        wrap.appendChild(t);
-        directEl.appendChild(wrap);
-      });
-    }
-
-    updateFooter(panel);
-
-    var pairsEl = panel.querySelector('.cc-pairs');
-    pairsEl.innerHTML = '';
-    if(pairOn){
-      var candidates = rows.filter(function(r){ return r.availableCount >= 2; });
-      var byRoute = {};
-      candidates.forEach(function(r){
-        var rk = r.origin + '|' + r.destination;
-        (byRoute[rk] = byRoute[rk] || []).push(r);
-      });
-      var pairs = [];
-      Object.keys(byRoute).forEach(function(rk){
-        var list = byRoute[rk];
-        for(var i = 0; i < list.length; i++){
-          for(var j = i + 1; j < list.length; j++){
-            var a = list[i], b = list[j];
-            var gapDays = Math.abs(new Date(a.departureDate) - new Date(b.departureDate)) / 86400000;
-            if(gapDays <= maxGap){
-              pairs.push({ a: a, b: b, gapDays: Math.round(gapDays), total: a.fareTotal + b.fareTotal });
-            }
-          }
-        }
-      });
-      pairs.sort(function(x, y){ return x.total - y.total; });
-      pairs = pairs.slice(0, 10);
-
-      pairsEl.innerHTML = '<div class="cc-section-title">2\u00d72 pairing suggestions (\u2264 ' + maxGap + 'd apart)</div>';
-      if(pairs.length === 0){
-        pairsEl.innerHTML += '<div class="cc-empty">No 2-seat pairs within range yet.</div>';
-      } else {
-        var pwrap = document.createElement('div');
-        pwrap.className = 'cc-table-wrap';
-        var pt = document.createElement('table');
-        pt.innerHTML = '<thead><tr><th>Route</th><th>Flight A</th><th>Flight B</th><th>Gap</th><th>Combined</th></tr></thead>';
-        var pbody = document.createElement('tbody');
-        pairs.forEach(function(p){
-          var tr = document.createElement('tr');
-          tr.innerHTML = '<td>' + p.a.origin + '\u2192' + p.a.destination + '</td>' +
-            '<td>' + fmtDate(p.a.departureDate) + '<br>' + fmtMoney(p.a.fareTotal, p.a.currency) + ' (' + p.a.availableCount + ')</td>' +
-            '<td>' + fmtDate(p.b.departureDate) + '<br>' + fmtMoney(p.b.fareTotal, p.b.currency) + ' (' + p.b.availableCount + ')</td>' +
-            '<td>' + p.gapDays + 'd</td>' +
-            '<td>' + fmtMoney(p.total, p.a.currency) + '</td>';
-          pbody.appendChild(tr);
-        });
-        pt.appendChild(pbody);
-        pwrap.appendChild(pt);
-        pairsEl.appendChild(pwrap);
-      }
-    }
-  }
-
-  function isSelected(panel, routeKey, row){
-    var sel = panel.__cebpacSelection || [];
-    return sel.some(function(s){ return s.key === routeKey && s.row.departureDate === row.departureDate; });
-  }
-
-  function toggleSelect(panel, routeKey, row){
-    var sel = panel.__cebpacSelection || (panel.__cebpacSelection = []);
-    var idx = sel.findIndex(function(s){ return s.key === routeKey; });
-    if(idx !== -1){
-      var sameRow = sel[idx].row.departureDate === row.departureDate;
-      sel.splice(idx, 1);
-      if(!sameRow) sel.push({ key: routeKey, row: row });
-    } else {
-      sel.push({ key: routeKey, row: row });
-      if(sel.length > 2) sel.shift();
-    }
-    updateTable(panel);
-  }
-
-  function updateFooter(panel){
-    var footEl = panel.querySelector('.cc-foot');
-    var sel = panel.__cebpacSelection || [];
-    if(sel.length < 2){
-      footEl.innerHTML = '<span class="cc-empty">Select 2 flights (different routes) to compare a round trip.</span>';
-      return;
-    }
-    var a = sel[0].row, b = sel[1].row;
-    var dA = new Date(a.departureDate), dB = new Date(b.departureDate);
-    var from = dA <= dB ? a : b;
-    var to = dA <= dB ? b : a;
-    var days = Math.round(Math.abs(dB - dA) / 86400000);
-    var combined = a.fareTotal + b.fareTotal;
-    footEl.innerHTML =
-      '<div><strong>' + a.origin + '\u2192' + a.destination + '</strong> ' + fmtDate(a.departureDate) +
-      ' (' + fmtMoney(a.fareTotal, a.currency) + ')' +
-      ' &nbsp;+&nbsp; <strong>' + b.origin + '\u2192' + b.destination + '</strong> ' + fmtDate(b.departureDate) +
-      ' (' + fmtMoney(b.fareTotal, b.currency) + ')</div>' +
-      '<div>' + fmtDate(from.departureDate) + ' \u2192 ' + fmtDate(to.departureDate) +
-      ' &nbsp;\u00b7&nbsp; ' + days + ' day' + (days === 1 ? '' : 's') +
-      ' &nbsp;\u00b7&nbsp; Combined ' + fmtMoney(combined, a.currency) + '</div>';
-  }
-
-  function renderPanel(){
-    var panel = document.getElementById(PANEL_ID);
-    if(!panel) panel = buildPanel();
-    updateTable(panel);
-  }
-
-  patchNetwork();
-  renderPanel();
-}
-
-function cebpacFareQueuePayload(){
-  var PANEL_ID = 'cebpac-fq-toolbar-e1a9';
-  var STYLE_ID = 'cebpac-fq-style-e1a9';
-  var STORAGE_KEY = 'cebpac_farecache_v1';
-
-  function loadData(){
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
-    catch(e){ return {}; }
-  }
-  function saveData(d){
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); } catch(e){}
-  }
-
-  function parsePrice(str){
-    str = String(str).trim();
-    if(/k$/i.test(str)) return parseFloat(str) * 1000;
-    return parseFloat(str);
-  }
-
-  function parseFareBlob(data){
-    if(!data || typeof data !== 'object') return null;
-    var key = Object.keys(data)[0];
-    if(!key) return null;
-    var parts = key.split('|');
-    var route = parts[0], currency = parts[1] || '';
-    if(!route || route.length !== 6) return null;
-    var from = route.slice(0, 3).toUpperCase();
-    var to = route.slice(3, 6).toUpperCase();
-    var datesObj = data[key];
-    var entries = Object.keys(datesObj).map(function(dtStr){
-      return { dateStr: dtStr, price: parsePrice(datesObj[dtStr]) };
-    }).filter(function(e){ return !isNaN(e.price) && !isNaN(new Date(e.dateStr).getTime()); });
-    return { from: from, to: to, currency: currency, entries: entries };
-  }
-
-  var fqSeq = 0;
-
-  function ingest(data, seq){
-    var parsed = parseFareBlob(data);
-    if(!parsed) return;
-    var store = loadData();
-    var key = parsed.from + '|' + parsed.to;
-    var existing = store.routes && store.routes[key];
-    if(existing && existing.seq != null && seq != null && seq < existing.seq) return;
-    store.routes = store.routes || {};
-    store.routes[key] = {
-      from: parsed.from,
-      to: parsed.to,
-      currency: parsed.currency,
-      entries: parsed.entries,
-      capturedAt: Date.now(),
-      seq: seq
-    };
-    saveData(store);
-    renderToolbar(true);
-  }
-
-  function patchNetwork(){
-    if(window.__cebpacFqPatched) return;
-    window.__cebpacFqPatched = true;
-
-    var origFetch = window.fetch;
-    if(origFetch){
-      window.fetch = function(){
-        var args = arguments;
-        var urlArg = args[0];
-        var url = (urlArg && urlArg.url) ? urlArg.url : urlArg;
-        var seq = ++fqSeq;
-        return origFetch.apply(this, args).then(function(res){
-          try{
-            if(typeof url === 'string' && url.indexOf('farecache') !== -1){
-              res.clone().json().then(function(data){ ingest(data, seq); }).catch(function(){});
-            }
-          }catch(e){}
-          return res;
-        });
-      };
-    }
-
-    var origOpen = XMLHttpRequest.prototype.open;
-    var origSend = XMLHttpRequest.prototype.send;
-    XMLHttpRequest.prototype.open = function(method, url){
-      this.__cebpacFqUrl = url;
-      this.__cebpacFqSeq = ++fqSeq;
-      return origOpen.apply(this, arguments);
-    };
-    XMLHttpRequest.prototype.send = function(){
-      var xhr = this;
-      xhr.addEventListener('load', function(){
-        try{
-          if(xhr.__cebpacFqUrl && String(xhr.__cebpacFqUrl).indexOf('farecache') !== -1){
-            ingest(JSON.parse(xhr.responseText), xhr.__cebpacFqSeq);
-          }
-        }catch(e){}
-      });
-      return origSend.apply(this, arguments);
-    };
-  }
-
-  function ensureStyle(){
-    if(document.getElementById(STYLE_ID)) return;
-    var style = document.createElement('style');
-    style.id = STYLE_ID;
-    style.textContent =
-      '#' + PANEL_ID + '{position:fixed;bottom:12px;right:12px;width:520px;max-height:80vh;' +
-      'background:#fff;color:#1c1e22;border:1px solid #ccc;border-radius:10px;' +
-      'box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:2147483647;' +
-      'font:12px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;' +
-      'display:flex;flex-direction:column;overflow:hidden;}' +
-      '#' + PANEL_ID + ' .fq-head{background:#2f6fed;color:#fff;padding:6px 10px;' +
-      'display:flex;align-items:center;justify-content:space-between;cursor:move;font-weight:600;flex-shrink:0;}' +
-      '#' + PANEL_ID + ' .fq-head-actions{display:flex;align-items:center;gap:6px;}' +
-      '#' + PANEL_ID + ' .fq-close,#' + PANEL_ID + ' .fq-collapse{cursor:pointer;background:none;border:none;color:#fff;font-size:16px;line-height:1;}' +
-      '#' + PANEL_ID + '.fq-collapsed .fq-body{display:none;}' +
-      '#' + PANEL_ID + ' .fq-body{padding:8px 10px;overflow:auto;display:flex;flex-wrap:wrap;align-items:center;gap:12px;}' +
-      '#' + PANEL_ID + ' .fq-settings{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}' +
-      '#' + PANEL_ID + ' .fq-settings label{display:flex;align-items:center;gap:4px;color:#444;}' +
-      '#' + PANEL_ID + ' .fq-settings input{width:44px;padding:2px 4px;border:1px solid #ccc;border-radius:4px;}' +
+      'display:flex;align-items:center;gap:8px;cursor:move;}' +
+      '#' + PANEL_ID + ' .avs-count{font-weight:700;}' +
       '#' + PANEL_ID + ' button{background:#2f6fed;color:#fff;border:none;border-radius:6px;' +
       'padding:4px 10px;font-weight:600;cursor:pointer;font-size:11px;}' +
-      '#' + PANEL_ID + ' .fq-combo{flex:1;min-width:260px;}' +
-      '#' + PANEL_ID + ' .fq-nav{display:flex;align-items:center;gap:8px;}' +
-      '#' + PANEL_ID + ' .fq-page{width:44px;padding:2px 4px;border:1px solid #ccc;border-radius:4px;text-align:center;}' +
-      '#' + PANEL_ID + ' .fq-pos-total{color:#666;font-variant-numeric:tabular-nums;}' +
-      '#' + PANEL_ID + ' .fq-empty{color:#888;}';
+      '#' + PANEL_ID + ' .avs-clear{background:#999;}' +
+      '#' + PANEL_ID + ' .avs-close{background:none;color:#888;font-size:14px;padding:0 4px;}';
     document.head.appendChild(style);
   }
 
-  function makeDraggable(panel, handle){
+  function makeDraggable(panel){
     var dragging = false, offX = 0, offY = 0;
-    handle.addEventListener('mousedown', function(e){
+    panel.addEventListener('mousedown', function(e){
+      if(e.target.tagName === 'BUTTON') return;
       dragging = true;
       var rect = panel.getBoundingClientRect();
       offX = e.clientX - rect.left;
@@ -656,178 +373,273 @@ function cebpacFareQueuePayload(){
     document.addEventListener('mouseup', function(){ dragging = false; });
   }
 
-  function fmtMoney(n, cur){
-    if(n == null || isNaN(n)) return '';
-    return (cur || '') + ' ' + Math.round(n).toLocaleString();
-  }
-  function fmtDate(s){
-    var d = new Date(s);
-    if(isNaN(d.getTime())) return s;
-    return d.toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric'});
-  }
-
-  function computeQueue(store){
-    var meta = store.meta || {};
-    var source = (meta.source || 'MNL').toUpperCase();
-    var minDays = meta.minDays != null ? meta.minDays : 2;
-    var maxDays = meta.maxDays != null ? meta.maxDays : 7;
-    var maxTotal = meta.maxTotal != null ? meta.maxTotal : 500;
-    var routes = store.routes || {};
-    var outbound = null, inbound = null;
-    Object.keys(routes).forEach(function(k){
-      var r = routes[k];
-      if(r.from === source) outbound = r;
-      if(r.to === source) inbound = r;
-    });
-    var result = { combos: [], outbound: outbound, inbound: inbound, source: source, minDays: minDays, maxDays: maxDays, maxTotal: maxTotal };
-    if(!outbound || !inbound || outbound === inbound) return result;
-    outbound.entries.forEach(function(o){
-      inbound.entries.forEach(function(i){
-        var diffDays = Math.round((new Date(i.dateStr) - new Date(o.dateStr)) / 86400000);
-        var total = o.price + i.price;
-        if(diffDays >= minDays && diffDays <= maxDays && total < maxTotal){
-          result.combos.push({ out: o, ret: i, diffDays: diffDays, total: total });
-        }
-      });
-    });
-    result.combos.sort(function(a, b){ return a.total - b.total; });
-    return result;
+  function fallbackCopy(text, cb){
+    try{
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      cb(ok);
+    }catch(e){ cb(false); }
   }
 
-  function updateMeta(el){
-    var store = loadData();
-    store.meta = store.meta || {};
-    store.meta.source = (el.querySelector('.fq-source').value || 'MNL').trim().toUpperCase();
-    var minV = parseInt(el.querySelector('.fq-min').value, 10);
-    var maxV = parseInt(el.querySelector('.fq-max').value, 10);
-    var maxTotalV = parseFloat(el.querySelector('.fq-max-total').value);
-    store.meta.minDays = isNaN(minV) ? 2 : minV;
-    store.meta.maxDays = isNaN(maxV) ? 7 : maxV;
-    store.meta.maxTotal = isNaN(maxTotalV) ? 500 : maxTotalV;
-    saveData(store);
-  }
-
-  function step(delta){
-    var el = document.getElementById(PANEL_ID);
-    if(!el) return;
-    var q = computeQueue(loadData());
-    if(!q.combos.length) return;
-    var idx = (el.__cebpacFqIndex || 0) + delta;
-    el.__cebpacFqIndex = Math.max(0, Math.min(q.combos.length - 1, idx));
-    renderToolbar(false);
-  }
-
-  function goToPage(page){
-    var el = document.getElementById(PANEL_ID);
-    if(!el) return;
-    var q = computeQueue(loadData());
-    if(!q.combos.length) return;
-    var idx = (parseInt(page, 10) || 1) - 1;
-    el.__cebpacFqIndex = Math.max(0, Math.min(q.combos.length - 1, idx));
-    renderToolbar(false);
-  }
-
-  function buildToolbar(){
+  function buildPanel(){
     ensureStyle();
-    var el = document.createElement('div');
-    el.id = PANEL_ID;
-    el.innerHTML =
-      '<div class="fq-head"><span>Fare Queue</span><div class="fq-head-actions">' +
-        '<button class="fq-collapse" title="Collapse">-</button>' +
-        '<button class="fq-close" title="Close">\u00d7</button>' +
-      '</div></div>' +
-      '<div class="fq-body">' +
-        '<div class="fq-settings">' +
-          '<label>Source <input type="text" class="fq-source" maxlength="3" value="MNL"></label>' +
-          '<label>Min days <input type="number" class="fq-min" value="2" min="0"></label>' +
-          '<label>Max days <input type="number" class="fq-max" value="7" min="0"></label>' +
-          '<label>Max total <input type="number" class="fq-max-total" value="500" min="0"></label>' +
-          '<button class="fq-recompute">Recompute</button>' +
-          '<button class="fq-clear">Clear</button>' +
-        '</div>' +
-        '<div class="fq-combo"></div>' +
-        '<div class="fq-nav">' +
-          '<button class="fq-prev">Prev</button>' +
-          '<input type="number" class="fq-page" min="1" title="Jump to page">' +
-          '<span class="fq-pos-total"></span>' +
-          '<button class="fq-next">Next</button>' +
-        '</div>' +
-      '</div>';
-    document.body.appendChild(el);
-    el.querySelector('.fq-close').addEventListener('click', function(){ el.remove(); });
-    el.querySelector('.fq-collapse').addEventListener('click', function(){
-      el.classList.toggle('fq-collapsed');
-      el.querySelector('.fq-collapse').textContent = el.classList.contains('fq-collapsed') ? '+' : '-';
+    var panel = document.createElement('div');
+    panel.id = PANEL_ID;
+    panel.innerHTML =
+      '<span class="avs-count">0</span>' +
+      '<button class="avs-copy">Copy all</button>' +
+      '<button class="avs-clear">Clear</button>' +
+      '<button class="avs-close">×</button>';
+    document.body.appendChild(panel);
+    panel.querySelector('.avs-close').addEventListener('click', function(){ panel.remove(); });
+    panel.querySelector('.avs-clear').addEventListener('click', function(){
+      if(confirm('Clear all scraped availability data?')){ saveData({}); renderPanel(); }
     });
-    el.querySelector('.fq-clear').addEventListener('click', function(){
-      if(confirm('Clear captured fare cache data?')){ saveData({}); renderToolbar(true); }
+    panel.querySelector('.avs-copy').addEventListener('click', function(){
+      var store = loadData();
+      var text = JSON.stringify(store.routes || {});
+      var btn = panel.querySelector('.avs-copy');
+      function done(ok){
+        btn.textContent = ok ? 'Copied!' : 'Copy failed';
+        setTimeout(function(){ btn.textContent = 'Copy all'; }, 1500);
+      }
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(function(){ done(true); }).catch(function(){ fallbackCopy(text, done); });
+      } else {
+        fallbackCopy(text, done);
+      }
     });
-    el.querySelector('.fq-source').addEventListener('input', function(){ updateMeta(el); renderToolbar(true); });
-    el.querySelector('.fq-min').addEventListener('input', function(){ updateMeta(el); renderToolbar(true); });
-    el.querySelector('.fq-max').addEventListener('input', function(){ updateMeta(el); renderToolbar(true); });
-    el.querySelector('.fq-max-total').addEventListener('input', function(){ updateMeta(el); renderToolbar(true); });
-    el.querySelector('.fq-recompute').addEventListener('click', function(){ renderToolbar(true); });
-    el.querySelector('.fq-prev').addEventListener('click', function(){ step(-1); });
-    el.querySelector('.fq-next').addEventListener('click', function(){ step(1); });
-    el.querySelector('.fq-page').addEventListener('change', function(){ goToPage(this.value); });
-    el.querySelector('.fq-page').addEventListener('keydown', function(e){
-      if(e.key === 'Enter') goToPage(this.value);
-    });
-    makeDraggable(el, el.querySelector('.fq-head'));
-    return el;
+    makeDraggable(panel);
+    return panel;
   }
 
-  function renderToolbar(resetIndex){
-    var el = document.getElementById(PANEL_ID);
-    var isNew = !el;
-    if(!el) el = buildToolbar();
-    if(isNew || resetIndex) el.__cebpacFqIndex = 0;
-
+  function renderPanel(){
+    var panel = document.getElementById(PANEL_ID);
+    if(!panel) panel = buildPanel();
     var store = loadData();
-    var meta = store.meta || {};
-    if(meta.source) el.querySelector('.fq-source').value = meta.source;
-    if(meta.minDays != null) el.querySelector('.fq-min').value = meta.minDays;
-    if(meta.maxDays != null) el.querySelector('.fq-max').value = meta.maxDays;
-    if(meta.maxTotal != null) el.querySelector('.fq-max-total').value = meta.maxTotal;
-
-    var q = computeQueue(store);
-    var comboEl = el.querySelector('.fq-combo');
-    var pageEl = el.querySelector('.fq-page');
-    var totalEl = el.querySelector('.fq-pos-total');
-
-    if(!q.outbound || !q.inbound){
-      comboEl.innerHTML = '<span class="fq-empty">Waiting for both fare cache directions for source ' + q.source + '...</span>';
-      pageEl.value = '';
-      pageEl.disabled = true;
-      totalEl.textContent = '';
-      return;
-    }
-    if(q.combos.length === 0){
-      comboEl.innerHTML = '<span class="fq-empty">No combos under ' + q.maxTotal + ' in the ' + q.minDays + '-' + q.maxDays + ' day window.</span>';
-      pageEl.value = '';
-      pageEl.disabled = true;
-      totalEl.textContent = '';
-      return;
-    }
-
-    pageEl.disabled = false;
-    pageEl.max = q.combos.length;
-
-    var idx = Math.max(0, Math.min(q.combos.length - 1, el.__cebpacFqIndex || 0));
-    el.__cebpacFqIndex = idx;
-    var combo = q.combos[idx];
-    comboEl.innerHTML =
-      '<strong>' + q.outbound.from + '\u2192' + q.outbound.to + '</strong> ' + fmtDate(combo.out.dateStr) +
-      ' (' + fmtMoney(combo.out.price, q.outbound.currency) + ')' +
-      ' &nbsp;+&nbsp; <strong>' + q.inbound.from + '\u2192' + q.inbound.to + '</strong> ' + fmtDate(combo.ret.dateStr) +
-      ' (' + fmtMoney(combo.ret.price, q.inbound.currency) + ')' +
-      ' &nbsp;\u00b7&nbsp; ' + combo.diffDays + 'd \u00b7 Total ' + fmtMoney(combo.total, q.outbound.currency);
-    pageEl.value = idx + 1;
-    totalEl.textContent = '/ ' + q.combos.length;
+    var routes = store.routes || {};
+    var routeCount = Object.keys(routes).length;
+    var journeyCount = 0;
+    Object.keys(routes).forEach(function(k){
+      journeyCount += Object.keys(routes[k].journeys || {}).length;
+    });
+    panel.querySelector('.avs-count').textContent = routeCount + ' routes / ' + journeyCount + ' journeys';
   }
 
   patchNetwork();
-  renderToolbar(true);
+  renderPanel();
+}
+
+
+function cebpacScraperPayload(){
+  var PANEL_ID = 'cebpac-scr-panel-e1a9';
+  var STYLE_ID = 'cebpac-scr-style-e1a9';
+  var STORAGE_KEY = 'cebpac_scraper_v1';
+  var MAX_PRICE = 600;
+
+  function loadData(){
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+    catch(e){ return {}; }
+  }
+  function saveData(d){
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); } catch(e){}
+  }
+
+  function routeKeyOf(data){
+    if(!data || typeof data !== 'object') return null;
+    var key = Object.keys(data)[0];
+    if(!key) return null;
+    var route = key.split('|')[0];
+    if(!route || route.length !== 6) return null;
+    return route.toUpperCase();
+  }
+
+  function parsePrice(str){
+    str = String(str).trim();
+    if(/k$/i.test(str)) return parseFloat(str) * 1000;
+    return parseFloat(str);
+  }
+
+  function filterUnderMax(data){
+    var key = Object.keys(data)[0];
+    var dates = data[key];
+    var filtered = {};
+    Object.keys(dates).forEach(function(dtStr){
+      var p = parsePrice(dates[dtStr]);
+      if(!isNaN(p) && p < MAX_PRICE) filtered[dtStr] = dates[dtStr];
+    });
+    var out = {};
+    out[key] = filtered;
+    return out;
+  }
+
+  var seq = 0;
+
+  function ingest(data, s){
+    var routeKey = routeKeyOf(data);
+    if(!routeKey) return;
+    var filtered = filterUnderMax(data);
+    var key = Object.keys(filtered)[0];
+    if(Object.keys(filtered[key]).length === 0) return;
+    var store = loadData();
+    store.routes = store.routes || {};
+    var existing = store.routes[routeKey];
+    if(existing && existing.seq != null && s != null && s < existing.seq) return;
+    store.routes[routeKey] = { raw: filtered, capturedAt: Date.now(), seq: s };
+    saveData(store);
+    renderPanel();
+  }
+
+  function patchNetwork(){
+    if(window.__cebpacScrPatched) return;
+    window.__cebpacScrPatched = true;
+
+    var origFetch = window.fetch;
+    if(origFetch){
+      window.fetch = function(){
+        var args = arguments;
+        var urlArg = args[0];
+        var url = (urlArg && urlArg.url) ? urlArg.url : urlArg;
+        var s = ++seq;
+        return origFetch.apply(this, args).then(function(res){
+          try{
+            if(typeof url === 'string' && url.indexOf('farecache') !== -1){
+              res.clone().json().then(function(data){ ingest(data, s); }).catch(function(){});
+            }
+          }catch(e){}
+          return res;
+        });
+      };
+    }
+
+    var origOpen = XMLHttpRequest.prototype.open;
+    var origSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function(method, url){
+      this.__cebpacScrUrl = url;
+      this.__cebpacScrSeq = ++seq;
+      return origOpen.apply(this, arguments);
+    };
+    XMLHttpRequest.prototype.send = function(){
+      var xhr = this;
+      xhr.addEventListener('load', function(){
+        try{
+          if(xhr.__cebpacScrUrl && String(xhr.__cebpacScrUrl).indexOf('farecache') !== -1){
+            ingest(JSON.parse(xhr.responseText), xhr.__cebpacScrSeq);
+          }
+        }catch(e){}
+      });
+      return origSend.apply(this, arguments);
+    };
+  }
+
+  function ensureStyle(){
+    if(document.getElementById(STYLE_ID)) return;
+    var style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent =
+      '#' + PANEL_ID + '{position:fixed;bottom:12px;left:12px;' +
+      'background:#fff;color:#1c1e22;border:1px solid #ccc;border-radius:10px;' +
+      'box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:2147483647;padding:8px 10px;' +
+      'font:12px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;' +
+      'display:flex;align-items:center;gap:8px;cursor:move;}' +
+      '#' + PANEL_ID + ' .scr-count{font-weight:700;}' +
+      '#' + PANEL_ID + ' button{background:#2f6fed;color:#fff;border:none;border-radius:6px;' +
+      'padding:4px 10px;font-weight:600;cursor:pointer;font-size:11px;}' +
+      '#' + PANEL_ID + ' .scr-clear{background:#999;}' +
+      '#' + PANEL_ID + ' .scr-close{background:none;color:#888;font-size:14px;padding:0 4px;}';
+    document.head.appendChild(style);
+  }
+
+  function makeDraggable(panel){
+    var dragging = false, offX = 0, offY = 0;
+    panel.addEventListener('mousedown', function(e){
+      if(e.target.tagName === 'BUTTON') return;
+      dragging = true;
+      var rect = panel.getBoundingClientRect();
+      offX = e.clientX - rect.left;
+      offY = e.clientY - rect.top;
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', function(e){
+      if(!dragging) return;
+      panel.style.left = (e.clientX - offX) + 'px';
+      panel.style.top = (e.clientY - offY) + 'px';
+      panel.style.right = 'auto';
+      panel.style.bottom = 'auto';
+    });
+    document.addEventListener('mouseup', function(){ dragging = false; });
+  }
+
+  function fallbackCopy(text, cb){
+    try{
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      cb(ok);
+    }catch(e){ cb(false); }
+  }
+
+  function buildPanel(){
+    ensureStyle();
+    var panel = document.createElement('div');
+    panel.id = PANEL_ID;
+    panel.innerHTML =
+      '<span class="scr-count">0</span>' +
+      '<button class="scr-copy">Copy all</button>' +
+      '<button class="scr-clear">Clear</button>' +
+      '<button class="scr-close">×</button>';
+    document.body.appendChild(panel);
+    panel.querySelector('.scr-close').addEventListener('click', function(){ panel.remove(); });
+    panel.querySelector('.scr-clear').addEventListener('click', function(){
+      if(confirm('Clear all scraped fare data?')){ saveData({}); renderPanel(); }
+    });
+    panel.querySelector('.scr-copy').addEventListener('click', function(){
+      var store = loadData();
+      var routes = store.routes || {};
+      var arr = Object.keys(routes).map(function(k){ return routes[k].raw; });
+      var text = JSON.stringify(arr);
+      var btn = panel.querySelector('.scr-copy');
+      function done(ok){
+        btn.textContent = ok ? 'Copied!' : 'Copy failed';
+        setTimeout(function(){ btn.textContent = 'Copy all'; }, 1500);
+      }
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(function(){ done(true); }).catch(function(){ fallbackCopy(text, done); });
+      } else {
+        fallbackCopy(text, done);
+      }
+    });
+    makeDraggable(panel);
+    return panel;
+  }
+
+  function renderPanel(){
+    var panel = document.getElementById(PANEL_ID);
+    if(!panel) panel = buildPanel();
+    var store = loadData();
+    var routes = store.routes || {};
+    var routeCount = Object.keys(routes).length;
+    var dateCount = 0;
+    Object.keys(routes).forEach(function(k){
+      var key = Object.keys(routes[k].raw || {})[0];
+      dateCount += key ? Object.keys(routes[k].raw[key] || {}).length : 0;
+    });
+    panel.querySelector('.scr-count').textContent = routeCount + ' routes / ' + dateCount + ' dates';
+  }
+
+  patchNetwork();
+  renderPanel();
 }
 
 (function(){
@@ -841,14 +653,163 @@ function cebpacFareQueuePayload(){
 
   var link = document.getElementById('cebpac-bookmarklet');
   if(link){
-    link.href = 'javascript:(' + minifyFn(cebpacBookmarkletPayload) + ')();';
+    link.href = 'javascript:(' + minifyFn(cebpacAvailabilityScraperPayload) + ')();';
   }
 
-  var linkFq = document.getElementById('cebpac-bookmarklet-fq');
-  if(linkFq){
-    linkFq.href = 'javascript:(' + minifyFn(cebpacFareQueuePayload) + ')();';
+  var linkScr = document.getElementById('cebpac-bookmarklet-scraper');
+  if(linkScr){
+    linkScr.href = 'javascript:(' + minifyFn(cebpacScraperPayload) + ')();';
   }
 })();
+
+const MANUAL_STORAGE_KEY = 'cebpac_manual_fares_v1';
+
+function loadManualStore(){
+  try { return JSON.parse(localStorage.getItem(MANUAL_STORAGE_KEY) || '{}'); }
+  catch(e){ return {}; }
+}
+function saveManualStore(store){
+  try { localStorage.setItem(MANUAL_STORAGE_KEY, JSON.stringify(store)); } catch(e){}
+}
+function saveManualFares(routeKey1, raw1, routeKey2, raw2){
+  const store = loadManualStore();
+  store.routes = store.routes || {};
+  store.routes[routeKey1] = { raw: raw1, savedAt: Date.now() };
+  store.routes[routeKey2] = { raw: raw2, savedAt: Date.now() };
+  store.lastUsed = { json1: routeKey1, json2: routeKey2 };
+  saveManualStore(store);
+}
+function restoreManualFares(){
+  const store = loadManualStore();
+  if(!store.routes || !store.lastUsed) return;
+  const r1 = store.routes[store.lastUsed.json1];
+  const r2 = store.routes[store.lastUsed.json2];
+  if(r1) document.getElementById('json1').value = r1.raw;
+  if(r2) document.getElementById('json2').value = r2.raw;
+}
+
+const AIRPORT_CITY = {
+  MNL:'Manila', CEB:'Cebu', DVO:'Davao', ILO:'Iloilo', BCD:'Bacolod', ZAM:'Zamboanga',
+  KLO:'Kalibo', PPS:'Puerto Princesa', TAG:'Tagbilaran', CGY:'Cagayan de Oro', DPL:'Dipolog',
+  SUG:'Surigao', TAC:'Tacloban', OZC:'Ozamiz', LGP:'Legazpi', WNP:'Naga', BXU:'Butuan',
+  MPH:'Boracay (Caticlan)', USU:'Busuanga (Coron)', TDG:'Roxas', SJI:'San Jose (Mindoro)',
+  DAD:'Da Nang', HAN:'Hanoi', SGN:'Ho Chi Minh City', HKG:'Hong Kong', DPS:'Bali (Denpasar)',
+  CGK:'Jakarta', SIN:'Singapore', BKK:'Bangkok', DMK:'Bangkok (Don Mueang)', USM:'Koh Samui',
+  TPE:'Taipei', KHH:'Kaohsiung', HND:'Tokyo (Haneda)', NRT:'Tokyo (Narita)', KIX:'Osaka',
+  NGO:'Nagoya', FUK:'Fukuoka', OKA:'Okinawa', ICN:'Seoul', PUS:'Busan', CJU:'Jeju',
+  KUL:'Kuala Lumpur', PEN:'Penang', BKI:'Kota Kinabalu', KCH:'Kuching', DXB:'Dubai',
+  DOH:'Doha', GUM:'Guam', SYD:'Sydney', MEL:'Melbourne', PER:'Perth', BNE:'Brisbane',
+  AUH:'Abu Dhabi', JED:'Jeddah', RUH:'Riyadh', DMM:'Dammam', CRK:'Clark', PVG:'Shanghai',
+  PEK:'Beijing', CAN:'Guangzhou', XMN:'Xiamen', MFM:'Macau', PNH:'Phnom Penh', RGN:'Yangon'
+};
+function cityName(code){ return AIRPORT_CITY[code] || code; }
+
+function refreshDestinationOptions(){
+  const source = document.getElementById('source').value.trim().toUpperCase();
+  const sel = document.getElementById('destSelect');
+  const prev = sel.value;
+  const routes = loadManualStore().routes || {};
+  const others = new Set();
+  Object.keys(routes).forEach(k => {
+    if(k.length !== 6) return;
+    const from = k.slice(0, 3), to = k.slice(3, 6);
+    if(from === source && routes[to + source]) others.add(to);
+    if(to === source && routes[source + to]) others.add(from);
+  });
+  const sorted = Array.from(others).sort((a, b) => cityName(a).localeCompare(cityName(b)));
+  sel.innerHTML = '<option value="">— choose —</option>' +
+    sorted.map(o => `<option value="${o}">${cityName(o)} (${o})</option>`).join('');
+  if(sorted.includes(prev)) sel.value = prev;
+}
+
+function applyDestinationPair(){
+  const source = document.getElementById('source').value.trim().toUpperCase();
+  const other = document.getElementById('destSelect').value;
+  if(!other) return;
+  const store = loadManualStore();
+  const outboundKey = source + other, inboundKey = other + source;
+  const outboundRoute = store.routes && store.routes[outboundKey];
+  const inboundRoute = store.routes && store.routes[inboundKey];
+  if(!outboundRoute || !inboundRoute) return;
+  document.getElementById('json1').value = outboundRoute.raw;
+  document.getElementById('json2').value = inboundRoute.raw;
+  store.lastUsed = { json1: outboundKey, json2: inboundKey };
+  saveManualStore(store);
+  saveFilters();
+  run();
+}
+
+const FILTERS_KEY = 'cebpac_filters_v1';
+
+function loadFilters(){
+  try { return JSON.parse(localStorage.getItem(FILTERS_KEY) || '{}'); }
+  catch(e){ return {}; }
+}
+
+function saveFilters(){
+  const filters = {
+    minDays: document.getElementById('minDays').value,
+    maxDays: document.getElementById('maxDays').value,
+    destination: document.getElementById('destSelect').value
+  };
+  try { localStorage.setItem(FILTERS_KEY, JSON.stringify(filters)); } catch(e){}
+}
+
+function restoreFilterInputs(){
+  const f = loadFilters();
+  if(f.minDays !== undefined) document.getElementById('minDays').value = f.minDays;
+  if(f.maxDays !== undefined) document.getElementById('maxDays').value = f.maxDays;
+  return f;
+}
+
+function importScrapedData(){
+  const errorEl = document.getElementById('error');
+  const statusEl = document.getElementById('importStatus');
+  errorEl.textContent = '';
+  statusEl.textContent = '';
+
+  const raw = window.prompt('Paste the JSON array copied from the Scraper bookmarklet:');
+  if(raw == null || !raw.trim()) return;
+
+  let arr;
+  try{
+    arr = JSON.parse(raw);
+    if(!Array.isArray(arr)) throw new Error('Expected a JSON array of fare blobs.');
+  }catch(e){
+    errorEl.textContent = 'Could not parse import data: ' + e.message;
+    return;
+  }
+
+  const store = loadManualStore();
+  store.routes = store.routes || {};
+  let imported = 0, skipped = 0;
+  arr.forEach(blob => {
+    let parsed;
+    try{ parsed = parseBlobObj(blob); }
+    catch(e){ skipped++; return; }
+    const routeKey = parsed.from + parsed.to;
+    store.routes[routeKey] = { raw: JSON.stringify(blob), savedAt: Date.now() };
+    imported++;
+  });
+  saveManualStore(store);
+  refreshDestinationOptions();
+
+  const sel = document.getElementById('destSelect');
+  const destCount = sel.options.length - 1;
+  if(destCount === 1){
+    sel.selectedIndex = 1;
+    applyDestinationPair();
+    statusEl.textContent = `Imported ${imported} route(s). Loaded the only available destination (${sel.value}).`;
+  } else if(destCount > 1){
+    statusEl.textContent = `Imported ${imported} route(s) across ${destCount} destinations` +
+      (skipped ? ` (skipped ${skipped} invalid entries)` : '') +
+      `. Pick one from the Destination dropdown above.`;
+  } else {
+    const currentSource = document.getElementById('source').value.trim().toUpperCase();
+    statusEl.textContent = `Imported ${imported} route(s), but no complete round-trip pair for source "${currentSource}" yet` +
+      (skipped ? ` (skipped ${skipped} invalid entries)` : '') + '.';
+  }
+}
 
 function parsePrice(str){
   str = String(str).trim();
@@ -858,8 +819,7 @@ function parsePrice(str){
   return parseFloat(str);
 }
 
-function parseBlob(raw){
-  const obj = JSON.parse(raw);
+function parseBlobObj(obj){
   const key = Object.keys(obj)[0];
   if(!key) throw new Error("No key found in JSON blob.");
   const [route, currency] = key.split('|');
@@ -873,6 +833,15 @@ function parseBlob(raw){
     price: parsePrice(dates[dtStr])
   })).filter(e => !isNaN(e.price) && !isNaN(e.date.getTime()));
   return { from, to, currency, entries };
+}
+
+function parseBlob(raw){
+  return parseBlobObj(JSON.parse(raw));
+}
+
+function toggleTier(id){
+  const el = document.getElementById(id);
+  if(el) el.classList.toggle('collapsed');
 }
 
 function fmtDate(d){
@@ -911,6 +880,11 @@ function run(){
     return;
   }
 
+  saveManualFares(
+    blob1.from + blob1.to, document.getElementById('json1').value.trim(),
+    blob2.from + blob2.to, document.getElementById('json2').value.trim()
+  );
+
   let outbound, inbound;
   if(blob1.from === source && blob2.to === source){
     outbound = blob1; inbound = blob2;
@@ -927,10 +901,7 @@ function run(){
     for(const ret of inbound.entries){
       const diffDays = Math.round((ret.date - out.date) / 86400000);
       if(diffDays >= minDays && diffDays <= maxDays){
-        combos.push({
-          out, ret, diffDays,
-          total: out.price + ret.price
-        });
+        combos.push({ out, ret, diffDays, total: out.price + ret.price });
       }
     }
   }
@@ -942,6 +913,7 @@ function run(){
 
   combos.sort((a,b) => a.total - b.total);
   const top = combos.slice(0, 10);
+  const rest = combos.slice(10);
 
   // split top results into 3 price tiers (cheapest bucket first)
   const tierCount = Math.min(3, top.length);
@@ -968,8 +940,8 @@ function run(){
     const minP = Math.min(...tierRows.map(r => r.total));
     const maxP = Math.max(...tierRows.map(r => r.total));
     const rangeLabel = minP === maxP ? fmtPrice(minP, currency) : `${fmtPrice(minP, currency)} – ${fmtPrice(maxP, currency)}`;
-    html += `<div class="tier">
-      <div class="tier-title"><span class="tier-dot" style="background:${tierMeta[i].color}"></span>${tierMeta[i].name} <span class="muted" style="font-weight:400;">(${rangeLabel})</span></div>
+    html += `<div class="tier" id="cebpac-tier-${i}">
+      <div class="tier-title" onclick="toggleTier('cebpac-tier-${i}')"><span class="tier-dot" style="background:${tierMeta[i].color}"></span>${tierMeta[i].name} <span class="muted" style="font-weight:400;">(${rangeLabel})</span><span class="tier-toggle">▾</span></div>
       <table>
         <thead><tr>
           <th>#</th><th>Depart (${outbound.from} → ${outbound.to})</th><th>Return (${inbound.from} → ${inbound.to})</th><th>Trip Length</th><th>Total Fare</th>
@@ -988,8 +960,492 @@ function run(){
     html += `</tbody></table></div>`;
   });
 
+  if(rest.length > 0){
+    const minP = Math.min(...rest.map(r => r.total));
+    const maxP = Math.max(...rest.map(r => r.total));
+    const rangeLabel = minP === maxP ? fmtPrice(minP, currency) : `${fmtPrice(minP, currency)} – ${fmtPrice(maxP, currency)}`;
+    html += `<div class="tier" id="cebpac-tier-rest">
+      <div class="tier-title" onclick="toggleTier('cebpac-tier-rest')"><span class="tier-dot" style="background:var(--muted)"></span>More Options <span class="muted" style="font-weight:400;">(${rangeLabel})</span><span class="tier-toggle">▾</span></div>
+      <table>
+        <thead><tr>
+          <th>#</th><th>Depart (${outbound.from} → ${outbound.to})</th><th>Return (${inbound.from} → ${inbound.to})</th><th>Trip Length</th><th>Total Fare</th>
+        </tr></thead>
+        <tbody>`;
+    rest.forEach(r => {
+      html += `<tr>
+        <td class="rank">${rank}</td>
+        <td>${fmtDate(r.out.date)}<br><span class="muted">${fmtPrice(r.out.price, currency)}</span></td>
+        <td>${fmtDate(r.ret.date)}<br><span class="muted">${fmtPrice(r.ret.price, currency)}</span></td>
+        <td>${r.diffDays} day${r.diffDays === 1 ? '' : 's'}</td>
+        <td class="price">${fmtPrice(r.total, currency)}</td>
+      </tr>`;
+      rank++;
+    });
+    html += `</tbody></table></div>`;
+  }
+
   resultsEl.innerHTML = html;
 }
+
+const MODE_KEY = 'cebpac_active_mode_v1';
+
+function switchMode(mode){
+  document.getElementById('fareSearchMode').hidden = mode !== 'fare';
+  document.getElementById('availabilityMode').hidden = mode !== 'availability';
+  document.querySelectorAll('.mode-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+  try { localStorage.setItem(MODE_KEY, mode); } catch(e){}
+}
+
+const AVAILABILITY_STORAGE_KEY = 'cebpac_availability_manual_v1';
+
+function loadAvailabilityStore(){
+  try { return JSON.parse(localStorage.getItem(AVAILABILITY_STORAGE_KEY) || '{}'); }
+  catch(e){ return {}; }
+}
+function saveAvailabilityStore(store){
+  try { localStorage.setItem(AVAILABILITY_STORAGE_KEY, JSON.stringify(store)); } catch(e){}
+}
+
+function refreshAvailabilityDestinationOptions(){
+  const source = document.getElementById('availSource').value.trim().toUpperCase();
+  const sel = document.getElementById('availDestSelect');
+  const prev = sel.value;
+  const routes = loadAvailabilityStore().routes || {};
+  const others = new Set();
+  Object.keys(routes).forEach(k => {
+    if(k.length !== 6) return;
+    const from = k.slice(0, 3), to = k.slice(3, 6);
+    if(from === source && routes[to + source]) others.add(to);
+    if(to === source && routes[source + to]) others.add(from);
+  });
+  const sorted = Array.from(others).sort((a, b) => cityName(a).localeCompare(cityName(b)));
+  sel.innerHTML = '<option value="">— choose —</option>' +
+    sorted.map(o => `<option value="${o}">${cityName(o)} (${o})</option>`).join('');
+  if(sorted.includes(prev)) sel.value = prev;
+}
+
+function safeDate(dateStr){
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? dateStr : fmtDate(d);
+}
+
+function gapHours(dateStrA, dateStrB){
+  return Math.abs(new Date(dateStrA) - new Date(dateStrB)) / 3600000;
+}
+
+function legSingleOptions(journeys, people){
+  return journeys
+    .filter(j => j.availableCount != null && j.availableCount >= people)
+    .map(j => ({ type: 'single', flights: [j], price: j.fareTotal * people }));
+}
+
+function legSplitOptions(journeys, people, maxGap){
+  const options = [];
+  for(let i = 0; i < journeys.length; i++){
+    for(let k = i + 1; k < journeys.length; k++){
+      const a = journeys[i], b = journeys[k];
+      if(a.availableCount == null || b.availableCount == null) continue;
+      if(a.availableCount < 1 || b.availableCount < 1) continue;
+      if(a.availableCount + b.availableCount < people) continue;
+      if(gapHours(a.departureDate, b.departureDate) > maxGap) continue;
+      const cheap = a.fareTotal <= b.fareTotal ? a : b;
+      const expensive = cheap === a ? b : a;
+      const cheapSeats = Math.min(cheap.availableCount, people);
+      const expensiveSeats = people - cheapSeats;
+      if(expensiveSeats > expensive.availableCount || expensiveSeats < 0) continue;
+      const price = cheap.fareTotal * cheapSeats + expensive.fareTotal * expensiveSeats;
+      options.push({
+        type: 'split',
+        flights: [
+          { journey: cheap, seats: cheapSeats },
+          { journey: expensive, seats: expensiveSeats }
+        ],
+        price
+      });
+    }
+  }
+  return options;
+}
+
+function optionDates(option){
+  return option.flights.map(f => new Date(f.departureDate || (f.journey && f.journey.departureDate)));
+}
+
+function outboundBoundaryDate(option){
+  return new Date(Math.max(...optionDates(option).map(d => d.getTime())));
+}
+
+function inboundBoundaryDate(option){
+  return new Date(Math.min(...optionDates(option).map(d => d.getTime())));
+}
+
+function tripDiffDays(outOption, retOption){
+  return Math.round((inboundBoundaryDate(retOption) - outboundBoundaryDate(outOption)) / 86400000);
+}
+
+// Real per-flight journeys carry fareClass/stops (even a direct flight has
+// stops:0); coarse calendar-only journeys have neither, so this naturally
+// renders nothing extra for those instead of a bogus "12:00am".
+function journeyTimeDetail(j){
+  if(j.fareClass == null && j.stops == null) return '';
+  const d = new Date(j.departureDate);
+  if(isNaN(d.getTime())) return '';
+  const bits = [d.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' })];
+  if(j.flightNumbers) bits.push(j.flightNumbers);
+  if(j.stops === 0) bits.push('direct');
+  else if(j.stops > 0) bits.push(j.stops + (j.stops === 1 ? ' stop' : ' stops'));
+  return ` <span class="muted">(${bits.join(' · ')})</span>`;
+}
+
+function legCellHtml(option, currency){
+  if(option.type === 'single'){
+    const j = option.flights[0];
+    return `${safeDate(j.departureDate)}${journeyTimeDetail(j)}<br><span class="muted">${fmtPrice(j.fareTotal, currency)}/pax · ${j.availableCount} seats avail</span>`;
+  }
+  return option.flights.map(f =>
+    `${safeDate(f.journey.departureDate)}${journeyTimeDetail(f.journey)} <span class="muted">— ${f.seats} pax @ ${fmtPrice(f.journey.fareTotal, currency)}/pax (${f.journey.availableCount} avail)</span>`
+  ).join('<br>');
+}
+
+function comboTableHtml(title, combos, currency, tierId){
+  const minP = Math.min(...combos.map(c => c.total));
+  const maxP = Math.max(...combos.map(c => c.total));
+  const rangeLabel = minP === maxP ? fmtPrice(minP, currency) : `${fmtPrice(minP, currency)} – ${fmtPrice(maxP, currency)}`;
+  let html = `<div class="tier" id="${tierId}">
+    <div class="tier-title" onclick="toggleTier('${tierId}')"><span class="tier-dot" style="background:var(--tier1)"></span>${title} <span class="muted" style="font-weight:400;">(${rangeLabel})</span><span class="tier-toggle">▾</span></div>
+    <table>
+      <thead><tr><th>#</th><th>Outbound</th><th>Return</th><th>Trip Length</th><th>Total</th></tr></thead>
+      <tbody>`;
+  combos.forEach((c, idx) => {
+    html += `<tr>
+      <td class="rank">${idx + 1}</td>
+      <td>${legCellHtml(c.out, currency)}</td>
+      <td>${legCellHtml(c.ret, currency)}</td>
+      <td>${c.diffDays} day${c.diffDays === 1 ? '' : 's'}</td>
+      <td class="price">${fmtPrice(c.total, currency)}</td>
+    </tr>`;
+  });
+  html += '</tbody></table></div>';
+  return html;
+}
+
+function computeAvailabilityCombos(){
+  const errorEl = document.getElementById('availError');
+  const resultsEl = document.getElementById('availResults');
+  errorEl.textContent = '';
+
+  const source = document.getElementById('availSource').value.trim().toUpperCase();
+  const other = document.getElementById('availDestSelect').value;
+  const peopleRaw = document.getElementById('availPeople').value.trim();
+  const gapRaw = document.getElementById('availMaxGapHours').value.trim();
+  const minDays = parseInt(document.getElementById('availMinDays').value, 10);
+  const maxDays = parseInt(document.getElementById('availMaxDays').value, 10);
+
+  if(!source || source.length !== 3){
+    resultsEl.innerHTML = '<p class="muted">Enter a valid 3-letter source code.</p>';
+    return;
+  }
+  if(!other){
+    resultsEl.innerHTML = '<p class="muted">Choose a destination to see combinations.</p>';
+    return;
+  }
+  if(peopleRaw === ''){
+    resultsEl.innerHTML = '<p class="muted">Enter the number of travelers to see combinations.</p>';
+    return;
+  }
+  const people = parseInt(peopleRaw, 10);
+  if(isNaN(people) || people < 1){
+    errorEl.textContent = 'Please enter a valid number of travelers (1 or more).';
+    resultsEl.innerHTML = '';
+    return;
+  }
+  if(isNaN(minDays) || isNaN(maxDays) || minDays > maxDays){
+    errorEl.textContent = 'Please enter a valid min/max days range (min ≤ max).';
+    resultsEl.innerHTML = '';
+    return;
+  }
+  let maxGap = parseFloat(gapRaw);
+  if(isNaN(maxGap) || maxGap < 0) maxGap = 24;
+
+  const routes = loadAvailabilityStore().routes || {};
+  const outboundRoute = routes[source + other];
+  const inboundRoute = routes[other + source];
+  if(!outboundRoute || !inboundRoute){
+    resultsEl.innerHTML = '<p class="muted">Missing captured availability data for one direction of this route.</p>';
+    return;
+  }
+
+  const outboundJourneys = Object.keys(outboundRoute.journeys || {}).map(k => outboundRoute.journeys[k]);
+  const inboundJourneys = Object.keys(inboundRoute.journeys || {}).map(k => inboundRoute.journeys[k]);
+  const currency = outboundRoute.currency || inboundRoute.currency || '';
+
+  const outboundSingles = legSingleOptions(outboundJourneys, people);
+  const inboundSingles = legSingleOptions(inboundJourneys, people);
+
+  const sameFlightCombos = [];
+  outboundSingles.forEach(o => {
+    inboundSingles.forEach(r => {
+      const diffDays = tripDiffDays(o, r);
+      if(diffDays >= minDays && diffDays <= maxDays){
+        sameFlightCombos.push({ out: o, ret: r, total: o.price + r.price, diffDays });
+      }
+    });
+  });
+  sameFlightCombos.sort((a, b) => a.total - b.total);
+
+  if(sameFlightCombos.length > 0){
+    resultsEl.innerHTML = comboTableHtml('Same Flight — Everyone Together', sameFlightCombos, currency, 'cebpac-avail-tier-same');
+    return;
+  }
+
+  const outboundOptions = outboundSingles.length > 0 ? outboundSingles : legSplitOptions(outboundJourneys, people, maxGap);
+  const inboundOptions = inboundSingles.length > 0 ? inboundSingles : legSplitOptions(inboundJourneys, people, maxGap);
+
+  const splitCombos = [];
+  outboundOptions.forEach(o => {
+    inboundOptions.forEach(r => {
+      const diffDays = tripDiffDays(o, r);
+      if(diffDays >= minDays && diffDays <= maxDays){
+        splitCombos.push({ out: o, ret: r, total: o.price + r.price, diffDays });
+      }
+    });
+  });
+  splitCombos.sort((a, b) => a.total - b.total);
+
+  if(splitCombos.length === 0){
+    resultsEl.innerHTML = `<p class="muted">No single-flight or split-flight combination fits ${people} traveler(s) within a ${maxGap}h gap and a ${minDays}-${maxDays} day trip length. Try a larger gap, a wider day range, or fewer travelers.</p>`;
+    return;
+  }
+
+  const note = `<p class="muted" style="margin-bottom:12px;">No single flight seats ${people} together on both legs — showing the cheapest combinations where a leg is split across two flights within ${maxGap}h of each other.</p>`;
+  resultsEl.innerHTML = note + comboTableHtml('Split Flights — Cheapest Combinations', splitCombos, currency, 'cebpac-avail-tier-split');
+}
+
+const AVAIL_FILTERS_KEY = 'cebpac_availability_filters_v1';
+
+function saveAvailFilters(){
+  const filters = {
+    source: document.getElementById('availSource').value,
+    destination: document.getElementById('availDestSelect').value,
+    people: document.getElementById('availPeople').value,
+    minDays: document.getElementById('availMinDays').value,
+    maxDays: document.getElementById('availMaxDays').value,
+    maxGapHours: document.getElementById('availMaxGapHours').value
+  };
+  try { localStorage.setItem(AVAIL_FILTERS_KEY, JSON.stringify(filters)); } catch(e){}
+}
+
+function loadAvailFilters(){
+  try { return JSON.parse(localStorage.getItem(AVAIL_FILTERS_KEY) || '{}'); }
+  catch(e){ return {}; }
+}
+
+function restoreAvailFilterInputs(){
+  const f = loadAvailFilters();
+  if(f.source !== undefined) document.getElementById('availSource').value = f.source;
+  if(f.people !== undefined) document.getElementById('availPeople').value = f.people;
+  if(f.minDays !== undefined) document.getElementById('availMinDays').value = f.minDays;
+  if(f.maxDays !== undefined) document.getElementById('availMaxDays').value = f.maxDays;
+  if(f.maxGapHours !== undefined) document.getElementById('availMaxGapHours').value = f.maxGapHours;
+  return f;
+}
+
+function importAvailabilityData(){
+  const errorEl = document.getElementById('availError');
+  const statusEl = document.getElementById('availImportStatus');
+  errorEl.textContent = '';
+  statusEl.textContent = '';
+
+  const raw = window.prompt('Paste the JSON object copied from the Availability bookmarklet:');
+  if(raw == null || !raw.trim()) return;
+
+  let obj;
+  try{
+    obj = JSON.parse(raw);
+    if(!obj || typeof obj !== 'object' || Array.isArray(obj)) throw new Error('Expected a JSON object of routes.');
+  }catch(e){
+    errorEl.textContent = 'Could not parse import data: ' + e.message;
+    return;
+  }
+
+  const store = loadAvailabilityStore();
+  store.routes = store.routes || {};
+  let importedRoutes = 0, importedJourneys = 0;
+  Object.keys(obj).forEach(routeKey => {
+    const incoming = obj[routeKey];
+    if(!incoming || typeof incoming !== 'object' || !incoming.journeys) return;
+
+    // Merge into the existing route (by journeyKey) rather than replacing
+    // it wholesale -- otherwise a later import covering a narrower date
+    // range would silently drop every previously-saved date for this route
+    // that isn't in the new paste.
+    const routeEntry = store.routes[routeKey] || { origin: incoming.origin, destination: incoming.destination, currency: incoming.currency, journeys: {} };
+    routeEntry.origin = incoming.origin || routeEntry.origin;
+    routeEntry.destination = incoming.destination || routeEntry.destination;
+    routeEntry.currency = incoming.currency || routeEntry.currency;
+    routeEntry.journeys = routeEntry.journeys || {};
+
+    Object.keys(incoming.journeys).forEach(journeyKey => {
+      const incomingJourney = incoming.journeys[journeyKey];
+      const existing = routeEntry.journeys[journeyKey];
+      if(existing && existing.seq != null && incomingJourney.seq != null && incomingJourney.seq < existing.seq) return;
+      routeEntry.journeys[journeyKey] = incomingJourney;
+    });
+
+    // A real per-flight journey (has a fareClass) always supersedes a
+    // coarse calendar-only entry for the same date -- whichever side (the
+    // data already saved, or this import) happened to capture the precise
+    // one, the coarse one for that date shouldn't keep sitting alongside it.
+    const preciseDates = {};
+    Object.keys(routeEntry.journeys).forEach(k => {
+      const j = routeEntry.journeys[k];
+      if(j.fareClass != null && j.departureDate) preciseDates[j.departureDate.slice(0, 10)] = true;
+    });
+    Object.keys(routeEntry.journeys).forEach(k => {
+      const j = routeEntry.journeys[k];
+      if(j.fareClass == null && j.departureDate && preciseDates[j.departureDate.slice(0, 10)]) delete routeEntry.journeys[k];
+    });
+
+    store.routes[routeKey] = routeEntry;
+    importedRoutes++;
+    importedJourneys += Object.keys(incoming.journeys).length;
+  });
+  saveAvailabilityStore(store);
+  refreshAvailabilityDestinationOptions();
+  computeAvailabilityCombos();
+  saveAvailFilters();
+
+  statusEl.textContent = `Imported ${importedRoutes} route(s), ${importedJourneys} journey(s) from the paste, merged into existing data (nothing dropped). ` +
+    `${Object.keys(store.routes).length} route(s) saved total.`;
+}
+
+// Downloads the same shape importAvailabilityData() expects to paste back in
+// (a plain object keyed by routeKey, each with a `journeys` map) -- so the
+// exported file round-trips through Import as-is.
+function exportAvailabilityData(){
+  const errorEl = document.getElementById('availError');
+  const statusEl = document.getElementById('availImportStatus');
+  errorEl.textContent = '';
+  statusEl.textContent = '';
+
+  const routes = loadAvailabilityStore().routes || {};
+  const routeCount = Object.keys(routes).length;
+  if(routeCount === 0){
+    errorEl.textContent = 'No availability data captured yet -- nothing to export.';
+    return;
+  }
+  const journeyCount = Object.keys(routes).reduce((sum, k) => sum + Object.keys(routes[k].journeys || {}).length, 0);
+
+  const blob = new Blob([JSON.stringify(routes, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'cebpac-availability-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+
+  statusEl.textContent = `Exported ${routeCount} route(s), ${journeyCount} journey(s).`;
+}
+
+// Removes old day-level estimate entries (no fareClass -- captured before
+// the tool read real per-flight data), keeping any real captured flights
+// untouched. Leaves a gap where an estimate used to be, rather than a
+// stale/possibly-wrong number, until that date gets re-scraped.
+function clearEstimateAvailability(){
+  const errorEl = document.getElementById('availError');
+  const statusEl = document.getElementById('availImportStatus');
+  errorEl.textContent = '';
+  statusEl.textContent = '';
+
+  const store = loadAvailabilityStore();
+  const routes = store.routes || {};
+  let removed = 0, keptReal = 0;
+  Object.keys(routes).forEach(routeKey => {
+    const journeys = routes[routeKey].journeys || {};
+    Object.keys(journeys).forEach(journeyKey => {
+      if(journeys[journeyKey].fareClass != null){ keptReal++; return; }
+      delete journeys[journeyKey];
+      removed++;
+    });
+  });
+
+  if(removed === 0){
+    errorEl.textContent = 'No estimate-only entries to clear -- everything saved is already real captured flight data.';
+    return;
+  }
+  if(!confirm(`Remove ${removed} old estimate-only date(s)? ${keptReal} real captured flight(s) will be kept. This can't be undone (re-scrape to bring dates back).`)) return;
+
+  saveAvailabilityStore(store);
+  refreshAvailabilityDestinationOptions();
+  computeAvailabilityCombos();
+
+  statusEl.textContent = `Cleared ${removed} estimate-only date(s). ${keptReal} real captured flight(s) kept.`;
+}
+
+function initManualPage(){
+  restoreManualFares();
+  const f = restoreFilterInputs();
+  refreshDestinationOptions();
+
+  const store = loadManualStore();
+  const sel = document.getElementById('destSelect');
+  let destToSelect = null;
+  if(f.destination && Array.from(sel.options).some(o => o.value === f.destination)){
+    destToSelect = f.destination;
+  } else if(store.lastUsed && store.lastUsed.json1 && store.lastUsed.json1.length === 6){
+    destToSelect = store.lastUsed.json1.slice(3, 6);
+  }
+  if(destToSelect && Array.from(sel.options).some(o => o.value === destToSelect)){
+    sel.value = destToSelect;
+  }
+
+  document.getElementById('source').addEventListener('input', refreshDestinationOptions);
+  document.getElementById('destSelect').addEventListener('change', applyDestinationPair);
+  document.getElementById('minDays').addEventListener('input', saveFilters);
+  document.getElementById('maxDays').addEventListener('input', saveFilters);
+
+  const af = restoreAvailFilterInputs();
+  refreshAvailabilityDestinationOptions();
+  const availSel = document.getElementById('availDestSelect');
+  if(af.destination && Array.from(availSel.options).some(o => o.value === af.destination)){
+    availSel.value = af.destination;
+  }
+  computeAvailabilityCombos();
+
+  document.getElementById('availSource').addEventListener('input', () => {
+    refreshAvailabilityDestinationOptions();
+    computeAvailabilityCombos();
+    saveAvailFilters();
+  });
+  document.getElementById('availDestSelect').addEventListener('change', () => {
+    computeAvailabilityCombos();
+    saveAvailFilters();
+  });
+  document.getElementById('availPeople').addEventListener('input', () => {
+    computeAvailabilityCombos();
+    saveAvailFilters();
+  });
+  document.getElementById('availMinDays').addEventListener('input', () => {
+    computeAvailabilityCombos();
+    saveAvailFilters();
+  });
+  document.getElementById('availMaxDays').addEventListener('input', () => {
+    computeAvailabilityCombos();
+    saveAvailFilters();
+  });
+  document.getElementById('availMaxGapHours').addEventListener('input', () => {
+    computeAvailabilityCombos();
+    saveAvailFilters();
+  });
+
+  let savedMode = 'fare';
+  try { savedMode = localStorage.getItem(MODE_KEY) || 'fare'; } catch(e){}
+  switchMode(savedMode === 'availability' ? 'availability' : 'fare');
+}
+
+initManualPage();
 </script>
 
   <script src="pwa-register.js"></script>
