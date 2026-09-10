@@ -38,6 +38,7 @@ class TimeChart extends HTMLElement {
         .legend-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #1a1917; text-transform: capitalize; }
         .legend-val { color: #6b6860; font-size: 10px; white-space: nowrap; }
         .legend-pct { color: #9c9a94; font-size: 10px; font-variant-numeric: tabular-nums; width: 30px; text-align: right; flex-shrink: 0; }
+        :host([no-legend]) .legend { display: none; }
 
         .tooltip {
           position: fixed; background: #1a1917; color: #fff; padding: 6px 10px; border-radius: 6px;
@@ -86,7 +87,10 @@ class TimeChart extends HTMLElement {
     if (totalMinutes < 60) return totalMinutes + 'm';
     const days = Math.floor(totalMinutes / 1440);
     const hours = Math.floor((totalMinutes % 1440) / 60);
-    if (days > 0) return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+    if (days > 0) {
+      if (days === 1 && hours === 0) return '24h'; // a full single day reads clearer as "24h" than "1d"
+      return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+    }
     const minutes = totalMinutes % 60;
     return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
   }
@@ -150,9 +154,7 @@ class TimeChart extends HTMLElement {
 
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillStyle = '#1a1917'; ctx.font = '600 13px system-ui';
-    ctx.fillText(this._fmtHours(total), cx, cy - 6);
-    ctx.fillStyle = '#9c9a94'; ctx.font = '10px system-ui';
-    ctx.fillText('logged', cx, cy + 10);
+    ctx.fillText(this._fmtHours(total), cx, cy);
 
     this.legend.innerHTML = calculated.map(s => `
       <div class="legend-item">

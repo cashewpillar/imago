@@ -34,6 +34,7 @@ const APP_SHELL = [
   './seldom/4d-playground.html',
   './seldom/cebpac-flight-finder.html',
   './seldom/meralco-multi-account.html',
+  './seldom/time.html',
   './seldom/ulam-spiral.html',
   // END GENERATED HTML PAGES
   './scripts/dexie.min.js',
