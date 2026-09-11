@@ -90,7 +90,7 @@
     width:15px; height:15px; color:var(--chalk-faint); pointer-events:none;
   }
   .search-wrap input{ font-size:13px; padding:8px 12px 8px 34px; }
-  input[type="search"], input[type="text"], input[type="number"], select, textarea{
+  input[type="search"], input[type="text"], input[type="number"], input[type="date"], select, textarea{
     font-family:'Work Sans', sans-serif;
     background:var(--bg-inset);
     border:1px solid var(--line);
@@ -102,9 +102,11 @@
     transition:border-color .15s;
   }
   select{ padding-left:12px; }
-  input[type="text"]:not(.search-wrap input), input[type="number"], textarea{ padding-left:12px; }
+  input[type="text"]:not(.search-wrap input), input[type="number"], input[type="date"], textarea{ padding-left:12px; }
   input:focus, select:focus, textarea:focus{ outline:none; border-color:var(--accent); }
   input::placeholder{ color:var(--chalk-faint); }
+  input[type="date"]::-webkit-calendar-picker-indicator{ cursor:pointer; opacity:0.6; }
+  input[type="date"]::-webkit-calendar-picker-indicator:hover{ opacity:1; }
 
   .view-toggle{
     display:flex; background:var(--bg-inset); border:1px solid var(--line);
@@ -723,7 +725,7 @@
     <div class="field">
       <label>Last Prepared <span style="text-transform:none;letter-spacing:0;color:var(--chalk-faint);">(optional)</span></label>
       <div style="display:flex; gap:8px; align-items:center;">
-        <input type="date" id="dishLastPreparedInput" style="padding-left:12px; flex:1;">
+        <input type="date" id="dishLastPreparedInput" style="flex:1;">
         <button type="button" id="dishSetTodayBtn" class="btn ghost" style="padding:6px 12px; font-size:12px; height:auto; width:auto; white-space:nowrap;">Today</button>
       </div>
     </div>
@@ -813,6 +815,17 @@
       <label>Where <span style="text-transform:none;letter-spacing:0;color:var(--chalk-faint);">(optional)</span></label>
       <input type="text" id="purchaseLocationInput" placeholder="e.g. SM Supermarket, Puregold" list="purchaseLocationList">
       <datalist id="purchaseLocationList"></datalist>
+    </div>
+    <div class="field">
+      <label>Quantity <span style="text-transform:none;letter-spacing:0;color:var(--chalk-faint);">(optional)</span></label>
+      <div style="display:grid; grid-template-columns:1fr 90px; gap:6px;">
+        <input type="text" id="purchaseQtyInput" class="mono" placeholder="qty" style="padding-left:12px;">
+        <input type="text" id="purchaseUnitInput" placeholder="unit" style="padding-left:12px;">
+      </div>
+    </div>
+    <div class="field">
+      <label>Note <span style="text-transform:none;letter-spacing:0;color:var(--chalk-faint);">(optional)</span></label>
+      <textarea id="purchaseNoteInput" rows="2" placeholder="Brand, size, condition…" style="padding-left:12px; resize:vertical;"></textarea>
     </div>
     <div class="modal-actions">
       <button class="btn ghost" id="cancelPurchaseBtn">Skip</button>
@@ -1191,12 +1204,16 @@
           ? `<span class="ph-price">₱${Number(h.price).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2})}</span>`
           : `<span style="color:var(--chalk-faint);">—</span>`;
         const locStr = h.location ? escapeHtml(h.location) : `<span style="color:var(--chalk-faint);">—</span>`;
-        return `<tr><td>${dateStr}</td><td>${priceStr}</td><td>${locStr}</td></tr>`;
+        const qtyStr = h.qty ? escapeHtml([h.qty, h.unit].filter(Boolean).join(' ')) : `<span style="color:var(--chalk-faint);">—</span>`;
+        const noteStr = h.note
+          ? `<span title="${escapeHtml(h.note)}" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px; display:inline-block; vertical-align:bottom;">${escapeHtml(h.note)}</span>`
+          : `<span style="color:var(--chalk-faint);">—</span>`;
+        return `<tr><td>${dateStr}</td><td>${priceStr}</td><td>${locStr}</td><td>${qtyStr}</td><td>${noteStr}</td></tr>`;
       }).join('');
 
       slot.innerHTML = `${statsHtml}
         <table class="ph-table">
-          <thead><tr><th>Date</th><th>Price</th><th>Where</th></tr></thead>
+          <thead><tr><th>Date</th><th>Price</th><th>Where</th><th>Qty</th><th>Note</th></tr></thead>
           <tbody>${rowsHtml}</tbody>
         </table>
         <button class="ph-log-btn" data-ph-log="${ingId}">+ Log another purchase</button>`;
@@ -1258,6 +1275,14 @@
     const allLocations = [...new Set(recent.map(h => h.location).filter(Boolean))];
     document.getElementById('purchaseLocationList').innerHTML = allLocations.map(l => `<option value="${escapeHtml(l)}">`).join('');
 
+    // Qty is per-purchase (varies each time) so it always starts blank; unit tends to stay
+    // the same for a given ingredient, so pre-fill it from the most recent purchase.
+    document.getElementById('purchaseQtyInput').value = '';
+    document.getElementById('purchaseUnitInput').value = recent[0]?.unit || '';
+
+    // Note is specific to this purchase instance, so it always starts blank.
+    document.getElementById('purchaseNoteInput').value = '';
+
     // Clear custom price when user types (deselects pill)
     document.getElementById('purchasePriceInput').oninput = () => {
       pillsEl.querySelectorAll('.price-pill').forEach(b => b.classList.remove('active'));
@@ -1273,8 +1298,11 @@
     const priceRaw = document.getElementById('purchasePriceInput').value;
     const price = priceRaw !== '' ? parseFloat(priceRaw) : null;
     const location = document.getElementById('purchaseLocationInput').value.trim() || null;
+    const qty = document.getElementById('purchaseQtyInput').value.trim() || null;
+    const unit = document.getElementById('purchaseUnitInput').value.trim() || null;
+    const note = document.getElementById('purchaseNoteInput').value.trim() || null;
     if(db.purchaseHistory){
-      await db.purchaseHistory.put({ id: uuid(), ingredientId: ingId, date, price, location, updatedAt: nowISO() });
+      await db.purchaseHistory.put({ id: uuid(), ingredientId: ingId, date, price, location, qty, unit, note, updatedAt: nowISO() });
     }
     document.getElementById('purchaseOverlay').classList.remove('show');
     _purchaseIngId = null;
