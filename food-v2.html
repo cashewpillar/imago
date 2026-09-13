@@ -1256,6 +1256,15 @@
   let _editingPurchaseId = null;
   const expandedIngRows = new Set();
 
+  // Suggestions drawn from every purchase ever logged, not just this ingredient's —
+  // a store you've bought other things at is still worth suggesting here.
+  async function refreshLocationDatalist(){
+    const list = document.getElementById('purchaseLocationList');
+    const history = db.purchaseHistory ? await db.purchaseHistory.toArray() : [];
+    const locations = [...new Set(history.map(h => h.location).filter(Boolean))].sort((a,b) => a.localeCompare(b));
+    list.innerHTML = locations.map(l => `<option value="${escapeHtml(l)}">`).join('');
+  }
+
   async function openPurchaseModal(ingId, e){
     if(e) e.stopPropagation();
     _purchaseIngId = ingId;
@@ -1303,8 +1312,7 @@
     // Pre-fill location from most recent purchase + populate datalist
     const lastLocation = recent[0]?.location || '';
     document.getElementById('purchaseLocationInput').value = lastLocation;
-    const allLocations = [...new Set(recent.map(h => h.location).filter(Boolean))];
-    document.getElementById('purchaseLocationList').innerHTML = allLocations.map(l => `<option value="${escapeHtml(l)}">`).join('');
+    await refreshLocationDatalist();
 
     // Qty is per-purchase (varies each time) so it always starts blank; unit tends to stay
     // the same for a given ingredient, so pre-fill it from the most recent purchase.
@@ -1358,8 +1366,7 @@
         document.getElementById('purchasePriceInput').value = btn.dataset.price;
       });
     });
-    const allLocations = [...new Set(recent.map(h => h.location).filter(Boolean))];
-    document.getElementById('purchaseLocationList').innerHTML = allLocations.map(l => `<option value="${escapeHtml(l)}">`).join('');
+    await refreshLocationDatalist();
 
     document.getElementById('purchasePriceInput').oninput = () => {
       pillsEl.querySelectorAll('.price-pill').forEach(b => b.classList.remove('active'));
