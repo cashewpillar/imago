@@ -2041,9 +2041,7 @@
     const plannedDishIds = new Set(plannedDishes.map(i => i.id));
 
     const plannedDemand = {};
-    const usageByIngredient = {};
     itemIngredients.forEach(j => {
-      (usageByIngredient[j.ingredientId] ||= []).push(j);
       if(plannedDishIds.has(j.itemId)){
         (plannedDemand[j.ingredientId] ||= []).push({
           dishName: itemsById[j.itemId]?.name || 'Dish',
@@ -2070,7 +2068,7 @@
       list = list.filter(i => (i.stockStatus || 'out') === pantryFilter);
     }
 
-    list = [...list].sort((a,b) => (usageByIngredient[b.id]?.length||0) - (usageByIngredient[a.id]?.length||0) || a.name.localeCompare(b.name));
+    list = [...list].sort((a,b) => a.name.localeCompare(b.name));
 
     const headerOpen = `
       <div class="grocery-section" style="margin-bottom:14px; padding:14px 16px;">
@@ -2363,12 +2361,15 @@
         toBuyIngredients.push(reqInfo);
       }
     });
+    toBuyIngredients.sort((a,b) => a.ing.name.localeCompare(b.ing.name));
+    inStockIngredientsForPlan.sort((a,b) => a.ing.name.localeCompare(b.ing.name));
 
     let activeCustomToBuy = customGrocery.filter(g => !g.bought);
     if(searchTerm){
       const q = normalize(searchTerm);
       activeCustomToBuy = activeCustomToBuy.filter(g => normalize(g.name).includes(q));
     }
+    activeCustomToBuy = [...activeCustomToBuy].sort((a,b) => a.name.localeCompare(b.name));
 
     const totalToBuyCount = toBuyIngredients.length + activeCustomToBuy.length;
 
