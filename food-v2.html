@@ -977,6 +977,7 @@
   let currentTab = 'dishes'; // 'dishes', 'ingredients', 'grocery'
   let dishFilter = 'all'; // 'all', 'planned', 'dishes', 'snacks'
   let pantryFilter = 'all'; // 'all', 'planned', 'in_stock', 'low', 'out'
+  let groceryViewMode = 'list'; // 'list' (to buy), 'recent' (purchase history)
   const collapsedTags = new Set();
   const collapsedGroceryTags = new Set();
   const expandedDishRows = new Set();
@@ -2356,12 +2357,70 @@
         </div>`;
       }).join('');
 
+    const recentPurchasesHtml = await (async () => {
+      const history = db.purchaseHistory ? await db.purchaseHistory.toArray() : [];
+      if(history.length === 0){
+        return `<div style="text-align:center; padding:14px; color:var(--chalk-faint); font-size:13px;">
+          No purchases logged yet — mark items as bought on the shopping list to start building history.
+        </div>`;
+      }
+
+      const byDate = {};
+      history.forEach(h => { (byDate[h.date || 'unknown'] ||= []).push(h); });
+      const sortedDates = Object.keys(byDate).sort((a,b) => b.localeCompare(a));
+
+      return sortedDates.map(date => {
+        const entries = byDate[date].slice().sort((a,b) => (b.updatedAt||'').localeCompare(a.updatedAt||''));
+        const key = `recent:${date}`;
+        const isCollapsed = collapsedGroceryTags.has(key);
+        const dateStr = date !== 'unknown'
+          ? new Date(date + 'T00:00:00').toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric', year:'numeric'})
+          : 'Unknown date';
+
+        const rowsHtml = entries.map(h => {
+          const ing = ingById[h.ingredientId];
+          const name = ing ? escapeHtml(ing.name) : '<span style="color:var(--chalk-faint);">Deleted ingredient</span>';
+          const priceStr = h.price != null
+            ? `<span class="ph-price">₱${Number(h.price).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2})}</span>`
+            : `<span style="color:var(--chalk-faint);">—</span>`;
+          const locStr = h.location ? escapeHtml(h.location) : `<span style="color:var(--chalk-faint);">—</span>`;
+          const qtyStr = h.qty ? escapeHtml([h.qty, h.unit].filter(Boolean).join(' ')) : `<span style="color:var(--chalk-faint);">—</span>`;
+          const noteStr = h.note
+            ? `<span title="${escapeHtml(h.note)}" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px; display:inline-block; vertical-align:bottom;">${escapeHtml(h.note)}</span>`
+            : `<span style="color:var(--chalk-faint);">—</span>`;
+          return `<tr><td>${name}</td><td>${priceStr}</td><td>${locStr}</td><td>${qtyStr}</td><td>${noteStr}</td></tr>`;
+        }).join('');
+
+        return `<div class="grocery-tag-group ${isCollapsed ? 'collapsed' : ''}" style="margin-bottom:14px;">
+          <div class="grocery-tag-title" data-grocery-tag="${key}" style="font-family:'Kalam', cursive; font-size:15px; font-weight:700; color:var(--chalk); margin:10px 0 6px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px dashed var(--line); padding-bottom:4px; cursor:pointer; user-select:none;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span class="chevron" style="font-size:11px; font-family:'Work Sans',sans-serif; color:var(--chalk-faint); font-weight:600; width:12px; display:inline-block;">${isCollapsed ? '▶' : '▼'}</span>
+              <span>${dateStr}</span>
+            </div>
+            <span style="font-family:'Work Sans',sans-serif; font-size:11px; color:var(--chalk-faint); font-weight:600;">${entries.length} ${entries.length===1?'item':'items'}</span>
+          </div>
+          <div style="${isCollapsed ? 'display:none;' : ''}">
+            <table class="ph-table">
+              <thead><tr><th>Item</th><th>Price</th><th>Where</th><th>Qty</th><th>Note</th></tr></thead>
+              <tbody>${rowsHtml}</tbody>
+            </table>
+          </div>
+        </div>`;
+      }).join('');
+    })();
+
     const shoppingListHtml = `
       <div class="grocery-section">
         <div class="grocery-section-title">
           <span>🛒 Shopping List</span>
         </div>
 
+        <div class="filter-bar" style="margin:0 0 12px;">
+          <button class="filter-pill ${groceryViewMode==='list'?'active':''}" data-gview="list">To Buy</button>
+          <button class="filter-pill ${groceryViewMode==='recent'?'active':''}" data-gview="recent">Recent Purchases</button>
+        </div>
+
+        ${groceryViewMode === 'recent' ? recentPurchasesHtml : `
         ${shoppingListItemsHtml}
 
         <form class="add-custom-buy" id="addCustomForm">
@@ -2395,9 +2454,18 @@
             </div>
           </div>`;
         })() : ''}
+        `}
       </div>`;
 
     container.innerHTML = shoppingListHtml;
+
+    container.querySelectorAll('.filter-pill[data-gview]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        groceryViewMode = btn.dataset.gview;
+        saveUIState();
+        render();
+      });
+    });
 
     container.querySelectorAll('.grocery-tag-title').forEach(title => {
       title.addEventListener('click', () => {
@@ -2488,6 +2556,7 @@
       currentTab,
       dishFilter,
       pantryFilter,
+      groceryViewMode,
       expandedDishRows: Array.from(expandedDishRows),
       expandedIngRows: Array.from(expandedIngRows),
       collapsedTags: Array.from(collapsedTags),
@@ -2505,6 +2574,7 @@
       if(s.currentTab) currentTab = s.currentTab;
       if(s.dishFilter) dishFilter = s.dishFilter;
       if(s.pantryFilter) pantryFilter = s.pantryFilter;
+      if(s.groceryViewMode) groceryViewMode = s.groceryViewMode;
       if(Array.isArray(s.expandedDishRows)){ expandedDishRows.clear(); s.expandedDishRows.forEach(id => expandedDishRows.add(id)); }
       if(Array.isArray(s.expandedIngRows)){ expandedIngRows.clear(); s.expandedIngRows.forEach(id => expandedIngRows.add(id)); }
       if(Array.isArray(s.collapsedTags)){ collapsedTags.clear(); s.collapsedTags.forEach(t => collapsedTags.add(t)); }
