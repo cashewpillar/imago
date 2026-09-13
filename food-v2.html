@@ -208,6 +208,8 @@
   .dish-pills{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
   .dish-last-prepared{ font-size:11.5px; color:var(--chalk-faint); margin-top:2px; }
 
+  .dish-row{ cursor:pointer; }
+
   /* Collapsible ingredients cell */
   .ing-cell{ cursor:pointer; }
   .ing-cell-collapsed{
@@ -403,6 +405,8 @@
   .ph-table td{ padding:4px 8px 4px 0; color:var(--chalk-dim); vertical-align:top;
     border-top:1px solid var(--line); }
   .ph-table td:first-child{ color:var(--chalk); font-weight:500; white-space:nowrap; }
+  .ph-row{ cursor:pointer; }
+  .ph-row:hover td{ background:var(--bg-inset); }
   .ph-price{ color:var(--sage) !important; font-weight:700 !important; }
   .ph-empty{ font-size:12px; color:var(--chalk-faint); font-style:italic; padding:4px 0; }
   .ph-log-btn{ font-size:11.5px; font-weight:600; color:var(--accent); background:none; border:none;
@@ -807,9 +811,12 @@
       <input type="date" id="purchaseDateInput">
     </div>
     <div class="field">
-      <label>Price <span style="text-transform:none;letter-spacing:0;color:var(--chalk-faint);">(optional)</span></label>
+      <label>Price per unit <span style="text-transform:none;letter-spacing:0;color:var(--chalk-faint);">(optional)</span></label>
       <div id="purchasePricePills" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
-      <input type="number" id="purchasePriceInput" placeholder="Custom price" min="0" step="0.01" style="padding-left:12px;">
+      <div style="display:grid; grid-template-columns:1fr 90px; gap:6px;">
+        <input type="number" id="purchasePriceInput" placeholder="Custom price" min="0" step="0.01" style="padding-left:12px;">
+        <input type="text" id="purchaseUnitInput" placeholder="unit" style="padding-left:12px;">
+      </div>
     </div>
     <div class="field">
       <label>Where <span style="text-transform:none;letter-spacing:0;color:var(--chalk-faint);">(optional)</span></label>
@@ -818,16 +825,14 @@
     </div>
     <div class="field">
       <label>Quantity <span style="text-transform:none;letter-spacing:0;color:var(--chalk-faint);">(optional)</span></label>
-      <div style="display:grid; grid-template-columns:1fr 90px; gap:6px;">
-        <input type="text" id="purchaseQtyInput" class="mono" placeholder="qty" style="padding-left:12px;">
-        <input type="text" id="purchaseUnitInput" placeholder="unit" style="padding-left:12px;">
-      </div>
+      <input type="text" id="purchaseQtyInput" class="mono" placeholder="e.g. 2.5" style="padding-left:12px;">
     </div>
     <div class="field">
       <label>Note <span style="text-transform:none;letter-spacing:0;color:var(--chalk-faint);">(optional)</span></label>
       <textarea id="purchaseNoteInput" rows="2" placeholder="Brand, size, condition…" style="padding-left:12px; resize:vertical;"></textarea>
     </div>
     <div class="modal-actions">
+      <button class="btn danger" id="btnDeletePurchase" style="margin-right:auto; display:none;">Delete</button>
       <button class="btn ghost" id="cancelPurchaseBtn">Skip</button>
       <button class="btn primary" id="savePurchaseBtn">✓ Mark in stock</button>
     </div>
@@ -1001,6 +1006,17 @@
 
   function escapeHtml(str){
     return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function formatMoney(n){
+    return `₱${Number(n).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2})}`;
+  }
+
+  // price is per-unit; total = price × qty, only when both are known numbers
+  function purchaseTotal(h){
+    const q = parseFloat(h.qty);
+    if(h.price == null || !isFinite(q)) return null;
+    return h.price * q;
   }
 
   function tallySVG(count){
@@ -1194,7 +1210,7 @@
 
       const statsHtml = `<div style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:8px;">
         <span style="font-size:11.5px; color:var(--chalk-faint);">Last bought: <strong style="color:var(--chalk);">${lastDateStr}</strong>${lastEntry.location ? ` at <strong style="color:var(--chalk);">${escapeHtml(lastEntry.location)}</strong>` : ''}</span>
-        ${avgPrice != null ? `<span style="font-size:11.5px; color:var(--chalk-faint);">Avg price: <strong class="ph-price">₱${avgPrice.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2})}</strong></span>` : ''}
+        ${avgPrice != null ? `<span style="font-size:11.5px; color:var(--chalk-faint);">Avg price/unit: <strong class="ph-price">${formatMoney(avgPrice)}</strong></span>` : ''}
       </div>`;
 
       const rowsHtml = entries.map(h => {
@@ -1202,19 +1218,21 @@
           ? new Date(h.date + 'T00:00:00').toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'})
           : '—';
         const priceStr = h.price != null
-          ? `<span class="ph-price">₱${Number(h.price).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2})}</span>`
+          ? `<span class="ph-price">${formatMoney(h.price)}</span>`
           : `<span style="color:var(--chalk-faint);">—</span>`;
         const locStr = h.location ? escapeHtml(h.location) : `<span style="color:var(--chalk-faint);">—</span>`;
         const qtyStr = h.qty ? escapeHtml([h.qty, h.unit].filter(Boolean).join(' ')) : `<span style="color:var(--chalk-faint);">—</span>`;
+        const total = purchaseTotal(h);
+        const totalStr = total != null ? formatMoney(total) : `<span style="color:var(--chalk-faint);">—</span>`;
         const noteStr = h.note
           ? `<span title="${escapeHtml(h.note)}" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px; display:inline-block; vertical-align:bottom;">${escapeHtml(h.note)}</span>`
           : `<span style="color:var(--chalk-faint);">—</span>`;
-        return `<tr><td>${dateStr}</td><td>${priceStr}</td><td>${locStr}</td><td>${qtyStr}</td><td>${noteStr}</td></tr>`;
+        return `<tr class="ph-row" data-purchase-id="${h.id}" title="Click to edit this purchase"><td>${dateStr}</td><td>${priceStr}</td><td>${locStr}</td><td>${qtyStr}</td><td>${totalStr}</td><td>${noteStr}</td></tr>`;
       }).join('');
 
       slot.innerHTML = `${statsHtml}
         <table class="ph-table">
-          <thead><tr><th>Date</th><th>Price</th><th>Where</th><th>Qty</th><th>Note</th></tr></thead>
+          <thead><tr><th>Date</th><th>Price/Unit</th><th>Where</th><th>Qty</th><th>Total</th><th>Note</th></tr></thead>
           <tbody>${rowsHtml}</tbody>
         </table>
         <button class="ph-log-btn" data-ph-log="${ingId}">+ Log another purchase</button>`;
@@ -1224,17 +1242,29 @@
       e.stopPropagation();
       openPurchaseModal(ingId);
     });
+
+    slot.querySelectorAll('.ph-row[data-purchase-id]').forEach(tr => {
+      tr.addEventListener('click', e => {
+        e.stopPropagation();
+        openEditPurchaseModal(tr.dataset.purchaseId);
+      });
+    });
   }
 
   /* ---- Purchase modal ---- */
   let _purchaseIngId = null;
+  let _editingPurchaseId = null;
   const expandedIngRows = new Set();
 
   async function openPurchaseModal(ingId, e){
     if(e) e.stopPropagation();
     _purchaseIngId = ingId;
+    _editingPurchaseId = null;
     const ing = await db.ingredients.get(ingId);
     document.getElementById('purchaseModalTitle').textContent = `Bought: ${ing ? ing.name : 'Item'}`;
+    document.getElementById('btnDeletePurchase').style.display = 'none';
+    document.getElementById('cancelPurchaseBtn').textContent = 'Skip';
+    document.getElementById('savePurchaseBtn').textContent = '✓ Mark in stock';
 
     // Default date = today
     const today = new Date().toISOString().slice(0, 10);
@@ -1292,9 +1322,56 @@
     document.getElementById('purchaseOverlay').classList.add('show');
   }
 
+  async function openEditPurchaseModal(entryId, e){
+    if(e) e.stopPropagation();
+    if(!db.purchaseHistory) return;
+    const entry = await db.purchaseHistory.get(entryId);
+    if(!entry) return;
+    _purchaseIngId = entry.ingredientId;
+    _editingPurchaseId = entry.id;
+    const ing = await db.ingredients.get(entry.ingredientId);
+    document.getElementById('purchaseModalTitle').textContent = `Edit Purchase: ${ing ? ing.name : 'Item'}`;
+    document.getElementById('btnDeletePurchase').style.display = 'inline-flex';
+    document.getElementById('cancelPurchaseBtn').textContent = 'Cancel';
+    document.getElementById('savePurchaseBtn').textContent = 'Save changes';
+
+    document.getElementById('purchaseDateInput').value = entry.date || new Date().toISOString().slice(0,10);
+    document.getElementById('purchasePriceInput').value = entry.price != null ? entry.price : '';
+    document.getElementById('purchaseLocationInput').value = entry.location || '';
+    document.getElementById('purchaseQtyInput').value = entry.qty || '';
+    document.getElementById('purchaseUnitInput').value = entry.unit || '';
+    document.getElementById('purchaseNoteInput').value = entry.note || '';
+
+    // Price pills + location datalist, built from this ingredient's other history
+    const history = await db.purchaseHistory.where('ingredientId').equals(entry.ingredientId).sortBy('date');
+    const recent = history.slice(-10).reverse();
+    const seenPrices = new Set();
+    const uniquePrices = recent.filter(h => h.price != null && !seenPrices.has(h.price) && seenPrices.add(h.price));
+    const pillsEl = document.getElementById('purchasePricePills');
+    pillsEl.innerHTML = uniquePrices.map(h =>
+      `<button type="button" class="price-pill ${h.price === entry.price ? 'active' : ''}" data-price="${h.price}">₱${Number(h.price).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2})}</button>`
+    ).join('');
+    pillsEl.querySelectorAll('.price-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        pillsEl.querySelectorAll('.price-pill').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('purchasePriceInput').value = btn.dataset.price;
+      });
+    });
+    const allLocations = [...new Set(recent.map(h => h.location).filter(Boolean))];
+    document.getElementById('purchaseLocationList').innerHTML = allLocations.map(l => `<option value="${escapeHtml(l)}">`).join('');
+
+    document.getElementById('purchasePriceInput').oninput = () => {
+      pillsEl.querySelectorAll('.price-pill').forEach(b => b.classList.remove('active'));
+    };
+
+    document.getElementById('purchaseOverlay').classList.add('show');
+  }
+
   async function savePurchase(){
     const ingId = _purchaseIngId;
     if(!ingId) return;
+    const isEditing = !!_editingPurchaseId;
     const date = document.getElementById('purchaseDateInput').value || new Date().toISOString().slice(0,10);
     const priceRaw = document.getElementById('purchasePriceInput').value;
     const price = priceRaw !== '' ? parseFloat(priceRaw) : null;
@@ -1303,18 +1380,39 @@
     const unit = document.getElementById('purchaseUnitInput').value.trim() || null;
     const note = document.getElementById('purchaseNoteInput').value.trim() || null;
     if(db.purchaseHistory){
-      await db.purchaseHistory.put({ id: uuid(), ingredientId: ingId, date, price, location, qty, unit, note, updatedAt: nowISO() });
+      await db.purchaseHistory.put({ id: isEditing ? _editingPurchaseId : uuid(), ingredientId: ingId, date, price, location, qty, unit, note, updatedAt: nowISO() });
     }
     document.getElementById('purchaseOverlay').classList.remove('show');
     _purchaseIngId = null;
-    await updateStockStatus(ingId, 'in_stock');
+    _editingPurchaseId = null;
+    if(isEditing){
+      toast('Purchase updated');
+      render();
+    } else {
+      await updateStockStatus(ingId, 'in_stock');
+    }
   }
 
   async function skipPurchase(){
     const ingId = _purchaseIngId;
+    const isEditing = !!_editingPurchaseId;
     document.getElementById('purchaseOverlay').classList.remove('show');
     _purchaseIngId = null;
-    if(ingId) await updateStockStatus(ingId, 'in_stock');
+    _editingPurchaseId = null;
+    if(ingId && !isEditing) await updateStockStatus(ingId, 'in_stock');
+  }
+
+  async function deletePurchaseEntry(){
+    const entryId = _editingPurchaseId;
+    if(!entryId || !db.purchaseHistory) return;
+    document.getElementById('purchaseOverlay').classList.remove('show');
+    _purchaseIngId = null;
+    _editingPurchaseId = null;
+    openConfirm('Delete purchase entry?', 'This purchase record will be permanently removed.', async () => {
+      await db.purchaseHistory.delete(entryId);
+      toast('Purchase entry deleted');
+      render();
+    });
   }
 
   async function updateDishStockStatus(itemId, newStatus, e){
@@ -2381,14 +2479,16 @@
           const ing = ingById[h.ingredientId];
           const name = ing ? escapeHtml(ing.name) : '<span style="color:var(--chalk-faint);">Deleted ingredient</span>';
           const priceStr = h.price != null
-            ? `<span class="ph-price">₱${Number(h.price).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2})}</span>`
+            ? `<span class="ph-price">${formatMoney(h.price)}</span>`
             : `<span style="color:var(--chalk-faint);">—</span>`;
           const locStr = h.location ? escapeHtml(h.location) : `<span style="color:var(--chalk-faint);">—</span>`;
           const qtyStr = h.qty ? escapeHtml([h.qty, h.unit].filter(Boolean).join(' ')) : `<span style="color:var(--chalk-faint);">—</span>`;
+          const total = purchaseTotal(h);
+          const totalStr = total != null ? formatMoney(total) : `<span style="color:var(--chalk-faint);">—</span>`;
           const noteStr = h.note
             ? `<span title="${escapeHtml(h.note)}" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px; display:inline-block; vertical-align:bottom;">${escapeHtml(h.note)}</span>`
             : `<span style="color:var(--chalk-faint);">—</span>`;
-          return `<tr><td>${name}</td><td>${priceStr}</td><td>${locStr}</td><td>${qtyStr}</td><td>${noteStr}</td></tr>`;
+          return `<tr class="ph-row" data-purchase-id="${h.id}" title="Click to edit this purchase"><td>${name}</td><td>${priceStr}</td><td>${locStr}</td><td>${qtyStr}</td><td>${totalStr}</td><td>${noteStr}</td></tr>`;
         }).join('');
 
         return `<div class="grocery-tag-group ${isCollapsed ? 'collapsed' : ''}" style="margin-bottom:14px;">
@@ -2401,7 +2501,7 @@
           </div>
           <div style="${isCollapsed ? 'display:none;' : ''}">
             <table class="ph-table">
-              <thead><tr><th>Item</th><th>Price</th><th>Where</th><th>Qty</th><th>Note</th></tr></thead>
+              <thead><tr><th>Item</th><th>Price/Unit</th><th>Where</th><th>Qty</th><th>Total</th><th>Note</th></tr></thead>
               <tbody>${rowsHtml}</tbody>
             </table>
           </div>
@@ -2464,6 +2564,13 @@
         groceryViewMode = btn.dataset.gview;
         saveUIState();
         render();
+      });
+    });
+
+    container.querySelectorAll('.ph-row[data-purchase-id]').forEach(tr => {
+      tr.addEventListener('click', e => {
+        e.stopPropagation();
+        openEditPurchaseModal(tr.dataset.purchaseId);
       });
     });
 
@@ -2788,6 +2895,7 @@
 
   document.getElementById('savePurchaseBtn').addEventListener('click', savePurchase);
   document.getElementById('cancelPurchaseBtn').addEventListener('click', skipPurchase);
+  document.getElementById('btnDeletePurchase').addEventListener('click', deletePurchaseEntry);
 
   document.getElementById('ioBtn').addEventListener('click', openIo);
   document.getElementById('closeIoBtn').addEventListener('click', closeIo);
