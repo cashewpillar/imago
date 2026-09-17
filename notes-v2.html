@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Notes</title>
+<script src="scripts/dexie.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+
+:root {
+  --bg: #0e0e10;
+  --bg2: #17171b;
+  --bg3: #1f1f25;
+  --bg4: #28282f;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.13);
+  --text: #efefee;
+  --muted: #7a7a88;
+  --muted2: #45454f;
+  --r: 14px;
+  --r-sm: 8px;
+  --font-h: 'Syne', sans-serif;
+  --font-b: 'DM Sans', sans-serif;
+  --sh: 0 4px 24px rgba(0,0,0,0.5);
+  --primary: #b8ff57;
+}
+:root.light {
+  --bg: #f6f2ea;
+  --bg2: #fffdf7;
+  --bg3: #f1ebdf;
+  --bg4: #e6dece;
+  --border: rgba(52,45,30,0.09);
+  --border2: rgba(52,45,30,0.16);
+  --text: #1f1c16;
+  --muted: #6e6658;
+  --muted2: #a49a87;
+  --sh: 0 12px 36px rgba(77,65,36,0.12);
+  --primary: #61a300;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:14px;line-height:1.5;min-height:100vh;}
+::-webkit-scrollbar{width:3px;height:3px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px;}
+
+.app{display:flex;flex-direction:column;height:100vh;}
+
+.topbar{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--border);padding:0 14px;height:52px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.topbar-title{font-family:var(--font-h);font-size:16px;font-weight:800;letter-spacing:-0.3px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.topbar-actions{display:flex;gap:6px;margin-left:auto;flex-shrink:0;}
+
+.filter-bar{padding:10px 14px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0;}
+.filter-bar:empty{display:none;}
+.search-wrap{position:relative;}
+.search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;}
+.search-input{width:100%;padding:8px 10px 8px 32px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:13px;font-family:var(--font-b);outline:none;transition:border-color .15s;}
+.search-input:focus{border-color:var(--border2);}
+.search-input::placeholder{color:var(--muted2);}
+.topbar-search{display:flex;align-items:center;justify-content:flex-end;overflow:hidden;max-width:0;opacity:0;transition:max-width .18s ease, opacity .12s ease;}
+.topbar-search.open{max-width:220px;opacity:1;}
+.topbar-search .search-wrap{width:200px;}
+.topbar-search .search-input{height:32px;padding:6px 10px 6px 32px;font-size:12px;}
+.tag-row{display:flex;flex-direction:column;gap:6px;}
+.tag-row:empty{display:none;}
+.tag-group{display:flex;gap:6px;align-items:flex-start;min-width:0;}
+.tag-group-label{flex:0 0 auto;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted2);padding-top:5px;min-width:32px;}
+.tag-group-chips{display:flex;gap:5px;flex-wrap:wrap;min-width:0;}
+.tag-chip{padding:4px 11px;border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--border2);background:var(--bg3);color:var(--muted);transition:all .12s;white-space:nowrap;user-select:none;}
+.tag-chip:hover{color:var(--text);}
+.tag-chip.active{border-color:transparent;color:#0e0e10;font-weight:600;}
+
+/* ── data table ── */
+.table-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;position:relative;padding:14px;}
+.table-card{border:1px solid var(--border);border-radius:var(--r);background:var(--bg2);overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.table-scroll.empty .table-card{display:none;}
+table.data-table{width:auto;min-width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px;}
+thead th{background:var(--bg2);text-align:left;padding:10px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;width:1%;}
+thead th:hover{color:var(--text);}
+thead th.nosort{cursor:default;}
+thead th.nosort:hover{color:var(--muted);}
+thead th.actions-h{cursor:default;width:34px;}
+thead th.actions-h:hover{color:var(--muted);}
+.sort-arrow{margin-left:4px;font-size:9px;opacity:.4;}
+.sort-arrow.active{opacity:1;color:var(--primary);}
+tbody tr{border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;}
+tbody tr:last-child{border-bottom:none;}
+tbody tr:hover{background:var(--bg3);}
+tbody td{padding:9px 12px;white-space:nowrap;width:1%;color:var(--text);}
+tbody td.title-cell{font-weight:600;white-space:normal;min-width:140px;width:auto;}
+tbody td.tags-cell{white-space:normal;}
+td.actions{width:34px;text-align:right;padding:6px 8px;}
+.row-menu-btn{width:24px;height:24px;border-radius:6px;border:none;background:none;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:16px;line-height:1;transition:all .12s;}
+.row-menu-btn:hover{background:var(--bg4);color:var(--text);}
+.cell-tag{font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;display:inline-block;margin:1px 3px 1px 0;}
+.cell-empty{color:var(--muted2);}
+
+.empty-state{display:none;flex-direction:column;align-items:center;padding:60px 20px;gap:10px;text-align:center;}
+.table-scroll.empty table{display:none;}
+.table-scroll.empty .empty-state{display:flex;}
+.empty-icon{font-size:40px;margin-bottom:4px;}
+.empty-state h3{font-family:var(--font-h);font-size:16px;font-weight:700;}
+.empty-state p{font-size:13px;color:var(--muted);max-width:220px;line-height:1.6;}
+
+.btn{padding:7px 14px;border-radius:var(--r-sm);font-size:12px;font-weight:600;font-family:var(--font-b);cursor:pointer;border:none;transition:all .15s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}
+.btn-primary{background:var(--primary);color:#0e0e10;}
+.btn-primary:hover{opacity:0.9;}
+.btn-ghost{background:var(--bg3);color:var(--text);border:1px solid var(--border2);}
+.btn-ghost:hover{background:var(--bg4);}
+.btn-danger{background:rgba(255,92,92,.12);color:#ff5c5c;border:1px solid rgba(255,92,92,.2);}
+.btn-danger:hover{background:rgba(255,92,92,.22);}
+.btn-icon{padding:7px 9px;}
+
+.fab{position:fixed;bottom:22px;right:18px;z-index:30;width:52px;height:52px;border-radius:50%;background:var(--primary);color:#0e0e10;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:300;box-shadow:0 4px 20px rgba(0,0,0,0.15);transition:transform .15s,box-shadow .15s;}
+.fab:hover{transform:scale(1.08);box-shadow:0 6px 28px rgba(0,0,0,0.2);}
+.fab:active{transform:scale(.95);}
+
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:flex-end;justify-content:center;z-index:100;}
+.modal-backdrop.open{display:flex;animation:fadeIn .15s ease;}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r) var(--r) 0 0;width:100%;max-width:520px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;animation:slideUp .22s cubic-bezier(.16,1,.3,1);}
+@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-header{padding:15px 16px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.modal-title{font-family:var(--font-h);font-size:16px;font-weight:700;}
+.modal-close{width:28px;height:28px;border-radius:var(--r-sm);border:none;background:var(--bg3);color:var(--muted);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;transition:all .12s;}
+.modal-close:hover{color:var(--text);background:var(--bg4);}
+.modal-body{padding:16px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:14px;}
+.modal-footer{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;}
+
+.fg{display:flex;flex-direction:column;gap:5px;}
+.flabel{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);}
+.finput,.fselect{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);font-family:var(--font-b);font-size:13px;line-height:1.5;padding:8px 10px;outline:none;transition:border-color .15s;width:100%;}
+.finput:focus,.fselect:focus{border-color:var(--primary);}
+.fselect option{background:var(--bg3);}
+
+/* ── sections editor ── */
+.sections-list{display:flex;flex-direction:column;gap:10px;}
+.section-block{border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg3);padding:10px;display:flex;flex-direction:column;gap:8px;}
+.section-block.drag-over,.item-row.drag-over{outline:1px dashed var(--primary);}
+.section-head{display:flex;align-items:center;gap:6px;}
+.section-grip{color:var(--muted2);cursor:grab;font-size:14px;flex-shrink:0;user-select:none;-webkit-user-select:none;touch-action:none;}
+.section-grip:active{cursor:grabbing;}
+.section-head input.heading{flex:1;min-width:0;background:none;border:none;color:var(--text);font-family:var(--font-h);font-weight:700;font-size:14px;outline:none;}
+.section-head input.heading::placeholder{color:var(--muted2);font-family:var(--font-b);font-weight:500;}
+.style-select{flex-shrink:0;background:var(--bg4);border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:11px;font-family:var(--font-b);padding:4px 6px;outline:none;cursor:pointer;}
+.section-del{width:22px;height:22px;border-radius:5px;border:none;background:none;color:var(--muted2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;transition:all .12s;}
+.section-del:hover{color:#ff5c5c;background:rgba(255,92,92,.12);}
+.items-list{display:flex;flex-direction:column;gap:6px;}
+.item-row{display:flex;align-items:flex-start;gap:6px;}
+.item-grip{color:var(--muted2);cursor:grab;font-size:12px;flex-shrink:0;padding-top:8px;user-select:none;-webkit-user-select:none;touch-action:none;}
+.item-grip:active{cursor:grabbing;}
+.item-marker{flex-shrink:0;font-size:12px;color:var(--muted);min-width:18px;text-align:right;padding-top:8px;user-select:none;}
+.item-input-wrap{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.item-input{background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--font-b);font-size:13px;line-height:1.5;padding:6px 8px;outline:none;resize:none;overflow:hidden;min-height:32px;transition:border-color .15s;width:100%;}
+.item-input:focus{border-color:var(--primary);}
+.item-input::placeholder{color:var(--muted2);}
+.char-count{font-size:10px;color:var(--muted2);text-align:right;padding-right:2px;}
+.char-count.over{color:#ff5c5c;font-weight:600;}
+.item-row.flag-over{outline:2px solid #ff5c5c;border-radius:6px;}
+.finput.flag-over{outline:2px solid #ff5c5c;}
+.item-del{width:20px;height:20px;border-radius:5px;border:none;background:none;color:var(--muted2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;margin-top:4px;transition:all .12s;}
+.item-del:hover{color:#ff5c5c;background:rgba(255,92,92,.12);}
+.btn-add-item{display:flex;align-items:center;gap:6px;padding:6px 8px;border:1px dashed var(--border2);border-radius:6px;background:none;color:var(--muted);font-size:11px;font-family:var(--font-b);cursor:pointer;margin-left:24px;transition:all .12s;}
+.btn-add-item:hover{border-color:var(--primary);color:var(--primary);}
+
+.tag-picker{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px;}
+.tag-pick-chip{padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border2);background:var(--bg3);color:var(--muted);transition:all .12s;user-select:none;}
+.tag-pick-chip.on{border-color:transparent;}
+.tag-pick-new{padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1px dashed var(--border2);background:none;color:var(--muted);}
+.tag-pick-new:hover{color:var(--primary);border-color:var(--primary);}
+.tag-pick-new-row{display:flex;gap:6px;margin-top:6px;}
+.tag-pick-new-row input{flex:1;}
+
+.field-row{display:flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);padding:8px 10px;cursor:grab;user-select:none;-webkit-user-select:none;}
+.field-row input{cursor:auto;user-select:text;-webkit-user-select:text;}
+.field-row input{flex:1;background:none;border:none;color:var(--text);font-size:13px;font-family:var(--font-b);outline:none;min-width:0;}
+.field-row input::placeholder{color:var(--muted2);}
+.field-row.wrap{flex-wrap:wrap;}
+.field-options{width:100%;padding-left:28px;}
+.field-grip{color:var(--muted2);cursor:grab;font-size:14px;flex-shrink:0;user-select:none;-webkit-user-select:none;touch-action:none;}
+.field-grip:active{cursor:grabbing;}
+.field-row.drag-over{outline:1px dashed var(--primary);}
+.field-del{width:22px;height:22px;border-radius:5px;border:none;background:none;color:var(--muted2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;transition:all .12s;}
+.field-del:hover{color:#ff5c5c;background:rgba(255,92,92,.12);}
+.btn-add-field{display:flex;align-items:center;gap:6px;padding:8px 10px;border:1px dashed var(--border2);border-radius:var(--r-sm);background:none;color:var(--muted);font-size:12px;font-family:var(--font-b);cursor:pointer;width:100%;transition:all .12s;}
+.btn-add-field:hover{border-color:var(--primary);color:var(--primary);}
+
+#rec-form{display:flex;flex-direction:column;gap:14px;}
+
+.cp{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px;}
+.cswatch{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .12s;}
+
+.ctx-menu{position:fixed;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);box-shadow:var(--sh);z-index:200;overflow:hidden;min-width:160px;display:none;}
+.ctx-item{display:flex;align-items:center;gap:8px;padding:9px 13px;font-size:13px;cursor:pointer;transition:background .1s;color:var(--text);}
+.ctx-item:hover{background:var(--bg4);}
+.ctx-item.danger{color:#ff5c5c;}
+.ctx-item.danger:hover{background:rgba(255,92,92,.12);}
+.ctx-sep{height:1px;background:var(--border);margin:3px 0;}
+
+#toast{position:fixed;bottom:84px;left:50%;transform:translateX(-50%) translateY(20px);background:#1f1f25;border:1px solid rgba(255,255,255,0.13);border-radius:var(--r-sm);padding:9px 16px;font-size:13px;color:#efefee;z-index:999;opacity:0;transition:all .25s cubic-bezier(.16,1,.3,1);box-shadow:0 4px 24px rgba(0,0,0,0.5);white-space:nowrap;display:flex;align-items:center;gap:8px;pointer-events:none;}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.tdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+</style>
+<meta name="theme-color" content="#f7f6f2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="imago">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/imago-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+</head>
+<body>
+
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="topbar-title">Notes</div>
+    <div class="topbar-search" id="top-search">
+      <div class="search-wrap">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"/><path d="M9 9l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <input class="search-input" id="search-input" placeholder="Search notes…" oninput="renderTable()">
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn btn-ghost btn-icon" title="Search notes" onclick="toggleTopSearch()">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"/><path d="M9 9l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+      </button>
+      <button class="btn btn-ghost btn-icon" title="Toggle theme" onclick="toggleTheme()">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="2.4" stroke="currentColor" stroke-width="1.2"/><path d="M6.5 1v1.4M6.5 10.6V12M12 6.5h-1.4M2.4 6.5H1M10.4 2.6l-1 1M3.6 9.4l-1 1M10.4 10.4l-1-1M3.6 3.6l-1-1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      </button>
+      <button class="btn btn-ghost btn-icon" title="Manage tags" onclick="openTagsModal()">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1 6.5L6.5 1H11a1 1 0 0 1 1 1v4.5L6.5 12 1 6.5Z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/><circle cx="8.6" cy="3.9" r=".9" fill="currentColor"/></svg>
+      </button>
+      <button class="btn btn-ghost btn-icon" title="Settings" onclick="openSettingsModal()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="filter-bar" id="filter-bar">
+    <div class="tag-row" id="tags-row"></div>
+  </div>
+  <div class="table-scroll" id="table-scroll">
+    <div class="table-card" id="table-card">
+      <table class="data-table">
+        <thead id="table-head"></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="empty-state">
+      <div class="empty-icon">🗒️</div>
+      <h3 id="empty-title">No notes yet</h3>
+      <p id="empty-sub">Tap + to add your first note.</p>
+    </div>
+  </div>
+  <button class="fab" onclick="openAddRecordModal()">+</button>
+</div>
+
+<!-- modal: settings (backup) -->
+<div id="m-settings" class="modal-backdrop" onclick="bdClose(event,'m-settings')">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Settings</div>
+      <button class="modal-close" onclick="cm('m-settings')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg">
+        <label class="flabel">Title character limit</label>
+        <input class="finput" type="number" id="st-title-limit" min="10" max="200" step="5" onchange="saveTitleLimit()">
+      </div>
+      <div class="fg">
+        <label class="flabel">Item character limit</label>
+        <input class="finput" type="number" id="st-item-limit" min="10" max="1000" step="5" onchange="saveItemLimit()">
+        <p style="font-size:11px;color:var(--muted);line-height:1.6;">Titles and list items over these lengths block saving — keeps notes skimmable.</p>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost" style="flex:1;" onclick="exportBackup()">Export Backup</button>
+        <button class="btn btn-ghost" style="flex:1;" onclick="importBackup()">Import Backup</button>
+      </div>
+      <button class="btn btn-danger" onclick="confirmClearNotes()">Clear All Notes</button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="cm('m-settings')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- modal: manage tags -->
+<div id="m-tags" class="modal-backdrop" onclick="bdClose(event,'m-tags')">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Manage Tags</div>
+      <button class="modal-close" onclick="cm('m-tags')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:var(--muted);line-height:1.7;">Tags used to organize and filter your notes. Deleting a tag removes it from any notes that use it.</p>
+      <div id="tags-ed" style="display:flex;flex-direction:column;gap:7px;"></div>
+      <button class="btn-add-field" onclick="addTagRow()">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Add Tag
+      </button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="cm('m-tags')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTags()">Save Tags</button>
+    </div>
+  </div>
+</div>
+
+<!-- modal: add/edit note -->
+<div id="m-record" class="modal-backdrop" onclick="bdClose(event,'m-record')">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="m-rec-ttl">Add Note</div>
+      <button class="modal-close" onclick="cm('m-record')">✕</button>
+    </div>
+    <div class="modal-body" id="rec-form"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="cm('m-record')">Cancel</button>
+      <button class="btn btn-primary" id="rec-save-btn" onclick="saveRecord()">Add</button>
+    </div>
+  </div>
+</div>
+
+<div id="ctx" class="ctx-menu"></div>
+<div id="toast"><div class="tdot" id="tdot"></div><span id="tmsg"></span></div>
+<input type="file" id="backup-file-input" accept=".json,application/json" style="display:none;" onchange="handleBackupFile(event)">
+
+<script>
+/* Notes v2 — one flat table of notes. A note is strictly structured —
+   {title, sections:[{title, style, items:[string,...]}], tags} — there's
+   no freeform prose body. This is deliberate: it's meant as a landing
+   spot for LLM output, and forcing heading+list structure is a forcing
+   function against LLM prose bloat. Tags are the only configurable
+   piece: a small managed list of {name, color} definitions (`tagDefs`)
+   that notes reference by id, so renaming/recoloring a tag updates every
+   note that uses it and deleting one just drops that id from each note's
+   tags array. Everything else (multi-table nav, per-table custom fields,
+   freeform markdown) from v1 is gone — see notes.html for that version. */
+
+const db = new Dexie('NotesV2DB');
+db.version(1).stores({ notes:'++id,createdAt,updatedAt,title', tagDefs:'++id,order' });
+
+const COLORS = [
+  {name:'Lime',  val:'#b8ff57', lightVal:'#61a300', dim:'rgba(184,255,87,.13)'},
+  {name:'Sky',   val:'#57c4ff', lightVal:'#0077b6', dim:'rgba(87,196,255,.13)'},
+  {name:'Pink',  val:'#ff7eb3', lightVal:'#c9184a', dim:'rgba(255,126,179,.13)'},
+  {name:'Amber', val:'#ffb84d', lightVal:'#b5651d', dim:'rgba(255,184,77,.13)'},
+  {name:'Violet',val:'#b57bff', lightVal:'#6a0dad', dim:'rgba(181,123,255,.13)'},
+  {name:'Teal',  val:'#3fe0c5', lightVal:'#008080', dim:'rgba(63,224,197,.13)'},
+  {name:'Coral', val:'#ff6b6b', lightVal:'#d00000', dim:'rgba(255,107,107,.13)'},
+  {name:'Ice',   val:'#ddeeff', lightVal:'#4682b4', dim:'rgba(221,238,255,.10)'},
+];
+const THEME_KEY = 'notesv2-theme';
+const VIEW_KEY = 'notesv2-view-v1';
+const ITEM_LIMIT_KEY = 'notesv2-item-limit';
+const TITLE_LIMIT_KEY = 'notesv2-title-limit';
+const DEFAULT_ITEM_LIMIT = 60;
+const DEFAULT_TITLE_LIMIT = 40;
+
+let notes = [], tagDefs = [], tagFilter = [], editNoteId = null, recTagIds = [], recSections = [];
+let sortKey = null, sortDir = 1;
+let itemCharLimit = DEFAULT_ITEM_LIMIT;
+let titleCharLimit = DEFAULT_TITLE_LIMIT;
+
+const gc = n => {
+  const named = COLORS.find(c=>c.name===n);
+  const isLight = document.documentElement.classList.contains('light');
+  if(named) {
+    const val = isLight ? named.lightVal : named.val;
+    return { ...named, val, dim: hexToRgba(val, isLight ? 0.12 : 0.13) };
+  }
+  const def = COLORS[0];
+  const val = isLight ? def.lightVal : def.val;
+  return { ...def, val, dim: hexToRgba(val, isLight ? 0.12 : 0.13) };
+};
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function loadViewState(){
+  tagFilter = []; sortKey = null; sortDir = 1;
+  let stored = null;
+  try { stored = JSON.parse(localStorage.getItem(VIEW_KEY)); } catch {}
+  if(!stored) return;
+  tagFilter = Array.isArray(stored.tagFilter) ? stored.tagFilter : [];
+  sortKey = stored.sortKey ?? null;
+  sortDir = stored.sortDir === -1 ? -1 : 1;
+}
+function saveViewState(){
+  localStorage.setItem(VIEW_KEY, JSON.stringify({tagFilter, sortKey, sortDir}));
+}
+const om = id => document.getElementById(id).classList.add('open');
+const cm = id => document.getElementById(id).classList.remove('open');
+const bdClose = (e,id) => { if(e.target.id===id) cm(id); };
+
+async function init() {
+  initTheme();
+  loadViewState();
+  loadItemLimit();
+  loadTitleLimit();
+  tagDefs = await db.tagDefs.orderBy('order').toArray();
+  notes = await db.notes.toArray();
+  renderTable();
+}
+
+/* ── TABLE RENDER ── */
+function tagById(id){ return tagDefs.find(t=>t.id===id); }
+function noteTags(note){ return (note.tags||[]).map(tagById).filter(Boolean); }
+function toggleTopSearch(){
+  const el = document.getElementById('top-search');
+  const willOpen = !el.classList.contains('open');
+  el.classList.toggle('open', willOpen);
+  if(willOpen) setTimeout(()=>document.getElementById('search-input')?.focus(), 120);
+}
+function setSort(key){
+  if(sortKey===key){ sortDir = -sortDir; }
+  else { sortKey = key; sortDir = key==='title' ? 1 : -1; }
+  saveViewState();
+  renderTable();
+}
+function sortArrow(key){
+  if(sortKey!==key) return '<span class="sort-arrow">↕</span>';
+  return `<span class="sort-arrow active">${sortDir===1?'↑':'↓'}</span>`;
+}
+function sortNotes(list){
+  const arr = [...list];
+  if(!sortKey){ arr.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)); return arr; }
+  arr.sort((a,b)=>{
+    let av,bv;
+    if(sortKey==='title'){ av=String(a.title||'').toLowerCase(); bv=String(b.title||'').toLowerCase(); }
+    else if(sortKey==='createdAt'){ av=a.createdAt||0; bv=b.createdAt||0; }
+    else { av=a.updatedAt||0; bv=b.updatedAt||0; }
+    if(av<bv) return -1*sortDir;
+    if(av>bv) return 1*sortDir;
+    return 0;
+  });
+  return arr;
+}
+function formatDate(val){
+  const d = new Date(val);
+  if(isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+}
+function renderThead(){
+  document.getElementById('table-head').innerHTML = `<tr>
+    <th onclick="setSort('title')">Title${sortArrow('title')}</th>
+    <th class="nosort">Tags</th>
+    <th onclick="setSort('createdAt')">Created${sortArrow('createdAt')}</th>
+    <th onclick="setSort('updatedAt')">Updated${sortArrow('updatedAt')}</th>
+    <th class="actions-h"></th>
+  </tr>`;
+}
+function tagsCellHtml(note){
+  const tags = noteTags(note);
+  if(!tags.length) return '<span class="cell-empty">—</span>';
+  return tags.map(t=>{ const c=gc(t.color); return `<span class="cell-tag" style="background:${c.dim};color:${c.val};">${esc(t.name)}</span>`; }).join('');
+}
+function renderRow(n){
+  return `<tr onclick="openEditRecord(${n.id})">
+    <td class="title-cell">${esc(n.title||'Untitled')}</td>
+    <td class="tags-cell">${tagsCellHtml(n)}</td>
+    <td>${esc(formatDate(n.createdAt))}</td>
+    <td>${esc(formatDate(n.updatedAt))}</td>
+    <td class="actions"><button class="row-menu-btn" title="More" onclick="showEntryCtx(event,${n.id})">⋮</button></td>
+  </tr>`;
+}
+function renderTable(){
+  renderThead();
+  const q = document.getElementById('search-input')?.value.toLowerCase() || '';
+
+  renderTagFilterRow();
+
+  let list = notes.filter(n=>{
+    const ids = n.tags||[];
+    if(tagFilter.length && !tagFilter.every(id=>ids.includes(id))) return false;
+    if(q){
+      const txt = [n.title||'', ...(n.sections||[]).flatMap(s=>[s.title||'', ...(s.items||[])])].join(' ').toLowerCase();
+      if(!txt.includes(q)) return false;
+    }
+    return true;
+  });
+  list = sortNotes(list);
+
+  const scroll = document.getElementById('table-scroll');
+  const body = document.getElementById('table-body');
+
+  if(!list.length){
+    body.innerHTML = '';
+    scroll.classList.add('empty');
+    document.getElementById('empty-title').textContent = notes.length ? 'No results' : 'No notes yet';
+    document.getElementById('empty-sub').textContent = notes.length ? 'Try different filters.' : 'Tap + to add your first note.';
+    return;
+  }
+  scroll.classList.remove('empty');
+  body.innerHTML = list.map(renderRow).join('');
+}
+function renderTagFilterRow(){
+  const el = document.getElementById('tags-row');
+  if(!tagDefs.length){ el.innerHTML=''; return; }
+  el.innerHTML = `<div class="tag-group">
+    <div class="tag-group-label">Tags</div>
+    <div class="tag-group-chips">${tagDefs.map(t=>{
+      const c = gc(t.color);
+      const on = tagFilter.includes(t.id);
+      return `<div class="tag-chip${on?' active':''}" style="${on?`background:${c.val};border-color:${c.val};`:''}" onclick="toggleTagFilter(${t.id})">${esc(t.name)}</div>`;
+    }).join('')}</div>
+  </div>`;
+}
+function toggleTagFilter(id){
+  const i = tagFilter.indexOf(id);
+  i>=0 ? tagFilter.splice(i,1) : tagFilter.push(id);
+  saveViewState();
+  renderTable();
+}
+
+/* ── SETTINGS (backup + title/item character limits) ── */
+function loadItemLimit(){
+  const stored = parseInt(localStorage.getItem(ITEM_LIMIT_KEY));
+  itemCharLimit = Number.isFinite(stored) && stored>0 ? stored : DEFAULT_ITEM_LIMIT;
+}
+function saveItemLimit(){
+  const el = document.getElementById('st-item-limit');
+  const val = parseInt(el.value);
+  itemCharLimit = Number.isFinite(val) && val>0 ? val : DEFAULT_ITEM_LIMIT;
+  el.value = itemCharLimit;
+  localStorage.setItem(ITEM_LIMIT_KEY, String(itemCharLimit));
+  if(document.getElementById('rf-sections')) renderSections();
+  toast('Item limit updated','success');
+}
+function loadTitleLimit(){
+  const stored = parseInt(localStorage.getItem(TITLE_LIMIT_KEY));
+  titleCharLimit = Number.isFinite(stored) && stored>0 ? stored : DEFAULT_TITLE_LIMIT;
+}
+function saveTitleLimit(){
+  const el = document.getElementById('st-title-limit');
+  const val = parseInt(el.value);
+  titleCharLimit = Number.isFinite(val) && val>0 ? val : DEFAULT_TITLE_LIMIT;
+  el.value = titleCharLimit;
+  localStorage.setItem(TITLE_LIMIT_KEY, String(titleCharLimit));
+  updateTitleCount();
+  toast('Title limit updated','success');
+}
+function openSettingsModal(){
+  document.getElementById('st-item-limit').value = itemCharLimit;
+  document.getElementById('st-title-limit').value = titleCharLimit;
+  om('m-settings');
+}
+function confirmClearNotes(){
+  if(!confirm('Delete all notes? This cannot be undone.')) return;
+  db.notes.clear().then(()=>{
+    notes = [];
+    cm('m-settings');
+    renderTable();
+    toast('All notes cleared','error');
+  });
+}
+
+/* ── TAGS EDITOR ── */
+let tagsEdBuffer = [];
+function openTagsModal(){
+  tagsEdBuffer = tagDefs.map(t=>({...t}));
+  renderTagsEd();
+  om('m-tags');
+}
+function renderTagsEd(){
+  document.getElementById('tags-ed').innerHTML = tagsEdBuffer.map((t,i)=>`
+    <div class="field-row wrap" data-idx="${i}" draggable="true" ondragstart="tagDragStart(event)" ondragend="tagDragEnd(event)" ondragover="tagDragOver(event)" ondrop="tagDrop(event)">
+      <span class="field-grip">⠿</span>
+      <input type="text" value="${esc(t.name)}" placeholder="Tag name" oninput="tagsEdBuffer[${i}].name=this.value">
+      <button class="field-del" onclick="delTagRow(${i})">✕</button>
+      <div class="field-options"><div class="cp" id="cp-tag-${i}"></div></div>
+    </div>`).join('');
+  tagsEdBuffer.forEach((t,i)=>initTagCP(i));
+}
+function initTagCP(i){
+  const el = document.getElementById(`cp-tag-${i}`);
+  if(!el) return;
+  el.innerHTML = '';
+  COLORS.forEach(c=>{
+    const s = document.createElement('div');
+    s.className = 'cswatch'; s.dataset.c = c.name;
+    s.style.background = c.val; s.title = c.name;
+    s.style.borderColor = tagsEdBuffer[i].color===c.name ? c.val : 'transparent';
+    s.style.transform = tagsEdBuffer[i].color===c.name ? 'scale(1.2)' : 'scale(1)';
+    s.onclick = () => { tagsEdBuffer[i].color = c.name; initTagCP(i); };
+    el.appendChild(s);
+  });
+}
+let tagDragEl = null;
+function tagDragStart(e){
+  if(e.target.closest('input,button')){ e.preventDefault(); return; }
+  tagDragEl = e.currentTarget;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain','');
+}
+function tagDragOver(e){
+  if(!tagDragEl) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const row = e.currentTarget;
+  if(row===tagDragEl) return;
+  const rect = row.getBoundingClientRect();
+  const before = (e.clientY-rect.top) < rect.height/2;
+  row.parentNode.insertBefore(tagDragEl, before?row:row.nextSibling);
+}
+function tagDrop(e){ e.preventDefault(); }
+function tagDragEnd(){
+  if(tagDragEl){
+    const order = [...document.querySelectorAll('#tags-ed .field-row')].map(row=>Number(row.dataset.idx));
+    tagsEdBuffer = order.map(i=>tagsEdBuffer[i]);
+    renderTagsEd();
+  }
+  tagDragEl = null;
+}
+function addTagRow(){
+  const used = new Set(tagsEdBuffer.map(t=>t.color));
+  const color = COLORS.find(c=>!used.has(c.name))?.name || COLORS[tagsEdBuffer.length % COLORS.length].name;
+  tagsEdBuffer.push({name:'', color});
+  renderTagsEd();
+}
+function delTagRow(i){
+  tagsEdBuffer.splice(i,1);
+  renderTagsEd();
+}
+async function saveTags(){
+  const cleaned = tagsEdBuffer.map(t=>({...t, name:(t.name||'').trim()})).filter(t=>t.name);
+  const keptIds = new Set(cleaned.filter(t=>t.id!=null).map(t=>t.id));
+  const removedIds = tagDefs.filter(t=>!keptIds.has(t.id)).map(t=>t.id);
+
+  await db.transaction('rw', db.tagDefs, db.notes, async () => {
+    for(let i=0;i<cleaned.length;i++){
+      const t = cleaned[i];
+      if(t.id!=null){
+        await db.tagDefs.update(t.id, {name:t.name, color:t.color, order:i});
+      } else {
+        cleaned[i].id = await db.tagDefs.add({name:t.name, color:t.color, order:i});
+      }
+    }
+    if(removedIds.length){
+      await db.tagDefs.bulkDelete(removedIds);
+      const affected = await db.notes.toArray();
+      for(const n of affected){
+        if(!(n.tags||[]).some(id=>removedIds.includes(id))) continue;
+        const tags = n.tags.filter(id=>!removedIds.includes(id));
+        await db.notes.update(n.id, {tags});
+      }
+    }
+  });
+
+  tagDefs = await db.tagDefs.orderBy('order').toArray();
+  notes = await db.notes.toArray();
+  tagFilter = tagFilter.filter(id=>tagDefs.some(t=>t.id===id));
+  saveViewState();
+  cm('m-tags');
+  renderTable();
+  toast('Tags updated!','success');
+}
+
+/* ── RECORD MODAL (add/edit note) ── */
+function openAddRecordModal(){
+  editNoteId = null;
+  recTagIds = [];
+  recSections = [];
+  document.getElementById('m-rec-ttl').textContent = 'Add Note';
+  document.getElementById('rec-save-btn').textContent = 'Add';
+  om('m-record');
+  buildRecForm({title:'', tags:[]});
+}
+async function openEditRecord(id){
+  editNoteId = id;
+  const n = await db.notes.get(id); if(!n) return;
+  recTagIds = [...(n.tags||[])];
+  recSections = (n.sections||[]).map(s=>({title:s.title||'', style:s.style||'bullet', items:[...(s.items||[])]}));
+  document.getElementById('m-rec-ttl').textContent = 'Edit Note';
+  document.getElementById('rec-save-btn').textContent = 'Save';
+  om('m-record');
+  buildRecForm(n);
+}
+function buildRecForm(n){
+  const titleLen = (n.title||'').length;
+  document.getElementById('rec-form').innerHTML = `
+    <div class="fg">
+      <label class="flabel">Title</label>
+      <input class="finput" id="rf-title" value="${esc(n.title||'')}" placeholder="Untitled" oninput="updateTitleCount()">
+      <div class="char-count${titleLen>titleCharLimit?' over':''}" id="rf-title-count">${titleLen}/${titleCharLimit}</div>
+    </div>
+    <div class="fg">
+      <label class="flabel">Tags</label>
+      <div class="tag-picker" id="rf-tags"></div>
+    </div>
+    <div class="fg">
+      <label class="flabel">Sections</label>
+      <div class="sections-list" id="rf-sections"></div>
+      <button class="btn-add-field" onclick="addSection()">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Add Section
+      </button>
+    </div>`;
+  renderRfTags();
+  renderSections();
+}
+function updateTitleCount(){
+  const ta = document.getElementById('rf-title');
+  const countEl = document.getElementById('rf-title-count');
+  if(!ta || !countEl) return;
+  const len = ta.value.length;
+  countEl.textContent = `${len}/${titleCharLimit}`;
+  countEl.classList.toggle('over', len>titleCharLimit);
+}
+
+/* ── SECTIONS EDITOR ──
+   A note is strictly {title, sections:[{title, style, items:[string,...]}]}.
+   Each section renders as a heading + a list, numbered per its own style
+   (bullet/decimal/alpha/roman); both sections and items reorder by drag,
+   mirroring the tag-row drag pattern above. */
+function autoGrowTextarea(el){
+  el.style.height='auto';
+  el.style.height=el.scrollHeight+'px';
+}
+function romanize(n){
+  const table=[[1000,'m'],[900,'cm'],[500,'d'],[400,'cd'],[100,'c'],[90,'xc'],[50,'l'],[40,'xl'],[10,'x'],[9,'ix'],[5,'v'],[4,'iv'],[1,'i']];
+  let out='';
+  for(const [v,s] of table){ while(n>=v){ out+=s; n-=v; } }
+  return out||'i';
+}
+function alphize(n){
+  let out='';
+  while(n>0){ n--; out=String.fromCharCode(97+(n%26))+out; n=Math.floor(n/26); }
+  return out||'a';
+}
+function markerFor(style, idx){
+  if(style==='decimal') return `${idx+1}.`;
+  if(style==='alpha') return `${alphize(idx+1)}.`;
+  if(style==='roman') return `${romanize(idx+1)}.`;
+  return '•';
+}
+const SECTION_STYLES = [
+  {key:'bullet', label:'Bulleted (-)'},
+  {key:'decimal', label:'Numbered (1.)'},
+  {key:'alpha', label:'Lettered (a.)'},
+  {key:'roman', label:'Roman (i.)'},
+];
+function renderSections(){
+  const el = document.getElementById('rf-sections');
+  if(!el) return;
+  el.innerHTML = recSections.map((s,si)=>`
+    <div class="section-block" data-idx="${si}" ondragover="sectionDragOver(event)" ondrop="sectionDrop(event)">
+      <div class="section-head">
+        <span class="section-grip" draggable="true" ondragstart="sectionDragStart(event)" ondragend="sectionDragEnd()">⠿</span>
+        <input class="heading" type="text" placeholder="Section heading" value="${esc(s.title)}" oninput="recSections[${si}].title=this.value">
+        <select class="style-select" onchange="setSectionStyle(${si},this.value)">
+          ${SECTION_STYLES.map(o=>`<option value="${o.key}"${s.style===o.key?' selected':''}>${o.label}</option>`).join('')}
+        </select>
+        <button class="section-del" onclick="delSection(${si})">✕</button>
+      </div>
+      <div class="items-list">
+        ${s.items.map((it,ii)=>{
+          const len = (it||'').length;
+          return `
+          <div class="item-row" data-idx="${ii}" ondragover="itemDragOver(event,${si})" ondrop="itemDrop(event)">
+            <span class="item-grip" draggable="true" ondragstart="itemDragStart(event,${si})" ondragend="itemDragEnd()">⠿</span>
+            <span class="item-marker">${esc(markerFor(s.style, ii))}</span>
+            <div class="item-input-wrap">
+              <textarea class="item-input" rows="1" placeholder="Item text" oninput="handleItemInput(this,${si},${ii})">${esc(it)}</textarea>
+              <div class="char-count${len>itemCharLimit?' over':''}">${len}/${itemCharLimit}</div>
+            </div>
+            <button class="item-del" onclick="delItem(${si},${ii})">✕</button>
+          </div>`;
+        }).join('')}
+      </div>
+      <button class="btn-add-item" onclick="addItem(${si})">+ Add item</button>
+    </div>`).join('');
+  el.querySelectorAll('.item-input').forEach(autoGrowTextarea);
+}
+function setSectionStyle(si, style){ recSections[si].style = style; renderSections(); }
+function addSection(){
+  recSections.push({title:'', style:'bullet', items:['']});
+  renderSections();
+  const heads = document.querySelectorAll('#rf-sections .heading');
+  heads[heads.length-1]?.focus();
+}
+function delSection(si){ recSections.splice(si,1); renderSections(); }
+function addItem(si){
+  recSections[si].items.push('');
+  renderSections();
+  const rows = document.querySelectorAll(`#rf-sections .section-block[data-idx="${si}"] .item-input`);
+  rows[rows.length-1]?.focus();
+}
+function delItem(si, ii){ recSections[si].items.splice(ii,1); renderSections(); }
+function handleItemInput(ta, si, ii){
+  recSections[si].items[ii] = ta.value;
+  autoGrowTextarea(ta);
+  const countEl = ta.closest('.item-input-wrap')?.querySelector('.char-count');
+  if(countEl){
+    const len = ta.value.length;
+    countEl.textContent = `${len}/${itemCharLimit}`;
+    countEl.classList.toggle('over', len>itemCharLimit);
+  }
+}
+function focusOverLimitItem(si, ii){
+  const row = document.querySelector(`#rf-sections .section-block[data-idx="${si}"] .item-row[data-idx="${ii}"]`);
+  if(!row) return;
+  row.scrollIntoView({block:'center', behavior:'smooth'});
+  row.querySelector('.item-input')?.focus();
+  row.classList.add('flag-over');
+  setTimeout(()=>row.classList.remove('flag-over'), 900);
+}
+
+let sectionDragEl = null;
+function sectionDragStart(e){
+  sectionDragEl = e.currentTarget.closest('.section-block');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain','');
+}
+function sectionDragOver(e){
+  if(!sectionDragEl) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const row = e.currentTarget;
+  if(row===sectionDragEl) return;
+  const rect = row.getBoundingClientRect();
+  const before = (e.clientY-rect.top) < rect.height/2;
+  row.parentNode.insertBefore(sectionDragEl, before?row:row.nextSibling);
+}
+function sectionDrop(e){ e.preventDefault(); }
+function sectionDragEnd(){
+  if(sectionDragEl){
+    const order = [...document.querySelectorAll('#rf-sections .section-block')].map(b=>Number(b.dataset.idx));
+    recSections = order.map(i=>recSections[i]);
+    renderSections();
+  }
+  sectionDragEl = null;
+}
+let itemDragEl = null, itemDragSi = null;
+function itemDragStart(e, si){
+  itemDragEl = e.currentTarget.closest('.item-row');
+  itemDragSi = si;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain','');
+}
+function itemDragOver(e, si){
+  if(!itemDragEl || si!==itemDragSi) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const row = e.currentTarget;
+  if(row===itemDragEl) return;
+  const rect = row.getBoundingClientRect();
+  const before = (e.clientY-rect.top) < rect.height/2;
+  row.parentNode.insertBefore(itemDragEl, before?row:row.nextSibling);
+}
+function itemDrop(e){ e.preventDefault(); }
+function itemDragEnd(){
+  if(itemDragEl && itemDragSi!=null){
+    const container = itemDragEl.parentNode;
+    const order = [...container.querySelectorAll('.item-row')].map(r=>Number(r.dataset.idx));
+    recSections[itemDragSi].items = order.map(i=>recSections[itemDragSi].items[i]);
+    renderSections();
+  }
+  itemDragEl = null; itemDragSi = null;
+}
+function renderRfTags(){
+  const el = document.getElementById('rf-tags');
+  el.innerHTML = tagDefs.map(t=>{
+    const c = gc(t.color);
+    const on = recTagIds.includes(t.id);
+    return `<div class="tag-pick-chip${on?' on':''}" style="${on?`background:${c.dim};color:${c.val};`:''}" onclick="toggleRfTag(${t.id})">${esc(t.name)}</div>`;
+  }).join('') + `<div class="tag-pick-new" id="rf-tag-add-btn" onclick="showRfTagAdd()">+ New tag</div>
+  <div class="tag-pick-new-row" id="rf-tag-add-row" style="display:none;">
+    <input class="finput" id="rf-tag-add-input" placeholder="Tag name" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmRfTagAdd();}">
+    <button class="btn btn-primary btn-icon" onclick="confirmRfTagAdd()">✓</button>
+  </div>`;
+}
+function toggleRfTag(id){
+  const i = recTagIds.indexOf(id);
+  i>=0 ? recTagIds.splice(i,1) : recTagIds.push(id);
+  renderRfTags();
+}
+function showRfTagAdd(){
+  document.getElementById('rf-tag-add-btn').style.display = 'none';
+  document.getElementById('rf-tag-add-row').style.display = 'flex';
+  document.getElementById('rf-tag-add-input').focus();
+}
+async function confirmRfTagAdd(){
+  const input = document.getElementById('rf-tag-add-input');
+  const name = input.value.trim();
+  if(!name) return;
+  const used = new Set(tagDefs.map(t=>t.color));
+  const color = COLORS.find(c=>!used.has(c.name))?.name || COLORS[tagDefs.length % COLORS.length].name;
+  const id = await db.tagDefs.add({name, color, order:tagDefs.length});
+  tagDefs.push({id, name, color, order:tagDefs.length});
+  recTagIds.push(id);
+  renderRfTags();
+}
+async function saveRecord(){
+  const titleEl = document.getElementById('rf-title');
+  if(titleEl.value.trim().length > titleCharLimit){
+    toast(`Title is over ${titleCharLimit} characters — trim it before saving`, 'error');
+    titleEl.focus();
+    titleEl.classList.add('flag-over');
+    setTimeout(()=>titleEl.classList.remove('flag-over'), 900);
+    return;
+  }
+  for(let si=0; si<recSections.length; si++){
+    const items = recSections[si].items||[];
+    for(let ii=0; ii<items.length; ii++){
+      if((items[ii]||'').trim().length > itemCharLimit){
+        toast(`An item is over ${itemCharLimit} characters — trim it before saving`, 'error');
+        focusOverLimitItem(si, ii);
+        return;
+      }
+    }
+  }
+  const title = document.getElementById('rf-title').value.trim();
+  const sections = recSections
+    .map(s=>({title:(s.title||'').trim(), style:s.style||'bullet', items:(s.items||[]).map(it=>it.trim()).filter(Boolean)}))
+    .filter(s=>s.title || s.items.length);
+  const tags = [...recTagIds];
+  const now = Date.now();
+  if(editNoteId){
+    await db.notes.update(editNoteId, {title, sections, tags, updatedAt:now});
+    toast('Updated!','success');
+  } else {
+    await db.notes.add({title, sections, tags, createdAt:now, updatedAt:now});
+    toast('Note added!','success');
+  }
+  cm('m-record');
+  notes = await db.notes.toArray();
+  renderTable();
+}
+
+/* ── CTX MENU ── */
+let ctxFns=[];
+function showEntryCtx(e,id){
+  e.stopPropagation();
+  showCtx(e.clientX,e.clientY,[
+    {l:'✏️  Edit',f:()=>openEditRecord(id)},
+    {sep:true},
+    {l:'🗑  Delete',f:()=>deleteEntry(id),d:true},
+  ]);
+}
+async function deleteEntry(id){
+  if(!confirm('Delete this note?')) return;
+  await db.notes.delete(id);
+  notes=notes.filter(n=>n.id!==id);
+  renderTable(); toast('Deleted','error');
+}
+function showCtx(x,y,items){
+  ctxFns=items;
+  const m=document.getElementById('ctx');
+  m.innerHTML=items.map((item,i)=>item.sep?'<div class="ctx-sep"></div>':`<div class="ctx-item${item.d?' danger':''}" onclick="fireCtx(${i})">${item.l}</div>`).join('');
+  m.style.display='block';
+  const vw=window.innerWidth,vh=window.innerHeight,mw=m.offsetWidth,mh=m.offsetHeight;
+  m.style.left=Math.min(x,vw-mw-10)+'px';
+  m.style.top=Math.min(y,vh-mh-10)+'px';
+}
+function fireCtx(i){ctxFns[i]?.f?.();document.getElementById('ctx').style.display='none';}
+document.addEventListener('click',()=>document.getElementById('ctx').style.display='none');
+
+/* ── THEME ── */
+function initTheme(){
+  const saved = localStorage.getItem(THEME_KEY);
+  const theme = saved || 'light';
+  applyTheme(theme);
+}
+function applyTheme(theme){
+  const isLight = theme === 'light';
+  document.documentElement.classList.toggle('light', isLight);
+  localStorage.setItem(THEME_KEY, theme);
+}
+function toggleTheme(){
+  applyTheme(document.documentElement.classList.contains('light') ? 'dark' : 'light');
+  renderTable();
+}
+
+/* ── BACKUP / RESTORE ── */
+function downloadJson(payload, filename){
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.style.display = 'none';
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  }, 100);
+}
+function exportBackup(){
+  try {
+    const payload = { type:'notesv2-backup', version:1, timestamp:Date.now(), tagDefs, notes };
+    downloadJson(payload, `notes-backup-${new Date().toISOString().slice(0,10)}.json`);
+    toast('Backup exported!','success');
+  } catch(err) {
+    console.error(err);
+    toast('Export failed','error');
+  }
+}
+function importBackup(){
+  const input = document.getElementById('backup-file-input');
+  input.value = '';
+  input.click();
+}
+async function handleBackupFile(event){
+  const file = event.target.files?.[0];
+  if(!file) return;
+  if(!confirm('Replace all current notes and tags with the data from this backup? This cannot be undone.')){
+    event.target.value=''; return;
+  }
+  try {
+    const snapshot = JSON.parse(await file.text());
+    if(snapshot?.type!=='notesv2-backup' || !Array.isArray(snapshot.notes)){
+      toast('Invalid backup file','error'); return;
+    }
+    const cleanTags = (snapshot.tagDefs||[]).map((t,i)=>({name:String(t.name||'').trim()||'Tag', color:t.color||COLORS[i%COLORS.length].name, order:i})).filter(t=>t.name);
+    await db.transaction('rw', db.tagDefs, db.notes, async () => {
+      await db.tagDefs.clear();
+      await db.notes.clear();
+      const idMap = {};
+      const oldTags = snapshot.tagDefs||[];
+      for(let i=0;i<cleanTags.length;i++){
+        const newId = await db.tagDefs.add(cleanTags[i]);
+        if(oldTags[i]?.id!=null) idMap[oldTags[i].id] = newId;
+      }
+      const ents = snapshot.notes.map(n=>({
+        title:n.title||'',
+        sections:(n.sections||[]).map(s=>({title:s.title||'', style:s.style||'bullet', items:Array.isArray(s.items)?s.items.map(String):[]})),
+        tags:(n.tags||[]).map(id=>idMap[id]).filter(id=>id!=null),
+        createdAt:n.createdAt||Date.now(), updatedAt:n.updatedAt||n.createdAt||Date.now(),
+      }));
+      if(ents.length) await db.notes.bulkAdd(ents);
+    });
+    tagDefs = await db.tagDefs.orderBy('order').toArray();
+    notes = await db.notes.toArray();
+    tagFilter = [];
+    saveViewState();
+    renderTable();
+    toast(`Imported ${notes.length} note${notes.length!==1?'s':''}`,'success');
+  } catch(err) {
+    console.error(err);
+    toast('Import failed','error');
+  } finally {
+    event.target.value = '';
+  }
+}
+
+/* ── HELPERS ── */
+function hexToRgba(hex, alpha){
+  let raw = hex.replace('#','');
+  if(raw.length === 3) raw = raw.split('').map(ch=>ch+ch).join('');
+  if(raw.length !== 6) {
+    const isLight = document.documentElement.classList.contains('light');
+    return isLight ? `rgba(97,163,0,${alpha})` : `rgba(184,255,87,${alpha})`;
+  }
+  const num = parseInt(raw,16);
+  const r = (num >> 16) & 255;
+  const g = (num >> 8) & 255;
+  const b = num & 255;
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+/* ── TOAST ── */
+let tT;
+function toast(msg,type='success'){
+  document.getElementById('tmsg').textContent=msg;
+  document.getElementById('tdot').style.background=type==='success'?'#57e5a0':'#ff5c5c';
+  const el=document.getElementById('toast');
+  el.classList.add('show'); clearTimeout(tT);
+  tT=setTimeout(()=>el.classList.remove('show'),2400);
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape')['m-settings','m-tags','m-record'].forEach(cm);
+});
+
+init().catch(async err => {
+  if(err?.name === 'VersionError'){
+    const reset = confirm('This browser has a Notes v2 database saved at a newer schema version than this app knows how to open, so it can\'t be upgraded automatically. Reset local data and start fresh?');
+    if(reset){
+      try {
+        await db.delete();
+        location.reload();
+        return;
+      } catch(delErr){
+        console.error('Failed to delete stale NotesV2DB', delErr);
+      }
+    }
+  }
+  console.error('Notes v2 init failed', err);
+  const msg = err?.message || err?.name || 'Startup failed';
+  try { toast(msg, 'error'); } catch {}
+});
+</script>
+  <script src="pwa-register.js"></script>
+</body>
+</html>
