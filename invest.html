@@ -103,11 +103,12 @@ td.actions{text-align:right;white-space:nowrap}
 .modal h2{font-size:17px;font-weight:600;margin-bottom:16px}
 .form-row{display:flex;flex-direction:column;gap:3px;margin-bottom:10px}
 .form-row label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}
-.form-row input,.form-row select,.form-row textarea{width:100%;padding:7px 10px;border:1px solid var(--border-strong);border-radius:var(--r);font-family:inherit;font-size:13px;color:var(--text);background:var(--surface)}
+.form-row input,.form-row select,.form-row textarea{width:100%;padding:7px 10px;border:1px solid var(--border-strong);border-radius:var(--r);font-family:inherit;font-size:16px;line-height:1.4;color:var(--text);background:var(--surface)}
+.form-row input[type="date"]{-webkit-appearance:none;appearance:none}
 .form-row input:focus,.form-row select:focus{outline:2px solid var(--accent-bg);border-color:var(--accent)}
 .form-row .required-mark{color:var(--danger)}
 .form-row input.input-error,.form-row select.input-error{border-color:var(--danger)}
-.form-row textarea{resize:vertical;min-height:100px;font-family:monospace;font-size:11px}
+.form-row textarea{resize:vertical;min-height:100px;font-family:monospace;font-size:16px}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
 
@@ -275,34 +276,36 @@ td.actions{text-align:right;white-space:nowrap}
 
 <div class="modal-backdrop" id="tickerModal">
   <div class="modal">
-    <h2>Add ticker</h2>
+    <h2 id="tickerModalTitle">Add ticker</h2>
     <div class="form-row">
       <label>Ticker <span class="required-mark">*</span></label>
-      <select id="fSymbol"></select>
+      <input type="text" id="fSymbol" placeholder="e.g. VWRA" style="text-transform:uppercase">
     </div>
-    <div class="form-grid">
-      <div class="form-row">
-        <label>Starting investment (USD)</label>
-        <input type="number" id="fStartAmount" step="0.01" min="0" placeholder="0">
+    <div id="tickerStartFields">
+      <div class="form-grid">
+        <div class="form-row">
+          <label>Starting investment (USD)</label>
+          <input type="number" id="fStartAmount" step="0.01" min="0" placeholder="0">
+        </div>
+        <div class="form-row">
+          <label>Date</label>
+          <input type="date" id="fStartDate">
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-row">
+          <label>Broker fee (USD)</label>
+          <input type="number" id="fStartFee" step="0.01" min="0" placeholder="0">
+        </div>
+        <div class="form-row">
+          <label>Conversion date</label>
+          <input type="date" id="fStartConversionDate">
+        </div>
       </div>
       <div class="form-row">
-        <label>Date</label>
-        <input type="date" id="fStartDate">
+        <label>PHP actually paid</label>
+        <input type="number" id="fStartPhpPaid" step="0.01" min="0" placeholder="leave blank to estimate from rate on conversion/buy date">
       </div>
-    </div>
-    <div class="form-grid">
-      <div class="form-row">
-        <label>Broker fee (USD)</label>
-        <input type="number" id="fStartFee" step="0.01" min="0" placeholder="0">
-      </div>
-      <div class="form-row">
-        <label>Conversion date</label>
-        <input type="date" id="fStartConversionDate">
-      </div>
-    </div>
-    <div class="form-row">
-      <label>PHP actually paid</label>
-      <input type="number" id="fStartPhpPaid" step="0.01" min="0" placeholder="leave blank to estimate from rate on conversion/buy date">
     </div>
     <div class="form-row">
       <label>Note</label>
@@ -310,7 +313,7 @@ td.actions{text-align:right;white-space:nowrap}
     </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('tickerModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="submitTicker()">Add ticker</button>
+      <button class="btn btn-primary" id="tickerModalSubmit" onclick="submitTicker()">Add ticker</button>
     </div>
   </div>
 </div>
@@ -799,6 +802,9 @@ function renderTickerTable(tickers, buys, today) {
       <td class="num">${fmtPhp(currentPhp)}<div class="rate-note" style="margin-top:3px">@ ${fmtRate(fxAt(today))}</div></td>
       <td>${returnHtml}</td>
       <td class="actions">
+        <button class="icon-btn neutral" title="Edit ticker" onclick="openTickerModal('${t.id}')">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M11 2l3 3-8 8-3.5 1 1-3.5 8-8z"/></svg>
+        </button>
         <button class="icon-btn" title="Delete ticker" onclick="deleteTicker('${t.id}')">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 5h10M6 5V3.5a1 1 0 011-1h2a1 1 0 011 1V5M5 5l.5 8a1 1 0 001 .9h3a1 1 0 001-.9l.5-8"/></svg>
         </button>
@@ -846,55 +852,63 @@ function renderHistory(buys, tickerById) {
 }
 
 // ── CRUD ───────────────────────────────────────────────────────────────────────
-async function openTickerModal() {
-  const existingTickers = await db.tickers.toArray();
-  const usedSymbols = new Set(existingTickers.map(t => t.symbol));
-  const available = (window.ETF_CATALOG || []).filter(c => !c.archived && !usedSymbols.has(c.symbol));
+let _editingTickerId = null;
 
-  if (!available.length) {
-    toast('All available tickers already added', true);
-    return;
-  }
+async function openTickerModal(tickerId) {
+  _editingTickerId = tickerId || null;
+  const editing = await (tickerId ? db.tickers.get(tickerId) : null);
 
-  document.getElementById('fSymbol').innerHTML = available.map(c => `<option value="${c.symbol}">${c.symbol} — ${c.label}</option>`).join('');
+  document.getElementById('tickerModalTitle').textContent = editing ? 'Edit ticker' : 'Add ticker';
+  document.getElementById('tickerModalSubmit').textContent = editing ? 'Save changes' : 'Add ticker';
+  document.getElementById('tickerStartFields').style.display = editing ? 'none' : '';
+  document.getElementById('fSymbol').value = editing ? editing.symbol : '';
+  document.getElementById('fTickerNote').value = editing ? (editing.note || '') : '';
   document.getElementById('fStartDate').value = todayStr();
   markFieldError('fSymbol', false);
   openModal('tickerModal');
 }
 
 async function submitTicker() {
-  const symbol = document.getElementById('fSymbol').value;
+  const symbol = document.getElementById('fSymbol').value.trim().toUpperCase();
   const label = (window.ETF_CATALOG || []).find(c => c.symbol === symbol)?.label || '';
   const note = document.getElementById('fTickerNote').value.trim();
-  const startAmount = parseFloat(document.getElementById('fStartAmount').value);
-  const startDate = document.getElementById('fStartDate').value || todayStr();
-  const startFee = parseFloat(document.getElementById('fStartFee').value) || 0;
-  const startConversionDate = document.getElementById('fStartConversionDate').value || null;
-  const startPhpPaid = parseFloat(document.getElementById('fStartPhpPaid').value) || 0;
 
   markFieldError('fSymbol', !symbol);
-  if (!symbol) { toast('Pick a ticker', true); return; }
+  if (!symbol) { toast('Enter a ticker', true); return; }
 
-  const existing = await db.tickers.where('symbol').equals(symbol).count();
-  if (existing > 0) { toast('That ticker already exists', true); return; }
+  const existing = await db.tickers.where('symbol').equals(symbol).toArray();
+  const clash = existing.find(t => t.id !== _editingTickerId);
+  if (clash) { toast('That ticker already exists', true); return; }
 
-  const ticker = { id: uuid(), symbol, label, note, created_at: new Date().toISOString() };
-  await db.tickers.put(ticker);
+  if (_editingTickerId) {
+    await db.tickers.update(_editingTickerId, { symbol, label, note });
+  } else {
+    const startAmount = parseFloat(document.getElementById('fStartAmount').value);
+    const startDate = document.getElementById('fStartDate').value || todayStr();
+    const startFee = parseFloat(document.getElementById('fStartFee').value) || 0;
+    const startConversionDate = document.getElementById('fStartConversionDate').value || null;
+    const startPhpPaid = parseFloat(document.getElementById('fStartPhpPaid').value) || 0;
 
-  if (startAmount > 0) {
-    await db.buys.put({
-      id: uuid(), tickerId: ticker.id, date: startDate, amountUsd: startAmount, fee: startFee,
-      conversionDate: startConversionDate, phpPaid: startPhpPaid, note: '', created_at: new Date().toISOString(),
-    });
+    const ticker = { id: uuid(), symbol, label, note, created_at: new Date().toISOString() };
+    await db.tickers.put(ticker);
+
+    if (startAmount > 0) {
+      await db.buys.put({
+        id: uuid(), tickerId: ticker.id, date: startDate, amountUsd: startAmount, fee: startFee,
+        conversionDate: startConversionDate, phpPaid: startPhpPaid, note: '', created_at: new Date().toISOString(),
+      });
+    }
   }
 
+  const wasEditing = !!_editingTickerId;
+  _editingTickerId = null;
   closeModal('tickerModal');
   document.getElementById('fTickerNote').value = '';
   document.getElementById('fStartAmount').value = '';
   document.getElementById('fStartFee').value = '';
   document.getElementById('fStartConversionDate').value = '';
   document.getElementById('fStartPhpPaid').value = '';
-  toast('Ticker added');
+  toast(wasEditing ? 'Ticker updated' : 'Ticker added');
   render();
 }
 

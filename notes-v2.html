@@ -53,13 +53,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .filter-bar:empty{display:none;}
 .search-wrap{position:relative;}
 .search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;}
-.search-input{width:100%;padding:8px 10px 8px 32px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:13px;font-family:var(--font-b);outline:none;transition:border-color .15s;}
+.search-input{width:100%;padding:8px 10px 8px 32px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:16px;font-family:var(--font-b);outline:none;transition:border-color .15s;}
 .search-input:focus{border-color:var(--border2);}
 .search-input::placeholder{color:var(--muted2);}
 .topbar-search{display:flex;align-items:center;justify-content:flex-end;overflow:hidden;max-width:0;opacity:0;transition:max-width .18s ease, opacity .12s ease;}
 .topbar-search.open{max-width:220px;opacity:1;}
 .topbar-search .search-wrap{width:200px;}
-.topbar-search .search-input{height:32px;padding:6px 10px 6px 32px;font-size:12px;}
+.topbar-search .search-input{height:32px;padding:6px 10px 6px 32px;font-size:16px;}
 .tag-row{display:flex;flex-direction:column;gap:6px;}
 .tag-row:empty{display:none;}
 .tag-group{display:flex;gap:6px;align-items:flex-start;min-width:0;}
@@ -128,7 +128,7 @@ td.actions{width:34px;text-align:right;padding:6px 8px;}
 
 .fg{display:flex;flex-direction:column;gap:5px;}
 .flabel{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);}
-.finput,.fselect{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);font-family:var(--font-b);font-size:13px;line-height:1.5;padding:8px 10px;outline:none;transition:border-color .15s;width:100%;}
+.finput,.fselect{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);font-family:var(--font-b);font-size:16px;line-height:1.5;padding:8px 10px;outline:none;transition:border-color .15s;width:100%;}
 .finput:focus,.fselect:focus{border-color:var(--primary);}
 .fselect option{background:var(--bg3);}
 
@@ -136,24 +136,23 @@ td.actions{width:34px;text-align:right;padding:6px 8px;}
 .sections-list{display:flex;flex-direction:column;gap:10px;}
 .section-block{border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg3);padding:10px;display:flex;flex-direction:column;gap:8px;}
 .section-block.drag-over,.item-row.drag-over{outline:1px dashed var(--primary);}
-.section-head{display:flex;align-items:center;gap:6px;}
-.section-grip{color:var(--muted2);cursor:grab;font-size:14px;flex-shrink:0;user-select:none;-webkit-user-select:none;touch-action:none;}
-.section-grip:active{cursor:grabbing;}
-.section-head input.heading{flex:1;min-width:0;background:none;border:none;color:var(--text);font-family:var(--font-h);font-weight:700;font-size:14px;outline:none;}
+.section-head{display:flex;align-items:center;gap:6px;cursor:grab;}
+.section-head:active{cursor:grabbing;}
+.section-head input.heading{flex:1;min-width:0;background:none;border:none;color:var(--text);font-family:var(--font-h);font-weight:700;font-size:16px;outline:none;cursor:text;}
 .section-head input.heading::placeholder{color:var(--muted2);font-family:var(--font-b);font-weight:500;}
-.style-select{flex-shrink:0;background:var(--bg4);border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:11px;font-family:var(--font-b);padding:4px 6px;outline:none;cursor:pointer;}
+.style-select{flex-shrink:0;background:var(--bg4);border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:16px;font-family:var(--font-b);padding:4px 6px;outline:none;cursor:pointer;}
 .section-del{width:22px;height:22px;border-radius:5px;border:none;background:none;color:var(--muted2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;transition:all .12s;}
 .section-del:hover{color:#ff5c5c;background:rgba(255,92,92,.12);}
 .items-list{display:flex;flex-direction:column;gap:6px;}
 .item-row{display:flex;align-items:flex-start;gap:6px;}
-.item-grip{color:var(--muted2);cursor:grab;font-size:12px;flex-shrink:0;padding-top:8px;user-select:none;-webkit-user-select:none;touch-action:none;}
-.item-grip:active{cursor:grabbing;}
-.item-marker{flex-shrink:0;font-size:12px;color:var(--muted);min-width:18px;text-align:right;padding-top:8px;user-select:none;}
+.item-marker{flex-shrink:0;font-size:12px;color:var(--muted);min-width:18px;text-align:right;padding-top:8px;user-select:none;-webkit-user-select:none;touch-action:none;cursor:grab;}
+.item-marker:active{cursor:grabbing;}
 .item-input-wrap{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
-.item-input{background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--font-b);font-size:13px;line-height:1.5;padding:6px 8px;outline:none;resize:none;overflow:hidden;min-height:32px;transition:border-color .15s;width:100%;}
+.item-input{background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--font-b);font-size:16px;line-height:1.5;padding:6px 8px;outline:none;resize:none;overflow:hidden;min-height:32px;transition:border-color .15s;width:100%;}
 .item-input:focus{border-color:var(--primary);}
 .item-input::placeholder{color:var(--muted2);}
-.char-count{font-size:10px;color:var(--muted2);text-align:right;padding-right:2px;}
+.char-count{display:none;font-size:10px;color:var(--muted2);text-align:right;padding-right:2px;}
+.char-count.show{display:block;}
 .char-count.over{color:#ff5c5c;font-weight:600;}
 .item-row.flag-over{outline:2px solid #ff5c5c;border-radius:6px;}
 .finput.flag-over{outline:2px solid #ff5c5c;}
@@ -172,7 +171,7 @@ td.actions{width:34px;text-align:right;padding:6px 8px;}
 
 .field-row{display:flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);padding:8px 10px;cursor:grab;user-select:none;-webkit-user-select:none;}
 .field-row input{cursor:auto;user-select:text;-webkit-user-select:text;}
-.field-row input{flex:1;background:none;border:none;color:var(--text);font-size:13px;font-family:var(--font-b);outline:none;min-width:0;}
+.field-row input{flex:1;background:none;border:none;color:var(--text);font-size:16px;font-family:var(--font-b);outline:none;min-width:0;}
 .field-row input::placeholder{color:var(--muted2);}
 .field-row.wrap{flex-wrap:wrap;}
 .field-options{width:100%;padding-left:28px;}
@@ -672,13 +671,19 @@ async function openEditRecord(id){
   om('m-record');
   buildRecForm(n);
 }
+const CHAR_COUNT_NEAR_RATIO = 0.8;
+function countClass(len, limit){
+  const near = len >= Math.floor(limit*CHAR_COUNT_NEAR_RATIO);
+  const over = len > limit;
+  return `char-count${near?' show':''}${over?' over':''}`;
+}
 function buildRecForm(n){
   const titleLen = (n.title||'').length;
   document.getElementById('rec-form').innerHTML = `
     <div class="fg">
       <label class="flabel">Title</label>
       <input class="finput" id="rf-title" value="${esc(n.title||'')}" placeholder="Untitled" oninput="updateTitleCount()">
-      <div class="char-count${titleLen>titleCharLimit?' over':''}" id="rf-title-count">${titleLen}/${titleCharLimit}</div>
+      <div class="${countClass(titleLen, titleCharLimit)}" id="rf-title-count">${titleLen}/${titleCharLimit}</div>
     </div>
     <div class="fg">
       <label class="flabel">Tags</label>
@@ -701,7 +706,7 @@ function updateTitleCount(){
   if(!ta || !countEl) return;
   const len = ta.value.length;
   countEl.textContent = `${len}/${titleCharLimit}`;
-  countEl.classList.toggle('over', len>titleCharLimit);
+  countEl.className = countClass(len, titleCharLimit);
 }
 
 /* ── SECTIONS EDITOR ──
@@ -741,8 +746,7 @@ function renderSections(){
   if(!el) return;
   el.innerHTML = recSections.map((s,si)=>`
     <div class="section-block" data-idx="${si}" ondragover="sectionDragOver(event)" ondrop="sectionDrop(event)">
-      <div class="section-head">
-        <span class="section-grip" draggable="true" ondragstart="sectionDragStart(event)" ondragend="sectionDragEnd()">⠿</span>
+      <div class="section-head" draggable="true" ondragstart="sectionDragStart(event)" ondragend="sectionDragEnd()">
         <input class="heading" type="text" placeholder="Section heading" value="${esc(s.title)}" oninput="recSections[${si}].title=this.value">
         <select class="style-select" onchange="setSectionStyle(${si},this.value)">
           ${SECTION_STYLES.map(o=>`<option value="${o.key}"${s.style===o.key?' selected':''}>${o.label}</option>`).join('')}
@@ -754,11 +758,10 @@ function renderSections(){
           const len = (it||'').length;
           return `
           <div class="item-row" data-idx="${ii}" ondragover="itemDragOver(event,${si})" ondrop="itemDrop(event)">
-            <span class="item-grip" draggable="true" ondragstart="itemDragStart(event,${si})" ondragend="itemDragEnd()">⠿</span>
-            <span class="item-marker">${esc(markerFor(s.style, ii))}</span>
+            <span class="item-marker" draggable="true" ondragstart="itemDragStart(event,${si})" ondragend="itemDragEnd()">${esc(markerFor(s.style, ii))}</span>
             <div class="item-input-wrap">
               <textarea class="item-input" rows="1" placeholder="Item text" oninput="handleItemInput(this,${si},${ii})">${esc(it)}</textarea>
-              <div class="char-count${len>itemCharLimit?' over':''}">${len}/${itemCharLimit}</div>
+              <div class="${countClass(len, itemCharLimit)}">${len}/${itemCharLimit}</div>
             </div>
             <button class="item-del" onclick="delItem(${si},${ii})">✕</button>
           </div>`;
@@ -790,7 +793,7 @@ function handleItemInput(ta, si, ii){
   if(countEl){
     const len = ta.value.length;
     countEl.textContent = `${len}/${itemCharLimit}`;
-    countEl.classList.toggle('over', len>itemCharLimit);
+    countEl.className = countClass(len, itemCharLimit);
   }
 }
 function focusOverLimitItem(si, ii){
@@ -804,6 +807,7 @@ function focusOverLimitItem(si, ii){
 
 let sectionDragEl = null;
 function sectionDragStart(e){
+  if(e.target.closest('input,select,button')){ e.preventDefault(); return; }
   sectionDragEl = e.currentTarget.closest('.section-block');
   e.dataTransfer.effectAllowed = 'move';
   e.dataTransfer.setData('text/plain','');

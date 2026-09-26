@@ -52,13 +52,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .filter-bar{padding:10px 14px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0;}
 .search-wrap{position:relative;}
 .search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;}
-.search-input{width:100%;padding:8px 10px 8px 32px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:13px;font-family:var(--font-b);outline:none;transition:border-color .15s;}
+.search-input{width:100%;padding:8px 10px 8px 32px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:16px;font-family:var(--font-b);outline:none;transition:border-color .15s;}
 .search-input:focus{border-color:var(--border2);}
 .search-input::placeholder{color:var(--muted2);}
 .topbar-search{display:flex;align-items:center;justify-content:flex-end;overflow:hidden;max-width:0;opacity:0;transition:max-width .18s ease, opacity .12s ease;}
 .topbar-search.open{max-width:220px;opacity:1;}
 .topbar-search .search-wrap{width:200px;}
-.topbar-search .search-input{height:32px;padding:6px 10px 6px 32px;font-size:12px;}
+.topbar-search .search-input{height:32px;padding:6px 10px 6px 32px;font-size:16px;}
 .tag-row{display:flex;flex-direction:column;gap:6px;}
 .tag-row:empty{display:none;}
 .tag-group{display:flex;gap:6px;align-items:flex-start;min-width:0;}
@@ -145,7 +145,7 @@ td.actions{width:34px;text-align:right;padding:6px 8px;}
 
 .fg{display:flex;flex-direction:column;gap:5px;}
 .flabel{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);}
-.finput,.fselect,.ftextarea{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);font-family:var(--font-b);font-size:13px;line-height:1.5;padding:8px 10px;outline:none;transition:border-color .15s;width:100%;}
+.finput,.fselect,.ftextarea{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);font-family:var(--font-b);font-size:16px;line-height:1.5;padding:8px 10px;outline:none;transition:border-color .15s;width:100%;}
 .finput:focus,.fselect:focus,.ftextarea:focus{border-color:var(--primary);}
 .ftextarea{resize:none;min-height:70px;overflow:hidden;}
 .md-editor-container{display:grid;width:100%;}
@@ -178,12 +178,12 @@ td.actions{width:34px;text-align:right;padding:6px 8px;}
 .field-row{display:flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);padding:8px 10px;cursor:grab;user-select:none;-webkit-user-select:none;}
 .field-row input,.field-row select{cursor:auto;user-select:text;-webkit-user-select:text;}
 .field-row.primary{border-left:3px solid var(--primary);}
-.field-row input{flex:1;background:none;border:none;color:var(--text);font-size:13px;font-family:var(--font-b);outline:none;min-width:0;}
+.field-row input{flex:1;background:none;border:none;color:var(--text);font-size:16px;font-family:var(--font-b);outline:none;min-width:0;}
 .field-row input::placeholder{color:var(--muted2);}
-.field-row select{background:var(--bg4);border:1px solid var(--border);border-radius:5px;color:var(--muted);font-size:11px;font-family:var(--font-b);padding:3px 6px;outline:none;cursor:pointer;}
+.field-row select{background:var(--bg4);border:1px solid var(--border);border-radius:5px;color:var(--muted);font-size:16px;font-family:var(--font-b);padding:3px 6px;outline:none;cursor:pointer;}
 .field-row.wrap{flex-wrap:wrap;}
 .field-options{width:100%;padding-left:28px;}
-.field-options input{width:100%;background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:12px;}
+.field-options input{width:100%;background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:16px;}
 .field-badge{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:2px 6px;border-radius:4px;background:color-mix(in srgb, var(--primary), transparent 88%);color:var(--primary);flex-shrink:0;}
 .field-grip{color:var(--muted2);cursor:grab;font-size:14px;flex-shrink:0;user-select:none;-webkit-user-select:none;touch-action:none;}
 .field-grip:active{cursor:grabbing;}

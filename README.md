@@ -17,11 +17,11 @@ node scripts/register-html.js
 ## Guide
 1. Dexie.js for storage
 1. Vanilla HTML and JS
-1. Mobile-first
 1. Light mode only
 1. Core features
     - Import/export (UUID, idempotent records)
     - Reset and import
+1. Mobile-first
 
 ## PWA caching
 
