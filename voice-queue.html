@@ -157,6 +157,14 @@ input, textarea { font-size: 16px; }
   box-shadow: 0 2px 10px rgba(0,0,0,.14); font-size: 12px; max-width: calc(100vw - 100px); flex-wrap: wrap; }
 .selection-bar.show { display: flex; }
 .selection-bar .spacer { flex: 1; }
+/* Phone width: full-width bar above the mic FAB, count on its own line, buttons wrap. */
+@media (max-width: 640px) {
+  .selection-bar { left: 12px; right: 12px; bottom: 88px; max-width: none; gap: 6px 8px; padding: 8px 10px; }
+  .selection-bar #selection-count { flex: 1 0 100%; }
+  .selection-bar .spacer { display: none; }
+  .selection-bar .btn { flex: 1 1 auto; justify-content: center; padding: 7px 8px; }
+  .list { padding-bottom: 200px; }
+}
 .undo-panel { display: none; flex-direction: column; align-items: center; gap: 6px; position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 17; max-width: calc(100vw - 32px); }
 .undo-panel.show { display: flex; }
 .undo-list { display: none; flex-direction: column; gap: 4px; }
