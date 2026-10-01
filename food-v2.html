@@ -440,6 +440,21 @@
   .stock-toggle-btn.active.low{ background:var(--accent-dim); color:var(--accent); font-weight:700; }
   .stock-toggle-btn.active.out{ background:var(--rust-dim); color:var(--rust); font-weight:700; }
 
+  /* Ingredient stock popover (dish tab chips) */
+  .chip-stock-pop{
+    position:fixed; z-index:200; background:var(--bg-raised);
+    border:1px solid var(--line-strong); border-radius:10px; box-shadow:var(--shadow);
+    padding:8px; display:flex; flex-direction:column; gap:6px; min-width:190px;
+  }
+  .chip-stock-pop .pop-title{ font-size:12px; font-weight:600; color:var(--chalk); padding:0 2px; }
+  .chip-stock-pop .stock-toggle-group{ display:flex; }
+  .chip-stock-pop .stock-toggle-btn{ flex:1; padding:6px 8px; }
+  .chip-stock-pop .pop-link{
+    background:none; border:none; padding:2px; text-align:left; cursor:pointer;
+    font:inherit; font-size:11.5px; color:var(--chalk-faint);
+  }
+  .chip-stock-pop .pop-link:hover{ color:var(--chalk); text-decoration:underline; }
+
   /* ---------- Pantry View ---------- */
   .grocery-stats{
     display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:16px;
@@ -1452,11 +1467,16 @@
     const ts = nowISO();
     const itemId = editingItemId || uuid();
     const isNew = !editingItemId;
+    const prev = isNew ? null : await db.items.get(itemId);
+
+    // Setting or changing the Last Prepared date means the planned meal got cooked: drop the plan
+    const preparedNow = !!lastPrepared && lastPrepared !== (prev?.lastPrepared || '');
+    const completedPlan = isPlanned && preparedNow;
 
     await db.items.put({
-      id: itemId, name, type: currentType, stockStatus, notes, isPlanned: isPlanned ? 1 : 0,
+      id: itemId, name, type: currentType, stockStatus, notes, isPlanned: (isPlanned && !completedPlan) ? 1 : 0,
       lastPrepared,
-      createdAt: isNew ? ts : (await db.items.get(itemId))?.createdAt || ts,
+      createdAt: prev?.createdAt || ts,
       updatedAt: ts
     });
 
@@ -1474,7 +1494,7 @@
     }
 
     closeDishModal();
-    toast(isNew ? 'Dish added' : 'Dish updated');
+    toast(completedPlan ? `"${name}" prepared — removed from plan` : (isNew ? 'Dish added' : 'Dish updated'));
     updateHeaderBadge();
     render();
   }
@@ -1918,7 +1938,7 @@
             </div>
           </div>
           <!-- Mobile detail body -->
-          <div class="dish-mobile-body">
+          <div class="dish-mobile-body${isExpanded ? ' open' : ''}">
             ${ingCount > 0 ? `<div class="dish-mobile-section">
               <div class="dish-mobile-label">Ingredients</div>
               <div class="chips">${chips || ''}</div>
@@ -1996,11 +2016,7 @@
       tr.querySelectorAll('.chip').forEach(chip => {
         chip.addEventListener('click', e => {
           e.stopPropagation();
-          currentTab = 'ingredients';
-          updateTabUI();
-          searchTerm = '';
-          document.getElementById('searchInput').value = '';
-          render(chip.dataset.ingId);
+          openChipStockPopover(chip);
         });
       });
 
@@ -2029,6 +2045,66 @@
         });
       }
     });
+  }
+
+  /* Dish-tab ingredient chip: small popover to set stock, with a link to the pantry tab */
+  function closeChipStockPopover(){
+    const pop = document.getElementById('chipStockPop');
+    if(pop) pop.remove();
+    document.removeEventListener('mousedown', onChipPopOutside, true);
+    document.removeEventListener('keydown', onChipPopKey, true);
+    window.removeEventListener('scroll', closeChipStockPopover, true);
+  }
+  function onChipPopOutside(e){ if(!e.target.closest('#chipStockPop')) closeChipStockPopover(); }
+  function onChipPopKey(e){ if(e.key === 'Escape') closeChipStockPopover(); }
+
+  async function openChipStockPopover(chip){
+    const wasOpenFor = document.getElementById('chipStockPop')?.dataset.ingId;
+    closeChipStockPopover();
+    const ingId = chip.dataset.ingId;
+    if(wasOpenFor === ingId) return;
+    const ing = await db.ingredients.get(ingId);
+    if(!ing) return;
+    const current = ing.stockStatus || 'out';
+    const opt = (status, label) =>
+      `<button class="stock-toggle-btn ${status}${current === status ? ' active' : ''}" data-status="${status}">${label}</button>`;
+
+    const pop = document.createElement('div');
+    pop.id = 'chipStockPop';
+    pop.className = 'chip-stock-pop';
+    pop.dataset.ingId = ingId;
+    pop.innerHTML = `
+      <div class="pop-title">${escapeHtml(ing.name)}</div>
+      <div class="stock-toggle-group">${opt('in_stock','In Stock')}${opt('low','Low')}${opt('out','Out')}</div>
+      <button class="pop-link">View in pantry →</button>`;
+    document.body.appendChild(pop);
+
+    const r = chip.getBoundingClientRect();
+    const pw = pop.offsetWidth, ph = pop.offsetHeight;
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - pw - 8));
+    const top = (r.bottom + 6 + ph > window.innerHeight) ? Math.max(8, r.top - ph - 6) : r.bottom + 6;
+    pop.style.left = left + 'px';
+    pop.style.top = top + 'px';
+
+    pop.querySelectorAll('.stock-toggle-btn').forEach(btn => {
+      btn.addEventListener('click', async e => {
+        closeChipStockPopover();
+        if(btn.dataset.status === current) return;
+        await updateStockStatus(ingId, btn.dataset.status, e);
+      });
+    });
+    pop.querySelector('.pop-link').addEventListener('click', () => {
+      closeChipStockPopover();
+      currentTab = 'ingredients';
+      updateTabUI();
+      searchTerm = '';
+      document.getElementById('searchInput').value = '';
+      render(ingId);
+    });
+
+    document.addEventListener('mousedown', onChipPopOutside, true);
+    document.addEventListener('keydown', onChipPopKey, true);
+    window.addEventListener('scroll', closeChipStockPopover, true);
   }
 
   function wireDishFilterEvents(container){
