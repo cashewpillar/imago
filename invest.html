@@ -327,6 +327,16 @@ td.actions{text-align:right;white-space:nowrap}
     </div>
     <div class="form-grid">
       <div class="form-row">
+        <label>Shares</label>
+        <input type="number" id="fBuyShares" step="0.0001" min="0" placeholder="0" oninput="recalcBuyAmount()">
+      </div>
+      <div class="form-row">
+        <label>Price per share (USD)</label>
+        <input type="number" id="fBuyPrice" step="0.01" min="0" placeholder="0" oninput="recalcBuyAmount()">
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="form-row">
         <label>Amount (USD) <span class="required-mark">*</span></label>
         <input type="number" id="fBuyAmount" step="0.01" min="0" placeholder="0">
       </div>
@@ -571,6 +581,7 @@ function markFieldError(id, hasError) {
 function fmtUsd(v) { return '$' + v.toLocaleString(undefined, { maximumFractionDigits: 0 }); }
 function fmtPhp(v) { return '₱' + v.toLocaleString(undefined, { maximumFractionDigits: 0 }); }
 function fmtRate(rate) { return `₱${rate.toFixed(1)}/$`; }
+function fmtShares(n) { return parseFloat(n.toFixed(4)).toString(); }
 
 // ── Price/FX lookups ──────────────────────────────────────────────────────────
 // A ticker's benchmark source key is just its symbol lowercased (matching
@@ -834,6 +845,7 @@ function renderHistory(buys, tickerById) {
     return `<div class="history-item">
       <div class="history-meta">
         <span><span class="ticker-symbol">${t ? t.symbol : '?'}</span> ${b.date}</span>
+        ${b.shares ? `<span class="sub">${fmtShares(b.shares)} sh @ $${b.price.toFixed(2)}</span>` : ''}
         ${b.fee ? `<span class="sub">+${fmtUsd(b.fee)} fee</span>` : ''}
         <span class="sub">${phpLabel}</span>
         ${b.note ? `<span class="sub">${b.note}</span>` : ''}
@@ -937,6 +949,8 @@ async function openBuyModal(buyId) {
   document.getElementById('buyModalTitle').textContent = editing ? 'Edit investment' : 'Add investment';
   document.getElementById('buyModalSubmit').textContent = editing ? 'Save changes' : 'Add investment';
   select.value = editing ? editing.tickerId : select.value;
+  document.getElementById('fBuyShares').value = editing && editing.shares ? editing.shares : '';
+  document.getElementById('fBuyPrice').value = editing && editing.price ? editing.price : '';
   document.getElementById('fBuyAmount').value = editing ? editing.amountUsd : '';
   document.getElementById('fBuyDate').value = editing ? editing.date : todayStr();
   document.getElementById('fBuyFee').value = editing && editing.fee ? editing.fee : '';
@@ -949,9 +963,22 @@ async function openBuyModal(buyId) {
   openModal('buyModal');
 }
 
+function recalcBuyAmount() {
+  const shares = parseFloat(document.getElementById('fBuyShares').value);
+  const price = parseFloat(document.getElementById('fBuyPrice').value);
+  if (shares > 0 && price > 0) {
+    document.getElementById('fBuyAmount').value = (shares * price).toFixed(2);
+  }
+}
+
 async function submitBuy() {
   const tickerId = document.getElementById('fBuyTicker').value;
-  const amountUsd = parseFloat(document.getElementById('fBuyAmount').value);
+  const sharesRaw = document.getElementById('fBuyShares').value;
+  const priceRaw = document.getElementById('fBuyPrice').value;
+  const shares = sharesRaw ? parseFloat(sharesRaw) : null;
+  const price = priceRaw ? parseFloat(priceRaw) : null;
+  let amountUsd = parseFloat(document.getElementById('fBuyAmount').value);
+  if (shares > 0 && price > 0) amountUsd = shares * price;
   const date = document.getElementById('fBuyDate').value || todayStr();
   const fee = parseFloat(document.getElementById('fBuyFee').value) || 0;
   const conversionDate = document.getElementById('fBuyConversionDate').value || null;
@@ -964,14 +991,16 @@ async function submitBuy() {
   if (!(amountUsd > 0)) { toast('Enter an amount', true); return; }
 
   if (_editingBuyId) {
-    await db.buys.update(_editingBuyId, { tickerId, date, amountUsd, fee, conversionDate, phpPaid, note });
+    await db.buys.update(_editingBuyId, { tickerId, shares, price, date, amountUsd, fee, conversionDate, phpPaid, note });
   } else {
-    await db.buys.put({ id: uuid(), tickerId, date, amountUsd, fee, conversionDate, phpPaid, note, created_at: new Date().toISOString() });
+    await db.buys.put({ id: uuid(), tickerId, shares, price, date, amountUsd, fee, conversionDate, phpPaid, note, created_at: new Date().toISOString() });
   }
 
   const wasEditing = !!_editingBuyId;
   _editingBuyId = null;
   closeModal('buyModal');
+  document.getElementById('fBuyShares').value = '';
+  document.getElementById('fBuyPrice').value = '';
   document.getElementById('fBuyAmount').value = '';
   document.getElementById('fBuyFee').value = '';
   document.getElementById('fBuyConversionDate').value = '';
