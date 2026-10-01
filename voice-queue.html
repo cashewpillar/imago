@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Voice Queue</title>
+<script src="scripts/dexie.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+
+:root {
+  --bg: #f6f2ea;
+  --bg2: #fffdf7;
+  --bg3: #f1ebdf;
+  --bg4: #e6dece;
+  --border: rgba(52,45,30,0.09);
+  --border2: rgba(52,45,30,0.16);
+  --text: #1f1c16;
+  --muted: #6e6658;
+  --muted2: #a49a87;
+  --primary: #61a300;
+  --on-primary: #fffdf7;
+  --danger: #d00000;
+  --r: 14px;
+  --r-sm: 8px;
+  --font-h: 'Syne', system-ui, sans-serif;
+  --font-b: 'DM Sans', system-ui, sans-serif;
+  --tag-lime: #61a300;   --tag-lime-dim: rgba(97,163,0,.12);
+  --tag-sky: #0077b6;    --tag-sky-dim: rgba(0,119,182,.12);
+  --tag-pink: #c9184a;   --tag-pink-dim: rgba(201,24,74,.12);
+  --tag-amber: #b5651d;  --tag-amber-dim: rgba(181,101,29,.12);
+  --tag-violet: #6a0dad; --tag-violet-dim: rgba(106,13,173,.12);
+  --tag-teal: #008080;   --tag-teal-dim: rgba(0,128,128,.12);
+  --tag-coral: #d00000;  --tag-coral-dim: rgba(208,0,0,.12);
+  --tag-ice: #4682b4;    --tag-ice-dim: rgba(70,130,180,.12);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--text); font-family: var(--font-b); font-size: 14px; line-height: 1.5; padding-bottom: 90px; -webkit-text-size-adjust: 100%; }
+h3 { font-family: var(--font-h); font-size: 14px; font-weight: 700; letter-spacing: -0.2px; }
+[hidden] { display: none !important; }
+
+/* iOS zooms into any focused field under 16px */
+input, textarea { font-size: 16px; }
+
+.btn { font-family: var(--font-b); font-size: 12px; font-weight: 600; padding: 7px 14px; border-radius: var(--r-sm); border: 1px solid var(--border2); background: var(--bg3); color: var(--text); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; transition: background .12s; }
+.btn:hover { background: var(--bg4); }
+.btn-icon { padding: 7px 9px; }
+
+/* -- topbar -- */
+.topbar { position: sticky; top: 0; z-index: 20; background: var(--bg); border-bottom: 1px solid var(--border); padding: 0 14px; padding-top: env(safe-area-inset-top); min-height: 52px; display: flex; align-items: center; gap: 10px; }
+.back { color: var(--muted); text-decoration: none; font-size: 20px; line-height: 1; padding: 4px 6px 4px 0; }
+.brand { font-family: var(--font-h); font-size: 16px; font-weight: 800; letter-spacing: -0.3px; }
+.topbar-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+
+.menu-wrap { position: relative; }
+.menu-dropdown { position: absolute; top: calc(100% + 6px); right: 0; z-index: 22; display: flex; flex-direction: column; gap: 4px;
+  min-width: 190px; padding: 8px; background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--r-sm); box-shadow: 0 6px 20px rgba(0,0,0,.16); }
+.menu-dropdown .tag-chip { width: 100%; text-align: left; }
+.menu-divider { height: 1px; background: var(--border); margin: 2px 0; }
+
+/* -- filters -- */
+.toolbar { max-width: 720px; margin: 0 auto; padding: 10px 14px 0; display: flex; flex-direction: column; gap: 8px; }
+.tag-group-chips { display: flex; gap: 5px; flex-wrap: wrap; min-width: 0; }
+.tag-chip { padding: 4px 11px; border-radius: 20px; font-size: 11px; font-weight: 500; cursor: pointer; border: 1px solid var(--border2); background: var(--bg3); color: var(--muted); font-family: inherit; transition: all .12s; white-space: nowrap;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.tag-chip:hover { color: var(--text); }
+.tag-chip.include { color: var(--on-primary); }
+.tag-chip.exclude { color: var(--danger); font-weight: 600; background: var(--bg3); border-color: var(--danger); }
+.tag-chip.f-lime.include   { background: var(--tag-lime);   border-color: var(--tag-lime); }
+.tag-chip.f-sky.include    { background: var(--tag-sky);    border-color: var(--tag-sky); }
+.tag-chip.f-pink.include   { background: var(--tag-pink);   border-color: var(--tag-pink); }
+.tag-chip.f-amber.include  { background: var(--tag-amber);  border-color: var(--tag-amber); }
+.tag-chip.f-violet.include { background: var(--tag-violet); border-color: var(--tag-violet); }
+.tag-chip.f-teal.include   { background: var(--tag-teal);   border-color: var(--tag-teal); }
+.tag-chip.f-coral.include  { background: var(--tag-coral);  border-color: var(--tag-coral); }
+.tag-chip.f-ice.include    { background: var(--tag-ice);    border-color: var(--tag-ice); }
+#toggle-trash.include { background: var(--text); border-color: var(--text); color: var(--bg2); }
+#toggle-done[data-state="all"] { background: var(--bg4); border-color: var(--border2); color: var(--text); }
+#toggle-done[data-state="only"] { background: var(--text); border-color: var(--text); color: var(--bg2); }
+.filter-count-row { display: flex; justify-content: flex-end; padding-top: 2px; }
+.filter-count { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+.cell-tag { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px; display: inline-block; margin: 1px 3px 1px 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: top;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.cell-tag.t-lime   { background: var(--tag-lime-dim);   color: var(--tag-lime); }
+.cell-tag.t-sky    { background: var(--tag-sky-dim);    color: var(--tag-sky); }
+.cell-tag.t-pink   { background: var(--tag-pink-dim);   color: var(--tag-pink); }
+.cell-tag.t-amber  { background: var(--tag-amber-dim);  color: var(--tag-amber); }
+.cell-tag.t-violet { background: var(--tag-violet-dim); color: var(--tag-violet); }
+.cell-tag.t-teal   { background: var(--tag-teal-dim);   color: var(--tag-teal); }
+.cell-tag.t-coral  { background: var(--tag-coral-dim);  color: var(--tag-coral); }
+.cell-tag.t-ice    { background: var(--tag-ice-dim);    color: var(--tag-ice); }
+/* AI-attached tags (the ##tag form) read differently from typed ones: dashed outline plus a sparkle, not a different color. */
+.tag-chip.llm-tag, .cell-tag.llm-tag { border: 1px dashed currentColor; }
+
+/* -- list -- */
+.list { max-width: 720px; margin: 0 auto; padding: 10px 14px 40px; display: flex; flex-direction: column; gap: 8px; }
+.empty { text-align: center; color: var(--muted); padding: 60px 20px; }
+
+.item { position: relative; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--bg2); cursor: pointer; overflow: hidden; }
+.item.selected { border-color: var(--text); box-shadow: 0 0 0 1px var(--text); }
+.item.drag-over { outline: 2px dashed var(--text); outline-offset: -2px; }
+.item.editing { cursor: default; }
+.item-select-badge { position: absolute; top: 7px; left: 7px; width: 16px; height: 16px; border-radius: 50%; background: var(--text); display: flex; align-items: center; justify-content: center; z-index: 3; }
+.item-select-badge svg { width: 10px; height: 10px; }
+.item-content { position: relative; padding: 9px 11px; display: flex; flex-direction: column; gap: 6px; background: var(--bg2); z-index: 1; }
+.item-head { display: flex; align-items: center; gap: 8px; }
+.item-caret { color: var(--muted); font-size: 9px; flex-shrink: 0; transition: transform .15s; }
+.item.expanded .item-caret { transform: rotate(90deg); }
+.item-title { flex: 1; font-size: 13px; font-weight: 600; word-break: break-word; min-width: 0; min-height: 1.4em; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.item-title[data-role="toggle"] { cursor: pointer; }
+.item-title.untitled { color: var(--muted); font-weight: 400; font-style: italic; }
+.item-text { font-size: 12.5px; word-break: break-word; display: none; padding-left: 17px; white-space: pre-wrap; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.item.expanded .item-text, .item:not(.has-title) .item-text { display: block; }
+.item-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-left: 17px; }
+.item-tags { display: flex; gap: 4px; flex-wrap: wrap; min-width: 0; }
+.status-done { background: var(--tag-lime-dim); color: var(--tag-lime); }
+.status-trashed { background: rgba(208,0,0,.12); color: var(--danger); }
+.item-time { text-align: right; font-size: 10.5px; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
+.item-summary { font-size: 12px; color: var(--muted); font-style: italic; padding-left: 17px; }
+.item-summary-list { font-size: 12px; color: var(--muted); margin: 0; padding-left: 32px; display: flex; flex-direction: column; gap: 2px; }
+
+.item-header-actions button, .item-swipe-actions button { border: none; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #fff; }
+.item-header-actions button svg, .item-swipe-actions button svg { stroke: #fff; fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.act-edit { background: var(--tag-sky); }
+.act-done, .act-restore { background: var(--primary); }
+.act-delete { background: var(--danger); }
+
+@media (hover:hover) and (pointer:fine) {
+  .item-header-actions { position: absolute; top: 6px; right: 6px; display: flex; gap: 4px; z-index: 2; }
+  .item-header-actions button { width: 22px; height: 22px; border-radius: 5px; }
+  .item-header-actions button svg { width: 12px; height: 12px; stroke: currentColor; }
+  .item-header-actions .act-edit { background: var(--tag-sky-dim); color: var(--tag-sky); }
+  .item-header-actions .act-edit:hover { background: var(--tag-sky); color: #fff; }
+  .item-header-actions .act-done, .item-header-actions .act-restore { background: var(--tag-lime-dim); color: var(--tag-lime); }
+  .item-header-actions .act-done:hover, .item-header-actions .act-restore:hover { background: var(--primary); color: #fff; }
+  .item-header-actions .act-delete { background: rgba(208,0,0,.12); color: var(--danger); }
+  .item-header-actions .act-delete:hover { background: var(--danger); color: #fff; }
+  .item-title { padding-right: 78px; }
+  .item-swipe-actions { display: none; }
+}
+@media (hover:none) {
+  .item-header-actions { display: none; }
+  .item-content { transition: transform .18s ease; transform: translateX(0); }
+  .item.swiped-open .item-content { transform: translateX(-142px); }
+  .item-swipe-actions { position: absolute; top: 0; right: 0; bottom: 0; width: 142px; display: flex; }
+  .item-swipe-actions button { flex: 1; }
+  .item-swipe-actions button svg { width: 18px; height: 18px; }
+}
+
+.edit-unified { width: 100%; border: 1px solid var(--border2); border-radius: var(--r-sm); padding: 8px 10px; font: inherit; font-size: 16px; background: var(--bg); color: var(--text); resize: none; overflow: hidden; min-height: 60px; line-height: 1.5; }
+
+/* -- selection bar / undo / toast -- */
+.selection-bar { display: none; align-items: center; gap: 10px; position: fixed; left: 16px; bottom: 20px; z-index: 18; padding: 8px 12px; border: 2px solid var(--text); border-radius: var(--r-sm); background: var(--bg2);
+  box-shadow: 0 2px 10px rgba(0,0,0,.14); font-size: 12px; max-width: calc(100vw - 100px); flex-wrap: wrap; }
+.selection-bar.show { display: flex; }
+.selection-bar .spacer { flex: 1; }
+.undo-panel { display: none; flex-direction: column; align-items: center; gap: 6px; position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 17; max-width: calc(100vw - 32px); }
+.undo-panel.show { display: flex; }
+.undo-list { display: none; flex-direction: column; gap: 4px; }
+.undo-panel.expanded .undo-list { display: flex; }
+@media (hover:hover) and (pointer:fine) { .undo-panel:hover .undo-list { display: flex; } }
+.undo-row { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--bg2); box-shadow: 0 2px 8px rgba(0,0,0,.12); font-size: 12px; white-space: nowrap; }
+.undo-peek { position: relative; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border); background: var(--text); color: var(--bg2); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,.16); }
+.undo-peek::after { content: attr(data-count); position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; border-radius: 50%; background: var(--danger); color: #fff; font-size: 9px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+.toast-wrap { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 30; display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; }
+.toast { background: var(--danger); color: #fff; font-size: 12.5px; padding: 8px 14px; border-radius: var(--r-sm); box-shadow: 0 2px 10px rgba(0,0,0,.18); max-width: calc(100vw - 32px); cursor: pointer; pointer-events: auto; animation: toast-in .15s ease; }
+.toast.ok { background: var(--text); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* -- mic -- */
+.fab { position: fixed; right: 20px; bottom: 20px; width: 56px; height: 56px; border-radius: 50%; border: 1px solid var(--border2); background: var(--bg2); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 10px rgba(0,0,0,.16); z-index: 20; font-size: 22px; }
+.fab:hover { background: var(--bg3); }
+.fab.live { background: rgba(208,0,0,.1); border-color: var(--danger); color: var(--danger); }
+.fab .status-dot { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--muted2); }
+.fab .status-dot.on { background: var(--danger); animation: mic-pulse 1.1s ease-in-out infinite; }
+@keyframes mic-pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+.sheet-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.2); z-index: 19; opacity: 0; pointer-events: none; transition: opacity .25s ease; cursor: pointer; }
+.sheet-backdrop.show { opacity: 1; pointer-events: auto; }
+.panel { position: fixed; left: 0; right: 0; bottom: 0; margin: 0 auto; width: 100%; max-width: 640px; display: flex; flex-direction: column; border: 1px solid var(--border2); border-bottom: none; border-radius: 16px 16px 0 0;
+  background: var(--bg2); box-shadow: 0 -6px 24px rgba(0,0,0,.16); overflow: hidden; z-index: 20; padding-bottom: env(safe-area-inset-bottom);
+  transform: translateY(100%); transition: transform .28s cubic-bezier(.25,.8,.35,1); pointer-events: none; }
+.panel.show { transform: translateY(0); pointer-events: auto; }
+.sheet-handle { width: 36px; height: 4px; border-radius: 100px; background: var(--border2); margin: 8px auto 2px; flex-shrink: 0; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 14px 4px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+.countdown { font-variant-numeric: tabular-nums; color: var(--danger); font-weight: 600; text-transform: none; }
+.speech-wrap { padding: 6px 20px 24px; }
+.speech-bubble { background: var(--bg3); border-radius: 18px; padding: 12px 16px; font-size: 14px; color: var(--text); min-height: 22px; word-break: break-word; }
+.speech-bubble:empty::before { content: "Listening…"; color: var(--muted); }
+.speech-bubble .interim { color: var(--muted); }
+
+/* -- tags modal -- */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 24; opacity: 0; pointer-events: none; transition: opacity .18s ease; }
+.modal-backdrop.show { opacity: 1; pointer-events: auto; }
+.tags-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%) scale(.97); width: calc(100vw - 32px); max-width: 480px; max-height: 80vh; display: flex; flex-direction: column; background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--r-sm);
+  box-shadow: 0 12px 40px rgba(0,0,0,.25); z-index: 25; opacity: 0; pointer-events: none; transition: opacity .18s ease, transform .18s ease; }
+.tags-modal.show { opacity: 1; transform: translate(-50%,-50%) scale(1); pointer-events: auto; }
+.tags-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.modal-close { border: none; background: none; font-size: 14px; color: var(--muted); cursor: pointer; padding: 2px 6px; }
+.tags-modal-body { overflow-y: auto; padding: 10px 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.tag-row { display: flex; align-items: center; gap: 8px; }
+.tag-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.tag-name-input { flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--bg); color: var(--text); padding: 5px 8px; font: inherit; font-size: 16px; }
+.tag-row .btn { font-size: 11.5px; padding: 4px 9px; flex-shrink: 0; }
+.tags-empty { color: var(--muted); font-size: 12.5px; padding: 6px 0; }
+.tag-delete-btn { color: var(--danger); border-color: var(--danger); }
+</style>
+<meta name="theme-color" content="#f7f6f2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="imago">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/imago-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+</head>
+<body>
+  <div class="toast-wrap" id="toast-wrap"></div>
+
+  <header class="topbar">
+    <a class="back" href="index.html" title="Back to launcher">‹</a>
+    <span class="brand">Voice queue</span>
+    <div class="topbar-actions">
+      <div class="menu-wrap">
+        <button type="button" class="btn btn-icon" id="btn-menu" title="More">☰</button>
+        <div class="menu-dropdown" id="menu-dropdown" hidden>
+          <button class="tag-chip" id="toggle-done" hidden>Show done</button>
+          <button class="tag-chip" id="toggle-trash" hidden>Trash</button>
+          <div class="menu-divider"></div>
+          <button type="button" class="tag-chip" id="btn-manage-tags">⚙ Manage tags</button>
+          <div class="menu-divider"></div>
+          <button type="button" class="tag-chip" id="btn-export">Export backup</button>
+          <button type="button" class="tag-chip" id="btn-import">Import backup</button>
+          <button type="button" class="tag-chip" id="btn-reset-import">Reset &amp; import</button>
+          <button type="button" class="tag-chip" id="btn-reset">Reset all data</button>
+          <input type="file" id="import-file" accept="application/json,.json" hidden>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <div class="tag-group-chips" id="tag-filter-chips"></div>
+    <div class="filter-count-row"><span class="filter-count" id="filter-count"></span></div>
+  </div>
+
+  <div class="selection-bar" id="selection-bar">
+    <span id="selection-count"></span>
+    <div class="spacer"></div>
+    <button class="btn" id="btn-copy-selection">Copy as JSON</button>
+    <button class="btn" id="btn-bulk-merge">Merge</button>
+    <button class="btn" id="btn-bulk-done">Done</button>
+    <button class="btn" id="btn-bulk-delete">Delete</button>
+    <button class="btn" id="btn-clear-selection">Clear</button>
+  </div>
+
+  <div class="undo-panel" id="undo-panel">
+    <div class="undo-list" id="undo-list"></div>
+    <button class="undo-peek" id="undo-peek">↺</button>
+  </div>
+
+  <div class="list" id="list"></div>
+
+  <div class="sheet-backdrop" id="sheet-backdrop"></div>
+  <div class="panel" id="mic-panel">
+    <div class="sheet-handle"></div>
+    <div class="panel-head"><span>Listening…</span><span class="countdown" id="mic-countdown"></span></div>
+    <div class="speech-wrap"><div class="speech-bubble" id="speech-bubble"></div></div>
+  </div>
+  <button class="fab" id="mic-fab" title="Toggle microphone">🎤<span class="status-dot off" id="mic-dot"></span></button>
+
+  <div class="modal-backdrop" id="tags-modal-backdrop"></div>
+  <div class="tags-modal" id="tags-modal">
+    <div class="tags-modal-head">
+      <h3>Manage tags</h3>
+      <button type="button" class="modal-close" id="tags-modal-close" title="Close">✕</button>
+    </div>
+    <div class="tags-modal-body" id="tags-modal-body"></div>
+  </div>
+
+<script src="voice-queue.js"></script>
+  <script src="pwa-register.js"></script>
+</body>
+</html>
