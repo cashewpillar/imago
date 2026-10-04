@@ -80,7 +80,7 @@
 
   .toolbar{
     display:flex; gap:8px; align-items:center; flex-wrap:wrap;
-    max-width:940px; margin:12px auto 0; padding:0 16px;
+    max-width:940px; margin:12px auto 0; padding:0;
   }
   .search-wrap{
     flex:1; min-width:180px; position:relative;
@@ -106,6 +106,8 @@
   select{ padding-left:12px; }
   input[type="text"]:not(.search-wrap input), input[type="number"], input[type="date"], textarea{ padding-left:12px; }
   input:focus, select:focus, textarea:focus{ outline:none; border-color:var(--accent); }
+  .search-wrap.active input{ border-color:var(--accent); background:var(--accent-dim); }
+  .search-wrap.active svg{ color:var(--accent); }
   input::placeholder{ color:var(--chalk-faint); }
   input[type="date"]::-webkit-calendar-picker-indicator{ cursor:pointer; opacity:0.6; }
   input[type="date"]::-webkit-calendar-picker-indicator:hover{ opacity:1; }
@@ -298,6 +300,7 @@
 
   .row-actions{ display:flex; gap:6px; justify-content:flex-end; }
   .row-actions button{
+    -webkit-appearance:none; appearance:none; padding:0; flex:none;
     background:none; border:1px solid var(--line); color:var(--chalk-faint);
     width:32px; height:32px; border-radius:7px; cursor:pointer;
     display:flex; align-items:center; justify-content:center; transition:all .15s;
@@ -307,7 +310,7 @@
     background:var(--accent-dim); color:var(--chalk); border-color:var(--accent);
   }
   .row-actions button.danger:hover{ color:var(--rust); border-color:var(--rust-dim); }
-  .row-actions svg{ width:15px; height:15px; }
+  .row-actions svg{ width:16px; height:16px; flex:none; }
 
   /* mobile: compact list rows, not cards */
   @media (max-width: 640px){
@@ -337,6 +340,16 @@
     }
     .dish-mobile-badges{ display:flex; align-items:center; gap:5px; flex:none; }
     .dish-mobile-actions{ display:flex; align-items:center; gap:4px; flex:none; }
+    /* Explicit button + icon sizing: iOS WebKit adds native button padding and sizes an
+       unsized flex-child svg to the leftover content box, which squeezed the icons. */
+    .dish-mobile-actions button{
+      -webkit-appearance:none; appearance:none; padding:0;
+      background:none; border:1px solid var(--line); color:var(--chalk-faint);
+      width:34px; height:34px; border-radius:7px; cursor:pointer; flex:none;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .dish-mobile-actions button.plan-btn.active{ background:var(--accent-dim); color:var(--chalk); border-color:var(--accent); }
+    .dish-mobile-actions svg{ width:18px; height:18px; flex:none; }
     /* detail body */
     .dish-mobile-body{
       display:none;
@@ -614,6 +627,12 @@
   .price-pill:hover{ border-color:var(--sage); color:var(--sage); }
   .price-pill.active{ background:var(--sage-dim); border-color:var(--sage); color:var(--sage); }
 
+  .loc-pills{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .loc-pill{ display:inline-flex; align-items:center; gap:5px; }
+  .loc-pill.custom{ padding:4px 9px; }
+  .loc-pill svg{ width:14px; height:14px; flex:none; }
+  .loc-pill.custom.active{ background:var(--accent-dim); border-color:var(--accent); color:var(--accent); }
+
   /* ---------- Tags ---------- */
   .tag-row{ display:flex; align-items:center; gap:8px; padding:6px 8px; background:var(--bg-inset); border:1px solid var(--line); border-radius:9px; }
   .tag-row input[type="color"]{ width:26px; height:26px; padding:0; border:1px solid var(--line-strong); border-radius:6px; cursor:pointer; flex:none; }
@@ -694,14 +713,13 @@
       </button>
     </div>
   </div>
-</header>
-
-<div class="toolbar">
-  <div class="search-wrap">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-    <input type="search" id="searchInput" placeholder="Search dishes and pantry…">
+  <div class="toolbar">
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input type="search" id="searchInput" placeholder="Search dishes…">
+    </div>
   </div>
-</div>
+</header>
 
 <main id="main"></main>
 
@@ -837,8 +855,8 @@
     </div>
     <div class="field">
       <label>Where <span style="text-transform:none;letter-spacing:0;color:var(--chalk-faint);">(optional)</span></label>
-      <input type="text" id="purchaseLocationInput" placeholder="e.g. SM Supermarket, Puregold" list="purchaseLocationList">
-      <datalist id="purchaseLocationList"></datalist>
+      <div id="purchaseLocationPills" class="loc-pills"></div>
+      <input type="text" id="purchaseLocationInput" placeholder="Type a store name" style="display:none; margin-top:8px; padding-left:12px;">
     </div>
     <div class="field">
       <label>Quantity <span style="text-transform:none;letter-spacing:0;color:var(--chalk-faint);">(optional)</span></label>
@@ -1003,7 +1021,9 @@
   const collapsedTags = new Set();
   const collapsedGroceryTags = new Set();
   const expandedDishRows = new Set();
-  let searchTerm = '';
+  // Search is scoped per tab so a pantry search doesn't filter dishes (and vice versa).
+  const searchTerms = { dishes: '', ingredients: '' };
+  const searchPlaceholders = { dishes: 'Search dishes…', ingredients: 'Search pantry…' };
   let editingItemId = null;
   let editingIngId = null;
   let currentType = 'dish';
@@ -1273,13 +1293,47 @@
   let _editingPurchaseId = null;
   const expandedIngRows = new Set();
 
-  // Suggestions drawn from every purchase ever logged, not just this ingredient's —
-  // a store you've bought other things at is still worth suggesting here.
+  // Registered stores = every location ever logged (not just this ingredient's), most used
+  // first. #purchaseLocationInput stays the source of truth; the pills just set it, and the
+  // receipt button reveals it for a one-off name.
   async function refreshLocationDatalist(){
-    const list = document.getElementById('purchaseLocationList');
+    const input = document.getElementById('purchaseLocationInput');
+    const pillsEl = document.getElementById('purchaseLocationPills');
     const history = db.purchaseHistory ? await db.purchaseHistory.toArray() : [];
-    const locations = [...new Set(history.map(h => h.location).filter(Boolean))].sort((a,b) => a.localeCompare(b));
-    list.innerHTML = locations.map(l => `<option value="${escapeHtml(l)}">`).join('');
+    const counts = {};
+    history.forEach(h => { if(h.location) counts[h.location] = (counts[h.location] || 0) + 1; });
+    const locations = Object.keys(counts).sort((a,b) => counts[b] - counts[a] || a.localeCompare(b));
+    const current = input.value.trim();
+    const isCustom = current !== '' && !locations.includes(current);
+    // Closed by default; stays open if there are no stores to pick or the value is one-off.
+    const customOpen = isCustom || locations.length === 0;
+
+    const receiptSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>';
+    pillsEl.innerHTML = locations.map(l =>
+      `<button type="button" class="price-pill loc-pill ${l === current ? 'active' : ''}" data-loc="${escapeHtml(l)}">${escapeHtml(l)}</button>`
+    ).join('') + `<button type="button" class="price-pill loc-pill custom ${customOpen ? 'active' : ''}" id="purchaseLocationCustomBtn" title="Type a store that isn't listed" aria-label="Type a custom store">${receiptSvg}</button>`;
+
+    input.style.display = customOpen ? 'block' : 'none';
+    const syncActive = () => {
+      const v = input.value.trim();
+      pillsEl.querySelectorAll('.loc-pill[data-loc]').forEach(b => b.classList.toggle('active', b.dataset.loc === v));
+    };
+    pillsEl.querySelectorAll('.loc-pill[data-loc]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        // Tapping the selected store again clears it (location is optional).
+        input.value = input.value.trim() === btn.dataset.loc ? '' : btn.dataset.loc;
+        input.style.display = 'none';
+        document.getElementById('purchaseLocationCustomBtn').classList.remove('active');
+        syncActive();
+      });
+    });
+    document.getElementById('purchaseLocationCustomBtn').addEventListener('click', e => {
+      const open = input.style.display === 'none';
+      input.style.display = open ? 'block' : 'none';
+      e.currentTarget.classList.toggle('active', open);
+      if(open) input.focus();
+    });
+    input.oninput = syncActive;
   }
 
   async function openPurchaseModal(ingId, e){
@@ -1855,8 +1909,8 @@
     else if(dishFilter === 'dish') filtered = filtered.filter(i => i.type === 'dish');
     else if(dishFilter === 'snack') filtered = filtered.filter(i => i.type === 'snack');
 
-    if(searchTerm){
-      const q = normalize(searchTerm);
+    if(searchTerms.dishes){
+      const q = normalize(searchTerms.dishes);
       const joinsByItem = {};
       itemIngredients.forEach(j => { (joinsByItem[j.itemId] ||= []).push(j); });
       filtered = filtered.filter(item => {
@@ -1930,11 +1984,11 @@
               ${isPlanned ? `<span title="Planned" style="font-size:11px;">📋</span>` : ''}
             </div>
             <div class="dish-mobile-actions">
-              <button class="plan-btn ${isPlanned ? 'active':''}" title="${isPlanned ? 'Remove from plan':'Add to plan'}" aria-label="Toggle Planned" style="width:30px;height:30px;">
+              <button class="plan-btn ${isPlanned ? 'active':''}" title="${isPlanned ? 'Remove from plan':'Add to plan'}" aria-label="Toggle Planned">
                 <svg viewBox="0 0 24 24" fill="${isPlanned?'currentColor':'none'}" stroke="currentColor" stroke-width="1.8"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
               </button>
-              <button class="edit-btn" aria-label="Edit" style="width:30px;height:30px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
-              <button class="duplicate-btn" aria-label="Duplicate" title="Duplicate dish" style="width:30px;height:30px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
+              <button class="edit-btn" aria-label="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
+              <button class="duplicate-btn" aria-label="Duplicate" title="Duplicate dish"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
             </div>
           </div>
           <!-- Mobile detail body -->
@@ -2097,8 +2151,8 @@
       closeChipStockPopover();
       currentTab = 'ingredients';
       updateTabUI();
-      searchTerm = '';
-      document.getElementById('searchInput').value = '';
+      searchTerms.ingredients = '';
+      syncSearchUI();
       render(ingId);
     });
 
@@ -2143,8 +2197,8 @@
     const outCount = ingredients.filter(i => (i.stockStatus || 'out') === 'out').length;
 
     let list = ingredients;
-    if(searchTerm){
-      const q = normalize(searchTerm);
+    if(searchTerms.ingredients){
+      const q = normalize(searchTerms.ingredients);
       list = list.filter(i => normalize(i.name).includes(q));
     }
     if(pantryFilter === 'planned'){
@@ -2450,10 +2504,6 @@
     inStockIngredientsForPlan.sort((a,b) => a.ing.name.localeCompare(b.ing.name));
 
     let activeCustomToBuy = customGrocery.filter(g => !g.bought);
-    if(searchTerm){
-      const q = normalize(searchTerm);
-      activeCustomToBuy = activeCustomToBuy.filter(g => normalize(g.name).includes(q));
-    }
     activeCustomToBuy = [...activeCustomToBuy].sort((a,b) => a.name.localeCompare(b.name));
 
     const totalToBuyCount = toBuyIngredients.length + activeCustomToBuy.length;
@@ -2468,6 +2518,7 @@
     toBuyIngredients.forEach(item => {
       const dishNames = item.demandList.map(d => d.dishName).join(', ');
       const qtys = item.demandList.map(d => [d.qty, d.unit].filter(Boolean).join(' ')).filter(Boolean).join(' + ');
+      const stockKey = item.ing.stockStatus === 'low' ? 'low' : 'out'; // in-stock items never reach the to-buy list
 
       const html = `<div class="buy-item-row" data-ing-id="${item.ing.id}">
           <div class="buy-item-left">
@@ -2475,7 +2526,8 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg>
             </button>
             <div class="buy-item-details">
-              <span class="buy-item-name">${escapeHtml(item.ing.name)}${qtys ? ` <span style="font-size:11px; color:var(--chalk-faint); font-weight:400;">(${escapeHtml(qtys)})</span>` : ''}</span>
+              <span class="buy-item-name">${escapeHtml(item.ing.name)}${qtys ? ` <span style="font-size:11px; color:var(--chalk-faint); font-weight:400;">(${escapeHtml(qtys)})</span>` : ''}
+                <span class="stock-pill ${stockKey}" style="margin-left:6px; vertical-align:middle;">${stockKey === 'low' ? 'Low' : 'Out of stock'}</span></span>
               <div class="buy-item-meta" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:3px;">
                 ${item.demandList.map(d => `<span style="font-size:10.5px; font-weight:600; padding:1px 7px; border-radius:10px; background:var(--bg-inset); border:1px solid var(--line); color:var(--chalk-dim);">${escapeHtml(d.dishName)}</span>`).join('')}
               </div>
@@ -2741,6 +2793,16 @@
     document.getElementById('tabIngredients').classList.toggle('active', currentTab === 'ingredients');
     document.getElementById('tabGrocery').classList.toggle('active', currentTab === 'grocery');
     document.querySelector('.toolbar').style.display = currentTab === 'grocery' ? 'none' : 'flex';
+    syncSearchUI();
+  }
+
+  // Search box mirrors the current tab's own term, placeholder, and active highlight.
+  function syncSearchUI(){
+    const input = document.getElementById('searchInput');
+    const term = searchTerms[currentTab] || '';
+    input.value = term;
+    input.placeholder = searchPlaceholders[currentTab] || 'Search…';
+    input.closest('.search-wrap').classList.toggle('active', term.trim() !== '');
   }
 
   /* ---------------- Persistence ---------------- */
@@ -2754,7 +2816,7 @@
       expandedIngRows: Array.from(expandedIngRows),
       collapsedTags: Array.from(collapsedTags),
       collapsedGroceryTags: Array.from(collapsedGroceryTags),
-      searchTerm
+      searchTerms: { ...searchTerms }
     };
     localStorage.setItem('larderUIState', JSON.stringify(state));
   }
@@ -2772,8 +2834,14 @@
       if(Array.isArray(s.expandedIngRows)){ expandedIngRows.clear(); s.expandedIngRows.forEach(id => expandedIngRows.add(id)); }
       if(Array.isArray(s.collapsedTags)){ collapsedTags.clear(); s.collapsedTags.forEach(t => collapsedTags.add(t)); }
       if(Array.isArray(s.collapsedGroceryTags)){ collapsedGroceryTags.clear(); s.collapsedGroceryTags.forEach(t => collapsedGroceryTags.add(t)); }
-      if(s.searchTerm !== undefined) searchTerm = s.searchTerm;
-      document.getElementById('searchInput').value = searchTerm;
+      // Old saves stored one shared term; it was dish-oriented, so carry it to dishes only.
+      if(s.searchTerms && typeof s.searchTerms === 'object'){
+        searchTerms.dishes = s.searchTerms.dishes || '';
+        searchTerms.ingredients = s.searchTerms.ingredients || '';
+      } else if(typeof s.searchTerm === 'string'){
+        searchTerms.dishes = s.searchTerm;
+      }
+      syncSearchUI();
     } catch(e) { console.error('Failed to load UI state', e); }
   }
 
@@ -2929,7 +2997,12 @@
   document.getElementById('tabDishes').addEventListener('click', () => { currentTab='dishes'; saveUIState(); updateTabUI(); render(); });
   document.getElementById('tabIngredients').addEventListener('click', () => { currentTab='ingredients'; saveUIState(); updateTabUI(); render(); });
   document.getElementById('tabGrocery').addEventListener('click', () => { currentTab='grocery'; saveUIState(); updateTabUI(); render(); });
-  document.getElementById('searchInput').addEventListener('input', e => { searchTerm = e.target.value; saveUIState(); render(); });
+  document.getElementById('searchInput').addEventListener('input', e => {
+    if(currentTab in searchTerms) searchTerms[currentTab] = e.target.value;
+    syncSearchUI();
+    saveUIState();
+    render();
+  });
 
   document.getElementById('fabAdd').addEventListener('click', () => {
     if(currentTab === 'ingredients') openIngModal(null);
