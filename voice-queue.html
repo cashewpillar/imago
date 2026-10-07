@@ -97,6 +97,25 @@ input, textarea { font-size: 16px; }
 
 /* -- list -- */
 .list { max-width: 720px; margin: 0 auto; padding: 10px 14px 40px; display: flex; flex-direction: column; gap: 8px; }
+
+/* Filters stay in view while the feed scrolls: sticky strip on phones, sticky left rail on desktop. */
+.layout { max-width: 720px; margin: 0 auto; }
+.layout .toolbar { position: sticky; top: calc(52px + env(safe-area-inset-top)); z-index: 15; background: var(--bg); max-width: none; margin: 0; padding: 8px 14px;
+  flex-direction: row; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); }
+/* One scrolling row of chips + the count, so many tags don't eat the screen. */
+.layout .tag-group-chips { flex: 1; min-width: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.layout .tag-group-chips::-webkit-scrollbar { display: none; }
+.layout .tag-chip { flex-shrink: 0; }
+.layout .filter-count-row { padding: 0; flex-shrink: 0; }
+@media (min-width: 900px) {
+  .layout { display: grid; grid-template-columns: 200px minmax(0, 720px); gap: 24px; max-width: 980px; padding: 0 14px; align-items: start; }
+  .layout .toolbar { top: calc(68px + env(safe-area-inset-top)); max-height: calc(100vh - 84px); overflow-y: auto; flex-direction: column; align-items: stretch; gap: 8px;
+    margin: 14px 0 0; padding: 0 4px 0 0; background: none; border-bottom: none; }
+  .layout .tag-group-chips { flex: none; flex-direction: column; align-items: stretch; overflow-x: visible; }
+  .layout .tag-chip { text-align: left; overflow: hidden; text-overflow: ellipsis; }
+  .layout .filter-count-row { order: -1; justify-content: flex-start; padding: 0 0 6px; }
+  .layout .list { margin: 0; padding: 10px 0 40px; }
+}
 .empty { text-align: center; color: var(--muted); padding: 60px 20px; }
 
 .item { position: relative; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--bg2); cursor: pointer; overflow: hidden; }
@@ -249,11 +268,6 @@ input, textarea { font-size: 16px; }
     </div>
   </header>
 
-  <div class="toolbar">
-    <div class="tag-group-chips" id="tag-filter-chips"></div>
-    <div class="filter-count-row"><span class="filter-count" id="filter-count"></span></div>
-  </div>
-
   <div class="selection-bar" id="selection-bar">
     <span id="selection-count"></span>
     <div class="spacer"></div>
@@ -269,7 +283,13 @@ input, textarea { font-size: 16px; }
     <button class="undo-peek" id="undo-peek">↺</button>
   </div>
 
-  <div class="list" id="list"></div>
+  <div class="layout">
+    <div class="toolbar">
+      <div class="tag-group-chips" id="tag-filter-chips"></div>
+      <div class="filter-count-row"><span class="filter-count" id="filter-count"></span></div>
+    </div>
+    <div class="list" id="list"></div>
+  </div>
 
   <div class="sheet-backdrop" id="sheet-backdrop"></div>
   <div class="panel" id="mic-panel">

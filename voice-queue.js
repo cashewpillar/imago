@@ -175,9 +175,15 @@ function visibleItems() {
   return base;
 }
 
+// Same breakpoint as the layout CSS: on the sideways-scrolling mobile strip, alphabetical is easier to scan.
+const mobileFilterMq = window.matchMedia('(max-width: 899px)');
+mobileFilterMq.addEventListener('change', () => renderTagFilterChips());
+
 function renderTagFilterChips() {
   const used = new Set(items.filter(it => !it.deletedAt).flatMap(it => it.tags || []));
-  $('tag-filter-chips').innerHTML = tags.filter(t => used.has(t.id)).map(t => {
+  const usable = tags.filter(t => used.has(t.id));
+  if (mobileFilterMq.matches) usable.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  $('tag-filter-chips').innerHTML = usable.map(t => {
     const state = tagFilter.get(t.id) || 'off';
     const cls = 'tag-chip f-' + t.color + ' ' + state + (t.llm ? ' llm-tag' : '');
     return `<button type="button" class="${cls}" data-tag="${t.id}" draggable="true">${t.llm ? '✨ ' : ''}${esc(t.name)}</button>`;
