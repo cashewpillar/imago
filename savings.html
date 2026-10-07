@@ -147,12 +147,20 @@ td.actions{text-align:right;white-space:nowrap}
 .chart-sub-h{display:flex;justify-content:space-between;align-items:center}
 .chart-sub-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-faint);font-weight:600}
 
-.target-row{display:grid;grid-template-columns:24px 70px 1fr 85px 75px;gap:10px;align-items:center;margin-bottom:12px}
+.target-row{display:grid;grid-template-columns:24px 70px 1fr auto;gap:10px;align-items:center;margin-bottom:12px}
 .target-row label{font-size:12px;font-weight:500;text-transform:capitalize}
-.target-row input[type="number"]{padding:4px 2px 4px 6px;font-size:16px;border:1px solid var(--border);border-radius:4px;width:100%;text-align:right;font-family:monospace}
-.target-amt{font-size:11px;color:var(--text-muted);text-align:right;font-family:monospace}
-.target-num-wrap{display:flex;align-items:center;gap:3px}
-.step-btn{display:none;background:var(--bg);border:1px solid var(--border);border-radius:4px;width:26px;height:26px;font-size:14px;cursor:pointer;color:var(--text-muted);flex-shrink:0;align-items:center;justify-content:center;line-height:1;padding:0;user-select:none}
+/* Percent and exact amount are both shown as tappable previews; tapping one swaps it for an input sized to its content. */
+.alloc-vals{display:flex;align-items:center;justify-content:flex-end;gap:6px}
+.alloc-slot{display:inline-flex;align-items:center}
+.alloc-chip{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;font-family:monospace;color:var(--text);cursor:pointer;white-space:nowrap;min-height:28px}
+.alloc-chip:hover{border-color:var(--border-strong)}
+.alloc-chip:disabled{cursor:default;color:var(--text-muted)}
+.alloc-slot[data-kind="amt"] .alloc-chip{color:var(--text-muted)}
+.alloc-edit{display:none;align-items:center;gap:3px}
+.alloc-slot.editing .alloc-edit{display:inline-flex}
+.alloc-slot.editing .alloc-chip{display:none}
+.alloc-edit input{box-sizing:content-box;width:4ch;min-width:2ch;padding:4px 6px;font-size:16px;border:1px solid var(--accent);border-radius:4px;text-align:right;font-family:monospace}
+.step-btn{display:flex;background:var(--bg);border:1px solid var(--border);border-radius:4px;width:26px;height:26px;font-size:14px;cursor:pointer;color:var(--text-muted);flex-shrink:0;align-items:center;justify-content:center;line-height:1;padding:0;user-select:none}
 .step-btn:active{background:var(--border-strong);color:var(--text)}
 .fab-add{display:none;position:fixed;bottom:18px;right:18px;width:44px;height:44px;border-radius:50%;background:var(--text);color:#fff;border:none;box-shadow:0 2px 10px rgba(0,0,0,.22);align-items:center;justify-content:center;cursor:pointer;z-index:50}
 .fab-add svg{width:18px;height:18px}
@@ -164,15 +172,10 @@ td.actions{text-align:right;white-space:nowrap}
 @media(max-width:480px){
   .demo-banner{gap:6px;padding:8px 10px;font-size:11px}
   .demo-banner .btn{padding:2px 6px;font-size:10px}
-  .target-row{grid-template-columns:22px 1fr auto 70px;grid-template-rows:auto auto;gap:6px 8px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+  .target-row{grid-template-columns:22px 1fr auto;grid-template-rows:auto auto;gap:6px 8px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)}
   .target-row .lock-btn{grid-column:1;grid-row:1}
   .target-row label{grid-column:2;grid-row:1}
-  .target-row .target-num-wrap{grid-column:3;grid-row:1}
-  .target-row input[type="number"]{width:42px;-moz-appearance:textfield}
-  .target-row input[type="number"]::-webkit-inner-spin-button,
-  .target-row input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
-  .step-btn{display:flex}
-  .target-amt{grid-column:4;grid-row:1}
+  .target-row .alloc-vals{grid-column:3;grid-row:1}
   .target-row input[type="range"]{grid-column:1/-1;grid-row:2;width:100%}
 }
 
@@ -793,12 +796,137 @@ function computeFundSplit(accounts) {
   return split;
 }
 
+// ── Allocation row editing (shared by Target Allocation + Fund Goals) ────────
+// Storage stays percent-only (_targets / _fundGoals); the exact amount is derived
+// from net worth, so editing it just converts back to a percent.
+const ALLOC_GROUPS = {
+  target: {
+    box: 'targetInputs',
+    keys: ['savings', 'equities', 'td', 'cash', 'receivable'],
+    get: k => _targets[k] || 0,
+    change: (k, v, src) => onTargetChange(k, v, src)
+  },
+  fund: {
+    box: 'fundGoalInputs',
+    keys: ['emergency', 'growth', 'fun'],
+    get: k => _fundGoals[k] || 0,
+    change: (k, v, src) => onFundGoalChange(k, v, src)
+  }
+};
+
+function allocTotalNW() {
+  return window._allAccounts.reduce((s, a) => s + (a.balance || 0), 0);
+}
+
+function allocRow(group, key) {
+  return document.querySelector(`#${ALLOC_GROUPS[group].box} .target-row[data-key="${key}"]`);
+}
+
+function allocValsHtml(group, key, pct) {
+  const nw = allocTotalNW();
+  const stepBtn = (d, sym, label) => `<button class="step-btn" type="button" tabindex="-1" onpointerdown="event.preventDefault()" onclick="stepAlloc('${group}','${key}',${d})" aria-label="${label}">${sym}</button>`;
+  const input = (kind, max) => `<input type="text" inputmode="decimal" maxlength="${max}" autocomplete="off" oninput="onAllocInput('${group}','${key}','${kind}',this)" onblur="endAllocEdit('${group}','${key}','${kind}')" onkeydown="allocKey(event,this)">`;
+  return `<div class="alloc-vals">
+    <span class="alloc-slot" data-kind="pct">
+      <button type="button" class="alloc-chip" onclick="startAllocEdit('${group}','${key}','pct')" title="Edit percent">${pct.toFixed(1)}%</button>
+      <span class="alloc-edit">${stepBtn(-0.1, '‹', 'Decrease')}${input('pct', 5)}${stepBtn(0.1, '›', 'Increase')}</span>
+    </span>
+    <span class="alloc-slot" data-kind="amt">
+      <button type="button" class="alloc-chip" ${nw > 0 ? '' : 'disabled'} onclick="startAllocEdit('${group}','${key}','amt')" title="Edit exact amount">₱${fmtk(nw * pct / 100)}</button>
+      <span class="alloc-edit">${input('amt', 12)}</span>
+    </span>
+  </div>`;
+}
+
+// Input is as wide as what's typed so decimals never clip.
+function sizeAllocInput(input) {
+  input.style.width = (Math.max(input.value.length, 2) + 1) + 'ch';
+}
+
+// Accepts "150000", "150,000", "₱150k", "1.2m".
+function parseAllocAmount(str) {
+  const m = String(str).replace(/[₱,\s]/g, '').toLowerCase().match(/^(\d*\.?\d*)([km]?)$/);
+  if (!m || m[1] === '' || m[1] === '.') return null;
+  return parseFloat(m[1]) * (m[2] === 'k' ? 1e3 : m[2] === 'm' ? 1e6 : 1);
+}
+
+function startAllocEdit(group, key, kind) {
+  const row = allocRow(group, key);
+  const slot = row.querySelector(`.alloc-slot[data-kind="${kind}"]`);
+  const input = slot.querySelector('input');
+  const pct = ALLOC_GROUPS[group].get(key);
+  input.value = kind === 'pct' ? pct.toFixed(1) : String(Math.round(allocTotalNW() * pct / 100));
+  slot.classList.add('editing');
+  sizeAllocInput(input);
+  input.focus();
+  input.select();
+}
+
+function onAllocInput(group, key, kind, input) {
+  sizeAllocInput(input);
+  let pct;
+  if (kind === 'pct') {
+    pct = parseFloat(input.value);
+  } else {
+    const amt = parseAllocAmount(input.value);
+    const nw = allocTotalNW();
+    pct = (amt == null || nw <= 0) ? NaN : amt / nw * 100;
+  }
+  if (isNaN(pct)) return; // mid-typing ("", ".") — keep the last valid value
+  ALLOC_GROUPS[group].change(key, String(pct), kind);
+}
+
+function endAllocEdit(group, key, kind) {
+  const g = ALLOC_GROUPS[group];
+  const slot = allocRow(group, key)?.querySelector(`.alloc-slot[data-kind="${kind}"]`);
+  if (!slot || !slot.classList.contains('editing')) return;
+  // Snap to the 0.1% precision that gets saved, so the preview matches what's stored.
+  g.change(key, String(Math.round(g.get(key) * 10) / 10), 'snap');
+  slot.classList.remove('editing');
+}
+
+function allocKey(e, input) {
+  if (e.key === 'Enter' || e.key === 'Escape') {
+    e.preventDefault();
+    e.stopPropagation();
+    input.blur();
+  }
+}
+
+function stepAlloc(group, key, delta) {
+  const g = ALLOC_GROUPS[group];
+  const next = Math.max(0, Math.min(100, +(g.get(key) + delta).toFixed(1)));
+  g.change(key, String(next), 'step');
+}
+
+// Re-render every row's slider + previews; never overwrite the input being typed in.
+function refreshAllocRows(group, activeKey, source) {
+  const g = ALLOC_GROUPS[group];
+  const nw = allocTotalNW();
+  g.keys.forEach(k => {
+    const row = allocRow(group, k);
+    if (!row) return;
+    const pct = g.get(k);
+    const amt = nw * pct / 100;
+    if (!(k === activeKey && source === 'range')) row.querySelector('input[type="range"]').value = pct.toFixed(1);
+    [['pct', pct.toFixed(1) + '%', pct.toFixed(1)], ['amt', '₱' + fmtk(amt), String(Math.round(amt))]].forEach(([kind, chipText, inputText]) => {
+      const slot = row.querySelector(`.alloc-slot[data-kind="${kind}"]`);
+      slot.querySelector('.alloc-chip').textContent = chipText;
+      const input = slot.querySelector('input');
+      if (slot.classList.contains('editing') && !(k === activeKey && source === kind)) {
+        input.value = inputText;
+        sizeAllocInput(input);
+      }
+    });
+  });
+}
+
 function openTargetModal() {
   _targetsSnapshot = JSON.parse(JSON.stringify(_targets)); // snapshot for cancel
   const container = document.getElementById('targetInputs');
   const tags = ['equities', 'td', 'savings', 'cash', 'receivable'];
   container.innerHTML = tags.map(t => `
-    <div class="target-row" data-tag="${t}">
+    <div class="target-row" data-key="${t}">
       <button class="lock-btn ${(_lockedTags[t] ? 'active' : '')}" onclick="toggleLock('${t}', this)" title="Lock amount">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
           ${_lockedTags[t] 
@@ -808,12 +936,7 @@ function openTargetModal() {
       </button>
       <label>${t}</label>
       <input type="range" min="0" max="100" step="0.1" value="${_targets[t]||0}" oninput="onTargetChange('${t}', this.value, 'range')">
-      <div class="target-num-wrap">
-        <button class="step-btn" type="button" onclick="stepTarget('${t}', -0.1)" aria-label="Decrease">‹</button>
-        <input type="number" min="0" max="100" step="0.1" value="${(_targets[t]||0).toFixed(1)}" oninput="onTargetChange('${t}', this.value, 'number')">
-        <button class="step-btn" type="button" onclick="stepTarget('${t}', 0.1)" aria-label="Increase">›</button>
-      </div>
-      <span class="target-amt" id="amt-${t}">₱0</span>
+      ${allocValsHtml('target', t, _targets[t]||0)}
     </div>
   `).join('');
   updateTargetTotalDisplay();
@@ -831,20 +954,7 @@ function toggleLock(tag, btn) {
   </svg>`;
 }
 
-function stepTarget(tag, delta) {
-  const cur = _targets[tag] || 0;
-  const next = Math.max(0, Math.min(100, +(cur + delta).toFixed(1)));
-  onTargetChange(tag, String(next), 'step');
-}
-
 function onTargetChange(tag, val, source) {
-  // If user is typing a decimal, don't parse it yet as it might be incomplete (e.g. "40.")
-  if (source === 'number' && (val.endsWith('.') || val.endsWith('.0'))) {
-    const row = document.querySelector(`.target-row[data-tag="${tag}"]`);
-    if (row) row.querySelector('input[type="range"]').value = val;
-    return;
-  }
-
   let parsedVal = parseFloat(val) || 0;
   if (parsedVal > 100) parsedVal = 100;
 
@@ -883,22 +993,7 @@ function onTargetChange(tag, val, source) {
   
   _targets[tag] = parsedVal;
   
-  const totalNW = window._allAccounts.reduce((s,a) => s + (a.balance||0), 0);
-  
-  tags.forEach(t => {
-    const row = document.querySelector(`.target-row[data-tag="${t}"]`);
-    if (row) {
-      const pct = _targets[t] || 0;
-      if (!(t === tag && source === 'range')) {
-        row.querySelector('input[type="range"]').value = pct.toFixed(1);
-      }
-      if (!(t === tag && source === 'number')) {
-        row.querySelector('input[type="number"]').value = pct.toFixed(1);
-      }
-      document.getElementById(`amt-${t}`).textContent = '₱' + fmtk(totalNW * (pct / 100));
-    }
-  });
-  
+  refreshAllocRows('target', tag, source);
   updateTargetTotalDisplay();
 }
 
@@ -908,14 +1003,6 @@ function updateTargetTotalDisplay() {
   const el = document.getElementById('targetTotalPct');
   el.textContent = sum.toFixed(1) + '%';
   el.style.color = Math.abs(sum - 100) < 0.01 ? 'var(--accent)' : 'var(--danger)';
-  
-  // Refresh amounts on initial open too
-  const totalNW = window._allAccounts.reduce((s,a) => s + (a.balance||0), 0);
-  const tags = ['savings', 'equities', 'td', 'cash', 'receivable'];
-  tags.forEach(t => {
-    const amtEl = document.getElementById(`amt-${t}`);
-    if (amtEl) amtEl.textContent = '₱' + fmtk(totalNW * ((_targets[t]||0) / 100));
-  });
 }
 
 function saveTargets() {
@@ -975,7 +1062,7 @@ function openFundGoalModal() {
   const container = document.getElementById('fundGoalInputs');
   const buckets = ['emergency', 'growth', 'fun'];
   container.innerHTML = buckets.map(b => `
-    <div class="target-row" data-bucket="${b}">
+    <div class="target-row" data-key="${b}">
       <button class="lock-btn ${(_lockedFundGoals[b] ? 'active' : '')}" onclick="toggleFundGoalLock('${b}', this)" title="Lock amount">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
           ${_lockedFundGoals[b]
@@ -985,22 +1072,11 @@ function openFundGoalModal() {
       </button>
       <label>${FUND_GROUP_LABELS[b]}</label>
       <input type="range" min="0" max="100" step="0.1" value="${_fundGoals[b]||0}" oninput="onFundGoalChange('${b}', this.value, 'range')">
-      <div class="target-num-wrap">
-        <button class="step-btn" type="button" onclick="stepFundGoal('${b}', -0.1)" aria-label="Decrease">‹</button>
-        <input type="number" min="0" max="100" step="0.1" value="${(_fundGoals[b]||0).toFixed(1)}" oninput="onFundGoalChange('${b}', this.value, 'number')">
-        <button class="step-btn" type="button" onclick="stepFundGoal('${b}', 0.1)" aria-label="Increase">›</button>
-      </div>
-      <span class="target-amt" id="fund-amt-${b}">₱0</span>
+      ${allocValsHtml('fund', b, _fundGoals[b]||0)}
     </div>
   `).join('');
   updateFundGoalTotalDisplay();
   openModal('fundGoalModal');
-}
-
-function stepFundGoal(bucket, delta) {
-  const cur = _fundGoals[bucket] || 0;
-  const next = Math.max(0, Math.min(100, +(cur + delta).toFixed(1)));
-  onFundGoalChange(bucket, String(next), 'step');
 }
 
 function toggleFundGoalLock(bucket, btn) {
@@ -1015,12 +1091,6 @@ function toggleFundGoalLock(bucket, btn) {
 }
 
 function onFundGoalChange(bucket, val, source) {
-  if (source === 'number' && (val.endsWith('.') || val.endsWith('.0'))) {
-    const row = document.querySelector(`#fundGoalInputs .target-row[data-bucket="${bucket}"]`);
-    if (row) row.querySelector('input[type="range"]').value = val;
-    return;
-  }
-
   let parsedVal = parseFloat(val) || 0;
   if (parsedVal > 100) parsedVal = 100;
 
@@ -1055,17 +1125,7 @@ function onFundGoalChange(bucket, val, source) {
 
   _fundGoals[bucket] = parsedVal;
 
-  const totalNW = window._allAccounts.reduce((s,a) => s + (a.balance||0), 0);
-  buckets.forEach(b => {
-    const row = document.querySelector(`#fundGoalInputs .target-row[data-bucket="${b}"]`);
-    if (row) {
-      const pct = _fundGoals[b] || 0;
-      if (!(b === bucket && source === 'range')) row.querySelector('input[type="range"]').value = pct.toFixed(1);
-      if (!(b === bucket && source === 'number')) row.querySelector('input[type="number"]').value = pct.toFixed(1);
-      document.getElementById(`fund-amt-${b}`).textContent = '₱' + fmtk(totalNW * (pct / 100));
-    }
-  });
-
+  refreshAllocRows('fund', bucket, source);
   updateFundGoalTotalDisplay();
 }
 
@@ -1075,12 +1135,6 @@ function updateFundGoalTotalDisplay() {
   const el = document.getElementById('fundGoalTotalPct');
   el.textContent = sum.toFixed(1) + '%';
   el.style.color = Math.abs(sum - 100) < 0.01 ? 'var(--accent)' : 'var(--danger)';
-
-  const totalNW = window._allAccounts.reduce((s,a) => s + (a.balance||0), 0);
-  ['emergency', 'growth', 'fun'].forEach(b => {
-    const amtEl = document.getElementById(`fund-amt-${b}`);
-    if (amtEl) amtEl.textContent = '₱' + fmtk(totalNW * ((_fundGoals[b]||0) / 100));
-  });
 }
 
 function saveFundGoals() {
