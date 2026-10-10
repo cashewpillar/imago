@@ -526,6 +526,13 @@
     padding:10px 14px; transition:all .15s; cursor:pointer;
   }
   .buy-item-row:hover{ border-color:var(--sage); background:var(--sage-dim); }
+  .buy-item-row[draggable="true"]{ cursor:grab; }
+  .buy-item-row.dragging{ opacity:0.4; transform:scale(0.98); }
+  /* Grocery tab: cards are drag sources, so no text selection or iOS long-press callout; inputs stay selectable */
+  .grocery-section{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+  .grocery-section input, .grocery-section textarea{ -webkit-user-select:text; user-select:text; }
+  .grocery-tag-group{ outline:2px dashed transparent; outline-offset:4px; border-radius:12px; transition:all .15s ease; }
+  .grocery-tag-group.drag-over{ outline-color:var(--accent); background:var(--accent-dim); }
   .buy-item-row.is-bought{
     opacity:0.55; background:var(--bg); border-style:dashed;
   }
@@ -2565,7 +2572,7 @@
       const qtys = item.demandList.map(d => [d.qty, d.unit].filter(Boolean).join(' ')).filter(Boolean).join(' + ');
       const stockKey = item.ing.stockStatus === 'low' ? 'low' : 'out'; // in-stock items never reach the to-buy list
 
-      const html = `<div class="buy-item-row" data-ing-id="${item.ing.id}">
+      const html = `<div class="buy-item-row" data-ing-id="${item.ing.id}" draggable="true">
           <div class="buy-item-left">
             <button class="buy-item-check mark-bought-btn" title="Mark as bought (adds to pantry stock)">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg>
@@ -2624,7 +2631,7 @@
         const iconHtml = tag
           ? `<span class="dot" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${tag.color};"></span>`
           : (key === EXTRA_KEY ? '🛒' : '🏷️');
-        return `<div class="grocery-tag-group ${isCollapsed ? 'collapsed' : ''}" style="margin-bottom:14px;">
+        return `<div class="grocery-tag-group ${isCollapsed ? 'collapsed' : ''}" ${key === EXTRA_KEY ? '' : `data-drop-key="${key}"`} style="margin-bottom:14px;">
           <div class="grocery-tag-title" data-grocery-tag="${key}" style="font-family:'Kalam', cursive; font-size:15px; font-weight:700; color:var(--chalk); margin:10px 0 6px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px dashed var(--line); padding-bottom:4px; cursor:pointer; user-select:none;">
             <div style="display:flex; align-items:center; gap:6px;">
               <span class="chevron" style="font-size:11px; font-family:'Work Sans',sans-serif; color:var(--chalk-faint); font-weight:600; width:12px; display:inline-block;">${isCollapsed ? '▶' : '▼'}</span>
@@ -2723,7 +2730,7 @@
               <span style="font-family:'Work Sans',sans-serif; font-size:11px; color:var(--chalk-faint); font-weight:600;">${inStockIngredientsForPlan.length} ${inStockIngredientsForPlan.length===1?'item':'items'}</span>
             </div>
             <div class="buy-list" style="${isCollapsed ? 'display:none;' : ''}">
-              ${inStockIngredientsForPlan.map(item => `<div class="buy-item-row" data-ing-id="${item.ing.id}">
+              ${inStockIngredientsForPlan.map(item => `<div class="buy-item-row" data-ing-id="${item.ing.id}" draggable="true">
                 <div class="buy-item-left">
                   <button class="buy-item-check unmark-stock-btn" style="background:var(--sage-dim); border-color:var(--sage); color:var(--sage);" title="Uncheck — mark as no longer in stock">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg>
@@ -2802,6 +2809,50 @@
         if(btn && !e.target.closest(btn.tagName + '.mark-bought-btn, ' + btn.tagName + '.unmark-stock-btn, ' + btn.tagName + '.toggle-custom-btn')){
           btn.click();
         }
+      });
+    });
+
+    // Drag an ingredient card onto a tag group to tag it, same rules as the Pantry tab
+    container.querySelectorAll('.buy-item-row[draggable="true"]').forEach(row => {
+      row.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', row.dataset.ingId);
+        e.dataTransfer.effectAllowed = 'move';
+        row.classList.add('dragging');
+      });
+      row.addEventListener('dragend', () => {
+        row.classList.remove('dragging');
+        container.querySelectorAll('.grocery-tag-group').forEach(g => g.classList.remove('drag-over'));
+      });
+    });
+
+    container.querySelectorAll('.grocery-tag-group[data-drop-key]').forEach(group => {
+      group.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        group.classList.add('drag-over');
+      });
+      group.addEventListener('dragleave', e => {
+        if(!group.contains(e.relatedTarget)) group.classList.remove('drag-over');
+      });
+      group.addEventListener('drop', async e => {
+        e.preventDefault();
+        group.classList.remove('drag-over');
+        const ingId = e.dataTransfer.getData('text/plain');
+        const ing = ingId && ingById[ingId];
+        if(!ing) return;
+        const key = group.dataset.dropKey;
+
+        if(key === UNTAGGED_KEY){
+          if((tagsByIngredient[ingId] || []).length === 0) return;
+          await setIngredientTags(ingId, []);
+          toast(`Cleared tags on "${ing.name}"`);
+        } else {
+          const currentIds = (tagsByIngredient[ingId] || []).map(t => t.id);
+          if(currentIds.includes(key)) return; // already has this tag
+          await setIngredientTags(ingId, [...currentIds, key]);
+          toast(`Added "${ing.name}" to ${groceryGroups[key].label}`);
+        }
+        render();
       });
     });
 
