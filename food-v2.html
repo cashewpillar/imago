@@ -260,6 +260,11 @@
   .stock-pill.low{ background:var(--accent-dim); color:var(--accent); }
   .stock-pill.out{ background:var(--rust-dim); color:var(--rust); }
 
+  .ready-badge{
+    display:inline-flex; align-items:center; font-size:10.5px; font-weight:700;
+    padding:2px 8px; border-radius:20px; background:var(--sage-dim); color:var(--sage);
+    white-space:nowrap;
+  }
   .planned-badge{
     display:inline-flex; align-items:center; gap:4px;
     background:var(--accent-dim); color:var(--on-accent);
@@ -1019,7 +1024,7 @@
 
   /* ---------------- State ---------------- */
   let currentTab = 'dishes'; // 'dishes', 'ingredients', 'grocery'
-  let dishFilter = 'all'; // 'all', 'planned', 'unplanned', 'dish', 'snack'
+  let dishFilter = 'all'; // 'all', 'planned', 'unplanned', 'ready', 'dish', 'snack'
   let dishSortByCooked = true; // true: least-recently cooked first, latest at the bottom; false: A-Z
   let pantryFilter = 'all'; // 'all', 'planned', 'in_stock', 'low', 'out'
   let groceryViewMode = 'list'; // 'list' (to buy), 'recent' (purchase history)
@@ -1888,6 +1893,14 @@
     const ingById = Object.fromEntries(ingredients.map(i => [i.id, i]));
     const usageCount = {};
     itemIngredients.forEach(j => { usageCount[j.ingredientId] = (usageCount[j.ingredientId]||0) + 1; });
+    const joinsByItem = {};
+    itemIngredients.forEach(j => { (joinsByItem[j.itemId] ||= []).push(j); });
+    // Ready to cook: has ingredients and none are out of stock (in stock or low is fine)
+    const isReady = item => {
+      const stocks = (joinsByItem[item.id] || []).map(j => ingById[j.ingredientId]).filter(Boolean).map(ing => ing.stockStatus || 'out');
+      return stocks.length > 0 && stocks.every(st => st !== 'out');
+    };
+    const readyCount = items.filter(isReady).length;
     const plannedCount = items.filter(i => i.isPlanned).length;
     const unplannedCount = items.length - plannedCount;
     const dishTypeCount = items.filter(i => i.type === 'dish').length;
@@ -1898,6 +1911,7 @@
         <button class="filter-pill ${dishFilter==='all'?'active':''}" data-filter="all">All (${items.length})</button>
         <button class="filter-pill ${dishFilter==='planned'?'active':''}" data-filter="planned">📋 Planned (${plannedCount})</button>
         <button class="filter-pill ${dishFilter==='unplanned'?'active':''}" data-filter="unplanned">Not planned (${unplannedCount})</button>
+        <button class="filter-pill ${dishFilter==='ready'?'active':''}" data-filter="ready">✅ Ready to cook (${readyCount})</button>
         <button class="filter-pill ${dishFilter==='dish'?'active':''}" data-filter="dish">Dishes (${dishTypeCount})</button>
         <button class="filter-pill ${dishFilter==='snack'?'active':''}" data-filter="snack">Snacks (${snackTypeCount})</button>
         <button class="filter-pill sort-pill ${dishSortByCooked?'active':''}" data-sort-toggle title="Least recently cooked first, latest at the bottom">🍳 Sort by last cooked</button>
@@ -1906,13 +1920,12 @@
     let filtered = items;
     if(dishFilter === 'planned') filtered = filtered.filter(i => i.isPlanned);
     else if(dishFilter === 'unplanned') filtered = filtered.filter(i => !i.isPlanned);
+    else if(dishFilter === 'ready') filtered = filtered.filter(isReady);
     else if(dishFilter === 'dish') filtered = filtered.filter(i => i.type === 'dish');
     else if(dishFilter === 'snack') filtered = filtered.filter(i => i.type === 'snack');
 
     if(searchTerms.dishes){
       const q = normalize(searchTerms.dishes);
-      const joinsByItem = {};
-      itemIngredients.forEach(j => { (joinsByItem[j.itemId] ||= []).push(j); });
       filtered = filtered.filter(item => {
         if(normalize(item.name).includes(q)) return true;
         const joins = joinsByItem[item.id] || [];
@@ -1937,9 +1950,6 @@
       return;
     }
 
-    const joinsByItem = {};
-    itemIngredients.forEach(j => { (joinsByItem[j.itemId] ||= []).push(j); });
-
     const rowsHtml = filtered.map(item => {
       const joins = (joinsByItem[item.id] || []).slice()
         .sort((a,b) => (ingById[a.ingredientId]?.name || '').localeCompare(ingById[b.ingredientId]?.name || ''));
@@ -1959,6 +1969,7 @@
       }).join('');
 
       const isPlanned = !!item.isPlanned;
+      const ready = isReady(item);
       const dishStock = item.stockStatus || 'in_stock';
       const stockLabelMap = { low: 'Low', out: 'Out' };
       const isStockWarning = dishStock === 'low' || dishStock === 'out';
@@ -1980,6 +1991,7 @@
             <span class="dish-name">${escapeHtml(item.name)}</span>
             <div class="dish-pills">
               <span class="dish-type ${item.type}">${item.type}</span>
+              ${ready ? `<span class="ready-badge" title="No ingredient is out of stock">✓ Ready</span>` : ''}
             </div>
             ${item.notes ? `<div style="font-size:12px; color:var(--chalk-faint); margin-top:2px;">${escapeHtml(item.notes)}</div>` : ''}
           </div>
@@ -1988,6 +2000,7 @@
             <span class="dish-mobile-name">${escapeHtml(item.name)}</span>
             <div class="dish-mobile-badges">
               <span class="dish-type ${item.type}" style="font-size:9.5px; padding:1px 6px;">${item.type}</span>
+              ${ready ? `<span class="ready-badge" title="No ingredient is out of stock" style="font-size:9.5px; padding:1px 6px;">✓ Ready</span>` : ''}
               ${isStockWarning ? `<span class="stock-dot ${dishStock}" title="${dishStock === 'low' ? 'Low stock' : 'Out of stock'}"></span>` : ''}
               ${isPlanned ? `<span title="Planned" style="font-size:11px;">📋</span>` : ''}
             </div>
@@ -2844,7 +2857,7 @@
       const s = JSON.parse(saved);
       if(s.currentTab) currentTab = s.currentTab;
       // stock filters were dropped from the dishes tab; fall back for old saves
-      if(['all','planned','unplanned','dish','snack'].includes(s.dishFilter)) dishFilter = s.dishFilter;
+      if(['all','planned','unplanned','ready','dish','snack'].includes(s.dishFilter)) dishFilter = s.dishFilter;
       if(typeof s.dishSortByCooked === 'boolean') dishSortByCooked = s.dishSortByCooked;
       if(s.pantryFilter) pantryFilter = s.pantryFilter;
       if(s.groceryViewMode) groceryViewMode = s.groceryViewMode;
