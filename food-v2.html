@@ -2208,6 +2208,7 @@
     const plannedDishIds = new Set(plannedDishes.map(i => i.id));
 
     const plannedDemand = {};
+    const unplannedDemand = {};
     itemIngredients.forEach(j => {
       if(plannedDishIds.has(j.itemId)){
         (plannedDemand[j.ingredientId] ||= []).push({
@@ -2215,8 +2216,17 @@
           qty: j.quantity,
           unit: j.unit
         });
+      } else if(itemsById[j.itemId]){
+        (unplannedDemand[j.ingredientId] ||= []).push({
+          dishName: itemsById[j.itemId].name || 'Dish',
+          qty: j.quantity,
+          unit: j.unit
+        });
       }
     });
+    const byDish = (a, b) => a.dishName.localeCompare(b.dishName);
+    Object.values(plannedDemand).forEach(l => l.sort(byDish));
+    Object.values(unplannedDemand).forEach(l => l.sort(byDish));
 
     const totalCount = ingredients.length;
     const plannedCount = ingredients.filter(i => !!plannedDemand[i.id]).length;
@@ -2276,6 +2286,7 @@
     function renderIngRow(ing){
       const stock = ing.stockStatus || 'out';
       const reqForPlan = plannedDemand[ing.id];
+      const reqUnplanned = unplannedDemand[ing.id];
       const ingTags = tagsByIngredient[ing.id] || [];
 
       const isExpanded = expandedIngRows.has(ing.id);
@@ -2308,12 +2319,18 @@
             </div>
           </div>
         </div>
-        ${reqForPlan ? `
+        ${(reqForPlan || reqUnplanned) ? `
         <div class="needed-for-expanded">
-          <div style="font-weight:600; color:var(--accent); margin-bottom:6px; font-size:11px;">Needed for:</div>
-          <ul style="margin:0; padding-left:18px; list-style-type:disc; color:var(--accent); font-size:11.5px;">
+          ${reqForPlan ? `
+          <div style="font-weight:600; color:var(--accent); margin-bottom:6px; font-size:11px;">Needed for planned:</div>
+          <ul style="margin:0 0 ${reqUnplanned ? '10px' : '0'}; padding-left:18px; list-style-type:disc; color:var(--accent); font-size:11.5px;">
             ${reqForPlan.map(d => `<li style="margin-bottom:4px; font-weight:500;">${escapeHtml(d.dishName)}</li>`).join('')}
-          </ul>
+          </ul>` : ''}
+          ${reqUnplanned ? `
+          <div style="font-weight:600; color:var(--chalk-dim); margin-bottom:6px; font-size:11px;">Also used in (not planned):</div>
+          <ul style="margin:0; padding-left:18px; list-style-type:disc; color:var(--chalk-dim); font-size:11.5px;">
+            ${reqUnplanned.map(d => `<li style="margin-bottom:4px; font-weight:500;">${escapeHtml(d.dishName)}</li>`).join('')}
+          </ul>` : ''}
         </div>
         ` : ''}
         <div class="ing-row-mobile-body">
