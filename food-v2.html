@@ -703,6 +703,51 @@
   datalist{ display:none; }
   .hidden-file{ display:none; }
   .confirm-text{ font-size:13.5px; color:var(--chalk-dim); line-height:1.5; margin-bottom:4px; }
+
+  /* ---------- Meals tab (tomorrow's allocation) ---------- */
+  .meal-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
+  .meal-title{ font-family:'Kalam', cursive; font-size:19px; font-weight:700; }
+  .meal-sub{ font-size:12px; color:var(--chalk-faint); margin-top:2px; }
+  .meal-slots{ display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:10px; margin-bottom:20px; }
+  .meal-slot{
+    background:var(--bg-raised); border:1px solid var(--line); border-radius:12px; padding:10px 12px 12px;
+    outline:2px dashed transparent; outline-offset:3px; transition:all .15s ease; min-height:96px;
+  }
+  .meal-slot.drag-over, .meal-pool.drag-over{ outline-color:var(--accent); background:var(--accent-dim); }
+  .meal-slot-title, .meal-group-title{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    font-family:'Kalam', cursive; font-weight:700; color:var(--chalk);
+  }
+  .meal-slot-title{ font-size:16px; margin-bottom:8px; }
+  .meal-group-title{ font-size:15px; margin:14px 0 8px; padding-bottom:4px; border-bottom:1px dashed var(--line); }
+  .meal-count{ font-family:'Work Sans', sans-serif; font-size:11px; color:var(--chalk-faint); font-weight:600; }
+  .meal-slot-body, .meal-list{ display:flex; flex-direction:column; gap:6px; }
+  .meal-slot-empty{ font-size:12.5px; color:var(--chalk-faint); font-style:italic; padding:8px 2px; }
+  .meal-pool{ border-radius:12px; outline:2px dashed transparent; outline-offset:4px; transition:all .15s ease; }
+  /* Cards are drag sources: no text selection or iOS long-press callout */
+  .meal-card{
+    display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;
+    background:var(--bg-inset); border:1px solid var(--line); border-radius:10px; padding:8px 10px;
+    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; cursor:grab;
+  }
+  .meal-card:active{ cursor:grabbing; }
+  .meal-card.dragging{ opacity:0.4; transform:scale(0.98); }
+  .meal-card.is-allocated{ opacity:0.55; }
+  .meal-card.in-slot{ background:var(--bg); flex-wrap:nowrap; }
+  .meal-card-info{ flex:1; min-width:0; }
+  .meal-card-name{ font-weight:600; font-size:14px; line-height:1.3; }
+  .meal-card-meta{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; font-size:11.5px; color:var(--chalk-faint); margin-top:2px; }
+  .meal-never{ font-style:italic; }
+  .meal-card-actions{ display:flex; align-items:center; gap:4px; flex:none; }
+  .meal-icon-btn{
+    -webkit-appearance:none; appearance:none; padding:0; flex:none;
+    background:var(--bg-raised); border:1px solid var(--line); color:var(--chalk-dim);
+    min-width:30px; height:30px; border-radius:7px; cursor:pointer; font-size:12px; font-weight:700;
+    font-family:'Work Sans',sans-serif; display:flex; align-items:center; justify-content:center;
+  }
+  .meal-icon-btn:hover{ color:var(--chalk); border-color:var(--accent); }
+  .meal-icon-btn svg{ width:14px; height:14px; flex:none; }
+  .meal-card-actions .meal-sep{ width:1px; height:18px; background:var(--line-strong); margin:0 2px; }
 </style>
 <meta name="theme-color" content="#f7f6f2">
 <meta name="mobile-web-app-capable" content="yes">
@@ -723,6 +768,7 @@
         <button id="tabDishes" class="active">Dishes</button>
         <button id="tabIngredients">Pantry</button>
         <button id="tabGrocery">Grocery <span class="badge-count" id="toBuyBadge">0</span></button>
+        <button id="tabMeals">Meals</button>
       </div>
       <button class="icon-btn" id="ioBtn" title="Import / Export" aria-label="Import or export data">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
@@ -1021,6 +1067,18 @@
     await tx.ingredients.bulkPut(ingredients);
   });
 
+  // Tomorrow's meal allocation: one row per dish placed in a slot (breakfast / lunch / dinner).
+  db.version(8).stores({
+    items: 'id, name, type, isPlanned, stockStatus, lastPrepared, updatedAt',
+    ingredients: 'id, &nameKey, stockStatus, updatedAt',
+    itemIngredients: 'id, itemId, ingredientId, updatedAt',
+    customGrocery: 'id, name, bought, updatedAt',
+    purchaseHistory: 'id, ingredientId, date, updatedAt',
+    tags: 'id, order',
+    ingredientTags: 'id, ingredientId, tagId',
+    mealSlots: 'id, slot, itemId'
+  });
+
   const uuid = () => (crypto.randomUUID ? crypto.randomUUID() :
     'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
       const r = Math.random()*16|0, v = c === 'x' ? r : (r&0x3|0x8);
@@ -1030,7 +1088,7 @@
   const normalize = s => s.trim().toLowerCase().replace(/\s+/g,' ');
 
   /* ---------------- State ---------------- */
-  let currentTab = 'dishes'; // 'dishes', 'ingredients', 'grocery'
+  let currentTab = 'dishes'; // 'dishes', 'ingredients', 'grocery', 'meals'
   let dishFilter = 'all'; // 'all', 'planned', 'unplanned', 'ready', 'dish', 'snack'
   let dishSortByCooked = true; // true: least-recently cooked first, latest at the bottom; false: A-Z
   let pantryFilter = 'all'; // 'all', 'planned', 'in_stock', 'low', 'out'
@@ -1039,8 +1097,8 @@
   const collapsedGroceryTags = new Set();
   const expandedDishRows = new Set();
   // Search is scoped per tab so a pantry search doesn't filter dishes (and vice versa).
-  const searchTerms = { dishes: '', ingredients: '' };
-  const searchPlaceholders = { dishes: 'Search dishes…', ingredients: 'Search pantry…' };
+  const searchTerms = { dishes: '', ingredients: '', meals: '' };
+  const searchPlaceholders = { dishes: 'Search dishes…', ingredients: 'Search pantry…', meals: 'Search dishes…' };
   let editingItemId = null;
   let editingIngId = null;
   let currentType = 'dish';
@@ -1573,6 +1631,7 @@
   async function deleteDish(itemId){
     const joins = await db.itemIngredients.where('itemId').equals(itemId).toArray();
     await db.itemIngredients.bulkDelete(joins.map(j => j.id));
+    await db.mealSlots.where('itemId').equals(itemId).delete();
     await db.items.delete(itemId);
     toast('Dish deleted');
     updateHeaderBadge();
@@ -2875,12 +2934,234 @@
     }
   }
 
+  /* ---------------- Render: Meals tab (tomorrow's allocation) ---------------- */
+  const MEAL_SLOTS = [
+    { key:'breakfast', label:'Breakfast', icon:'🌅' },
+    { key:'lunch', label:'Lunch', icon:'☀️' },
+    { key:'dinner', label:'Dinner', icon:'🌙' }
+  ];
+  let dragMeal = null; // { itemId, allocId } mid-drag; allocId is set when the card came from a slot
+
+  // Local calendar date as YYYY-MM-DD (toISOString would give the UTC date)
+  function localDateStr(d = new Date()){
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }
+
+  function preparedAgo(lastPrepared){
+    const [y, m, d] = lastPrepared.split('-').map(Number);
+    if(!y) return lastPrepared;
+    const now = new Date();
+    const days = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(y, m - 1, d)) / 86400000);
+    if(days <= 0) return 'today';
+    if(days === 1) return 'yesterday';
+    return `${days}d ago`;
+  }
+
+  async function allocateMeal(itemId, slot, fromAllocId){
+    const [item, dupe] = await Promise.all([
+      db.items.get(itemId),
+      db.mealSlots.where('slot').equals(slot).filter(r => r.itemId === itemId).first()
+    ]);
+    if(!item) return;
+    const slotLabel = MEAL_SLOTS.find(s => s.key === slot).label;
+    if(dupe){
+      if(!fromAllocId || dupe.id !== fromAllocId) toast(`"${item.name}" is already in ${slotLabel}`);
+      return;
+    }
+    if(fromAllocId) await db.mealSlots.delete(fromAllocId);
+    await db.mealSlots.put({ id: uuid(), slot, itemId, createdAt: nowISO() });
+    toast(`"${item.name}" → ${slotLabel}`);
+    render();
+  }
+
+  async function unallocateMeal(allocId){
+    await db.mealSlots.delete(allocId);
+    render();
+  }
+
+  async function resetMealAllocation(){
+    await db.mealSlots.clear();
+    toast('Allocation reset');
+    render();
+  }
+
+  // Same side effect as setting Last Prepared in the dish modal: a cooked planned meal leaves the plan
+  async function markPreparedToday(itemId){
+    const item = await db.items.get(itemId);
+    if(!item) return;
+    await db.items.update(itemId, { lastPrepared: localDateStr(), isPlanned: 0, updatedAt: nowISO() });
+    toast(`"${item.name}" marked prepared today`);
+    render();
+  }
+
+  async function renderMealsTab(container){
+    const [items, allocs] = await Promise.all([db.items.toArray(), db.mealSlots.toArray()]);
+    const itemsById = Object.fromEntries(items.map(i => [i.id, i]));
+    const slotLabelByKey = Object.fromEntries(MEAL_SLOTS.map(s => [s.key, s.label]));
+    const slotsByItem = {};
+    allocs.forEach(a => { if(itemsById[a.itemId]) (slotsByItem[a.itemId] ||= []).push(a.slot); });
+
+    const lastPrepHtml = item => item.lastPrepared
+      ? `<span title="${escapeHtml(item.lastPrepared)}">🍳 ${escapeHtml(preparedAgo(item.lastPrepared))}</span>`
+      : `<span class="meal-never">Never prepared</span>`;
+
+    // Pool order: most recently prepared first (likeliest to be on hand), then planned, then the rest
+    let pool = items;
+    if(searchTerms.meals){
+      const q = normalize(searchTerms.meals);
+      pool = pool.filter(i => normalize(i.name).includes(q));
+    }
+    const byName = (a, b) => a.name.localeCompare(b.name);
+    const prepared = pool.filter(i => i.lastPrepared)
+      .sort((a, b) => b.lastPrepared.localeCompare(a.lastPrepared) || byName(a, b));
+    const planned = pool.filter(i => !i.lastPrepared && i.isPlanned).sort(byName);
+    const rest = pool.filter(i => !i.lastPrepared && !i.isPlanned).sort(byName);
+
+    const pencilSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>';
+    const closeSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+
+    const poolCard = item => {
+      const where = slotsByItem[item.id] || [];
+      return `<div class="meal-card ${where.length ? 'is-allocated' : ''}" draggable="true" data-item-id="${item.id}">
+        <div class="meal-card-info">
+          <div class="meal-card-name">${escapeHtml(item.name)}</div>
+          <div class="meal-card-meta">
+            ${lastPrepHtml(item)}
+            <span class="dish-type ${item.type}" style="font-size:9.5px; padding:1px 6px;">${item.type}</span>
+            ${item.isPlanned ? '<span class="planned-badge">Planned</span>' : ''}
+            ${where.map(s => `<span class="ready-badge">→ ${slotLabelByKey[s]}</span>`).join('')}
+          </div>
+        </div>
+        <div class="meal-card-actions">
+          ${MEAL_SLOTS.map(s => `<button class="meal-icon-btn" data-assign="${s.key}" title="Add to ${s.label}" aria-label="Add to ${s.label}">${s.label[0]}</button>`).join('')}
+          <span class="meal-sep"></span>
+          <button class="meal-icon-btn" data-prepared title="Prepared today" aria-label="Mark prepared today">🍳</button>
+          <button class="meal-icon-btn" data-edit title="Edit dish" aria-label="Edit dish">${pencilSvg}</button>
+        </div>
+      </div>`;
+    };
+
+    const poolGroup = (title, list) => list.length === 0 ? '' : `<div class="meal-group">
+      <div class="meal-group-title"><span>${title}</span><span class="meal-count">${list.length}</span></div>
+      <div class="meal-list">${list.map(poolCard).join('')}</div>
+    </div>`;
+
+    const slotsHtml = MEAL_SLOTS.map(s => {
+      const rows = allocs.filter(a => a.slot === s.key && itemsById[a.itemId])
+        .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+      const rowsHtml = rows.length === 0
+        ? '<div class="meal-slot-empty">Drop a dish here</div>'
+        : rows.map(a => {
+            const item = itemsById[a.itemId];
+            return `<div class="meal-card in-slot" draggable="true" data-item-id="${item.id}" data-alloc-id="${a.id}">
+              <div class="meal-card-info">
+                <div class="meal-card-name">${escapeHtml(item.name)}</div>
+                <div class="meal-card-meta">${lastPrepHtml(item)}</div>
+              </div>
+              <button class="meal-icon-btn" data-unallocate title="Remove from ${s.label}" aria-label="Remove from ${s.label}">${closeSvg}</button>
+            </div>`;
+          }).join('');
+      return `<div class="meal-slot" data-slot="${s.key}">
+        <div class="meal-slot-title"><span>${s.icon} ${s.label}</span><span class="meal-count">${rows.length}</span></div>
+        <div class="meal-slot-body">${rowsHtml}</div>
+      </div>`;
+    }).join('');
+
+    const poolHtml = items.length === 0
+      ? `<div class="empty"><span class="display">No dishes yet</span><p>Add dishes on the Dishes tab, then allocate them here.</p></div>`
+      : pool.length === 0
+        ? `<div class="empty"><span class="display">No matching dishes</span><p>Try a different search.</p></div>`
+        : poolGroup('Recently prepared', prepared) + poolGroup('Planned', planned) + poolGroup('Other dishes', rest);
+
+    container.innerHTML = `
+      <div class="meal-head">
+        <div>
+          <div class="meal-title">Tomorrow's meals</div>
+          <div class="meal-sub">Drag a dish into a slot, or tap B / L / D. Reset once tomorrow comes.</div>
+        </div>
+        ${allocs.length ? '<button class="filter-pill" id="resetMealsBtn">Reset</button>' : ''}
+      </div>
+      <div class="meal-slots">${slotsHtml}</div>
+      <div class="meal-pool" id="mealPool">${poolHtml}</div>`;
+
+    // Drag: pool cards copy into a slot, slot cards move between slots (or back to the pool to remove)
+    container.querySelectorAll('.meal-card[draggable="true"]').forEach(card => {
+      card.addEventListener('dragstart', e => {
+        dragMeal = { itemId: card.dataset.itemId, allocId: card.dataset.allocId || null };
+        e.dataTransfer.setData('text/plain', card.dataset.itemId);
+        e.dataTransfer.effectAllowed = 'move';
+        card.classList.add('dragging');
+      });
+      card.addEventListener('dragend', () => {
+        dragMeal = null;
+        card.classList.remove('dragging');
+        container.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+      });
+    });
+
+    container.querySelectorAll('.meal-slot').forEach(slotEl => {
+      slotEl.addEventListener('dragover', e => {
+        if(!dragMeal) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        slotEl.classList.add('drag-over');
+      });
+      slotEl.addEventListener('dragleave', e => {
+        if(!slotEl.contains(e.relatedTarget)) slotEl.classList.remove('drag-over');
+      });
+      slotEl.addEventListener('drop', e => {
+        e.preventDefault();
+        slotEl.classList.remove('drag-over');
+        const drag = dragMeal;
+        dragMeal = null; // the re-render replaces the dragged card, so dragend never fires
+        if(drag) allocateMeal(drag.itemId, slotEl.dataset.slot, drag.allocId);
+      });
+    });
+
+    const poolEl = container.querySelector('#mealPool');
+    poolEl.addEventListener('dragover', e => {
+      if(!dragMeal || !dragMeal.allocId) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      poolEl.classList.add('drag-over');
+    });
+    poolEl.addEventListener('dragleave', e => {
+      if(!poolEl.contains(e.relatedTarget)) poolEl.classList.remove('drag-over');
+    });
+    poolEl.addEventListener('drop', e => {
+      e.preventDefault();
+      poolEl.classList.remove('drag-over');
+      const drag = dragMeal;
+      dragMeal = null;
+      if(drag && drag.allocId) unallocateMeal(drag.allocId);
+    });
+
+    // Buttons: tap alternative to dragging (touch screens don't fire HTML5 drag events)
+    container.querySelectorAll('.meal-card').forEach(card => {
+      const itemId = card.dataset.itemId;
+      card.querySelectorAll('[data-assign]').forEach(btn => {
+        btn.addEventListener('click', () => allocateMeal(itemId, btn.dataset.assign, null));
+      });
+      const prepBtn = card.querySelector('[data-prepared]');
+      if(prepBtn) prepBtn.addEventListener('click', () => markPreparedToday(itemId));
+      const editBtn = card.querySelector('[data-edit]');
+      if(editBtn) editBtn.addEventListener('click', () => openDishModal(itemId));
+      const removeBtn = card.querySelector('[data-unallocate]');
+      if(removeBtn) removeBtn.addEventListener('click', () => unallocateMeal(card.dataset.allocId));
+    });
+
+    const resetBtn = container.querySelector('#resetMealsBtn');
+    if(resetBtn) resetBtn.addEventListener('click', resetMealAllocation);
+  }
+
   /* ---------------- Master render ---------------- */
   async function render(openIngId){
     const container = document.getElementById('main');
     if(currentTab === 'dishes') await renderDishesTab(container);
     else if(currentTab === 'ingredients') await renderIngredientsTab(container, openIngId);
     else if(currentTab === 'grocery') await renderGroceryTab(container);
+    else if(currentTab === 'meals') await renderMealsTab(container);
     await updateHeaderBadge();
   }
 
@@ -2888,6 +3169,7 @@
     document.getElementById('tabDishes').classList.toggle('active', currentTab === 'dishes');
     document.getElementById('tabIngredients').classList.toggle('active', currentTab === 'ingredients');
     document.getElementById('tabGrocery').classList.toggle('active', currentTab === 'grocery');
+    document.getElementById('tabMeals').classList.toggle('active', currentTab === 'meals');
     document.querySelector('.toolbar').style.display = currentTab === 'grocery' ? 'none' : 'flex';
     syncSearchUI();
   }
@@ -2937,6 +3219,7 @@
       if(s.searchTerms && typeof s.searchTerms === 'object'){
         searchTerms.dishes = s.searchTerms.dishes || '';
         searchTerms.ingredients = s.searchTerms.ingredients || '';
+        searchTerms.meals = s.searchTerms.meals || '';
       } else if(typeof s.searchTerm === 'string'){
         searchTerms.dishes = s.searchTerm;
       }
@@ -3082,7 +3365,8 @@
         db.customGrocery.clear(),
         db.purchaseHistory.clear(),
         db.tags.clear(),
-        db.ingredientTags.clear()
+        db.ingredientTags.clear(),
+        db.mealSlots.clear()
       ]);
       localStorage.removeItem('larderUIState');
       await loadTags();
@@ -3096,6 +3380,7 @@
   document.getElementById('tabDishes').addEventListener('click', () => { currentTab='dishes'; saveUIState(); updateTabUI(); render(); });
   document.getElementById('tabIngredients').addEventListener('click', () => { currentTab='ingredients'; saveUIState(); updateTabUI(); render(); });
   document.getElementById('tabGrocery').addEventListener('click', () => { currentTab='grocery'; saveUIState(); updateTabUI(); render(); });
+  document.getElementById('tabMeals').addEventListener('click', () => { currentTab='meals'; saveUIState(); updateTabUI(); render(); });
   document.getElementById('searchInput').addEventListener('input', e => {
     if(currentTab in searchTerms) searchTerms[currentTab] = e.target.value;
     syncSearchUI();
