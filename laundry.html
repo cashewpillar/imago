@@ -1,0 +1,1176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Laundry</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="scripts/dexie.min.js"></script>
+<style>
+  :root{
+    --bg:#ffffff;
+    --bg-inset:#f1f4f6;
+    --ink:#1c2024;
+    --ink-dim:#555d65;
+    --ink-faint:#8a929a;
+    --accent:#2a79a8;
+    --accent-dim:#dcecf6;
+    --accent-tint:rgba(42,121,168,0.08);
+    --on-accent:#ffffff;
+    --sage:#4f6a40;
+    --sage-dim:#e3ead9;
+    --amber:#b9812e;
+    --amber-dim:#f4e7c8;
+    --rust:#a1454c;
+    --rust-dim:#f5dcdd;
+    --on-rust:#fdf2f2;
+    --line:rgba(20,22,20,0.11);
+    --line-strong:rgba(20,22,20,0.22);
+    --shadow:0 8px 24px rgba(20,22,20,0.09);
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:'Work Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size:15px; min-height:100vh; -webkit-font-smoothing:antialiased;
+  }
+  [hidden]{ display:none !important; }
+  button{ font-family:inherit; }
+  .display{ font-family:'Kalam', cursive; }
+  .mono{ font-family:'IBM Plex Mono', monospace; }
+
+  /* ---------- Header ---------- */
+  header{
+    position:sticky; top:0; z-index:20;
+    background:rgba(255,255,255,0.94); backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--line);
+    padding:12px 16px; padding-top:calc(12px + env(safe-area-inset-top));
+  }
+  .brand{ display:flex; align-items:center; justify-content:space-between; gap:10px; max-width:940px; margin:0 auto; }
+  .brand h1{ font-family:'Kalam', cursive; font-weight:700; font-size:20px; margin:0; }
+  .header-actions{ display:flex; gap:8px; align-items:center; }
+  .view-toggle{ display:flex; background:var(--bg-inset); border:1px solid var(--line); border-radius:9px; padding:2px; }
+  .view-toggle button{
+    background:none; border:none; color:var(--ink-faint); font-size:13px; font-weight:600;
+    padding:7px 12px; border-radius:7px; cursor:pointer; white-space:nowrap;
+  }
+  .view-toggle button.active{ background:var(--accent-dim); color:var(--ink); }
+  .icon-btn{
+    background:none; border:1px solid var(--line-strong); color:var(--ink-dim);
+    width:36px; height:36px; border-radius:8px; flex:none;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .icon-btn:hover{ color:var(--ink); border-color:var(--accent); }
+  .icon-btn svg{ width:16px; height:16px; }
+
+  main{ padding:14px 16px 120px; max-width:560px; margin:0 auto; }
+
+  /* ---------- Shared bits ---------- */
+  .pill{
+    background:var(--bg-inset); border:1px solid var(--line); color:var(--ink-dim);
+    font-size:13px; font-weight:600; padding:7px 14px; border-radius:20px;
+    cursor:pointer; white-space:nowrap; touch-action:manipulation;
+  }
+  .pill:hover{ border-color:var(--line-strong); color:var(--ink); }
+  .pill.active{ background:var(--ink); color:var(--bg); border-color:var(--ink); }
+  .inp{
+    font-family:inherit; font-size:16px; line-height:1.4; width:100%;
+    background:var(--bg-inset); border:1px solid var(--line); color:var(--ink);
+    border-radius:9px; padding:9px 12px;
+  }
+  .inp:focus{ outline:none; border-color:var(--accent); }
+  .inp::placeholder{ color:var(--ink-faint); }
+  input[type="date"].inp{ -webkit-appearance:none; appearance:none; min-height:40px; }
+  .empty{ text-align:center; padding:56px 20px; color:var(--ink-faint); }
+  .empty .display{ font-size:22px; color:var(--ink-dim); display:block; margin-bottom:6px; }
+  .empty p{ font-size:13.5px; margin:0 0 16px; }
+  .empty .btn{ flex:none; padding:10px 18px; margin:0 4px; }
+
+  /* ---------- Log tab ---------- */
+  .banner{
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    background:var(--amber-dim); border:1px solid var(--amber); border-radius:12px;
+    padding:10px 12px; margin-bottom:12px; font-size:13.5px;
+  }
+  .banner .grow{ flex:1; min-width:140px; }
+  .banner button{
+    background:none; border:1px solid var(--line-strong); border-radius:8px;
+    padding:6px 12px; font-size:12.5px; font-weight:600; color:var(--ink-dim); cursor:pointer;
+  }
+  .banner button.danger{ color:var(--rust); border-color:var(--rust); }
+
+  .when{ background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:10px; }
+  .date-row{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .date-row .inp{ flex:1; min-width:130px; width:auto; }
+  .link-btn{ background:none; border:none; color:var(--accent); font-size:13px; font-weight:600; padding:10px 0 0; cursor:pointer; }
+  .details{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
+  .details .full{ grid-column:1 / -1; }
+  .details label{ display:block; font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--ink-faint); font-weight:600; margin-bottom:5px; }
+
+  .quick{ display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap; }
+  .quick .pill{ font-size:12.5px; padding:6px 12px; }
+
+  .group-title{
+    font-size:11px; text-transform:uppercase; letter-spacing:1.2px; font-weight:700;
+    color:var(--ink-faint); margin:18px 2px 8px;
+  }
+  .row{
+    display:flex; align-items:center; gap:10px; margin-bottom:6px;
+    padding:6px 6px 6px 14px; min-height:58px;
+    background:var(--bg); border:1px solid var(--line); border-radius:12px;
+    transition:background .12s, border-color .12s;
+  }
+  .row.on{ border-color:var(--accent); background:var(--accent-tint); }
+  .row-name{ flex:1; min-width:0; }
+  .row-name b{ display:block; font-weight:500; font-size:15px; color:var(--ink-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row.on .row-name b{ font-weight:600; color:var(--ink); }
+  .row-hint{ font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--ink-faint); }
+  .row.archived .row-name b::after{ content:' (removed)'; font-weight:400; font-size:12px; color:var(--ink-faint); }
+  .stepper{ display:flex; align-items:center; gap:2px; flex:none; }
+  .step{
+    width:44px; height:44px; border-radius:11px; flex:none;
+    border:1px solid var(--line-strong); background:var(--bg); color:var(--ink-dim);
+    font-size:24px; line-height:1; cursor:pointer; touch-action:manipulation;
+    user-select:none; -webkit-user-select:none;
+  }
+  .step.plus{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
+  .step:active{ transform:scale(0.93); }
+  .count{
+    width:38px; text-align:center; border:none; background:none; padding:0; border-radius:8px;
+    font-family:'IBM Plex Mono', monospace; font-weight:600; font-size:20px; color:var(--ink-faint);
+  }
+  .row.on .count{ color:var(--ink); }
+  .count:focus{ outline:2px solid var(--accent); background:var(--bg); }
+  .add-item-btn{
+    width:100%; margin-top:14px; padding:12px; border-radius:12px; cursor:pointer;
+    background:none; border:1px dashed var(--line-strong); color:var(--ink-dim); font-size:14px; font-weight:500;
+  }
+  .add-item-btn:hover{ color:var(--ink); border-color:var(--accent); }
+
+  .logbar{
+    position:fixed; left:0; right:0; bottom:0; z-index:30; display:none;
+    background:rgba(255,255,255,0.96); backdrop-filter:blur(6px);
+    border-top:1px solid var(--line);
+    padding:10px 16px calc(10px + env(safe-area-inset-bottom));
+  }
+  .logbar.show{ display:block; }
+  .logbar-in{ max-width:560px; margin:0 auto; display:flex; align-items:center; gap:14px; }
+  .total{ line-height:1.1; min-width:64px; }
+  .total b{ display:block; font-family:'IBM Plex Mono', monospace; font-size:24px; font-weight:600; }
+  .total span{ font-size:11px; color:var(--ink-faint); text-transform:uppercase; letter-spacing:1px; }
+  .logbar .btn.dim{ opacity:0.45; }
+
+  /* ---------- History tab ---------- */
+  .stats{ font-size:12.5px; color:var(--ink-faint); margin:2px 2px 12px; }
+  .wash{ background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:8px; cursor:pointer; }
+  .wash:hover{ border-color:var(--line-strong); }
+  .wash-head{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:8px; }
+  .wash-date{ font-weight:600; font-size:15px; }
+  .wash-sub{ font-size:12px; color:var(--ink-faint); font-family:'IBM Plex Mono', monospace; white-space:nowrap; }
+  .chips{ display:flex; flex-wrap:wrap; gap:5px; }
+  .chip{
+    display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-dim);
+    background:var(--bg-inset); border:1px solid var(--line); padding:3px 8px; border-radius:12px 4px 12px 4px;
+  }
+  .chip .qty{ font-family:'IBM Plex Mono', monospace; font-size:11px; font-weight:600; color:var(--accent); }
+  .wash-note{ font-size:12.5px; color:var(--ink-dim); margin-top:8px; font-style:italic; }
+
+  /* ---------- Due tab ---------- */
+  .due-row{
+    display:flex; align-items:center; gap:10px; cursor:pointer;
+    background:var(--bg); border:1px solid var(--line); border-radius:12px;
+    padding:8px 8px 8px 14px; margin-bottom:6px; min-height:60px;
+  }
+  .due-row:hover{ border-color:var(--line-strong); }
+  .due-main{ flex:1; min-width:0; }
+  .due-row b{ display:block; font-weight:500; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .due-row small{ font-size:12px; color:var(--ink-faint); }
+  .done-btn{
+    flex:none; width:44px; height:44px; border-radius:11px; cursor:pointer; touch-action:manipulation;
+    background:var(--accent); border:1px solid var(--accent); color:var(--on-accent);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .done-btn svg{ width:20px; height:20px; }
+  .done-btn:active{ transform:scale(0.93); }
+  .done-btn.done{ background:var(--sage-dim); border-color:var(--sage-dim); color:var(--sage); }
+  .age{
+    flex:none; font-size:11.5px; font-weight:700; padding:3px 10px; border-radius:20px;
+    background:var(--sage-dim); color:var(--sage); white-space:nowrap;
+  }
+  .age.warm{ background:var(--amber-dim); color:var(--amber); }
+  .age.hot{ background:var(--rust-dim); color:var(--rust); }
+  .age.none{ background:var(--bg-inset); color:var(--ink-faint); }
+
+  /* ---------- Modals ---------- */
+  .overlay{
+    position:fixed; inset:0; background:rgba(15,14,13,0.6);
+    display:none; align-items:flex-end; justify-content:center; z-index:50; backdrop-filter:blur(2px);
+  }
+  .overlay.show{ display:flex; }
+  .modal{
+    background:var(--bg); width:100%; max-width:480px; max-height:92vh; overflow-y:auto;
+    border-radius:18px 18px 0 0; border-top:1px solid var(--line-strong);
+    padding:20px 18px calc(24px + env(safe-area-inset-bottom)); animation:slideUp .18s ease;
+  }
+  @media (min-width:640px){ .overlay{ align-items:center; } .modal{ border-radius:16px; margin:20px; } }
+  @keyframes slideUp{ from{ transform:translateY(24px); opacity:0; } to{ transform:translateY(0); opacity:1; } }
+  .modal h2{ font-family:'Kalam', cursive; font-size:22px; margin:0 0 14px; }
+  .modal-actions{ display:flex; gap:10px; margin-top:18px; }
+  .confirm-text{ font-size:13.5px; color:var(--ink-dim); line-height:1.5; margin:0; }
+  .btn{
+    flex:1; padding:12px; border-radius:10px; border:none; font-weight:600; font-size:15px; cursor:pointer;
+    display:inline-flex; align-items:center; justify-content:center; gap:6px; touch-action:manipulation;
+  }
+  .btn.primary{ background:var(--accent); color:var(--on-accent); }
+  .btn.ghost{ background:none; border:1px solid var(--line-strong); color:var(--ink-dim); }
+  .btn.danger{ background:var(--rust); color:var(--on-rust); }
+
+  .io-row{ display:flex; flex-direction:column; gap:10px; }
+  .io-btn{
+    display:flex; align-items:center; gap:12px; text-align:left; cursor:pointer;
+    background:var(--bg-inset); border:1px solid var(--line); border-radius:10px; padding:13px 14px;
+    color:var(--ink); font-size:14px; font-weight:500;
+  }
+  .io-btn:hover{ border-color:var(--accent); }
+  .io-btn svg{ width:18px; height:18px; color:var(--accent); flex:none; }
+  .io-btn small{ display:block; color:var(--ink-faint); font-size:11.5px; font-weight:400; margin-top:2px; }
+  .io-btn.warn{ border-color:var(--rust-dim); }
+  .io-btn.warn svg{ color:var(--rust); }
+
+  .add-row{ display:flex; gap:6px; margin-bottom:14px; }
+  .add-row .inp{ flex:1; min-width:0; }
+  .add-row select{ width:112px; flex:none; }
+  .add-row .btn{ flex:none; padding:0 16px; }
+  .item-row{ display:flex; gap:6px; align-items:center; margin-bottom:6px; }
+  .item-row .inp{ padding:8px 10px; }
+  .item-row .item-name{ flex:1; min-width:0; }
+  .item-row select{ width:112px; flex:none; }
+  .item-row.archived .item-name{ color:var(--ink-faint); text-decoration:line-through; }
+  .item-row button{
+    flex:none; width:36px; height:38px; border-radius:8px; cursor:pointer;
+    background:none; border:1px solid var(--line); color:var(--ink-faint);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .item-row button:hover{ color:var(--rust); border-color:var(--rust-dim); }
+  .item-row.archived button:hover{ color:var(--sage); border-color:var(--sage); }
+  .item-row button svg{ width:16px; height:16px; }
+  .hint{ font-size:12px; color:var(--ink-faint); margin:-6px 0 12px; }
+
+  .toast{
+    position:fixed; bottom:96px; left:50%; transform:translateX(-50%);
+    background:var(--ink); color:var(--bg); padding:10px 18px; border-radius:30px;
+    font-size:13px; z-index:60; box-shadow:var(--shadow);
+    opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; max-width:calc(100vw - 32px); text-align:center;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(-8px); }
+  .toast.show.has-action{ pointer-events:auto; }
+  .toast-undo{ margin-left:14px; background:none; border:none; color:#9fd0ea; font-weight:700; font-size:13px; cursor:pointer; padding:0; }
+  .field{ margin-bottom:14px; }
+  .field label{ display:block; font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--ink-faint); font-weight:600; margin-bottom:6px; }
+  .date-list{ display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+  .date-chip{
+    display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-size:12.5px; color:var(--ink-dim);
+    background:var(--bg-inset); border:1px solid var(--line); padding:5px 10px; border-radius:14px;
+  }
+  .date-chip:hover{ color:var(--rust); border-color:var(--rust-dim); }
+  .date-chip span{ color:var(--ink-faint); }
+  .modal-actions .btn.danger{ flex:none; padding:12px 16px; }
+  .hidden-file{ display:none; }
+</style>
+<meta name="theme-color" content="#f7f6f2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="imago">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/imago-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>Laundry</h1>
+    <div class="header-actions">
+      <div class="view-toggle">
+        <button id="tabLog" class="active">Log</button>
+        <button id="tabHistory">History</button>
+        <button id="tabDue">Last washed</button>
+      </div>
+      <button class="icon-btn" id="ioBtn" title="Import / Export" aria-label="Import or export data">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="main"></main>
+
+<div class="logbar" id="logBar">
+  <div class="logbar-in">
+    <div class="total"><b id="totalNum">0</b><span>pieces</span></div>
+    <button class="btn primary dim" id="saveBtn">Save wash</button>
+  </div>
+</div>
+
+<!-- Items manager -->
+<div class="overlay" id="itemsOverlay">
+  <div class="modal">
+    <h2>Items</h2>
+    <div class="add-row">
+      <input class="inp" id="newItemName" type="text" placeholder="New item, e.g. pot holder" maxlength="40">
+      <select class="inp" id="newItemGroup"></select>
+      <button class="btn primary" id="addItemBtn">Add</button>
+    </div>
+    <div id="itemsList"></div>
+    <p class="hint">Removed items leave your log but stay in past washes.</p>
+    <div class="modal-actions"><button class="btn ghost" id="closeItemsBtn">Done</button></div>
+  </div>
+</div>
+
+<!-- Piece editor -->
+<div class="overlay" id="pieceOverlay">
+  <div class="modal">
+    <h2 id="pieceTitle">New piece</h2>
+    <div class="field">
+      <label for="pieceName">Name</label>
+      <input class="inp" id="pieceName" type="text" maxlength="40" placeholder="e.g. black jeans">
+    </div>
+    <div class="field">
+      <label for="pieceDate">Washed on</label>
+      <div class="add-row" style="margin-bottom:0">
+        <input class="inp" id="pieceDate" type="date">
+        <button class="btn ghost" id="pieceAddDate" style="flex:none; padding:0 16px">Add date</button>
+      </div>
+      <div class="date-list" id="pieceDates"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn danger" id="pieceDeleteBtn">Delete</button>
+      <button class="btn ghost" id="pieceCancelBtn">Cancel</button>
+      <button class="btn primary" id="pieceSaveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import / export sheet -->
+<div class="overlay" id="ioOverlay">
+  <div class="modal">
+    <h2>Import / Export</h2>
+    <div class="io-row">
+      <button class="io-btn" id="exportBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
+        <span>Export data<small>Download every wash, item and piece as JSON</small></span>
+      </button>
+      <button class="io-btn" id="importBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 21V9m0 0l-4 4m4-4l4 4M5 3h14"/></svg>
+        <span>Import data<small>Merge a JSON file — matching records update, the newer edit wins</small></span>
+      </button>
+      <button class="io-btn warn" id="resetImportBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+        <span>Reset &amp; import<small>Wipe everything here, then load a JSON file</small></span>
+      </button>
+      <button class="io-btn warn" id="clearDataBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6"/></svg>
+        <span>Clear all data<small>Delete every wash, item and piece — export first for a backup</small></span>
+      </button>
+      <input type="file" accept="application/json,.json" class="hidden-file" id="importFile">
+    </div>
+    <div class="modal-actions"><button class="btn ghost" id="closeIoBtn">Close</button></div>
+  </div>
+</div>
+
+<!-- Confirm -->
+<div class="overlay" id="confirmOverlay">
+  <div class="modal" style="max-width:380px; border-radius:16px;">
+    <h2 id="confirmTitle">Are you sure?</h2>
+    <p class="confirm-text" id="confirmText"></p>
+    <div class="modal-actions">
+      <button class="btn ghost" id="confirmCancelBtn">Cancel</button>
+      <button class="btn danger" id="confirmOkBtn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  /* ---------------- Config ---------------- */
+  const GROUPS = ['Tops', 'Bottoms', 'Small', 'Towels', 'Other'];
+  const STARTER = [
+    ['t-shirt white', 'Tops'], ['t-shirt colored', 'Tops'], ['sando', 'Tops'],
+    ['pants', 'Bottoms'], ['shorts', 'Bottoms'], ['boxer short', 'Bottoms'],
+    ['socks', 'Small'], ['handkerchief', 'Small'],
+    ['face towel', 'Towels'], ['towel', 'Towels'],
+    ['jacket', 'Other'], ['pillow cover', 'Other']
+  ];
+  const WARM_DAYS = 14;   // Last-washed pill turns amber
+  const HOT_DAYS = 30;    // ...and rust
+  const MAX_COUNT = 99;
+
+  /* ---------------- Storage ---------------- */
+  const db = new Dexie('LaundryDB');
+  db.version(1).stores({
+    items: 'id,nameKey,group,order',
+    washes: 'id,date,updatedAt'
+  });
+  // Pieces are specific things (black jeans, the blue jacket) tracked by wash dates, separate from the category counts in washes.
+  db.version(2).stores({
+    items: 'id,nameKey,group,order',
+    washes: 'id,date,updatedAt',
+    pieces: 'id,nameKey'
+  });
+
+  const ls = {
+    get(k){ try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v){ try { localStorage.setItem(k, v); } catch {} },
+    del(k){ try { localStorage.removeItem(k); } catch {} }
+  };
+
+  /* ---------------- State ---------------- */
+  let items = [];
+  let washes = [];
+  let tab = 'log';
+  let pieces = [];
+  let pieceDraft = null;
+  let detailsOpen = false;
+  let importMode = 'merge';
+  let confirmAction = null;
+  let draft; // set in init, once the date helpers below exist
+
+  const $ = id => document.getElementById(id);
+  const main = $('main');
+
+  /* ---------------- Helpers ---------------- */
+  const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10));
+  const nowISO = () => new Date().toISOString();
+  const norm = s => String(s).trim().toLowerCase().replace(/\s+/g, ' ');
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const pad = n => String(n).padStart(2, '0');
+  // Local calendar dates, not toISOString — that would roll back a day before 8am in UTC+8.
+  const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const todayStr = () => ymd(new Date());
+  const parseYmd = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+  const isYmd = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
+  const yesterdayStr = () => { const d = new Date(); d.setDate(d.getDate() - 1); return ymd(d); };
+  const daysAgo = s => Math.round((parseYmd(todayStr()) - parseYmd(s)) / 864e5);
+  const ageLabel = n => n <= 0 ? 'today' : n === 1 ? 'yesterday' : n < 60 ? `${n}d ago` : `${Math.round(n / 30)}mo ago`;
+  const fmtDate = s => {
+    const d = parseYmd(s);
+    const opts = { weekday: 'short', month: 'short', day: 'numeric' };
+    if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+    return d.toLocaleDateString(undefined, opts);
+  };
+  const numOrNull = v => { if (v === '' || v == null) return null; const n = Number(v); return Number.isFinite(n) && n >= 0 ? n : null; };
+  const sumCounts = c => Object.values(c).reduce((a, n) => a + (n > 0 ? n : 0), 0);
+  const itemSort = (a, b) => GROUPS.indexOf(a.group) - GROUPS.indexOf(b.group) || a.order - b.order || a.name.localeCompare(b.name);
+  const washSort = (a, b) => b.date.localeCompare(a.date) || String(b.createdAt).localeCompare(String(a.createdAt));
+
+  function toast(msg, undo){
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.toggle('has-action', !!undo);
+    if (undo) {
+      const b = document.createElement('button');
+      b.className = 'toast-undo';
+      b.textContent = 'Undo';
+      b.addEventListener('click', () => { t.classList.remove('show'); undo(); });
+      t.appendChild(b);
+    }
+    t.classList.add('show');
+    clearTimeout(toast._h);
+    toast._h = setTimeout(() => t.classList.remove('show'), undo ? 5000 : 2200);
+  }
+
+  function openConfirm(title, text, fn, okLabel = 'Delete'){
+    $('confirmTitle').textContent = title;
+    $('confirmText').textContent = text;
+    $('confirmOkBtn').textContent = okLabel;
+    confirmAction = fn;
+    $('confirmOverlay').classList.add('show');
+  }
+  const closeConfirm = () => { $('confirmOverlay').classList.remove('show'); confirmAction = null; };
+
+  /* ---------------- Draft (the wash being logged) ---------------- */
+  function freshDraft(){ return { editId: null, date: todayStr(), counts: {}, kg: '', price: '', note: '' }; }
+  const saveDraft = () => ls.set('laundryDraft', JSON.stringify(draft));
+  function loadDraft(){
+    try {
+      const d = JSON.parse(ls.get('laundryDraft'));
+      if (!d || typeof d !== 'object' || typeof d.counts !== 'object' || !isYmd(d.date)) return;
+      draft = { editId: d.editId || null, date: d.date, counts: d.counts || {}, kg: d.kg ?? '', price: d.price ?? '', note: d.note ?? '' };
+    } catch {}
+    if (draft.editId && !washes.some(w => w.id === draft.editId)) draft = freshDraft();
+    if (!draft.editId && !sumCounts(draft.counts)) draft.date = todayStr();
+    detailsOpen = !!(draft.kg || draft.price || draft.note);
+  }
+
+  const saveUI = () => ls.set('laundryUI', JSON.stringify({ tab }));
+  function loadUI(){
+    try {
+      const u = JSON.parse(ls.get('laundryUI'));
+      if (u && ['log', 'history', 'due'].includes(u.tab)) tab = u.tab;
+    } catch {}
+  }
+
+  /* ---------------- Data ---------------- */
+  async function loadAll(){
+    items = (await db.items.toArray()).sort(itemSort);
+    washes = (await db.washes.toArray()).sort(washSort);
+    pieces = await db.pieces.toArray();
+  }
+
+  // Most recent wash (and count) per item, skipping the wash being edited so its own numbers don't echo back as hints.
+  function lastMap(excludeId){
+    const m = new Map();
+    for (const w of washes) {
+      if (w.id === excludeId) continue;
+      for (const [id, n] of Object.entries(w.counts)) if (n > 0 && !m.has(id)) m.set(id, { date: w.date, n });
+    }
+    return m;
+  }
+
+  async function seedStarter(){
+    const now = nowISO();
+    const have = new Set(items.map(i => i.nameKey));
+    const recs = STARTER
+      .map(([name, group], order) => ({ id: uuid(), name, nameKey: norm(name), group, order, archived: false, createdAt: now, updatedAt: now }))
+      .filter(r => !have.has(r.nameKey));
+    await db.items.bulkPut(recs);
+    ls.set('laundrySeeded', '1');
+    await loadAll();
+  }
+
+  async function addItem(name, group){
+    name = name.trim();
+    if (!name) return null;
+    const key = norm(name);
+    const dupe = items.find(i => i.nameKey === key);
+    if (dupe) {
+      if (dupe.archived) { await db.items.update(dupe.id, { archived: false, updatedAt: nowISO() }); toast(`Restored "${dupe.name}"`); }
+      else toast(`"${dupe.name}" is already in your list`);
+      return dupe;
+    }
+    const order = Math.max(-1, ...items.filter(i => i.group === group).map(i => i.order)) + 1;
+    const now = nowISO();
+    const rec = { id: uuid(), name, nameKey: key, group, order, archived: false, createdAt: now, updatedAt: now };
+    await db.items.put(rec);
+    return rec;
+  }
+
+  /* ---------------- Tabs ---------------- */
+  function updateTabUI(){
+    $('tabLog').classList.toggle('active', tab === 'log');
+    $('tabHistory').classList.toggle('active', tab === 'history');
+    $('tabDue').classList.toggle('active', tab === 'due');
+    $('logBar').classList.toggle('show', tab === 'log' && items.some(i => !i.archived));
+  }
+  function setTab(t){
+    tab = t;
+    saveUI();
+    updateTabUI();
+    render();
+    window.scrollTo(0, 0);
+  }
+  function render(){
+    updateTabUI();
+    if (tab === 'log') renderLog();
+    else if (tab === 'history') renderHistory();
+    else renderPieces();
+  }
+
+  /* ---------------- Log tab ---------------- */
+  function renderLog(){
+    const active = items.filter(i => !i.archived);
+    if (!active.length) {
+      main.innerHTML = `<div class="empty"><span class="display">No items yet</span>
+        <p>List what you wash, then log each load with a few taps.</p>
+        <button class="btn primary" data-act="seed">Add starter list</button>
+        <button class="btn ghost" data-act="items">Add my own</button></div>`;
+      return;
+    }
+    const last = lastMap(draft.editId);
+    const shown = items.filter(i => !i.archived || draft.counts[i.id] > 0);
+    const editing = draft.editId ? washes.find(w => w.id === draft.editId) : null;
+
+    const rowHtml = i => {
+      const n = draft.counts[i.id] || 0;
+      const l = last.get(i.id);
+      const hint = l ? `last ${l.n} · ${ageLabel(daysAgo(l.date))}` : '';
+      return `<div class="row${n > 0 ? ' on' : ''}${i.archived ? ' archived' : ''}" data-id="${i.id}">
+        <div class="row-name"><b>${esc(i.name)}</b><span class="row-hint">${hint}</span></div>
+        <div class="stepper">
+          <button class="step" data-act="dec" aria-label="Fewer ${esc(i.name)}">−</button>
+          <input class="count" type="text" inputmode="numeric" pattern="[0-9]*" value="${n}" aria-label="${esc(i.name)} count">
+          <button class="step plus" data-act="inc" aria-label="More ${esc(i.name)}">+</button>
+        </div></div>`;
+    };
+    const groupsHtml = GROUPS.map(g => {
+      const rows = shown.filter(i => i.group === g);
+      return rows.length ? `<section><h3 class="group-title">${g}</h3>${rows.map(rowHtml).join('')}</section>` : '';
+    }).join('');
+
+    const canCopy = !editing && washes.length > 0;
+    const hasCounts = sumCounts(draft.counts) > 0;
+    main.innerHTML = `
+      ${editing ? `<div class="banner"><span class="grow">Editing <b>${fmtDate(editing.date)}</b></span>
+        <button data-act="cancel-edit">Cancel</button><button class="danger" data-act="delete-wash">Delete</button></div>` : ''}
+      <div class="when">
+        <div class="date-row">
+          <button class="pill${draft.date === todayStr() ? ' active' : ''}" data-act="date-today">Today</button>
+          <button class="pill${draft.date === yesterdayStr() ? ' active' : ''}" data-act="date-yest">Yesterday</button>
+          <input class="inp" type="date" id="dDate" value="${draft.date}" max="${todayStr()}">
+        </div>
+        <button class="link-btn" data-act="details">${detailsOpen ? '− Hide' : '+'} weight, price, note</button>
+        <div class="details" ${detailsOpen ? '' : 'hidden'}>
+          <div><label for="dKg">Weight (kg)</label><input class="inp" id="dKg" type="text" inputmode="decimal" value="${esc(draft.kg)}" placeholder="2.8"></div>
+          <div><label for="dPrice">Price (₱)</label><input class="inp" id="dPrice" type="text" inputmode="decimal" value="${esc(draft.price)}" placeholder="135"></div>
+          <div class="full"><label for="dNote">Note</label><input class="inp" id="dNote" type="text" value="${esc(draft.note)}" placeholder="e.g. lost a sock"></div>
+        </div>
+      </div>
+      <div class="quick">
+        <button class="pill" data-act="copy-last" ${canCopy ? '' : 'hidden'}>Start from last wash${canCopy ? ' · ' + fmtDate(washes[0].date) : ''}</button>
+        <button class="pill" data-act="clear" ${hasCounts ? '' : 'hidden'}>Clear</button>
+      </div>
+      ${groupsHtml}
+      <button class="add-item-btn" data-act="items">+ Add or edit items</button>`;
+    updateTotals();
+  }
+
+  function updateTotals(){
+    const total = items.reduce((a, i) => a + (draft.counts[i.id] > 0 ? draft.counts[i.id] : 0), 0);
+    $('totalNum').textContent = total;
+    $('saveBtn').classList.toggle('dim', total === 0);
+    $('saveBtn').textContent = draft.editId ? 'Save changes' : 'Save wash';
+    const clear = main.querySelector('[data-act="clear"]');
+    if (clear) clear.hidden = total === 0;
+  }
+
+  function setCount(id, n, keepInput){
+    n = Math.max(0, Math.min(MAX_COUNT, n | 0));
+    if (n > 0) draft.counts[id] = n; else delete draft.counts[id];
+    saveDraft();
+    const row = main.querySelector(`.row[data-id="${CSS.escape(id)}"]`);
+    if (row) {
+      row.classList.toggle('on', n > 0);
+      if (!keepInput) row.querySelector('.count').value = n;
+    }
+    updateTotals();
+  }
+
+  async function saveWash(){
+    const counts = {};
+    for (const i of items) if (draft.counts[i.id] > 0) counts[i.id] = draft.counts[i.id];
+    const total = sumCounts(counts);
+    if (!total) { toast('Add at least one piece'); return; }
+    const existing = draft.editId ? washes.find(w => w.id === draft.editId) : null;
+    const now = nowISO();
+    const rec = {
+      id: existing ? existing.id : uuid(),
+      date: isYmd(draft.date) ? draft.date : todayStr(),
+      counts,
+      kg: numOrNull(draft.kg),
+      price: numOrNull(draft.price),
+      note: draft.note.trim(),
+      createdAt: existing ? existing.createdAt : now,
+      updatedAt: now
+    };
+    await db.washes.put(rec);
+    await loadAll();
+    draft = freshDraft();
+    saveDraft();
+    detailsOpen = false;
+    setTab('history');
+    toast(`${existing ? 'Updated' : 'Saved'} · ${total} pieces`);
+  }
+
+  function startEdit(id){
+    const w = washes.find(x => x.id === id);
+    if (!w) return;
+    draft = { editId: w.id, date: w.date, counts: { ...w.counts }, kg: w.kg == null ? '' : String(w.kg), price: w.price == null ? '' : String(w.price), note: w.note || '' };
+    saveDraft();
+    detailsOpen = !!(draft.kg || draft.price || draft.note);
+    setTab('log');
+  }
+
+  function cancelEdit(){
+    draft = freshDraft();
+    saveDraft();
+    detailsOpen = false;
+    setTab('history');
+  }
+
+  async function deleteWash(){
+    const id = draft.editId;
+    if (!id) return;
+    const w = washes.find(x => x.id === id);
+    openConfirm('Delete this wash?', `${w ? fmtDate(w.date) : 'This wash'} will be removed from your history.`, async () => {
+      await db.washes.delete(id);
+      await loadAll();
+      draft = freshDraft();
+      saveDraft();
+      setTab('history');
+      toast('Wash deleted');
+    });
+  }
+
+  main.addEventListener('click', async e => {
+    const t = e.target.closest('[data-act]');
+    if (!t) return;
+    const act = t.dataset.act;
+    if (act === 'inc' || act === 'dec') {
+      const id = t.closest('.row').dataset.id;
+      setCount(id, (draft.counts[id] || 0) + (act === 'inc' ? 1 : -1));
+    }
+    else if (act === 'date-today') { draft.date = todayStr(); saveDraft(); renderLog(); }
+    else if (act === 'date-yest') { draft.date = yesterdayStr(); saveDraft(); renderLog(); }
+    else if (act === 'details') { detailsOpen = !detailsOpen; renderLog(); }
+    else if (act === 'copy-last') {
+      const known = new Set(items.map(i => i.id));
+      draft.counts = Object.fromEntries(Object.entries(washes[0].counts).filter(([id]) => known.has(id)));
+      saveDraft();
+      renderLog();
+    }
+    else if (act === 'clear') { draft.counts = {}; saveDraft(); renderLog(); }
+    else if (act === 'cancel-edit') cancelEdit();
+    else if (act === 'delete-wash') deleteWash();
+    else if (act === 'items') openItems();
+    else if (act === 'seed') { await seedStarter(); render(); }
+    else if (act === 'edit-wash') startEdit(t.dataset.id);
+    else if (act === 'go-log') setTab('log');
+    else if (act === 'piece-washed') markWashed(t.dataset.id);
+    else if (act === 'piece-edit') openPiece(t.dataset.id);
+    else if (act === 'piece-add') openPiece(null);
+  });
+
+  main.addEventListener('input', e => {
+    const t = e.target;
+    if (t.classList.contains('count')) {
+      const n = parseInt(t.value.replace(/\D/g, ''), 10);
+      setCount(t.closest('.row').dataset.id, Number.isNaN(n) ? 0 : n, true);
+    }
+    else if (t.id === 'dKg') { draft.kg = t.value; saveDraft(); }
+    else if (t.id === 'dPrice') { draft.price = t.value; saveDraft(); }
+    else if (t.id === 'dNote') { draft.note = t.value; saveDraft(); }
+  });
+  main.addEventListener('change', e => {
+    if (e.target.id === 'dDate') {
+      draft.date = isYmd(e.target.value) ? e.target.value : todayStr();
+      saveDraft();
+      renderLog();
+    }
+  });
+  main.addEventListener('focusin', e => { if (e.target.classList.contains('count')) e.target.select(); });
+  main.addEventListener('focusout', e => {
+    if (e.target.classList.contains('count')) {
+      const id = e.target.closest('.row')?.dataset.id;
+      if (id) e.target.value = draft.counts[id] || 0;
+    }
+  });
+
+  /* ---------------- History tab ---------------- */
+  function renderHistory(){
+    if (!washes.length) {
+      main.innerHTML = `<div class="empty"><span class="display">No washes yet</span>
+        <p>Your logged loads will show up here.</p>
+        <button class="btn primary" data-act="go-log">Log a wash</button></div>`;
+      return;
+    }
+    const nameOf = new Map(items.map(i => [i.id, i.name]));
+    const order = new Map(items.map((i, idx) => [i.id, idx]));
+    let stats = `${washes.length} wash${washes.length === 1 ? '' : 'es'}`;
+    if (washes.length > 1) {
+      const span = Math.round((parseYmd(washes[0].date) - parseYmd(washes[washes.length - 1].date)) / 864e5);
+      stats += ` · every ~${Math.max(1, Math.round(span / (washes.length - 1)))} days`;
+      stats += ` · avg ${Math.round(washes.reduce((a, w) => a + sumCounts(w.counts), 0) / washes.length)} pieces`;
+    }
+    main.innerHTML = `<div class="stats">${stats}</div>` + washes.map(w => {
+      const sub = [`${sumCounts(w.counts)} pcs`, w.kg != null ? `${w.kg} kg` : '', w.price != null ? `₱${w.price}` : ''].filter(Boolean).join(' · ');
+      const chips = Object.entries(w.counts)
+        .filter(([, n]) => n > 0)
+        .sort(([a], [b]) => (order.get(a) ?? 999) - (order.get(b) ?? 999))
+        .map(([id, n]) => `<span class="chip"><span>${esc(nameOf.get(id) || 'unknown item')}</span><span class="qty">${n}</span></span>`)
+        .join('');
+      return `<div class="wash" data-act="edit-wash" data-id="${w.id}">
+        <div class="wash-head"><span class="wash-date">${fmtDate(w.date)}</span><span class="wash-sub">${esc(sub)}</span></div>
+        <div class="chips">${chips}</div>
+        ${w.note ? `<div class="wash-note">${esc(w.note)}</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  /* ---------------- Last washed tab (pieces) ---------------- */
+  const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 13 10 18 19 7"/></svg>';
+
+  function renderPieces(){
+    const addBtn = `<button class="add-item-btn" style="margin:0 0 12px" data-act="piece-add">+ Add piece</button>`;
+    if (!pieces.length) {
+      main.innerHTML = `<div class="empty"><span class="display">No pieces yet</span>
+        <p>Track specific things you wash less often — jeans, jackets, pillow covers.</p>
+        <button class="btn primary" data-act="piece-add">Add a piece</button></div>`;
+      return;
+    }
+    const seen = pieces.filter(p => p.dates.length).sort((a, b) => a.dates[0].localeCompare(b.dates[0])); // oldest first = most overdue
+    const never = pieces.filter(p => !p.dates.length).sort((a, b) => a.name.localeCompare(b.name));
+    const today = todayStr();
+    const row = p => {
+      if (!p.dates.length) return `<div class="due-row" data-act="piece-edit" data-id="${p.id}"><div class="due-main"><b>${esc(p.name)}</b><small>not logged yet</small></div>
+        <span class="age none">never</span><button class="done-btn" data-act="piece-washed" data-id="${p.id}" aria-label="Mark ${esc(p.name)} washed today">${CHECK}</button></div>`;
+      const d = daysAgo(p.dates[0]);
+      const cls = d >= HOT_DAYS ? 'hot' : d >= WARM_DAYS ? 'warm' : '';
+      const doneToday = p.dates[0] === today;
+      return `<div class="due-row" data-act="piece-edit" data-id="${p.id}">
+        <div class="due-main"><b>${esc(p.name)}</b><small>${fmtDate(p.dates[0])} · ${p.dates.length}×</small></div>
+        <span class="age ${cls}">${ageLabel(d)}</span>
+        <button class="done-btn${doneToday ? ' done' : ''}" data-act="piece-washed" data-id="${p.id}" aria-label="Mark ${esc(p.name)} washed today">${CHECK}</button></div>`;
+    };
+    main.innerHTML = addBtn + seen.map(row).join('') + never.map(row).join('');
+  }
+
+  async function markWashed(id){
+    const p = pieces.find(x => x.id === id);
+    if (!p) return;
+    const today = todayStr();
+    if (p.dates.includes(today)) { toast(`${p.name} is already marked today`); return; }
+    const before = [...p.dates];
+    await db.pieces.update(id, { dates: [today, ...p.dates].sort((a, b) => b.localeCompare(a)), updatedAt: nowISO() });
+    await loadAll();
+    if (tab === 'due') renderPieces();
+    toast(`${p.name} · washed today`, async () => {
+      await db.pieces.update(id, { dates: before, updatedAt: nowISO() });
+      await loadAll();
+      if (tab === 'due') renderPieces();
+    });
+  }
+
+  function openPiece(id){
+    const p = id ? pieces.find(x => x.id === id) : null;
+    pieceDraft = { id: p ? p.id : null, name: p ? p.name : '', dates: p ? [...p.dates] : [todayStr()] };
+    $('pieceTitle').textContent = p ? 'Edit piece' : 'New piece';
+    $('pieceName').value = pieceDraft.name;
+    $('pieceDate').value = todayStr();
+    $('pieceDate').max = todayStr();
+    $('pieceDeleteBtn').hidden = !p;
+    renderPieceDates();
+    $('pieceOverlay').classList.add('show');
+  }
+  const closePiece = () => { $('pieceOverlay').classList.remove('show'); pieceDraft = null; };
+  function renderPieceDates(){
+    $('pieceDates').innerHTML = pieceDraft.dates.length
+      ? pieceDraft.dates.map(d => `<button class="date-chip" data-date="${d}" aria-label="Remove ${fmtDate(d)}">${fmtDate(d)} <span>✕</span></button>`).join('')
+      : '<span style="font-size:12.5px;color:var(--ink-faint)">No dates yet</span>';
+  }
+  async function savePiece(){
+    const name = $('pieceName').value.trim();
+    if (!name) { toast('Give the piece a name'); return; }
+    const key = norm(name);
+    if (pieces.some(x => x.id !== pieceDraft.id && x.nameKey === key)) { toast(`"${name}" already exists`); return; }
+    const existing = pieceDraft.id ? pieces.find(x => x.id === pieceDraft.id) : null;
+    const now = nowISO();
+    await db.pieces.put({
+      id: existing ? existing.id : uuid(), name, nameKey: key,
+      dates: [...new Set(pieceDraft.dates)].sort((a, b) => b.localeCompare(a)),
+      createdAt: existing ? existing.createdAt : now, updatedAt: now
+    });
+    closePiece();
+    await loadAll();
+    if (tab === 'due') renderPieces();
+    toast(existing ? 'Piece updated' : 'Piece added');
+  }
+
+  $('pieceAddDate').addEventListener('click', () => {
+    const d = $('pieceDate').value;
+    if (!isYmd(d)) { toast('Pick a date'); return; }
+    if (!pieceDraft.dates.includes(d)) pieceDraft.dates.push(d);
+    pieceDraft.dates.sort((a, b) => b.localeCompare(a));
+    renderPieceDates();
+  });
+  $('pieceDates').addEventListener('click', e => {
+    const chip = e.target.closest('.date-chip');
+    if (!chip) return;
+    pieceDraft.dates = pieceDraft.dates.filter(d => d !== chip.dataset.date);
+    renderPieceDates();
+  });
+  $('pieceSaveBtn').addEventListener('click', savePiece);
+  $('pieceCancelBtn').addEventListener('click', closePiece);
+  $('pieceDeleteBtn').addEventListener('click', () => {
+    const p = pieces.find(x => x.id === pieceDraft.id);
+    if (!p) return;
+    closePiece();
+    openConfirm('Delete this piece?', `"${p.name}" and its wash dates will be removed.`, async () => {
+      await db.pieces.delete(p.id);
+      await loadAll();
+      if (tab === 'due') renderPieces();
+      toast('Piece deleted');
+    });
+  });
+
+  /* ---------------- Items modal ---------------- */
+  const ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  const ICON_RESTORE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>';
+  const groupOptions = sel => GROUPS.map(g => `<option${g === sel ? ' selected' : ''}>${g}</option>`).join('');
+
+  function openItems(){
+    $('newItemGroup').innerHTML = groupOptions('Other');
+    $('newItemName').value = '';
+    renderItemsList();
+    $('itemsOverlay').classList.add('show');
+  }
+  function closeItems(){ $('itemsOverlay').classList.remove('show'); render(); }
+  function renderItemsList(){
+    $('itemsList').innerHTML = items.map(i => `
+      <div class="item-row${i.archived ? ' archived' : ''}" data-id="${i.id}">
+        <input class="inp item-name" type="text" value="${esc(i.name)}" maxlength="40">
+        <select class="inp item-group">${groupOptions(i.group)}</select>
+        <button class="item-arch" title="${i.archived ? 'Restore' : 'Remove'}" aria-label="${i.archived ? 'Restore' : 'Remove'} ${esc(i.name)}">${i.archived ? ICON_RESTORE : ICON_X}</button>
+      </div>`).join('');
+  }
+
+  $('addItemBtn').addEventListener('click', async () => {
+    const rec = await addItem($('newItemName').value, $('newItemGroup').value);
+    if (!rec) return;
+    $('newItemName').value = '';
+    await loadAll();
+    renderItemsList();
+  });
+  $('newItemName').addEventListener('keydown', e => { if (e.key === 'Enter') $('addItemBtn').click(); });
+  $('closeItemsBtn').addEventListener('click', closeItems);
+
+  $('itemsList').addEventListener('change', async e => {
+    const row = e.target.closest('.item-row');
+    if (!row) return;
+    const item = items.find(i => i.id === row.dataset.id);
+    if (!item) return;
+    if (e.target.classList.contains('item-name')) {
+      const name = e.target.value.trim();
+      const key = norm(name);
+      if (!name || items.some(i => i.id !== item.id && i.nameKey === key)) {
+        toast(name ? `"${name}" already exists` : 'Name can’t be empty');
+        e.target.value = item.name;
+        return;
+      }
+      await db.items.update(item.id, { name, nameKey: key, updatedAt: nowISO() });
+    } else if (e.target.classList.contains('item-group')) {
+      const group = e.target.value;
+      const order = Math.max(-1, ...items.filter(i => i.group === group).map(i => i.order)) + 1;
+      await db.items.update(item.id, { group, order, updatedAt: nowISO() });
+    }
+    await loadAll();
+    renderItemsList();
+  });
+  $('itemsList').addEventListener('click', async e => {
+    const btn = e.target.closest('.item-arch');
+    if (!btn) return;
+    const item = items.find(i => i.id === btn.closest('.item-row').dataset.id);
+    if (!item) return;
+    await db.items.update(item.id, { archived: !item.archived, updatedAt: nowISO() });
+    await loadAll();
+    renderItemsList();
+  });
+
+  /* ---------------- Import / Export ---------------- */
+  async function exportData(){
+    const payload = { app: 'laundry', version: 2, exportedAt: nowISO(), items: await db.items.toArray(), washes: await db.washes.toArray(), pieces: await db.pieces.toArray() };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `laundry-export-${todayStr()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast('Export downloaded');
+  }
+
+  function cleanItem(raw){
+    const now = nowISO();
+    return {
+      id: String(raw.id), name: raw.name.trim(), nameKey: norm(raw.name),
+      group: GROUPS.includes(raw.group) ? raw.group : 'Other',
+      order: Number.isFinite(raw.order) ? raw.order : 0,
+      archived: !!raw.archived,
+      createdAt: raw.createdAt || now, updatedAt: raw.updatedAt || raw.createdAt || now
+    };
+  }
+  function cleanWash(raw){
+    const now = nowISO();
+    const counts = {};
+    for (const [id, n] of Object.entries(raw.counts || {})) {
+      const v = Math.round(Number(n));
+      if (Number.isFinite(v) && v > 0) counts[id] = Math.min(v, MAX_COUNT);
+    }
+    return {
+      id: String(raw.id), date: raw.date, counts,
+      kg: numOrNull(raw.kg), price: numOrNull(raw.price), note: typeof raw.note === 'string' ? raw.note : '',
+      createdAt: raw.createdAt || now, updatedAt: raw.updatedAt || raw.createdAt || now
+    };
+  }
+
+  function cleanPiece(raw){
+    const now = nowISO();
+    const dates = [...new Set((Array.isArray(raw.dates) ? raw.dates : []).filter(isYmd))].sort((a, b) => b.localeCompare(a));
+    return { id: String(raw.id), name: raw.name.trim(), nameKey: norm(raw.name), dates, createdAt: raw.createdAt || now, updatedAt: raw.updatedAt || raw.createdAt || now };
+  }
+
+  // Parse and validate first, so a bad file never wipes anything.
+  async function importData(file, reset){
+    let data;
+    try { data = JSON.parse(await file.text()); }
+    catch { toast('That file isn’t valid JSON'); return; }
+    if (!data || typeof data !== 'object') { toast('Unrecognised file format'); return; }
+
+    const inItems = (Array.isArray(data.items) ? data.items : [])
+      .filter(i => i && i.id && typeof i.name === 'string' && i.name.trim()).map(cleanItem);
+    const inWashes = (Array.isArray(data.washes) ? data.washes : [])
+      .filter(w => w && w.id && isYmd(w.date) && w.counts && typeof w.counts === 'object').map(cleanWash);
+    const inPieces = (Array.isArray(data.pieces) ? data.pieces : [])
+      .filter(p => p && p.id && typeof p.name === 'string' && p.name.trim()).map(cleanPiece);
+    if (!inItems.length && !inWashes.length && !inPieces.length) { toast('Nothing to import in that file'); return; }
+
+    const apply = async () => {
+      let newItems = 0, putWashes = 0, touchedPieces = 0;
+      try {
+        await db.transaction('rw', db.items, db.washes, db.pieces, async () => {
+          if (reset) { await db.items.clear(); await db.washes.clear(); await db.pieces.clear(); }
+          const local = await db.items.toArray();
+          const byId = new Map(local.map(i => [i.id, i]));
+          const byKey = new Map(local.map(i => [i.nameKey, i]));
+          const idMap = new Map();
+
+          // Same id: newer edit wins. Same name, different id (e.g. seeded separately on another device): map onto the local item.
+          for (const it of inItems) {
+            const same = byId.get(it.id);
+            const named = byKey.get(it.nameKey);
+            if (same) {
+              idMap.set(it.id, same.id);
+              if (String(it.updatedAt) > String(same.updatedAt) && (!named || named.id === same.id)) {
+                await db.items.put(it);
+                byId.set(it.id, it); byKey.set(it.nameKey, it);
+              }
+            } else if (named) {
+              idMap.set(it.id, named.id);
+            } else {
+              await db.items.put(it);
+              byId.set(it.id, it); byKey.set(it.nameKey, it); idMap.set(it.id, it.id);
+              newItems++;
+            }
+          }
+
+          for (const w of inWashes) {
+            const counts = {};
+            for (const [id, n] of Object.entries(w.counts)) {
+              const to = idMap.get(id) ?? id;
+              counts[to] = Math.min(MAX_COUNT, (counts[to] || 0) + n);
+            }
+            const cur = await db.washes.get(w.id);
+            if (cur && String(cur.updatedAt) >= String(w.updatedAt)) continue; // idempotent: newer-or-equal wins
+            await db.washes.put({ ...w, counts });
+            putWashes++;
+          }
+
+          // Pieces merge by union of wash dates, so re-importing never loses or duplicates one; a newer rename wins.
+          const localPieces = await db.pieces.toArray();
+          const pById = new Map(localPieces.map(x => [x.id, x]));
+          const pByKey = new Map(localPieces.map(x => [x.nameKey, x]));
+          for (const pc of inPieces) {
+            const sameId = pById.get(pc.id);
+            const cur = sameId || pByKey.get(pc.nameKey);
+            if (!cur) {
+              await db.pieces.put(pc);
+              pById.set(pc.id, pc); pByKey.set(pc.nameKey, pc);
+              touchedPieces++;
+              continue;
+            }
+            const dates = [...new Set([...cur.dates, ...pc.dates])].sort((a, b) => b.localeCompare(a));
+            const grew = dates.length > cur.dates.length;
+            const renamed = !!sameId && String(pc.updatedAt) > String(cur.updatedAt) && pc.nameKey !== cur.nameKey && !pByKey.has(pc.nameKey);
+            if (!grew && !renamed) continue;
+            const next = { ...cur, dates, updatedAt: String(pc.updatedAt) > String(cur.updatedAt) ? pc.updatedAt : cur.updatedAt };
+            if (renamed) { next.name = pc.name; next.nameKey = pc.nameKey; }
+            await db.pieces.put(next);
+            pById.set(next.id, next); pByKey.set(next.nameKey, next);
+            touchedPieces++;
+          }
+        });
+      } catch (err) {
+        console.error(err);
+        toast('Import failed — nothing was changed');
+        return;
+      }
+      ls.set('laundrySeeded', '1');
+      if (reset) { draft = freshDraft(); saveDraft(); }
+      await loadAll();
+      if (draft.editId && !washes.some(w => w.id === draft.editId)) { draft = freshDraft(); saveDraft(); }
+      closeIo();
+      render();
+      toast(`${reset ? 'Reset & imported' : 'Imported'} ${putWashes} wash${putWashes === 1 ? '' : 'es'}, ${newItems} new item${newItems === 1 ? '' : 's'}, ${touchedPieces} piece${touchedPieces === 1 ? '' : 's'}`);
+    };
+
+    if (reset) openConfirm('Reset & import?', `This wipes every wash, item and piece here, then loads ${inWashes.length} wash${inWashes.length === 1 ? '' : 'es'}, ${inItems.length} item${inItems.length === 1 ? '' : 's'} and ${inPieces.length} piece${inPieces.length === 1 ? '' : 's'} from the file.`, apply, 'Reset & import');
+    else await apply();
+  }
+
+  function openIo(){ $('ioOverlay').classList.add('show'); }
+  function closeIo(){ $('ioOverlay').classList.remove('show'); }
+
+  function clearAllData(){
+    closeIo();
+    openConfirm('Clear all data?', 'This permanently deletes every wash, item and piece. Export a backup first if you want to keep anything.', async () => {
+      await Promise.all([db.items.clear(), db.washes.clear(), db.pieces.clear()]);
+      ls.del('laundryDraft');
+      draft = freshDraft();
+      await loadAll();
+      render();
+      toast('All data cleared');
+    }, 'Clear all');
+  }
+
+  /* ---------------- Wire up ---------------- */
+  $('tabLog').addEventListener('click', () => setTab('log'));
+  $('tabHistory').addEventListener('click', () => setTab('history'));
+  $('tabDue').addEventListener('click', () => setTab('due'));
+  $('saveBtn').addEventListener('click', saveWash);
+
+  $('ioBtn').addEventListener('click', openIo);
+  $('closeIoBtn').addEventListener('click', closeIo);
+  $('exportBtn').addEventListener('click', exportData);
+  $('importBtn').addEventListener('click', () => { importMode = 'merge'; $('importFile').click(); });
+  $('resetImportBtn').addEventListener('click', () => { importMode = 'reset'; $('importFile').click(); });
+  $('clearDataBtn').addEventListener('click', clearAllData);
+  $('importFile').addEventListener('change', e => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (file) importData(file, importMode === 'reset');
+  });
+
+  $('confirmCancelBtn').addEventListener('click', closeConfirm);
+  $('confirmOkBtn').addEventListener('click', () => { const fn = confirmAction; closeConfirm(); if (fn) fn(); });
+  ['itemsOverlay', 'pieceOverlay', 'ioOverlay', 'confirmOverlay'].forEach(id => {
+    const ov = $(id);
+    ov.addEventListener('click', e => {
+      if (e.target !== ov) return;
+      if (id === 'itemsOverlay') closeItems();
+      else if (id === 'pieceOverlay') closePiece();
+      else if (id === 'confirmOverlay') closeConfirm();
+      else ov.classList.remove('show');
+    });
+  });
+
+  /* ---------------- Init ---------------- */
+  (async function init(){
+    draft = freshDraft();
+    loadUI();
+    await loadAll();
+    if (!items.length && !ls.get('laundrySeeded')) await seedStarter();
+    loadDraft();
+    render();
+  })();
+})();
+</script>
+  <script src="pwa-register.js"></script>
+</body>
+</html>
