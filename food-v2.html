@@ -3006,17 +3006,17 @@
       ? `<span title="${escapeHtml(item.lastPrepared)}">🍳 ${escapeHtml(preparedAgo(item.lastPrepared))}</span>`
       : `<span class="meal-never">Never prepared</span>`;
 
-    // Pool order: most recently prepared first (likeliest to be on hand), then planned, then the rest
+    // Pool order: dishes in stock, then planned (the ones not in stock), then the rest (low / out).
+    // Each section sorts latest prepared first; never-prepared ('') falls to the bottom.
     let pool = items;
     if(searchTerms.meals){
       const q = normalize(searchTerms.meals);
       pool = pool.filter(i => normalize(i.name).includes(q));
     }
-    const byName = (a, b) => a.name.localeCompare(b.name);
-    const prepared = pool.filter(i => i.lastPrepared)
-      .sort((a, b) => b.lastPrepared.localeCompare(a.lastPrepared) || byName(a, b));
-    const planned = pool.filter(i => !i.lastPrepared && i.isPlanned).sort(byName);
-    const rest = pool.filter(i => !i.lastPrepared && !i.isPlanned).sort(byName);
+    const byRecent = (a, b) => (b.lastPrepared || '').localeCompare(a.lastPrepared || '') || a.name.localeCompare(b.name);
+    const inStock = pool.filter(i => (i.stockStatus || 'in_stock') === 'in_stock').sort(byRecent);
+    const planned = pool.filter(i => (i.stockStatus || 'in_stock') !== 'in_stock' && i.isPlanned).sort(byRecent);
+    const rest = pool.filter(i => (i.stockStatus || 'in_stock') !== 'in_stock' && !i.isPlanned).sort(byRecent);
 
     const pencilSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>';
     const closeSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
@@ -3072,7 +3072,7 @@
       ? `<div class="empty"><span class="display">No dishes yet</span><p>Add dishes on the Dishes tab, then allocate them here.</p></div>`
       : pool.length === 0
         ? `<div class="empty"><span class="display">No matching dishes</span><p>Try a different search.</p></div>`
-        : poolGroup('Recently prepared', prepared) + poolGroup('Planned', planned) + poolGroup('Other dishes', rest);
+        : poolGroup('In stock', inStock) + poolGroup('Planned', planned) + poolGroup('Other dishes', rest);
 
     container.innerHTML = `
       <div class="meal-head">
