@@ -176,6 +176,7 @@
     background:var(--bg-inset); border:1px solid var(--line); padding:3px 8px; border-radius:12px 4px 12px 4px;
   }
   .chip .qty{ font-family:'IBM Plex Mono', monospace; font-size:11px; font-weight:600; color:var(--accent); }
+  .chip.piece{ background:var(--accent-dim); border-color:transparent; color:var(--ink); }
   .wash-note{ font-size:12.5px; color:var(--ink-dim); margin-top:8px; font-style:italic; }
 
   /* ---------- Due tab ---------- */
@@ -298,7 +299,7 @@
       <div class="view-toggle">
         <button id="tabLog" class="active">Log</button>
         <button id="tabHistory">History</button>
-        <button id="tabDue">Last washed</button>
+        <button id="tabDue">Pieces</button>
       </div>
       <button class="icon-btn" id="ioBtn" title="Import / Export" aria-label="Import or export data">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
@@ -311,7 +312,7 @@
 
 <div class="logbar" id="logBar">
   <div class="logbar-in">
-    <div class="total"><b id="totalNum">0</b><span>pieces</span></div>
+    <div class="total"><b id="totalNum">0</b><span>total</span></div>
     <button class="btn primary dim" id="saveBtn">Save wash</button>
   </div>
 </div>
@@ -407,7 +408,7 @@
     ['face towel', 'Towels'], ['towel', 'Towels'],
     ['jacket', 'Other'], ['pillow cover', 'Other']
   ];
-  const WARM_DAYS = 14;   // Last-washed pill turns amber
+  const WARM_DAYS = 14;   // Pieces age pill turns amber
   const HOT_DAYS = 30;    // ...and rust
   const MAX_COUNT = 99;
 
@@ -665,7 +666,7 @@
     const counts = {};
     for (const i of items) if (draft.counts[i.id] > 0) counts[i.id] = draft.counts[i.id];
     const total = sumCounts(counts);
-    if (!total) { toast('Add at least one piece'); return; }
+    if (!total) { toast('Add at least one item'); return; }
     const existing = draft.editId ? washes.find(w => w.id === draft.editId) : null;
     const now = nowISO();
     const rec = {
@@ -684,7 +685,7 @@
     saveDraft();
     detailsOpen = false;
     setTab('history');
-    toast(`${existing ? 'Updated' : 'Saved'} · ${total} pieces`);
+    toast(`${existing ? 'Updated' : 'Saved'} · ${total} pcs`);
   }
 
   function startEdit(id){
@@ -781,11 +782,19 @@
     }
     const nameOf = new Map(items.map(i => [i.id, i.name]));
     const order = new Map(items.map((i, idx) => [i.id, idx]));
+    // A piece shows on the wash that shares its date. Two washes on one day: the newest only.
+    const piecesOn = new Map();
+    const seenDates = new Set();
+    for (const w of washes) {
+      if (seenDates.has(w.date)) continue;
+      seenDates.add(w.date);
+      piecesOn.set(w.id, pieces.filter(pc => pc.dates.includes(w.date)).sort((a, b) => a.name.localeCompare(b.name)));
+    }
     let stats = `${washes.length} wash${washes.length === 1 ? '' : 'es'}`;
     if (washes.length > 1) {
       const span = Math.round((parseYmd(washes[0].date) - parseYmd(washes[washes.length - 1].date)) / 864e5);
       stats += ` · every ~${Math.max(1, Math.round(span / (washes.length - 1)))} days`;
-      stats += ` · avg ${Math.round(washes.reduce((a, w) => a + sumCounts(w.counts), 0) / washes.length)} pieces`;
+      stats += ` · avg ${Math.round(washes.reduce((a, w) => a + sumCounts(w.counts), 0) / washes.length)} pcs`;
     }
     main.innerHTML = `<div class="stats">${stats}</div>` + washes.map(w => {
       const sub = [`${sumCounts(w.counts)} pcs`, w.kg != null ? `${w.kg} kg` : '', w.price != null ? `₱${w.price}` : ''].filter(Boolean).join(' · ');
@@ -793,7 +802,8 @@
         .filter(([, n]) => n > 0)
         .sort(([a], [b]) => (order.get(a) ?? 999) - (order.get(b) ?? 999))
         .map(([id, n]) => `<span class="chip"><span>${esc(nameOf.get(id) || 'unknown item')}</span><span class="qty">${n}</span></span>`)
-        .join('');
+        .join('')
+        + (piecesOn.get(w.id) || []).map(pc => `<span class="chip piece"><span>${esc(pc.name)}</span></span>`).join('');
       return `<div class="wash" data-act="edit-wash" data-id="${w.id}">
         <div class="wash-head"><span class="wash-date">${fmtDate(w.date)}</span><span class="wash-sub">${esc(sub)}</span></div>
         <div class="chips">${chips}</div>
@@ -802,8 +812,16 @@
     }).join('');
   }
 
-  /* ---------------- Last washed tab (pieces) ---------------- */
+  /* ---------------- Pieces tab ---------------- */
   const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 13 10 18 19 7"/></svg>';
+
+  const BATCH_WINDOW_DAYS = 2;
+  // Marking a piece washed files it under your latest batch if that was within the last 2 days (so it appears on that
+  // History card); with no recent batch it just records today and History is untouched.
+  function markTarget(){
+    const wash = washes.find(w => { const d = daysAgo(w.date); return d >= 0 && d <= BATCH_WINDOW_DAYS; });
+    return { date: wash ? wash.date : todayStr(), wash };
+  }
 
   function renderPieces(){
     const addBtn = `<button class="add-item-btn" style="margin:0 0 12px" data-act="piece-add">+ Add piece</button>`;
@@ -815,31 +833,35 @@
     }
     const seen = pieces.filter(p => p.dates.length).sort((a, b) => a.dates[0].localeCompare(b.dates[0])); // oldest first = most overdue
     const never = pieces.filter(p => !p.dates.length).sort((a, b) => a.name.localeCompare(b.name));
-    const today = todayStr();
+    const target = markTarget();
+    const hint = target.wash
+      ? `Marks go on your ${fmtDate(target.date)} wash`
+      : `No wash in the last ${BATCH_WINDOW_DAYS} days — marks record today only`;
     const row = p => {
       if (!p.dates.length) return `<div class="due-row" data-act="piece-edit" data-id="${p.id}"><div class="due-main"><b>${esc(p.name)}</b><small>not logged yet</small></div>
-        <span class="age none">never</span><button class="done-btn" data-act="piece-washed" data-id="${p.id}" aria-label="Mark ${esc(p.name)} washed today">${CHECK}</button></div>`;
+        <span class="age none">never</span><button class="done-btn" data-act="piece-washed" data-id="${p.id}" aria-label="Mark ${esc(p.name)} washed">${CHECK}</button></div>`;
       const d = daysAgo(p.dates[0]);
       const cls = d >= HOT_DAYS ? 'hot' : d >= WARM_DAYS ? 'warm' : '';
-      const doneToday = p.dates[0] === today;
+      const doneNow = p.dates.includes(target.date);
       return `<div class="due-row" data-act="piece-edit" data-id="${p.id}">
         <div class="due-main"><b>${esc(p.name)}</b><small>${fmtDate(p.dates[0])} · ${p.dates.length}×</small></div>
         <span class="age ${cls}">${ageLabel(d)}</span>
-        <button class="done-btn${doneToday ? ' done' : ''}" data-act="piece-washed" data-id="${p.id}" aria-label="Mark ${esc(p.name)} washed today">${CHECK}</button></div>`;
+        <button class="done-btn${doneNow ? ' done' : ''}" data-act="piece-washed" data-id="${p.id}" aria-label="Mark ${esc(p.name)} washed">${CHECK}</button></div>`;
     };
-    main.innerHTML = addBtn + seen.map(row).join('') + never.map(row).join('');
+    main.innerHTML = addBtn + `<div class="stats">${hint}</div>` + seen.map(row).join('') + never.map(row).join('');
   }
 
   async function markWashed(id){
     const p = pieces.find(x => x.id === id);
     if (!p) return;
-    const today = todayStr();
-    if (p.dates.includes(today)) { toast(`${p.name} is already marked today`); return; }
+    const { date, wash } = markTarget();
+    const where = wash ? `on ${fmtDate(date)}` : 'today';
+    if (p.dates.includes(date)) { toast(`${p.name} is already marked ${where}`); return; }
     const before = [...p.dates];
-    await db.pieces.update(id, { dates: [today, ...p.dates].sort((a, b) => b.localeCompare(a)), updatedAt: nowISO() });
+    await db.pieces.update(id, { dates: [date, ...p.dates].sort((a, b) => b.localeCompare(a)), updatedAt: nowISO() });
     await loadAll();
     if (tab === 'due') renderPieces();
-    toast(`${p.name} · washed today`, async () => {
+    toast(wash ? `${p.name} · added to ${fmtDate(date)} wash` : `${p.name} · washed today`, async () => {
       await db.pieces.update(id, { dates: before, updatedAt: nowISO() });
       await loadAll();
       if (tab === 'due') renderPieces();
