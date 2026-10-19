@@ -551,6 +551,17 @@
   .buy-item-row.is-bought .buy-item-name{ text-decoration:line-through; }
   .buy-item-meta{ font-size:12px; color:var(--chalk-faint); margin-top:2px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
   .buy-item-meta .needed-for{ color:var(--accent); font-weight:500; }
+  /* Previous purchase reference, right side of a to-buy card; shrinks on narrow screens */
+  .buy-item-last{ flex:none; max-width:42%; text-align:right; line-height:1.3; }
+  .buy-item-last-price{ font-size:13px; font-weight:700; color:var(--chalk); white-space:nowrap; }
+  .buy-item-last-price small{ font-size:11px; font-weight:500; color:var(--chalk-dim); }
+  .buy-item-last-sub{ font-size:10.5px; color:var(--chalk-faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .buy-item-last-none{ font-size:10.5px; font-style:italic; color:var(--chalk-faint); }
+  @media (max-width:480px){
+    .buy-item-last-price{ font-size:12px; }
+    .buy-item-last-price small{ font-size:10px; }
+    .buy-item-last-sub, .buy-item-last-none{ font-size:9.5px; }
+  }
 
   .add-custom-buy{ display:flex; gap:8px; margin-top:12px; }
   .add-custom-buy input{ flex:1; }
@@ -2619,6 +2630,35 @@
     const EXTRA_KEY = '__extra__';
     const groceryGroups = {};
 
+    // Latest purchase per ingredient (by date, then last edit), for the price reference on each card.
+    // Prefers the latest entry that has a price; falls back to any entry so "no price" can be told
+    // apart from "never bought".
+    const lastPurchaseByIng = {};
+    const purchaseHistoryAll = db.purchaseHistory ? await db.purchaseHistory.toArray() : [];
+    const isNewer = (a, b) => (a.date || '').localeCompare(b.date || '') || (a.updatedAt || '').localeCompare(b.updatedAt || '');
+    purchaseHistoryAll.forEach(h => {
+      const slot = (lastPurchaseByIng[h.ingredientId] ||= { any: null, priced: null });
+      if(!slot.any || isNewer(h, slot.any) > 0) slot.any = h;
+      if(h.price != null && (!slot.priced || isNewer(h, slot.priced) > 0)) slot.priced = h;
+    });
+
+    function lastPurchaseHtml(ingId){
+      const slot = lastPurchaseByIng[ingId];
+      if(!slot) return `<div class="buy-item-last"><span class="buy-item-last-none">No previous purchase</span></div>`;
+      const h = slot.priced;
+      if(!h) return `<div class="buy-item-last"><span class="buy-item-last-none">No price logged</span></div>`;
+      // price is per unit, so the unit tells what the price refers to
+      const unitStr = h.unit ? `<small>/${escapeHtml(h.unit)}</small>` : '';
+      const dateStr = h.date
+        ? new Date(h.date + 'T00:00:00').toLocaleDateString(undefined, {month:'short', day:'numeric'})
+        : '';
+      const sub = [dateStr, h.location].filter(Boolean).map(escapeHtml).join(' · ');
+      return `<div class="buy-item-last">
+          <div class="buy-item-last-price">${formatMoney(h.price)}${unitStr}</div>
+          ${sub ? `<div class="buy-item-last-sub">${sub}</div>` : ''}
+        </div>`;
+    }
+
     toBuyIngredients.forEach(item => {
       const dishNames = item.demandList.map(d => d.dishName).join(', ');
       const qtys = item.demandList.map(d => [d.qty, d.unit].filter(Boolean).join(' ')).filter(Boolean).join(' + ');
@@ -2637,6 +2677,7 @@
               </div>
             </div>
           </div>
+          ${lastPurchaseHtml(item.ing.id)}
         </div>`;
 
       const ingTags = tagsByIngredient[item.ing.id] || [];
