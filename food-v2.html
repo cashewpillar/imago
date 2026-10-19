@@ -665,11 +665,6 @@
   }
   .tag-pick .dot{ width:8px; height:8px; border-radius:50%; flex:none; }
 
-  .tag-chip{
-    display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:600;
-    padding:2px 8px; border-radius:12px; white-space:nowrap; background:var(--bg-inset); border:1px solid var(--line);
-  }
-  .tag-chip .dot{ width:6px; height:6px; border-radius:50%; flex:none; }
   .btn{
     flex:1; padding:11px; border-radius:10px; border:none; font-weight:600; font-size:14px;
     cursor:pointer; font-family:'Work Sans',sans-serif;
@@ -2353,7 +2348,6 @@
       const stock = ing.stockStatus || 'out';
       const reqForPlan = plannedDemand[ing.id];
       const reqUnplanned = unplannedDemand[ing.id];
-      const ingTags = tagsByIngredient[ing.id] || [];
 
       const isExpanded = expandedIngRows.has(ing.id);
       return `<div class="ing-row is-draggable ${isExpanded ? 'expanded' : ''}" data-ing-id="${ing.id}" draggable="true">
@@ -2364,7 +2358,6 @@
             <div style="min-width: 0; flex: 1;">
               <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                 <span class="ing-name">${escapeHtml(ing.name)}</span>
-                ${ingTags.map(t => `<span class="tag-chip"><span class="dot" style="background:${t.color}"></span>${escapeHtml(t.label)}</span>`).join('')}
               </div>
               ${reqForPlan ? `<div class="needed-for-collapsed" style="font-size:11px; color:var(--accent); font-weight:600; margin-top:2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Needed for: ${escapeHtml(reqForPlan.map(d=>d.dishName).join(', '))}</div>` : ''}
             </div>
