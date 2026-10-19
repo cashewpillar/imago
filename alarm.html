@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alarm</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f8f7f4;--surface:#fff;--border:#e2e0d8;--border-strong:#c8c5bb;
+  --text:#1a1917;--text-muted:#6b6860;--text-faint:#9c9a94;
+  --accent:#3d5a99;
+  --r:8px;--rl:12px;
+}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
+
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px}
+header h1{font-size:17px;font-weight:600;letter-spacing:-.3px}
+
+main{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:36px;padding:24px 16px 48px;max-width:560px;width:100%;margin:0 auto}
+
+.result{text-align:center}
+.result-lbl{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted)}
+.result-time{display:flex;align-items:baseline;justify-content:center;gap:10px;margin:6px 0 4px;font-variant-numeric:tabular-nums}
+.result-clock{font-size:clamp(72px,26vw,140px);font-weight:600;letter-spacing:-.04em;line-height:1}
+.result-period{font-size:clamp(22px,7vw,36px);font-weight:500;color:var(--text-muted)}
+.result-day{font-size:13px;color:var(--text-faint);min-height:20px}
+
+.goal{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:16px 18px}
+.goal-lbl{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:12px;text-align:center}
+.goal-row{display:flex;justify-content:center;gap:20px;flex-wrap:wrap}
+.field{display:flex;flex-direction:column;align-items:center;gap:6px}
+.stepper{display:flex;align-items:center;gap:6px}
+.stepper input{width:64px;padding:6px 2px;font-size:22px;font-weight:600;text-align:center;border:1px solid var(--border);border-radius:var(--r);font-family:inherit;color:var(--text);background:var(--surface);-moz-appearance:textfield}
+.stepper input::-webkit-inner-spin-button,.stepper input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.step-btn{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);width:40px;height:40px;font-size:20px;line-height:1;cursor:pointer;color:var(--text-muted);display:flex;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.step-btn:active{background:var(--border-strong);color:var(--text)}
+.field-unit{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-faint)}
+</style>
+<meta name="theme-color" content="#f7f6f2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="imago">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/imago-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+</head>
+<body>
+<header><h1>Alarm</h1></header>
+
+<main>
+  <section class="result" aria-live="off">
+    <div class="result-lbl">Set your alarm for</div>
+    <div class="result-time">
+      <span class="result-clock" id="clock">--:--</span>
+      <span class="result-period" id="period"></span>
+    </div>
+    <div class="result-day" id="day"></div>
+  </section>
+
+  <section class="goal">
+    <div class="goal-lbl">Minimum sleep</div>
+    <div class="goal-row">
+      <div class="field">
+        <div class="stepper">
+          <button class="step-btn" type="button" data-step="-60" aria-label="Less hours">−</button>
+          <input id="hours" type="number" inputmode="numeric" min="0" max="24" aria-label="Hours">
+          <button class="step-btn" type="button" data-step="60" aria-label="More hours">+</button>
+        </div>
+        <span class="field-unit">hours</span>
+      </div>
+      <div class="field">
+        <div class="stepper">
+          <button class="step-btn" type="button" data-step="-5" aria-label="Less minutes">−</button>
+          <input id="minutes" type="number" inputmode="numeric" min="0" max="59" aria-label="Minutes">
+          <button class="step-btn" type="button" data-step="5" aria-label="More minutes">+</button>
+        </div>
+        <span class="field-unit">minutes</span>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const STORAGE_KEY = 'imago-alarm-sleep-minutes';
+const DEFAULT_MINUTES = 7 * 60 + 30;
+const MAX_MINUTES = 24 * 60;
+
+const els = {
+  clock: document.getElementById('clock'),
+  period: document.getElementById('period'),
+  day: document.getElementById('day'),
+  hours: document.getElementById('hours'),
+  minutes: document.getElementById('minutes')
+};
+
+function loadMinutes() {
+  try {
+    const n = parseInt(localStorage.getItem(STORAGE_KEY), 10);
+    if (Number.isFinite(n) && n >= 0 && n <= MAX_MINUTES) return n;
+  } catch (e) {}
+  return DEFAULT_MINUTES;
+}
+
+let sleepMinutes = loadMinutes();
+
+function setMinutes(total) {
+  sleepMinutes = Math.max(0, Math.min(MAX_MINUTES, total));
+  try { localStorage.setItem(STORAGE_KEY, String(sleepMinutes)); } catch (e) {}
+  syncInputs();
+  render();
+}
+
+function syncInputs() {
+  els.hours.value = Math.floor(sleepMinutes / 60);
+  els.minutes.value = sleepMinutes % 60;
+}
+
+function readInputs() {
+  const h = parseInt(els.hours.value, 10);
+  const m = parseInt(els.minutes.value, 10);
+  setMinutes((Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0));
+}
+
+function dayLabel(now, wake) {
+  const startOf = d => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diff = Math.round((startOf(wake) - startOf(now)) / 86400000);
+  if (diff === 0) return 'today';
+  if (diff === 1) return 'tomorrow';
+  return wake.toLocaleDateString(undefined, { weekday: 'long' });
+}
+
+function render() {
+  const now = new Date();
+  const wake = new Date(now.getTime() + sleepMinutes * 60000);
+  const parts = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).formatToParts(wake);
+  const get = type => (parts.find(p => p.type === type) || {}).value || '';
+  els.clock.textContent = get('hour') + ':' + get('minute');
+  els.period.textContent = get('dayPeriod');
+  els.day.textContent = dayLabel(now, wake);
+}
+
+document.querySelectorAll('.step-btn').forEach(btn => {
+  btn.addEventListener('click', () => setMinutes(sleepMinutes + parseInt(btn.dataset.step, 10)));
+});
+els.hours.addEventListener('change', readInputs);
+els.minutes.addEventListener('change', readInputs);
+
+syncInputs();
+render();
+// Re-render each second so the wake time rolls over as soon as the minute changes.
+setInterval(render, 1000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
+</script>
+  <script src="pwa-register.js"></script>
+</body>
+</html>
