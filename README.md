@@ -21,6 +21,7 @@ node scripts/register-html.js
 1. Core features
     - Import/export (UUID, idempotent records)
     - Reset and import
+1. Remember last inputs state on refresh if appropriate UI/UX
 1. Mobile-first
 
 ## PWA caching
