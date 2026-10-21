@@ -754,6 +754,18 @@
   .meal-icon-btn:hover{ color:var(--chalk); border-color:var(--accent); }
   .meal-icon-btn svg{ width:14px; height:14px; flex:none; }
   .meal-card-actions .meal-sep{ width:1px; height:18px; background:var(--line-strong); margin:0 2px; }
+  /* Extras: takeout / leftovers / bought food that lives in a slot only, not in the dish catalog */
+  .meal-slot-title-end{ display:flex; align-items:center; gap:8px; }
+  .meal-extra-btn{ min-width:26px; height:24px; font-size:15px; line-height:1; }
+  .meal-extra-btn.active{ color:var(--accent); border-color:var(--accent); background:var(--accent-dim); }
+  .meal-extra-kind{
+    font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em;
+    padding:1px 6px; border-radius:10px; background:var(--accent-dim); color:var(--accent);
+  }
+  .meal-extra-form{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+  .meal-extra-form input[type="text"]{ flex:1 1 140px; min-width:0; padding-left:12px; }
+  .meal-extra-kinds{ display:flex; gap:4px; flex:1 1 100%; }
+  .meal-extra-kinds .filter-pill{ flex:1; text-align:center; }
 </style>
 <meta name="theme-color" content="#f7f6f2">
 <meta name="mobile-web-app-capable" content="yes">
@@ -2974,7 +2986,15 @@
     { key:'lunch', label:'Lunch', icon:'☀️' },
     { key:'dinner', label:'Dinner', icon:'🌙' }
   ];
-  let dragMeal = null; // { itemId, allocId } mid-drag; allocId is set when the card came from a slot
+  let dragMeal = null; // { itemId, allocId, extra } mid-drag; allocId is set when the card came from a slot
+  // Extras are one-off slot entries (no dish behind them): mealSlots rows with itemId null + label + kind.
+  const EXTRA_KINDS = [
+    { key:'takeout', label:'Takeout' },
+    { key:'leftover', label:'Leftover' },
+    { key:'bought', label:'Bought' }
+  ];
+  let extraFormSlot = null; // slot key whose "add takeout / leftover" form is open
+  let extraFormKind = 'takeout';
 
   // Local calendar date as YYYY-MM-DD (toISOString would give the UTC date)
   function localDateStr(d = new Date()){
@@ -3006,6 +3026,22 @@
     if(fromAllocId) await db.mealSlots.delete(fromAllocId);
     await db.mealSlots.put({ id: uuid(), slot, itemId, createdAt: nowISO() });
     toast(`"${item.name}" → ${slotLabel}`);
+    render();
+  }
+
+  async function addExtraMeal(slot, label, kind){
+    label = label.trim();
+    if(!label) return;
+    const slotLabel = MEAL_SLOTS.find(s => s.key === slot).label;
+    await db.mealSlots.put({ id: uuid(), slot, itemId: null, label, kind, createdAt: nowISO() });
+    toast(`"${label}" → ${slotLabel}`);
+    render();
+  }
+
+  async function moveExtraMeal(allocId, slot){
+    const row = await db.mealSlots.get(allocId);
+    if(!row || row.slot === slot) return;
+    await db.mealSlots.update(allocId, { slot });
     render();
   }
 
@@ -3082,11 +3118,29 @@
     </div>`;
 
     const slotsHtml = MEAL_SLOTS.map(s => {
-      const rows = allocs.filter(a => a.slot === s.key && itemsById[a.itemId])
+      const rows = allocs.filter(a => a.slot === s.key && (a.itemId ? itemsById[a.itemId] : a.label))
         .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+      const formOpen = extraFormSlot === s.key;
+      const formHtml = formOpen ? `<div class="meal-extra-form" data-extra-form="${s.key}">
+          <input type="text" class="meal-extra-input" placeholder="e.g. Jollibee chicken" maxlength="80" autocomplete="off">
+          <div class="meal-extra-kinds">
+            ${EXTRA_KINDS.map(k => `<button type="button" class="filter-pill ${extraFormKind===k.key?'active':''}" data-extra-kind="${k.key}">${k.label}</button>`).join('')}
+          </div>
+          <button type="button" class="filter-pill active" data-extra-add>Add</button>
+        </div>` : '';
       const rowsHtml = rows.length === 0
-        ? '<div class="meal-slot-empty">Drop a dish here</div>'
+        ? (formOpen ? '' : '<div class="meal-slot-empty">Drop a dish here</div>')
         : rows.map(a => {
+            if(!a.itemId){
+              const kindLabel = (EXTRA_KINDS.find(k => k.key === a.kind) || EXTRA_KINDS[0]).label;
+              return `<div class="meal-card in-slot" draggable="true" data-extra="1" data-alloc-id="${a.id}">
+              <div class="meal-card-info">
+                <div class="meal-card-name">${escapeHtml(a.label)}</div>
+                <div class="meal-card-meta"><span class="meal-extra-kind">${kindLabel}</span></div>
+              </div>
+              <button class="meal-icon-btn" data-unallocate title="Remove from ${s.label}" aria-label="Remove from ${s.label}">${closeSvg}</button>
+            </div>`;
+            }
             const item = itemsById[a.itemId];
             return `<div class="meal-card in-slot" draggable="true" data-item-id="${item.id}" data-alloc-id="${a.id}">
               <div class="meal-card-info">
@@ -3097,8 +3151,12 @@
             </div>`;
           }).join('');
       return `<div class="meal-slot" data-slot="${s.key}">
-        <div class="meal-slot-title"><span>${s.icon} ${s.label}</span><span class="meal-count">${rows.length}</span></div>
-        <div class="meal-slot-body">${rowsHtml}</div>
+        <div class="meal-slot-title"><span>${s.icon} ${s.label}</span>
+          <span class="meal-slot-title-end"><span class="meal-count">${rows.length}</span>
+            <button class="meal-icon-btn meal-extra-btn ${formOpen ? 'active' : ''}" data-extra-toggle="${s.key}" title="Add takeout or leftover to ${s.label}" aria-label="Add takeout or leftover to ${s.label}">${formOpen ? '×' : '+'}</button>
+          </span>
+        </div>
+        <div class="meal-slot-body">${formHtml}${rowsHtml}</div>
       </div>`;
     }).join('');
 
@@ -3112,7 +3170,7 @@
       <div class="meal-head">
         <div>
           <div class="meal-title">Tomorrow's meals</div>
-          <div class="meal-sub">Drag a dish into a slot, or tap B / L / D. Reset once tomorrow comes.</div>
+          <div class="meal-sub">Drag a dish into a slot, or tap B / L / D. Use + on a slot for takeout or leftovers. Reset once tomorrow comes.</div>
         </div>
         ${allocs.length ? '<button class="filter-pill" id="resetMealsBtn">Reset</button>' : ''}
       </div>
@@ -3122,8 +3180,8 @@
     // Drag: pool cards copy into a slot, slot cards move between slots (or back to the pool to remove)
     container.querySelectorAll('.meal-card[draggable="true"]').forEach(card => {
       card.addEventListener('dragstart', e => {
-        dragMeal = { itemId: card.dataset.itemId, allocId: card.dataset.allocId || null };
-        e.dataTransfer.setData('text/plain', card.dataset.itemId);
+        dragMeal = { itemId: card.dataset.itemId || null, allocId: card.dataset.allocId || null, extra: !!card.dataset.extra };
+        e.dataTransfer.setData('text/plain', card.dataset.itemId || card.dataset.allocId);
         e.dataTransfer.effectAllowed = 'move';
         card.classList.add('dragging');
       });
@@ -3149,7 +3207,9 @@
         slotEl.classList.remove('drag-over');
         const drag = dragMeal;
         dragMeal = null; // the re-render replaces the dragged card, so dragend never fires
-        if(drag) allocateMeal(drag.itemId, slotEl.dataset.slot, drag.allocId);
+        if(!drag) return;
+        if(drag.extra) moveExtraMeal(drag.allocId, slotEl.dataset.slot);
+        else allocateMeal(drag.itemId, slotEl.dataset.slot, drag.allocId);
       });
     });
 
@@ -3184,6 +3244,35 @@
       const removeBtn = card.querySelector('[data-unallocate]');
       if(removeBtn) removeBtn.addEventListener('click', () => unallocateMeal(card.dataset.allocId));
     });
+
+    // Extras: + on a slot opens an inline form (name + kind) for food that isn't a dish
+    container.querySelectorAll('[data-extra-toggle]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        extraFormSlot = extraFormSlot === btn.dataset.extraToggle ? null : btn.dataset.extraToggle;
+        render();
+      });
+    });
+    const extraForm = container.querySelector('[data-extra-form]');
+    if(extraForm){
+      const input = extraForm.querySelector('.meal-extra-input');
+      const submit = () => {
+        const slot = extraForm.dataset.extraForm;
+        const label = input.value;
+        if(!label.trim()){ input.focus(); return; }
+        extraFormSlot = null;
+        addExtraMeal(slot, label, extraFormKind);
+      };
+      extraForm.querySelectorAll('[data-extra-kind]').forEach(b => {
+        b.addEventListener('click', () => {
+          extraFormKind = b.dataset.extraKind;
+          extraForm.querySelectorAll('[data-extra-kind]').forEach(o => o.classList.toggle('active', o === b));
+          input.focus();
+        });
+      });
+      extraForm.querySelector('[data-extra-add]').addEventListener('click', submit);
+      input.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); submit(); } });
+      input.focus();
+    }
 
     const resetBtn = container.querySelector('#resetMealsBtn');
     if(resetBtn) resetBtn.addEventListener('click', resetMealAllocation);
