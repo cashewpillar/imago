@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meds</title>
+<script src="scripts/dexie.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  color-scheme:light;
+  --bg:#f8f7f4;--surface:#fff;--border:#e2e0d8;--border-strong:#c8c5bb;
+  --text:#1a1917;--text-muted:#6b6860;--text-faint:#9c9a94;
+  --accent:#3d5a99;--accent-soft:#e8edf7;--danger:#b3372f;
+  --r:8px;--rl:12px;
+}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh;min-height:100dvh}
+button{font-family:inherit;font-size:inherit;color:inherit;cursor:pointer;touch-action:manipulation}
+input,textarea{font-family:inherit;font-size:16px;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:9px 10px;width:100%}
+input:focus,textarea:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+textarea{resize:vertical;min-height:44px}
+
+header{position:sticky;top:0;z-index:10;background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:17px;font-weight:600;letter-spacing:-.3px}
+.icon-btn{background:none;border:1px solid var(--border);border-radius:var(--r);width:40px;height:40px;font-size:20px;line-height:1;color:var(--text-muted)}
+.icon-btn:active{background:var(--bg)}
+
+main{max-width:560px;margin:0 auto;padding:16px 16px 64px;display:flex;flex-direction:column;gap:20px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:16px}
+.lbl{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:8px}
+
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips:empty{display:none}
+.chip{background:var(--bg);border:1px solid var(--border);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:500;letter-spacing:.02em}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+
+.row{display:flex;gap:8px;margin-top:12px}
+.row>*{flex:1;min-width:0}
+.row .now{flex:0 0 auto;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:0 12px;color:var(--accent);font-weight:500}
+.note{margin-top:12px}
+.primary{width:100%;margin-top:14px;background:var(--accent);color:#fff;border:0;border-radius:var(--r);padding:13px;font-size:16px;font-weight:600}
+.primary:active{opacity:.85}
+
+.summary{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.sum{text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:12px}
+.sum.on{border-color:var(--accent);background:var(--accent-soft)}
+.sum-name{font-size:12px;font-weight:600;letter-spacing:.04em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sum-ago{font-size:20px;font-weight:600;letter-spacing:-.02em;margin:2px 0}
+.sum-meta{font-size:12px;color:var(--text-muted)}
+
+.hist-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px}
+.hist-head .lbl{margin:0}
+.link{background:none;border:0;color:var(--accent);font-size:13px;padding:4px 0}
+.day{font-size:12px;font-weight:600;color:var(--text-muted);margin:14px 0 6px}
+.entry{display:flex;gap:12px;width:100%;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-bottom:6px}
+.entry:active{background:var(--bg)}
+.e-time{flex:0 0 72px;font-variant-numeric:tabular-nums;color:var(--text-muted);font-size:13px;padding-top:1px}
+.e-main{flex:1;min-width:0}
+.e-med{font-weight:600;letter-spacing:.02em}
+.e-note{font-size:13px;color:var(--text-muted);white-space:pre-wrap;overflow-wrap:anywhere}
+.empty{color:var(--text-faint);text-align:center;padding:28px 0}
+
+dialog{margin:auto;border:1px solid var(--border-strong);border-radius:var(--rl);padding:18px;width:min(92vw,420px);background:var(--surface);color:var(--text)}
+dialog::backdrop{background:rgba(26,25,23,.4)}
+dialog h2{font-size:16px;font-weight:600;margin-bottom:4px}
+.field{margin-top:12px}
+.actions{display:flex;gap:8px;margin-top:16px}
+.actions button,.menu button{flex:1;padding:11px;border-radius:var(--r);border:1px solid var(--border);background:var(--bg);font-weight:500}
+.actions .save{background:var(--accent);border-color:var(--accent);color:#fff}
+.danger{color:var(--danger)}
+.menu{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.menu button{text-align:left;flex:none}
+.menu small{display:block;font-weight:400;color:var(--text-muted);font-size:12px}
+
+.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:var(--text);color:#fff;padding:10px 16px;border-radius:var(--r);font-size:13px;opacity:0;pointer-events:none;transition:opacity .15s,transform .15s;max-width:90vw;text-align:center;z-index:50}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+</style>
+<meta name="theme-color" content="#f7f6f2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="imago">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/imago-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+</head>
+<body>
+<header>
+  <h1>Meds</h1>
+  <button class="icon-btn" id="menu-btn" type="button" aria-label="Data menu">⋯</button>
+</header>
+
+<main>
+  <section class="card" aria-label="Log a dose">
+    <div class="lbl">Log a dose</div>
+    <input id="med" type="text" placeholder="Medicine" autocomplete="off" autocapitalize="characters" aria-label="Medicine">
+    <div class="chips" id="chips"></div>
+    <div class="row">
+      <input id="date" type="date" aria-label="Date">
+      <input id="time" type="time" aria-label="Time">
+      <button class="now" id="now" type="button" hidden>Now</button>
+    </div>
+    <textarea class="note" id="note" rows="2" placeholder="Note (optional)" aria-label="Note"></textarea>
+    <button class="primary" id="log" type="button">Log dose</button>
+  </section>
+
+  <section>
+    <div class="lbl">Last taken</div>
+    <div class="summary" id="summary"></div>
+  </section>
+
+  <section>
+    <div class="hist-head">
+      <div class="lbl" id="hist-lbl">History</div>
+      <button class="link" id="clear-filter" type="button" hidden>Show all</button>
+    </div>
+    <div id="history"></div>
+  </section>
+</main>
+
+<dialog id="edit">
+  <form method="dialog" id="edit-form">
+    <h2>Edit dose</h2>
+    <div class="field"><input id="e-med" type="text" placeholder="Medicine" autocomplete="off" autocapitalize="characters" aria-label="Medicine" required></div>
+    <div class="row">
+      <input id="e-date" type="date" aria-label="Date" required>
+      <input id="e-time" type="time" aria-label="Time" required>
+    </div>
+    <div class="field"><textarea id="e-note" rows="3" placeholder="Note (optional)" aria-label="Note"></textarea></div>
+    <div class="actions">
+      <button type="button" class="danger" id="e-delete">Delete</button>
+      <button type="button" id="e-cancel">Cancel</button>
+      <button type="submit" class="save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="menu">
+  <h2>Data</h2>
+  <div class="menu">
+    <button type="button" id="m-export">Export<small>Download all entries as JSON</small></button>
+    <button type="button" id="m-import">Import<small>Merge a backup. Safe to repeat, matched by ID</small></button>
+    <button type="button" id="m-replace">Reset and import<small>Wipe everything, then load a backup</small></button>
+    <button type="button" id="m-reset" class="danger">Reset<small>Delete all entries</small></button>
+    <button type="button" id="m-close">Close</button>
+  </div>
+</dialog>
+
+<input type="file" id="file" accept=".json,application/json" hidden>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const db = new Dexie('MedsDB');
+db.version(1).stores({ entries: 'id, takenAt, med' });
+
+const UI_KEY = 'imago-meds-ui';
+const BACKUP_TYPE = 'meds-backup';
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DAY = 86400000;
+
+const $ = id => document.getElementById(id);
+const els = {
+  med: $('med'), chips: $('chips'), date: $('date'), time: $('time'), now: $('now'), note: $('note'),
+  summary: $('summary'), history: $('history'), histLbl: $('hist-lbl'), clearFilter: $('clear-filter'),
+  edit: $('edit'), menu: $('menu'), file: $('file'), toast: $('toast')
+};
+
+let entries = [];          // newest first
+let editingId = null;
+let importMode = 'merge';
+
+// ── Remembered UI state ─────────────────────────────────────────────────────
+// Medicine, note, filter and a hand-set date/time survive refresh.
+// Date/time follow the clock until the user changes them.
+const ui = Object.assign({ med: '', note: '', manual: false, date: '', time: '', filter: '' }, loadUi());
+
+function loadUi() {
+  try { return JSON.parse(localStorage.getItem(UI_KEY)) || {}; } catch (e) { return {}; }
+}
+function saveUi() {
+  try { localStorage.setItem(UI_KEY, JSON.stringify(ui)); } catch (e) {}
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+const pad = n => String(n).padStart(2, '0');
+const dateValue = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const timeValue = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const normMed = s => String(s || '').trim().replace(/\s+/g, ' ').toUpperCase();
+const fmtTime = ms => new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+
+function uuid() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map(x => pad(x.toString(16))).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+function parseStamp(dateStr, timeStr) {
+  const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+  const t = /^(\d{2}):(\d{2})$/.exec(timeStr);
+  if (!d || !t) return null;
+  const ms = new Date(+d[1], +d[2] - 1, +d[3], +t[1], +t[2]).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function ago(ms) {
+  const mins = Math.floor((Date.now() - ms) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ${mins % 60}m ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function dayLabel(ms) {
+  const diff = Math.round((startOfDay(new Date()) - startOfDay(new Date(ms))) / DAY);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Yesterday';
+  return new Date(ms).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: diff > 300 ? 'numeric' : undefined });
+}
+
+let toastTimer;
+function toast(msg) {
+  els.toast.textContent = msg;
+  els.toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => els.toast.classList.remove('show'), 2600);
+}
+
+// ── Data ────────────────────────────────────────────────────────────────────
+async function reload() {
+  entries = await db.entries.orderBy('takenAt').reverse().toArray();
+  if (ui.filter && !entries.some(e => e.med === ui.filter)) { ui.filter = ''; saveUi(); }
+  renderAll();
+}
+
+// Distinct meds, most recently taken first.
+function medList() {
+  const seen = new Map();
+  for (const e of entries) if (!seen.has(e.med)) seen.set(e.med, e);
+  return [...seen.keys()];
+}
+
+// ── Render ──────────────────────────────────────────────────────────────────
+function renderChips() {
+  const cur = normMed(els.med.value);
+  els.chips.innerHTML = medList().map(m =>
+    `<button type="button" class="chip${m === cur ? ' on' : ''}" data-med="${esc(m)}">${esc(m)}</button>`).join('');
+}
+
+function renderSummary() {
+  const now = Date.now();
+  const cards = medList().map(m => {
+    const mine = entries.filter(e => e.med === m);
+    const last = mine[0].takenAt;
+    const n7 = mine.filter(e => now - e.takenAt <= 7 * DAY).length;
+    const n30 = mine.filter(e => now - e.takenAt <= 30 * DAY).length;
+    return `<button type="button" class="sum${ui.filter === m ? ' on' : ''}" data-med="${esc(m)}">
+      <div class="sum-name">${esc(m)}</div>
+      <div class="sum-ago">${ago(last)}</div>
+      <div class="sum-meta">${esc(dayLabel(last))}, ${fmtTime(last)}</div>
+      <div class="sum-meta">7d: ${n7} · 30d: ${n30}</div>
+    </button>`;
+  });
+  els.summary.innerHTML = cards.length ? cards.join('') : '<div class="empty" style="grid-column:1/-1">Nothing logged yet</div>';
+}
+
+function renderHistory() {
+  const list = ui.filter ? entries.filter(e => e.med === ui.filter) : entries;
+  els.histLbl.textContent = ui.filter ? `History · ${ui.filter}` : 'History';
+  els.clearFilter.hidden = !ui.filter;
+  if (!list.length) { els.history.innerHTML = '<div class="empty">No entries</div>'; return; }
+  let html = '', lastDay = null;
+  for (const e of list) {
+    const day = dayLabel(e.takenAt);
+    if (day !== lastDay) { html += `<div class="day">${esc(day)}</div>`; lastDay = day; }
+    html += `<button type="button" class="entry" data-id="${e.id}">
+      <span class="e-time">${fmtTime(e.takenAt)}</span>
+      <span class="e-main"><div class="e-med">${esc(e.med)}</div>${e.note ? `<div class="e-note">${esc(e.note)}</div>` : ''}</span>
+    </button>`;
+  }
+  els.history.innerHTML = html;
+}
+
+function renderAll() { renderChips(); renderSummary(); renderHistory(); }
+
+// ── Log form ────────────────────────────────────────────────────────────────
+function syncClock() {
+  els.now.hidden = !ui.manual;
+  if (ui.manual) { els.date.value = ui.date; els.time.value = ui.time; return; }
+  const d = new Date();
+  els.date.value = dateValue(d);
+  els.time.value = timeValue(d);
+}
+
+function initForm() {
+  els.med.value = ui.med;
+  els.note.value = ui.note;
+  syncClock();
+}
+
+els.med.addEventListener('input', () => { ui.med = els.med.value; saveUi(); renderChips(); });
+els.note.addEventListener('input', () => { ui.note = els.note.value; saveUi(); });
+
+function markManual() {
+  ui.manual = true; ui.date = els.date.value; ui.time = els.time.value;
+  saveUi(); els.now.hidden = false;
+}
+els.date.addEventListener('input', markManual);
+els.time.addEventListener('input', markManual);
+els.now.addEventListener('click', () => { ui.manual = false; saveUi(); syncClock(); });
+
+els.chips.addEventListener('click', e => {
+  const b = e.target.closest('[data-med]');
+  if (!b) return;
+  els.med.value = ui.med = b.dataset.med;
+  saveUi(); renderChips();
+});
+
+$('log').addEventListener('click', async () => {
+  const med = normMed(els.med.value);
+  if (!med) { toast('Pick or type a medicine'); els.med.focus(); return; }
+  const takenAt = parseStamp(els.date.value, els.time.value);
+  if (takenAt === null) { toast('Set a valid date and time'); return; }
+  const now = Date.now();
+  await db.entries.add({ id: uuid(), takenAt, med, note: els.note.value.trim(), createdAt: now, updatedAt: now });
+  ui.med = med; ui.note = ''; ui.manual = false;
+  els.med.value = med; els.note.value = '';
+  saveUi(); syncClock();
+  await reload();
+  toast(`Logged ${med} · ${fmtTime(takenAt)}`);
+});
+
+// Keep "x ago" and the clock fresh.
+function tick() {
+  if (!document.hidden) {
+    renderSummary();
+    const a = document.activeElement;
+    if (!ui.manual && a !== els.date && a !== els.time) syncClock();
+  }
+}
+setInterval(tick, 30000);
+document.addEventListener('visibilitychange', tick);
+
+// ── Summary / history interactions ──────────────────────────────────────────
+els.summary.addEventListener('click', e => {
+  const b = e.target.closest('[data-med]');
+  if (!b) return;
+  ui.filter = ui.filter === b.dataset.med ? '' : b.dataset.med;
+  saveUi(); renderSummary(); renderHistory();
+});
+els.clearFilter.addEventListener('click', () => { ui.filter = ''; saveUi(); renderSummary(); renderHistory(); });
+
+els.history.addEventListener('click', e => {
+  const b = e.target.closest('[data-id]');
+  if (!b) return;
+  const entry = entries.find(x => x.id === b.dataset.id);
+  if (!entry) return;
+  editingId = entry.id;
+  const d = new Date(entry.takenAt);
+  $('e-med').value = entry.med;
+  $('e-date').value = dateValue(d);
+  $('e-time').value = timeValue(d);
+  $('e-note').value = entry.note || '';
+  els.edit.showModal();
+});
+
+// ── Edit dialog ─────────────────────────────────────────────────────────────
+$('edit-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const med = normMed($('e-med').value);
+  const takenAt = parseStamp($('e-date').value, $('e-time').value);
+  if (!med || takenAt === null) { toast('Medicine, date and time are required'); return; }
+  await db.entries.update(editingId, { med, takenAt, note: $('e-note').value.trim(), updatedAt: Date.now() });
+  els.edit.close();
+  await reload();
+  toast('Saved');
+});
+$('e-cancel').addEventListener('click', () => els.edit.close());
+$('e-delete').addEventListener('click', async () => {
+  if (!confirm('Delete this entry?')) return;
+  await db.entries.delete(editingId);
+  els.edit.close();
+  await reload();
+  toast('Deleted');
+});
+
+// ── Data menu: export / import / reset ──────────────────────────────────────
+$('menu-btn').addEventListener('click', () => els.menu.showModal());
+$('m-close').addEventListener('click', () => els.menu.close());
+
+$('m-export').addEventListener('click', async () => {
+  const all = await db.entries.orderBy('takenAt').toArray();
+  if (!all.length) { toast('Nothing to export'); return; }
+  const payload = { type: BACKUP_TYPE, version: 1, exportedAt: new Date().toISOString(), entries: all };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `meds-backup-${dateValue(new Date())}.json`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 100);
+  els.menu.close();
+  toast(`Exported ${all.length} entries`);
+});
+
+function pickFile(mode) {
+  importMode = mode;
+  els.menu.close();
+  els.file.value = '';
+  els.file.click();
+}
+$('m-import').addEventListener('click', () => pickFile('merge'));
+$('m-replace').addEventListener('click', () => pickFile('replace'));
+
+$('m-reset').addEventListener('click', async () => {
+  const n = await db.entries.count();
+  if (!n) { toast('Already empty'); return; }
+  if (!confirm(`Delete all ${n} entries? Export first if you want a copy.`)) return;
+  await db.entries.clear();
+  els.menu.close();
+  await reload();
+  toast('All entries deleted');
+});
+
+function cleanEntry(raw) {
+  if (!raw || typeof raw.id !== 'string' || !UUID_RE.test(raw.id)) return null;
+  const takenAt = Number(raw.takenAt);
+  const med = normMed(raw.med);
+  if (!Number.isFinite(takenAt) || !med) return null;
+  const createdAt = Number(raw.createdAt) || takenAt;
+  return {
+    id: raw.id.toLowerCase(), takenAt, med,
+    note: typeof raw.note === 'string' ? raw.note.trim() : '',
+    createdAt, updatedAt: Number(raw.updatedAt) || createdAt
+  };
+}
+
+els.file.addEventListener('change', async () => {
+  const file = els.file.files[0];
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (data?.type !== BACKUP_TYPE || !Array.isArray(data.entries)) { toast('Not a Meds backup file'); return; }
+    const incoming = new Map();
+    for (const raw of data.entries) {
+      const e = cleanEntry(raw);
+      if (e) incoming.set(e.id, e);
+    }
+    const skipped = data.entries.length - incoming.size;
+    const rows = [...incoming.values()];
+
+    if (importMode === 'replace') {
+      if (!confirm(`Delete everything and load ${rows.length} entries from this file?`)) return;
+      await db.transaction('rw', db.entries, async () => { await db.entries.clear(); await db.entries.bulkPut(rows); });
+      await reload();
+      toast(`Loaded ${rows.length} entries${skipped ? `, ${skipped} invalid skipped` : ''}`);
+      return;
+    }
+
+    // Merge: matched by ID, the newer updatedAt wins, so re-importing the same file changes nothing.
+    const existing = await db.entries.bulkGet(rows.map(r => r.id));
+    const toWrite = [];
+    let added = 0, updated = 0;
+    rows.forEach((r, i) => {
+      const cur = existing[i];
+      if (!cur) { toWrite.push(r); added++; }
+      else if (r.updatedAt > cur.updatedAt) { toWrite.push(r); updated++; }
+    });
+    if (toWrite.length) await db.entries.bulkPut(toWrite);
+    await reload();
+    toast(`${added} new, ${updated} updated, ${rows.length - added - updated} unchanged${skipped ? `, ${skipped} invalid` : ''}`);
+  } catch (err) {
+    console.error(err);
+    toast('Import failed');
+  }
+});
+
+// ── Init ────────────────────────────────────────────────────────────────────
+initForm();
+reload().catch(err => { console.error(err); toast(err?.message || 'Startup failed'); });
+</script>
+  <script src="pwa-register.js"></script>
+</body>
+</html>
