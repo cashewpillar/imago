@@ -299,10 +299,11 @@
   }
 
   /* stock pills on chips */
-  .stock-dot{ width:7px; height:7px; border-radius:50%; flex:none; }
-  .stock-dot.in_stock{ background:var(--sage); }
-  .stock-dot.low{ background:var(--accent); }
-  .stock-dot.out{ background:var(--rust); }
+  .stock-dot{ width:8px; height:8px; border-radius:50%; flex:none; }
+  /* all three are brighter than --sage/--accent/--rust so the dots read apart */
+  .stock-dot.in_stock{ background:#2fa84f; }
+  .stock-dot.low{ background:#f0c21a; }
+  .stock-dot.out{ background:#d6282b; }
 
   .row-actions{ display:flex; gap:6px; justify-content:flex-end; }
   .row-actions button{
@@ -2683,7 +2684,7 @@
             </button>
             <div class="buy-item-details">
               <span class="buy-item-name">${escapeHtml(item.ing.name)}${qtys ? ` <span style="font-size:11px; color:var(--chalk-faint); font-weight:400;">(${escapeHtml(qtys)})</span>` : ''}
-                <span class="stock-pill ${stockKey}" style="margin-left:6px; vertical-align:middle;">${stockKey === 'low' ? 'Low' : 'Out of stock'}</span></span>
+                <span class="stock-dot ${stockKey}" title="${stockKey === 'low' ? 'Low stock' : 'Out of stock'}" style="display:inline-block; margin-left:6px; vertical-align:middle;"></span></span>
               <div class="buy-item-meta" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:3px;">
                 ${item.demandList.map(d => `<span style="font-size:10.5px; font-weight:600; padding:1px 7px; border-radius:10px; background:var(--bg-inset); border:1px solid var(--line); color:var(--chalk-dim);">${escapeHtml(d.dishName)}</span>`).join('')}
               </div>
