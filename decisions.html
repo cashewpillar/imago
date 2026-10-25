@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Decisions</title>
+<script src="scripts/dexie.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  color-scheme:light;
+  --bg:#f8f7f4;--surface:#fff;--border:#e2e0d8;--border-strong:#c8c5bb;
+  --text:#1a1917;--text-muted:#6b6860;--text-faint:#9c9a94;
+  --accent:#3d5a99;--accent-soft:#e8edf7;--danger:#b3372f;
+  /* one color per column kind */
+  --k-question:#185fa5;--k-question-bg:#e6f1fb;
+  --k-alternative:#854f0b;--k-alternative-bg:#faeeda;
+  --k-pro:#1a6b3c;--k-pro-bg:#eaf4ee;
+  --k-con:#a32d2d;--k-con-bg:#fcebeb;
+  --r:8px;--rl:12px;
+}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh;min-height:100dvh}
+button{font-family:inherit;font-size:inherit;color:inherit;cursor:pointer;touch-action:manipulation}
+input,textarea,select{font-family:inherit;font-size:16px;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:9px 10px;width:100%}
+input:focus,textarea:focus,select:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+textarea{resize:vertical;min-height:44px}
+
+.sticky-top{position:sticky;top:0;z-index:10}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+header h1{font-size:17px;font-weight:600;letter-spacing:-.3px}
+.header-actions{display:flex;gap:6px;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border:1px solid var(--border-strong);border-radius:var(--r);background:var(--surface);font-size:13px;white-space:nowrap}
+.btn:active{background:var(--bg)}
+.btn-primary{background:var(--text);color:#fff;border-color:var(--text)}
+.btn-primary:active{background:#333}
+.btn svg{width:13px;height:13px;flex-shrink:0}
+.icon-btn{background:none;border:1px solid var(--border);border-radius:var(--r);width:36px;height:36px;font-size:20px;line-height:1;color:var(--text-muted)}
+.icon-btn:active{background:var(--bg)}
+
+.fab-add{display:none;position:fixed;bottom:18px;right:18px;width:48px;height:48px;border-radius:50%;background:var(--text);color:#fff;border:none;box-shadow:0 2px 10px rgba(0,0,0,.22);align-items:center;justify-content:center;z-index:50}
+.fab-add svg{width:18px;height:18px}
+
+main{max-width:1100px;margin:0 auto;padding:20px 16px 80px}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px}
+.section-title{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted)}
+.filters{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.filter-chip{padding:4px 11px;border:1px solid var(--border-strong);border-radius:99px;font-size:12px;background:var(--surface);color:var(--text-muted);user-select:none}
+.filter-chip.active{background:var(--text);color:#fff;border-color:var(--text)}
+.filter-chip .n{opacity:.6;margin-left:3px;font-variant-numeric:tabular-nums}
+
+/* ── Table ── */
+.table-container{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:var(--rl);background:var(--surface)}
+table{width:100%;border-collapse:collapse;text-align:left;table-layout:fixed}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);font-weight:500;padding:9px 12px;border-bottom:1px solid var(--border);background:var(--bg);user-select:none;white-space:nowrap}
+th .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px}
+td{padding:12px;border-bottom:1px solid var(--border);vertical-align:top;font-size:13px}
+tr:last-child td{border-bottom:none}
+.d-row{cursor:pointer}
+.d-row:hover td{background:#fafaf8}
+.d-row.expanded td{background:var(--bg)}
+.col-title{width:24%}
+.col-act{width:44px}
+.c-act{text-align:right;padding-left:0}
+
+.d-title{font-weight:600;font-size:14px;line-height:1.35;overflow-wrap:anywhere}
+.d-meta{display:flex;align-items:center;gap:6px;margin-top:5px;flex-wrap:wrap}
+.d-note{font-size:12px;color:var(--text-muted);font-style:italic;margin-top:5px;white-space:pre-wrap;overflow-wrap:anywhere}
+
+/* Status pill: 11px label, invisible 16px select on top so iOS doesn't zoom */
+.tag{display:inline-flex;align-items:center;position:relative;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:600;border:1px solid transparent}
+.tag select{position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:16px;padding:0;border:0;cursor:pointer}
+.tag.s-open{background:var(--k-question-bg);color:var(--k-question)}
+.tag.s-parked{background:var(--bg);color:var(--text-muted);border-color:var(--border)}
+.tag.s-decided{background:var(--k-pro-bg);color:var(--k-pro)}
+
+/* Items inside a kind cell */
+.items{display:flex;flex-direction:column;gap:4px}
+.it{display:flex;gap:6px;width:100%;text-align:left;background:none;border:0;border-left:2px solid var(--kc);border-radius:0 6px 6px 0;padding:4px 6px;font-size:13px;line-height:1.4}
+.it:hover,.it:active{background:var(--kbg)}
+.it .t{flex:1;min-width:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.d-row:not(.expanded) .it .t{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.ref{flex:none;align-self:flex-start;font-size:10px;font-weight:700;color:var(--kc);background:var(--kbg);border-radius:4px;padding:0 5px;line-height:17px;font-variant-numeric:tabular-nums}
+.k-question{--kc:var(--k-question);--kbg:var(--k-question-bg)}
+.k-alternative{--kc:var(--k-alternative);--kbg:var(--k-alternative-bg)}
+.k-pro{--kc:var(--k-pro);--kbg:var(--k-pro-bg)}
+.k-con{--kc:var(--k-con);--kbg:var(--k-con-bg)}
+.more,.add{background:none;border:0;color:var(--text-faint);font-size:12px;text-align:left;padding:3px 6px}
+.more{color:var(--text-muted)}
+.add:hover,.add:active{color:var(--accent)}
+.items .add{margin-top:2px}
+
+/* Mobile-only pieces */
+.m-only{display:none}
+.counts{display:flex;gap:5px;flex-wrap:wrap}
+.cnt{font-size:11px;font-weight:600;padding:1px 8px;border-radius:99px;background:var(--kbg);color:var(--kc);font-variant-numeric:tabular-nums}
+.m-section{margin-top:12px}
+.m-label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--kc);font-weight:600;margin-bottom:4px}
+.m-body{border-top:1px dashed var(--border);margin-top:10px;padding-top:2px}
+
+.empty{text-align:center;padding:36px 16px;color:var(--text-faint)}
+.empty .btn{margin-top:12px}
+
+@media(max-width:640px){
+  .fab-add{display:flex}
+  .header-actions .add-btn{display:none}
+  main{padding:14px 12px 90px}
+  .table-container{overflow:visible}
+  thead{display:none}
+  .c-kind,.c-act{display:none}
+  td.c-title{display:block;width:100%;border-bottom:none}
+  tr.d-row{display:block;border-bottom:1px solid var(--border)}
+  tr:last-child.d-row{border-bottom:none}
+  .m-only{display:block}
+  .counts.m-only{display:flex}
+  .m-body.m-only{display:none}
+  .d-row.expanded .m-body.m-only{display:block}
+  .d-row.expanded .counts.m-only{display:none}
+  .d-meta{margin-top:7px}
+}
+
+/* ── Dialogs ── */
+dialog{margin:auto;border:1px solid var(--border-strong);border-radius:var(--rl);padding:18px;width:min(92vw,440px);background:var(--surface);color:var(--text)}
+dialog::backdrop{background:rgba(26,25,23,.4)}
+dialog h2{font-size:16px;font-weight:600;margin-bottom:4px}
+.field{margin-top:12px}
+.field label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:3px}
+.kind-pick{display:flex;gap:6px;flex-wrap:wrap}
+.kind-pick button{flex:1;min-width:0;padding:8px 6px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface);font-size:13px;font-weight:500;color:var(--text-muted)}
+.kind-pick button.on{background:var(--kbg);border-color:var(--kc);color:var(--kc);font-weight:600}
+.actions{display:flex;gap:8px;margin-top:16px}
+.actions button,.menu button{flex:1;padding:11px;border-radius:var(--r);border:1px solid var(--border);background:var(--bg);font-weight:500}
+.actions .save{background:var(--accent);border-color:var(--accent);color:#fff}
+.actions .danger{flex:0 0 auto}
+.danger{color:var(--danger)}
+.menu{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.menu button{text-align:left;flex:none}
+.menu small{display:block;font-weight:400;color:var(--text-muted);font-size:12px}
+
+.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:var(--text);color:#fff;padding:10px 16px;border-radius:var(--r);font-size:13px;opacity:0;pointer-events:none;transition:opacity .15s,transform .15s;max-width:90vw;text-align:center;z-index:200}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+</style>
+<meta name="theme-color" content="#f7f6f2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="imago">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/imago-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+</head>
+<body>
+<div class="sticky-top">
+  <header>
+    <h1>Decisions</h1>
+    <div class="header-actions">
+      <button class="btn btn-primary add-btn" id="add-d" type="button">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
+        Add decision
+      </button>
+      <button class="icon-btn" id="menu-btn" type="button" aria-label="Data menu">⋯</button>
+    </div>
+  </header>
+</div>
+
+<button class="fab-add" id="fab" type="button" aria-label="Add decision">
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
+</button>
+
+<main>
+  <div class="section-header">
+    <span class="section-title">Decisions</span>
+    <div class="filters" id="filters"></div>
+  </div>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th class="col-title">Decision</th>
+          <th><span class="dot" style="background:var(--k-question)"></span>Questions</th>
+          <th><span class="dot" style="background:var(--k-alternative)"></span>Alternatives</th>
+          <th><span class="dot" style="background:var(--k-pro)"></span>Pros</th>
+          <th><span class="dot" style="background:var(--k-con)"></span>Cons</th>
+          <th class="col-act"></th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</main>
+
+<dialog id="d-dlg">
+  <form method="dialog" id="d-form">
+    <h2 id="d-dlg-title">Add decision</h2>
+    <div class="field"><label for="d-title">Decision</label><input id="d-title" type="text" placeholder="e.g. Continue renting?" autocomplete="off" required></div>
+    <div class="field"><label for="d-status">Status</label>
+      <select id="d-status"><option value="open">Open</option><option value="parked">Parked</option><option value="decided">Decided</option></select>
+    </div>
+    <div class="field"><label for="d-note">Where I landed</label><textarea id="d-note" rows="3" placeholder="Optional. The call and why."></textarea></div>
+    <div class="actions">
+      <button type="button" class="danger" id="d-delete">Delete</button>
+      <button type="button" id="d-cancel">Cancel</button>
+      <button type="submit" class="save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="i-dlg">
+  <form method="dialog" id="i-form">
+    <h2 id="i-dlg-title">Add item</h2>
+    <div class="field"><div class="kind-pick" id="i-kinds"></div></div>
+    <div class="field"><textarea id="i-text" rows="4" placeholder="Write it as it comes" aria-label="Text" required></textarea></div>
+    <div class="field" id="i-ref-wrap"><label for="i-ref">Responds to</label><select id="i-ref"></select></div>
+    <div class="actions">
+      <button type="button" class="danger" id="i-delete">Delete</button>
+      <button type="button" id="i-cancel">Cancel</button>
+      <button type="submit" class="save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="menu">
+  <h2>Data</h2>
+  <div class="menu">
+    <button type="button" id="m-export">Export<small>Download all decisions as JSON</small></button>
+    <button type="button" id="m-import">Import<small>Merge a backup. Safe to repeat, matched by ID</small></button>
+    <button type="button" id="m-replace">Reset and import<small>Wipe everything, then load a backup</small></button>
+    <button type="button" id="m-reset" class="danger">Reset<small>Delete all decisions</small></button>
+    <button type="button" id="m-close">Close</button>
+  </div>
+</dialog>
+
+<input type="file" id="file" accept=".json,application/json" hidden>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const db = new Dexie('DecisionsDB');
+db.version(1).stores({ decisions: 'id, status, createdAt', items: 'id, decisionId, kind' });
+
+const UI_KEY = 'imago-decisions-ui';
+const BACKUP_TYPE = 'decisions-backup';
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const COLLAPSED_LIMIT = 3;
+
+// Column order = display order. `abbr` is the short badge on a "responds to" link.
+const KINDS = [
+  { key: 'question',    label: 'Questions',    one: 'Question',    abbr: 'Q' },
+  { key: 'alternative', label: 'Alternatives', one: 'Alternative', abbr: 'Alt' },
+  { key: 'pro',         label: 'Pros',         one: 'Pro',         abbr: 'Pro' },
+  { key: 'con',         label: 'Cons',         one: 'Con',         abbr: 'Con' }
+];
+const KIND_KEYS = KINDS.map(k => k.key);
+const STATUSES = [{ key: 'open', label: 'Open' }, { key: 'parked', label: 'Parked' }, { key: 'decided', label: 'Decided' }];
+const STATUS_KEYS = STATUSES.map(s => s.key);
+const STATUS_RANK = { open: 0, parked: 1, decided: 2 };
+
+const $ = id => document.getElementById(id);
+const els = {
+  filters: $('filters'), tbody: $('tbody'), toast: $('toast'), file: $('file'),
+  dDlg: $('d-dlg'), iDlg: $('i-dlg'), menu: $('menu')
+};
+
+let decisions = [];            // open first, then parked, decided; oldest first within each
+let itemsByDecision = new Map();  // decisionId -> items sorted by order
+let editingDecisionId = null;
+let editingItem = null;        // { id|null, decisionId, kind }
+let importMode = 'merge';
+
+// ── Remembered UI state ─────────────────────────────────────────────────────
+// Status filter and which rows are expanded survive refresh.
+const ui = Object.assign({ filter: 'all', expanded: [] }, loadUi());
+const expanded = new Set(Array.isArray(ui.expanded) ? ui.expanded : []);
+
+function loadUi() {
+  try { return JSON.parse(localStorage.getItem(UI_KEY)) || {}; } catch (e) { return {}; }
+}
+function saveUi() {
+  ui.expanded = [...expanded];
+  try { localStorage.setItem(UI_KEY, JSON.stringify(ui)); } catch (e) {}
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+const pad = n => String(n).padStart(2, '0');
+const dateValue = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const clean = s => String(s || '').trim().replace(/[ \t]+\n/g, '\n');
+
+function uuid() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map(x => pad(x.toString(16))).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+let toastTimer;
+function toast(msg) {
+  els.toast.textContent = msg;
+  els.toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => els.toast.classList.remove('show'), 2600);
+}
+
+// ── Data ────────────────────────────────────────────────────────────────────
+async function reload() {
+  const [ds, its] = await Promise.all([db.decisions.toArray(), db.items.toArray()]);
+  ds.sort((a, b) => (STATUS_RANK[a.status] - STATUS_RANK[b.status]) || (a.createdAt - b.createdAt));
+  decisions = ds;
+  itemsByDecision = new Map();
+  its.sort((a, b) => (a.order - b.order) || (a.createdAt - b.createdAt));
+  for (const it of its) {
+    if (!itemsByDecision.has(it.decisionId)) itemsByDecision.set(it.decisionId, []);
+    itemsByDecision.get(it.decisionId).push(it);
+  }
+  for (const id of [...expanded]) if (!ds.some(d => d.id === id)) expanded.delete(id);
+  renderAll();
+}
+
+const itemsOf = (id, kind) => (itemsByDecision.get(id) || []).filter(i => i.kind === kind);
+
+// Questions are numbered 1..n within a decision so other items can point at them.
+function questionNumbers(id) {
+  const map = new Map();
+  itemsOf(id, 'question').forEach((q, i) => map.set(q.id, i + 1));
+  return map;
+}
+
+// ── Render ──────────────────────────────────────────────────────────────────
+function renderFilters() {
+  const counts = { all: decisions.length };
+  for (const s of STATUS_KEYS) counts[s] = decisions.filter(d => d.status === s).length;
+  const chips = [{ key: 'all', label: 'All' }, ...STATUSES];
+  els.filters.innerHTML = chips.map(c =>
+    `<button type="button" class="filter-chip${ui.filter === c.key ? ' active' : ''}" data-filter="${c.key}">${c.label}<span class="n">${counts[c.key]}</span></button>`).join('');
+}
+
+function itemHtml(it, nums) {
+  const ref = it.parentId && nums.has(it.parentId) ? `<span class="ref" title="Responds to question ${nums.get(it.parentId)}">↳ ${nums.get(it.parentId)}</span>` : '';
+  const num = it.kind === 'question' ? `<span class="ref">${nums.get(it.id)}</span>` : '';
+  return `<button type="button" class="it k-${it.kind}" data-item="${it.id}">${num}${ref}<span class="t">${esc(it.text)}</span></button>`;
+}
+
+// One kind's list inside a decision. `all` false = desktop collapsed row, capped.
+function listHtml(d, kind, all) {
+  const list = itemsOf(d.id, kind);
+  const nums = questionNumbers(d.id);
+  const shown = all ? list : list.slice(0, COLLAPSED_LIMIT);
+  const hidden = list.length - shown.length;
+  return `<div class="items k-${kind}">
+    ${shown.map(i => itemHtml(i, nums)).join('')}
+    ${hidden > 0 ? `<button type="button" class="more" data-toggle="${d.id}">+${hidden} more</button>` : ''}
+    <button type="button" class="add" data-add="${kind}" data-d="${d.id}">+ Add</button>
+  </div>`;
+}
+
+function statusPill(d) {
+  const label = STATUSES.find(s => s.key === d.status).label;
+  return `<span class="tag s-${d.status}">${label}<select data-status="${d.id}" aria-label="Status">
+    ${STATUSES.map(s => `<option value="${s.key}"${s.key === d.status ? ' selected' : ''}>${s.label}</option>`).join('')}
+  </select></span>`;
+}
+
+function rowHtml(d) {
+  const open = expanded.has(d.id);
+  const counts = KINDS.map(k => ({ k, n: itemsOf(d.id, k.key).length })).filter(c => c.n);
+  return `<tr class="d-row${open ? ' expanded' : ''}" data-row="${d.id}">
+    <td class="c-title">
+      <div class="d-title">${esc(d.title)}</div>
+      <div class="d-meta">${statusPill(d)}<span class="counts m-only">${counts.map(c => `<span class="cnt k-${c.k.key}">${c.n} ${c.k.abbr}</span>`).join('')}</span></div>
+      ${d.note ? `<div class="d-note">${esc(d.note)}</div>` : ''}
+      <div class="m-body m-only">
+        ${KINDS.map(k => `<div class="m-section k-${k.key}"><div class="m-label">${k.label}</div>${listHtml(d, k.key, true)}</div>`).join('')}
+        <div class="m-section"><button type="button" class="btn" data-edit="${d.id}">Edit decision</button></div>
+      </div>
+    </td>
+    ${KINDS.map(k => `<td class="c-kind">${listHtml(d, k.key, open)}</td>`).join('')}
+    <td class="c-act"><button type="button" class="icon-btn" data-edit="${d.id}" aria-label="Edit decision" title="Edit decision" style="font-size:14px;width:32px;height:32px">✎</button></td>
+  </tr>`;
+}
+
+function renderTable() {
+  const list = ui.filter === 'all' ? decisions : decisions.filter(d => d.status === ui.filter);
+  if (!list.length) {
+    els.tbody.innerHTML = `<tr><td colspan="6"><div class="empty">${decisions.length ? 'No decisions with this status' : 'No decisions yet'}${decisions.length ? '' : '<br><button type="button" class="btn btn-primary" data-new>Add decision</button>'}</div></td></tr>`;
+    return;
+  }
+  els.tbody.innerHTML = list.map(rowHtml).join('');
+}
+
+function renderAll() { renderFilters(); renderTable(); }
+
+// ── Interactions ────────────────────────────────────────────────────────────
+els.filters.addEventListener('click', e => {
+  const b = e.target.closest('[data-filter]');
+  if (!b) return;
+  ui.filter = b.dataset.filter;
+  saveUi(); renderAll();
+});
+
+els.tbody.addEventListener('change', async e => {
+  const sel = e.target.closest('[data-status]');
+  if (!sel) return;
+  await db.decisions.update(sel.dataset.status, { status: sel.value, updatedAt: Date.now() });
+  await reload();
+  toast(`Marked ${sel.value}`);
+});
+
+function toggleRow(id) {
+  if (expanded.has(id)) expanded.delete(id); else expanded.add(id);
+  saveUi(); renderTable();
+}
+
+els.tbody.addEventListener('click', e => {
+  if (e.target.closest('select')) return;
+  const item = e.target.closest('[data-item]');
+  if (item) { openItem(item.dataset.item); return; }
+  const add = e.target.closest('[data-add]');
+  if (add) { openItem(null, add.dataset.d, add.dataset.add); return; }
+  const edit = e.target.closest('[data-edit]');
+  if (edit) { openDecision(edit.dataset.edit); return; }
+  if (e.target.closest('[data-new]')) { openDecision(null); return; }
+  const more = e.target.closest('[data-toggle]');
+  if (more) { toggleRow(more.dataset.toggle); return; }
+  const row = e.target.closest('[data-row]');
+  if (row) toggleRow(row.dataset.row);
+});
+
+// ── Decision dialog ─────────────────────────────────────────────────────────
+function openDecision(id) {
+  editingDecisionId = id;
+  const d = id ? decisions.find(x => x.id === id) : null;
+  $('d-dlg-title').textContent = d ? 'Edit decision' : 'Add decision';
+  $('d-title').value = d ? d.title : '';
+  $('d-status').value = d ? d.status : 'open';
+  $('d-note').value = d ? d.note : '';
+  $('d-delete').hidden = !d;
+  els.dDlg.showModal();
+  if (!d) $('d-title').focus();
+}
+$('add-d').addEventListener('click', () => openDecision(null));
+$('fab').addEventListener('click', () => openDecision(null));
+$('d-cancel').addEventListener('click', () => els.dDlg.close());
+
+$('d-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const title = clean($('d-title').value);
+  if (!title) { toast('Give the decision a title'); return; }
+  const fields = { title, status: $('d-status').value, note: clean($('d-note').value), updatedAt: Date.now() };
+  if (editingDecisionId) {
+    await db.decisions.update(editingDecisionId, fields);
+  } else {
+    const id = uuid();
+    await db.decisions.add({ id, createdAt: Date.now(), ...fields });
+    expanded.add(id); saveUi();
+  }
+  els.dDlg.close();
+  await reload();
+  toast('Saved');
+});
+
+$('d-delete').addEventListener('click', async () => {
+  const n = (itemsByDecision.get(editingDecisionId) || []).length;
+  if (!confirm(n ? `Delete this decision and its ${n} item${n === 1 ? '' : 's'}?` : 'Delete this decision?')) return;
+  await db.transaction('rw', db.decisions, db.items, async () => {
+    await db.items.where('decisionId').equals(editingDecisionId).delete();
+    await db.decisions.delete(editingDecisionId);
+  });
+  els.dDlg.close();
+  await reload();
+  toast('Deleted');
+});
+
+// ── Item dialog ─────────────────────────────────────────────────────────────
+function openItem(id, decisionId, kind) {
+  const it = id ? [...itemsByDecision.values()].flat().find(x => x.id === id) : null;
+  if (id && !it) return;
+  editingItem = { id: it ? it.id : null, decisionId: it ? it.decisionId : decisionId, kind: it ? it.kind : kind };
+  $('i-dlg-title').textContent = it ? 'Edit item' : 'Add item';
+  $('i-text').value = it ? it.text : '';
+  $('i-delete').hidden = !it;
+  renderKindPick();
+  renderRefOptions(it ? it.parentId : null);
+  els.iDlg.showModal();
+  if (!it) $('i-text').focus();
+}
+
+function renderKindPick() {
+  $('i-kinds').innerHTML = KINDS.map(k =>
+    `<button type="button" class="k-${k.key}${editingItem.kind === k.key ? ' on' : ''}" data-kind="${k.key}">${k.one}</button>`).join('');
+}
+
+// "Responds to" lists this decision's questions; a question can't respond to a question.
+function renderRefOptions(selected) {
+  const qs = itemsOf(editingItem.decisionId, 'question').filter(q => q.id !== editingItem.id);
+  const nums = questionNumbers(editingItem.decisionId);
+  $('i-ref-wrap').hidden = editingItem.kind === 'question' || !qs.length;
+  $('i-ref').innerHTML = '<option value="">Nothing in particular</option>' +
+    qs.map(q => `<option value="${q.id}"${q.id === selected ? ' selected' : ''}>${nums.get(q.id)}. ${esc(q.text.length > 60 ? q.text.slice(0, 60) + '…' : q.text)}</option>`).join('');
+}
+
+$('i-kinds').addEventListener('click', e => {
+  const b = e.target.closest('[data-kind]');
+  if (!b) return;
+  editingItem.kind = b.dataset.kind;
+  renderKindPick();
+  renderRefOptions($('i-ref').value || null);
+});
+$('i-cancel').addEventListener('click', () => els.iDlg.close());
+
+$('i-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const text = clean($('i-text').value);
+  if (!text) { toast('Write something first'); return; }
+  const { id, decisionId, kind } = editingItem;
+  const parentId = kind === 'question' ? null : ($('i-ref').value || null);
+  const now = Date.now();
+  await db.transaction('rw', db.decisions, db.items, async () => {
+    if (id) {
+      await db.items.update(id, { kind, text, parentId, updatedAt: now });
+      // A question turned into something else no longer anchors its replies.
+      if (kind !== 'question') await db.items.where('decisionId').equals(decisionId).filter(i => i.parentId === id).modify({ parentId: null });
+    } else {
+      const order = Math.max(-1, ...(itemsByDecision.get(decisionId) || []).map(i => i.order)) + 1;
+      await db.items.add({ id: uuid(), decisionId, kind, text, parentId, order, createdAt: now, updatedAt: now });
+    }
+    await db.decisions.update(decisionId, { updatedAt: now });
+  });
+  els.iDlg.close();
+  await reload();
+  toast(id ? 'Saved' : `Added ${KINDS.find(k => k.key === kind).one.toLowerCase()}`);
+});
+
+$('i-delete').addEventListener('click', async () => {
+  if (!confirm('Delete this item?')) return;
+  const { id, decisionId } = editingItem;
+  await db.transaction('rw', db.decisions, db.items, async () => {
+    await db.items.where('decisionId').equals(decisionId).filter(i => i.parentId === id).modify({ parentId: null });
+    await db.items.delete(id);
+    await db.decisions.update(decisionId, { updatedAt: Date.now() });
+  });
+  els.iDlg.close();
+  await reload();
+  toast('Deleted');
+});
+
+// ── Data menu: export / import / reset ──────────────────────────────────────
+$('menu-btn').addEventListener('click', () => els.menu.showModal());
+$('m-close').addEventListener('click', () => els.menu.close());
+
+$('m-export').addEventListener('click', async () => {
+  const [ds, its] = await Promise.all([db.decisions.orderBy('createdAt').toArray(), db.items.toArray()]);
+  if (!ds.length) { toast('Nothing to export'); return; }
+  const payload = { type: BACKUP_TYPE, version: 1, exportedAt: new Date().toISOString(), decisions: ds, items: its };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `decisions-backup-${dateValue(new Date())}.json`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 100);
+  els.menu.close();
+  toast(`Exported ${ds.length} decisions, ${its.length} items`);
+});
+
+function pickFile(mode) {
+  importMode = mode;
+  els.menu.close();
+  els.file.value = '';
+  els.file.click();
+}
+$('m-import').addEventListener('click', () => pickFile('merge'));
+$('m-replace').addEventListener('click', () => pickFile('replace'));
+
+$('m-reset').addEventListener('click', async () => {
+  const n = await db.decisions.count();
+  if (!n) { toast('Already empty'); return; }
+  if (!confirm(`Delete all ${n} decisions and their items? Export first if you want a copy.`)) return;
+  await db.transaction('rw', db.decisions, db.items, async () => { await db.decisions.clear(); await db.items.clear(); });
+  expanded.clear(); saveUi();
+  els.menu.close();
+  await reload();
+  toast('All decisions deleted');
+});
+
+function cleanDecision(raw) {
+  if (!raw || typeof raw.id !== 'string' || !UUID_RE.test(raw.id)) return null;
+  const title = clean(raw.title);
+  if (!title) return null;
+  const createdAt = Number(raw.createdAt) || Date.now();
+  return {
+    id: raw.id.toLowerCase(), title,
+    status: STATUS_KEYS.includes(raw.status) ? raw.status : 'open',
+    note: typeof raw.note === 'string' ? raw.note.trim() : '',
+    createdAt, updatedAt: Number(raw.updatedAt) || createdAt
+  };
+}
+
+function cleanItem(raw) {
+  if (!raw || typeof raw.id !== 'string' || !UUID_RE.test(raw.id)) return null;
+  if (typeof raw.decisionId !== 'string' || !UUID_RE.test(raw.decisionId)) return null;
+  const text = clean(raw.text);
+  if (!text || !KIND_KEYS.includes(raw.kind)) return null;
+  const createdAt = Number(raw.createdAt) || Date.now();
+  return {
+    id: raw.id.toLowerCase(), decisionId: raw.decisionId.toLowerCase(), kind: raw.kind, text,
+    parentId: typeof raw.parentId === 'string' && UUID_RE.test(raw.parentId) ? raw.parentId.toLowerCase() : null,
+    order: Number.isFinite(Number(raw.order)) ? Number(raw.order) : 0,
+    createdAt, updatedAt: Number(raw.updatedAt) || createdAt
+  };
+}
+
+// Newer updatedAt wins, so re-importing the same file changes nothing.
+async function mergeTable(table, rows) {
+  const existing = await table.bulkGet(rows.map(r => r.id));
+  const toWrite = [];
+  let added = 0, updated = 0;
+  rows.forEach((r, i) => {
+    const cur = existing[i];
+    if (!cur) { toWrite.push(r); added++; }
+    else if (r.updatedAt > cur.updatedAt) { toWrite.push(r); updated++; }
+  });
+  if (toWrite.length) await table.bulkPut(toWrite);
+  return { added, updated, unchanged: rows.length - added - updated };
+}
+
+els.file.addEventListener('change', async () => {
+  const file = els.file.files[0];
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (data?.type !== BACKUP_TYPE || !Array.isArray(data.decisions) || !Array.isArray(data.items)) { toast('Not a Decisions backup file'); return; }
+    const dMap = new Map();
+    for (const raw of data.decisions) { const d = cleanDecision(raw); if (d) dMap.set(d.id, d); }
+    const iMap = new Map();
+    for (const raw of data.items) { const it = cleanItem(raw); if (it) iMap.set(it.id, it); }
+    const knownIds = new Set(dMap.keys());
+    if (importMode === 'merge') for (const id of await db.decisions.toCollection().primaryKeys()) knownIds.add(id);
+    // Items must belong to a decision we have; drop strays instead of showing orphans.
+    for (const [id, it] of iMap) if (!knownIds.has(it.decisionId)) iMap.delete(id);
+    const ds = [...dMap.values()], its = [...iMap.values()];
+    const skipped = (data.decisions.length - ds.length) + (data.items.length - its.length);
+    const skippedNote = skipped ? `, ${skipped} invalid skipped` : '';
+
+    if (importMode === 'replace') {
+      if (!confirm(`Delete everything and load ${ds.length} decisions from this file?`)) return;
+      await db.transaction('rw', db.decisions, db.items, async () => {
+        await db.decisions.clear(); await db.items.clear();
+        await db.decisions.bulkPut(ds); await db.items.bulkPut(its);
+      });
+      await reload();
+      toast(`Loaded ${ds.length} decisions, ${its.length} items${skippedNote}`);
+      return;
+    }
+
+    let d, i;
+    await db.transaction('rw', db.decisions, db.items, async () => {
+      d = await mergeTable(db.decisions, ds);
+      i = await mergeTable(db.items, its);
+    });
+    await reload();
+    const changed = d.added + d.updated + i.added + i.updated;
+    toast(changed ? `${d.added + i.added} new, ${d.updated + i.updated} updated${skippedNote}` : `Nothing new${skippedNote}`);
+  } catch (err) {
+    console.error(err);
+    toast('Import failed');
+  }
+});
+
+// ── Init ────────────────────────────────────────────────────────────────────
+reload().catch(err => { console.error(err); toast(err?.message || 'Startup failed'); });
+</script>
+  <script src="pwa-register.js"></script>
+</body>
+</html>
