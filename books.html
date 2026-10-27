@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Books</title>
+<script src="scripts/dexie.min.js"></script>
+<script src="books-data.js"></script>
+<script src="ideas-data.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+:root{
+  color-scheme:light;
+  --bg:#f8f7f4;--surface:#fff;--border:#e2e0d8;--border-strong:#c8c5bb;
+  --text:#1a1917;--text-muted:#6b6860;--text-faint:#9c9a94;
+  --accent:#3d5a99;--accent-soft:#e8edf7;--danger:#b3372f;
+  --lasting:#185fa5;--lasting-bg:#e6f1fb;
+  --current:#1a6b3c;--current-bg:#eaf4ee;
+  --fact:#185fa5;--fact-bg:#e6f1fb;
+  --theory:#c2410c;--theory-bg:#fdeee3;
+  --lens:#7c3aed;--lens-bg:#f1ebfd;
+  --r:8px;--rl:12px;
+  --hdr-h:57px;
+}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh;min-height:100dvh}
+button{font-family:inherit;font-size:inherit;color:inherit;cursor:pointer;touch-action:manipulation}
+input,textarea,select{font-family:inherit;font-size:16px;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:9px 10px;width:100%}
+input:focus,textarea:focus,select:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+textarea{resize:vertical;min-height:44px}
+
+.sticky-top{position:sticky;top:0;z-index:10}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+header h1{font-size:17px;font-weight:600;letter-spacing:-.3px}
+.header-actions{display:flex;gap:6px;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border:1px solid var(--border-strong);border-radius:var(--r);background:var(--surface);font-size:13px;white-space:nowrap}
+.btn:active{background:var(--bg)}
+.btn-primary{background:var(--text);color:#fff;border-color:var(--text)}
+.btn-primary:active{background:#333}
+.btn svg{width:13px;height:13px;flex-shrink:0}
+.icon-btn{background:none;border:1px solid var(--border);border-radius:var(--r);width:36px;height:36px;font-size:20px;line-height:1;color:var(--text-muted)}
+.icon-btn:active{background:var(--bg)}
+
+.fab-add{display:none;position:fixed;bottom:18px;right:18px;width:48px;height:48px;border-radius:50%;background:var(--text);color:#fff;border:none;box-shadow:0 2px 10px rgba(0,0,0,.22);align-items:center;justify-content:center;z-index:50}
+.fab-add svg{width:18px;height:18px}
+
+main{max-width:1400px;margin:0 auto;padding:16px 16px 80px}
+
+/* ── Toolbar: search, domain, chips, count ── */
+.toolbar{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
+.tool-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.tool-row input[type=search]{flex:1 1 200px;width:auto;min-width:0}
+.tool-row select{flex:0 1 190px;width:auto}
+.sortbar{display:none;gap:8px}
+.sortbar select{flex:1}
+.sortbar .icon-btn{flex:none}
+.filters{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.filters .sep{width:1px;align-self:stretch;background:var(--border);margin:0 4px}
+.filter-chip{padding:4px 11px;border:1px solid var(--border-strong);border-radius:99px;font-size:12px;background:var(--surface);color:var(--text-muted);user-select:none}
+.filter-chip.active{background:var(--text);color:#fff;border-color:var(--text)}
+.filter-chip .n{opacity:.6;margin-left:3px;font-variant-numeric:tabular-nums}
+.count{font-size:12px;color:var(--text-muted);font-variant-numeric:tabular-nums;margin-left:auto}
+
+/* ── Table ── */
+.table-container{width:100%;border:1px solid var(--border);border-radius:var(--rl);background:var(--surface);overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;text-align:left}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);font-weight:500;padding:9px 12px;border-bottom:1px solid var(--border);background:var(--bg);white-space:nowrap;user-select:none}
+th[data-sort]{cursor:pointer}
+th[data-sort]:hover{background:var(--surface)}
+th.sort-active{color:var(--text);background:var(--surface)}
+th.sort-active::after{content:attr(data-dir);margin-left:4px;font-size:9px}
+th.c-center,td.c-center{text-align:center}
+td{padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:top;font-size:13px}
+tr:last-child td{border-bottom:none}
+.b-row{cursor:pointer}
+.b-row:hover td{background:#fafaf8}
+.b-row.is-done .b-title{color:var(--text-muted)}
+
+.c-title{min-width:180px}
+.c-claim{min-width:200px}
+.c-domain{white-space:nowrap}
+.c-era{min-width:90px}
+.b-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.b-name{min-width:0}
+.row-edit{flex:none;width:28px;height:28px;font-size:14px}
+.b-title{font-weight:600;font-size:14px;line-height:1.35;overflow-wrap:anywhere}
+.b-author{font-size:12px;color:var(--text-muted);margin-top:2px}
+.c-era{color:var(--text-muted)}
+.c-claim{color:var(--text)}
+
+.pill{display:inline-flex;align-items:center;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:600;border:1px solid transparent;white-space:nowrap}
+.pill.domain{background:var(--bg);color:var(--text-muted);border-color:var(--border);font-weight:500}
+.pill.lasting{background:var(--lasting-bg);color:var(--lasting)}
+.pill.current{background:var(--current-bg);color:var(--current)}
+button.pill.ex{min-height:26px;background:var(--surface);color:var(--text-muted);border-color:var(--border-strong)}
+button.pill.ex.yes{background:var(--current-bg);color:var(--current);border-color:transparent}
+
+.dots{display:inline-flex;gap:3px;vertical-align:middle}
+.dots i{width:7px;height:7px;border-radius:50%;background:var(--border)}
+.dots i.on{background:var(--accent)}
+
+/* Lens pills: scale (violet), mechanism (blue outline, tap to filter), tension (amber, tap to show the pair) */
+.pill.scale.sc-self{background:#d9f3ef;color:#0f766e}
+.pill.scale.sc-pair{background:#fce7f1;color:#be185d}
+.pill.scale.sc-group{background:#e8e7fb;color:#4338ca}
+.pill.scale.sc-society{background:#f6ecd2;color:#8a5a00}
+.pill.scale.sc-nature{background:#eef4d6;color:#4d7c0f}
+/* Mechanism colors: 12 hues, picked per tag by mechClass() so a tag keeps its color everywhere */
+.mc-0{--mc:#1d4ed8;--mcbg:#e3ebfd}.mc-1{--mc:#0f766e;--mcbg:#d9f3ef}.mc-2{--mc:#be185d;--mcbg:#fce7f1}
+.mc-3{--mc:#6d28d9;--mcbg:#efe8fc}.mc-4{--mc:#c2410c;--mcbg:#fdeee3}.mc-5{--mc:#15803d;--mcbg:#e2f4e8}
+.mc-6{--mc:#0e7490;--mcbg:#ddf3f8}.mc-7{--mc:#a21caf;--mcbg:#f8e6fa}.mc-8{--mc:#4d7c0f;--mcbg:#eef4d6}
+.mc-9{--mc:#475569;--mcbg:#e9edf2}.mc-10{--mc:#4338ca;--mcbg:#e8e7fb}.mc-11{--mc:#b91c1c;--mcbg:#fde8e8}
+.tags{display:flex;flex-wrap:wrap;gap:4px}
+button.pill.mech{background:var(--mcbg);color:var(--mc);font-weight:500}
+button.pill.mech:hover{border-color:var(--mc)}
+button.pill.mech.on{background:var(--mc);color:#fff}
+button.tn{display:inline-flex;align-items:center;gap:4px;max-width:150px;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:600;background:#faeeda;color:#854f0b;border:1px solid transparent;text-align:left}
+button.tn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+button.tn:hover{border-color:#854f0b}
+.col-mech,.col-tension{min-width:130px}
+.banner{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;margin-bottom:10px;background:#faeeda;color:#854f0b;border-radius:var(--r);font-size:13px}
+.banner[hidden]{display:none}
+
+/* Claim type colors, shared by table pills, legend swatches and scatter dots */
+.pill.ct-fact{background:var(--fact-bg);color:var(--fact)}
+.pill.ct-theory{background:var(--theory-bg);color:var(--theory)}
+.pill.ct-lens{background:var(--lens-bg);color:var(--lens)}
+.dots.shift i.on{background:var(--lens)}
+
+/* View tabs + scatter */
+.tabs{display:flex;gap:4px;margin-bottom:12px;border-bottom:1px solid var(--border)}
+.tabs button{padding:8px 14px;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;background:none;color:var(--text-muted);font-weight:500}
+.tabs button[aria-selected=true]{color:var(--text);border-bottom-color:var(--text)}
+.scatter{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:14px}
+.scatter-legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--text-muted);margin-bottom:8px}
+.lg{display:inline-flex;align-items:center;gap:5px}
+.lg .n{font-variant-numeric:tabular-nums;opacity:.7}
+.sw{width:10px;height:10px;border-radius:50%;display:inline-block}
+.sw.ct-fact,.dot.ct-fact{background:var(--fact);fill:var(--fact)}
+.sw.ct-theory,.dot.ct-theory{background:var(--theory);fill:var(--theory)}
+.sw.ct-lens,.dot.ct-lens{background:var(--lens);fill:var(--lens)}
+#scatter-chart svg{display:block;max-width:100%}
+.scatter svg text{font:11px system-ui,-apple-system,sans-serif;fill:var(--text-muted)}
+.scatter svg .axis-title{font-weight:600;fill:var(--text)}
+.scatter svg .grid{stroke:var(--border);stroke-width:1}
+.scatter svg .jackpot{fill:var(--accent-soft);opacity:.7}
+.scatter svg .jackpot-label{fill:var(--accent);font-weight:700;font-size:10px;letter-spacing:.08em}
+circle.dot{stroke:#fff;stroke-width:1.5;transition:transform .1s;transform-box:fill-box;transform-origin:center;outline:none}
+circle.dot:hover,circle.dot:focus{transform:scale(1.35);stroke:var(--text)}
+.scatter-note{font-size:12px;color:var(--text-muted);margin-top:8px}
+/* Ideas tab: two columns, idea and classification (same colors as claim type: fact blue, theory orange, mental model violet) */
+.ideas-head{margin-bottom:10px}
+.ideas-head select{flex:1 1 260px;max-width:420px}
+.pill.ic-fact{background:var(--fact-bg);color:var(--fact)}
+.pill.ic-theory{background:var(--theory-bg);color:var(--theory)}
+.pill.ic-model{background:var(--lens-bg);color:var(--lens)}
+#ideas-view td:first-child{font-size:14px;line-height:1.45}
+#ideas-view th:nth-child(2),#ideas-view td:nth-child(2){width:150px;white-space:nowrap}
+#ideas-view th:nth-child(3),#ideas-view td:nth-child(3){width:140px;white-space:nowrap}
+.pill.val-yes{background:var(--current-bg);color:var(--current)}
+.pill.val-no{background:var(--surface);color:var(--text-muted);border-color:var(--border-strong);font-weight:500}
+.tip{position:fixed;z-index:60;max-width:280px;background:var(--text);color:#fff;border-radius:var(--r);padding:10px 12px;font-size:13px;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,.25)}
+.tip-claim{font-weight:600;line-height:1.35}
+.tip-src{color:#d8d6cf;font-size:12px;margin-top:3px}
+.tip-meta{display:flex;gap:10px;align-items:center;margin-top:7px;font-size:11px;color:#d8d6cf}
+.banner button{background:none;border:0;font-weight:600;color:inherit;text-decoration:underline;white-space:nowrap}
+
+/* Column visibility: the table gets an h-<key> class per hidden column */
+table.h-domain .col-domain,table.h-era .col-era,table.h-kind .col-kind,table.h-scale .col-scale,table.h-mech .col-mech,
+table.h-tension .col-tension,table.h-claim .col-claim,table.h-action .col-action,table.h-ex .col-ex,table.h-ctype .col-ctype,table.h-shift .col-shift{display:none!important}
+
+.empty{text-align:center;padding:36px 16px;color:var(--text-faint)}
+.empty .btn{margin-top:12px}
+
+/* Wide screens: the table fits, so the header can stick under the page bar. */
+@media(min-width:1420px){
+  .table-container{overflow:visible}
+  th{position:sticky;top:var(--hdr-h);z-index:5}
+  th:first-child{border-top-left-radius:var(--rl)}
+  th:last-child{border-top-right-radius:var(--rl)}
+}
+/* Narrower than the full table: scroll sideways, keep the book name pinned. */
+@media(min-width:641px) and (max-width:1419px){
+  td.c-title,th.c-title{position:sticky;left:0;background:var(--surface);z-index:1;box-shadow:1px 0 0 var(--border)}
+  th.c-title{background:var(--bg)}
+}
+/* Phone: each book is a card. Sorting moves to the toolbar. */
+@media(max-width:640px){
+  .fab-add{display:flex}
+  .header-actions .add-btn{display:none}
+  main{padding:12px 12px 90px}
+  .sortbar{display:flex}
+  .tool-row select{flex:1 1 30%;min-width:0;padding:9px 6px}
+  .table-container{overflow:visible}
+  thead{display:none}
+  table,tbody{display:block}
+  tr.b-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:12px;border-bottom:1px solid var(--border)}
+  tr.b-row:last-child{border-bottom:none}
+  td{display:block;padding:0;border:0;min-width:0}
+  td.c-title{order:1;flex:1 1 100%}
+  td.c-domain{order:2}
+  td.c-era{order:3;font-size:12px}
+  td.c-kind{order:4}
+  td.col-scale{order:4}
+  td.col-ctype{order:4}
+  td.col-shift{order:8}
+  td.col-mech{order:5;flex:1 1 100%}
+  td.col-tension{order:6;flex:1 1 100%}
+  td.c-claim{order:7;flex:1 1 100%;min-width:0;margin-top:2px}
+  td.c-action{order:8}
+  td.c-ex{order:9;margin-left:auto}
+  td:empty{display:none}
+  #ideas-view tr{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:12px;border-bottom:1px solid var(--border)}
+  #ideas-view tr:last-child{border-bottom:none}
+  #ideas-view td:first-child{flex:1 1 100%}
+  #ideas-view td:nth-child(n){width:auto}
+  button.pill.ex{min-height:32px;padding:2px 12px}
+  .b-row:hover td{background:none}
+  .count{margin-left:0}
+}
+
+/* ── Dialogs ── */
+dialog{margin:auto;border:1px solid var(--border-strong);border-radius:var(--rl);padding:18px;width:min(92vw,460px);max-height:92vh;overflow:auto;background:var(--surface);color:var(--text)}
+dialog::backdrop{background:rgba(26,25,23,.4)}
+dialog h2{font-size:16px;font-weight:600;margin-bottom:4px}
+.field{margin-top:12px}
+.field label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:3px}
+.field-row{display:flex;gap:8px}
+.field-row .field{flex:1;min-width:0}
+.check{display:flex;align-items:center;gap:8px;font-size:14px}
+.check input{width:auto}
+.field label.check{text-transform:none;letter-spacing:0;font-size:14px;color:var(--text);margin-bottom:0}
+.col-opt{padding:11px 4px;border-bottom:1px solid var(--border)}
+.col-opt:last-child{border-bottom:none}
+.hint{font-size:12px;color:var(--text-muted)}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px}
+.chips:empty{display:none}
+.chip-x{display:inline-flex;align-items:center;gap:4px;padding:3px 6px 3px 10px;border-radius:99px;font-size:12px;border:1px solid var(--border-strong);background:var(--bg)}
+.chip-x[class*=mc-]{background:var(--mcbg);color:var(--mc);border-color:transparent}
+.chip-x[class*=mc-] button{color:inherit}
+.chip-x button{border:0;background:none;color:var(--text-muted);font-size:15px;line-height:1;padding:0 3px}
+.actions{display:flex;gap:8px;margin-top:16px}
+.actions button,.menu button{flex:1;padding:11px;border-radius:var(--r);border:1px solid var(--border);background:var(--bg);font-weight:500}
+.actions .save{background:var(--accent);border-color:var(--accent);color:#fff}
+.actions .danger{flex:0 0 auto}
+.danger{color:var(--danger)}
+.menu{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.menu button{text-align:left;flex:none}
+.menu small{display:block;font-weight:400;color:var(--text-muted);font-size:12px}
+
+.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:var(--text);color:#fff;padding:10px 16px;border-radius:var(--r);font-size:13px;opacity:0;pointer-events:none;transition:opacity .15s,transform .15s;max-width:90vw;text-align:center;z-index:200}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+</style>
+<meta name="theme-color" content="#f7f6f2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="imago">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/imago-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+</head>
+<body>
+<div class="sticky-top">
+  <header>
+    <h1>Books</h1>
+    <div class="header-actions">
+      <button class="btn btn-primary add-btn" id="add-b" type="button">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
+        Add book
+      </button>
+      <button class="icon-btn" id="menu-btn" type="button" aria-label="Data menu">⋯</button>
+    </div>
+  </header>
+</div>
+
+<button class="fab-add" id="fab" type="button" aria-label="Add book">
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
+</button>
+
+<main>
+  <div class="tabs" role="tablist" aria-label="View">
+    <button type="button" role="tab" data-view="table">Table</button>
+    <button type="button" role="tab" data-view="scatter">Scatter</button>
+    <button type="button" role="tab" data-view="ideas">Ideas</button>
+  </div>
+  <div class="toolbar">
+    <div class="tool-row">
+      <input type="search" id="q" placeholder="Search title, author or claim" aria-label="Search books" autocomplete="off">
+      <select id="domain-filter" aria-label="Filter by domain"></select>
+      <select id="scale-filter" aria-label="Filter by scale"></select>
+      <select id="mech-filter" aria-label="Filter by mechanism"></select>
+    </div>
+    <div class="sortbar">
+      <select id="sort-key" aria-label="Sort by"></select>
+      <button class="icon-btn" id="sort-dir" type="button" aria-label="Reverse sort order"></button>
+    </div>
+    <div class="tool-row">
+      <div class="filters" id="filters"></div>
+      <span class="count" id="count"></span>
+      <button class="btn" id="cols-btn" type="button">Columns</button>
+    </div>
+  </div>
+  <div class="banner" id="banner" hidden><span id="banner-text"></span><button type="button" id="banner-clear">Show all</button></div>
+  <div class="table-container" id="table-view">
+    <table id="tbl">
+      <thead>
+        <tr>
+          <th class="c-title" data-sort="title">Book</th>
+          <th class="col-domain" data-sort="domain">Domain</th>
+          <th class="col-era" data-sort="year">Era</th>
+          <th class="col-kind" data-sort="kind">Type</th>
+          <th class="col-scale" data-sort="scale">Scale</th>
+          <th class="col-mech">Mechanism</th>
+          <th class="col-tension" title="Books this one pulls against">Tension</th>
+          <th class="c-claim col-claim">Core claim</th>
+          <th class="col-ctype" data-sort="ctype" title="Fact, theory or lens">Claim type</th>
+          <th class="c-center col-action" data-sort="action" title="Actionability, 1 to 5">Actionability</th>
+          <th class="c-center col-shift" data-sort="shift" title="Perspective shift, 1 to 5">Shift</th>
+          <th class="c-center col-ex" data-sort="extracted">Extracted</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  <div class="scatter" id="scatter-view" hidden>
+    <div class="scatter-legend" id="scatter-legend"></div>
+    <div id="scatter-chart"></div>
+    <div class="scatter-note" id="scatter-note"></div>
+  </div>
+  <div id="ideas-view" hidden>
+    <div class="tool-row ideas-head">
+      <select id="idea-book" aria-label="Book"></select>
+      <span class="count" id="idea-count"></span>
+    </div>
+    <div class="table-container">
+      <table>
+        <thead><tr><th>Idea</th><th>Classification</th><th title="Checked against an EPUB of the book">Validated</th></tr></thead>
+        <tbody id="idea-body"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+<div class="tip" id="tip" role="tooltip" hidden></div>
+
+<dialog id="b-dlg">
+  <form method="dialog" id="b-form">
+    <h2 id="b-dlg-title">Add book</h2>
+    <div class="field"><label for="b-title">Title</label><input id="b-title" type="text" autocomplete="off" required></div>
+    <div class="field"><label for="b-author">Author</label><input id="b-author" type="text" autocomplete="off"></div>
+    <div class="field-row">
+      <div class="field"><label for="b-domain">Domain</label><input id="b-domain" type="text" list="domain-list" autocomplete="off" placeholder="e.g. Psychology"></div>
+      <div class="field"><label for="b-kind">Type</label>
+        <select id="b-kind"><option value="lasting">Lasting</option><option value="current">Current</option></select>
+      </div>
+    </div>
+    <datalist id="domain-list"></datalist>
+    <div class="field-row">
+      <div class="field"><label for="b-era">Era</label><input id="b-era" type="text" autocomplete="off" placeholder="e.g. 1990s"></div>
+      <div class="field"><label for="b-year">Year (for sorting)</label><input id="b-year" type="number" inputmode="numeric" placeholder="BC as negative"></div>
+    </div>
+    <div class="field"><label for="b-scale">Scale</label><select id="b-scale"></select></div>
+    <div class="field"><label for="b-mech-in">Mechanisms</label>
+      <div class="chips" id="b-mech-chips"></div>
+      <input id="b-mech-in" type="text" list="mech-list" autocomplete="off" placeholder="Type one, press Enter">
+      <datalist id="mech-list"></datalist>
+    </div>
+    <div class="field"><label for="b-tn-add">Tension (pulls against)</label>
+      <div class="chips" id="b-tn-chips"></div>
+      <select id="b-tn-add"></select>
+    </div>
+    <div class="field"><label for="b-action">Actionability</label>
+      <select id="b-action"><option value="1">1 · Interesting</option><option value="2">2 · Some use</option><option value="3" selected>3 · Useful</option><option value="4">4 · Apply soon</option><option value="5">5 · Apply today</option></select>
+    </div>
+    <div class="field"><label for="b-shift">Perspective shift</label>
+      <select id="b-shift"><option value="">Not rated</option><option value="1">1 · Expected</option><option value="2">2 · Mild nudge</option><option value="3">3 · New angle</option><option value="4">4 · Rethink something</option><option value="5">5 · Mind-blowing</option></select>
+    </div>
+    <div class="field"><label for="b-ctype">Claim type</label><select id="b-ctype"></select></div>
+    <div class="field"><label for="b-claim">Core claim</label><textarea id="b-claim" rows="2" placeholder="One line"></textarea></div>
+    <div class="field"><label class="check"><input id="b-ex" type="checkbox"> Ideas extracted</label></div>
+    <div class="actions">
+      <button type="button" class="danger" id="b-delete">Delete</button>
+      <button type="button" id="b-cancel">Cancel</button>
+      <button type="submit" class="save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="cols-dlg">
+  <h2>Columns</h2>
+  <p class="hint">Pick what the table shows. Saved on this device.</p>
+  <div id="cols-list" style="margin-top:8px"></div>
+  <div class="actions">
+    <button type="button" id="cols-all">Show all</button>
+    <button type="button" class="save" id="cols-done">Done</button>
+  </div>
+</dialog>
+
+<dialog id="menu">
+  <h2>Data</h2>
+  <div class="menu">
+    <button type="button" id="m-seed">Load starter books<small>Add the 20 starter books. Safe to repeat, your edits stay</small></button>
+    <button type="button" id="m-export">Export<small>Download all books as JSON</small></button>
+    <button type="button" id="m-import">Import<small>Merge a backup. Safe to repeat, matched by ID</small></button>
+    <button type="button" id="m-replace">Reset and import<small>Wipe everything, then load a backup</small></button>
+    <button type="button" id="m-reset" class="danger">Reset<small>Delete all books</small></button>
+    <button type="button" id="m-close">Close</button>
+  </div>
+</dialog>
+
+<input type="file" id="file" accept=".json,application/json" hidden>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const db = new Dexie('BooksDB');
+db.version(1).stores({ books: 'id, year, createdAt' });
+
+const UI_KEY = 'imago-books-ui';
+const SEEDED_KEY = 'imago-books-seeded';
+const BACKUP_TYPE = 'books-backup';
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const KINDS = [{ key: 'lasting', label: 'Lasting' }, { key: 'current', label: 'Current' }];
+const KIND_KEYS = KINDS.map(k => k.key);
+const EXTRACTED = [{ key: 'no', label: 'To extract' }, { key: 'yes', label: 'Extracted' }];
+// Who the idea is about, smallest to largest. One value per book.
+const SCALES = [
+  { key: 'self', label: 'Self' }, { key: 'pair', label: 'One to one' }, { key: 'group', label: 'Group' },
+  { key: 'society', label: 'Society' }, { key: 'nature', label: 'Nature' }
+];
+const SCALE_KEYS = SCALES.map(s => s.key);
+const MECH_MAX = 6;
+// What kind of claim the core claim is, and the plot colors that go with it.
+const CTYPES = [
+  { key: 'fact', label: 'Fact', hint: 'backed by evidence' },
+  { key: 'theory', label: 'Theory', hint: 'an explanation that could be wrong' },
+  { key: 'lens', label: 'Lens', hint: 'a way of looking that changes what you notice' }
+];
+const CTYPE_KEYS = CTYPES.map(c => c.key);
+const isJackpot = b => b.action >= 4 && b.shift >= 4;
+// Mechanism tag -> color slot (0-11, see .mc-N). Related tags share a hue; a tag not listed gets one from its spelling.
+const MECH_COLOR = new Map(Object.entries({
+  incentive: 0, control: 1, reciprocity: 2, framing: 3, narrative: 3, leverage: 4, tradeoff: 4, adaptation: 5,
+  'feedback loop': 6, 'paradigm shift': 7, selection: 8, compounding: 9, 'power law': 9, specialization: 10, bias: 11
+}));
+const mechClass = m => {
+  if (MECH_COLOR.has(m)) return `mc-${MECH_COLOR.get(m)}`;
+  let h = 0;
+  for (const ch of m) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return `mc-${h % 12}`;
+};
+// Hideable columns, in display order. The book title is always shown.
+const COLUMNS = [
+  { key: 'domain', label: 'Domain' }, { key: 'era', label: 'Era' }, { key: 'kind', label: 'Type' },
+  { key: 'scale', label: 'Scale' }, { key: 'mech', label: 'Mechanism' }, { key: 'tension', label: 'Tension' },
+  { key: 'claim', label: 'Core claim' }, { key: 'ctype', label: 'Claim type' }, { key: 'action', label: 'Actionability' },
+  { key: 'shift', label: 'Perspective shift' }, { key: 'ex', label: 'Extracted' }
+];
+
+// Sort keys double as the phone sort menu. `dir` is what the first click on a header sorts by.
+const SORTS = [
+  { key: 'title', label: 'Title', dir: 'asc' },
+  { key: 'domain', label: 'Domain', dir: 'asc' },
+  { key: 'year', label: 'Era (oldest first)', dir: 'asc' },
+  { key: 'kind', label: 'Type', dir: 'asc' },
+  { key: 'scale', label: 'Scale (smallest first)', dir: 'asc' },
+  { key: 'action', label: 'Actionability', dir: 'desc' },
+  { key: 'shift', label: 'Perspective shift', dir: 'desc' },
+  { key: 'ctype', label: 'Claim type', dir: 'asc' },
+  { key: 'extracted', label: 'Extracted', dir: 'asc' }
+];
+
+// Starter books come from books-data.js, which is where they are maintained. Tension links there use keys; here they become IDs.
+// Fixed IDs and one shared updatedAt make loading them repeatable: an edit made in the page is always newer and wins.
+function buildSeed(data) {
+  const rows = data && Array.isArray(data.books) ? data.books : [];
+  const idOf = new Map(rows.map(b => [b.key, b.id]));
+  const at = Number(data && data.updatedAt) || 0;
+  return rows.map(b => ({
+    id: b.id, title: b.title, author: b.author || '', domain: b.domain || '', era: b.era || '',
+    year: Number.isFinite(b.year) ? b.year : null, kind: b.kind, action: b.action, claim: b.claim || '',
+    extracted: false, scale: b.scale || '', mechanisms: b.mechanisms || [],
+    tensions: (b.tensions || []).map(k => idOf.get(k)).filter(Boolean),
+    shift: b.shift || 0, ctype: b.ctype || '', createdAt: at, updatedAt: at
+  }));
+}
+const SEED = buildSeed(window.BOOKS_DATA);
+if (!SEED.length) console.error('books-data.js did not load, so there are no starter books');
+
+const $ = id => document.getElementById(id);
+const els = {
+  q: $('q'), domainFilter: $('domain-filter'), scaleFilter: $('scale-filter'), mechFilter: $('mech-filter'),
+  filters: $('filters'), count: $('count'), tbl: $('tbl'), banner: $('banner'),
+  sortKey: $('sort-key'), sortDir: $('sort-dir'), tbody: $('tbody'), toast: $('toast'), file: $('file'),
+  bDlg: $('b-dlg'), colsDlg: $('cols-dlg'), menu: $('menu')
+};
+
+let books = [];
+let links = new Map();    // bookId -> Set of books it pulls against (a link counts both ways)
+let focusId = null;       // when set, only this book and its tensions show
+let editingId = null;
+let pendingMech = [];     // dialog state: mechanisms and tension partners being edited
+let pendingTn = [];
+let importMode = 'merge';
+
+// ── Remembered UI state ─────────────────────────────────────────────────────
+// Search, filters, sort and hidden columns survive refresh.
+const ui = Object.assign({ q: '', domain: 'all', scale: 'all', mech: 'all', kind: 'all', ex: 'all', sort: 'year', dir: 'asc', hidden: [], view: 'table', hv: 0, ideaBook: '' }, loadUi());
+ui.hidden = Array.isArray(ui.hidden) ? ui.hidden.filter(k => COLUMNS.some(c => c.key === k)) : [];
+// Claim type and shift columns arrived with the scatter tab; they start hidden so the table keeps its width.
+if (ui.hv < 2) { ui.hidden = [...new Set([...ui.hidden, 'ctype', 'shift'])]; ui.hv = 2; }
+if (!['scatter', 'ideas'].includes(ui.view)) ui.view = 'table';
+
+function loadUi() {
+  try { return JSON.parse(localStorage.getItem(UI_KEY)) || {}; } catch (e) { return {}; }
+}
+function saveUi() {
+  try { localStorage.setItem(UI_KEY, JSON.stringify(ui)); } catch (e) {}
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+const pad = n => String(n).padStart(2, '0');
+const dateValue = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const clean = s => String(s || '').trim().replace(/[ \t]+\n/g, '\n');
+
+function uuid() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map(x => pad(x.toString(16))).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+let toastTimer;
+function toast(msg) {
+  els.toast.textContent = msg;
+  els.toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => els.toast.classList.remove('show'), 2600);
+}
+
+// ── Data ────────────────────────────────────────────────────────────────────
+async function reload() {
+  // Rows saved before scale/mechanism/tension existed read as empty.
+  books = (await db.books.toArray()).map(b => ({ ...b, scale: b.scale || '', mechanisms: b.mechanisms || [], tensions: b.tensions || [], shift: b.shift || 0, ctype: b.ctype || '' }));
+  links = new Map(books.map(b => [b.id, new Set()]));
+  for (const b of books) for (const t of b.tensions) {
+    if (links.has(t) && t !== b.id) { links.get(b.id).add(t); links.get(t).add(b.id); }
+  }
+  if (focusId && !links.has(focusId)) focusId = null;
+  renderAll();
+}
+
+// Starter books saved before a lens or scatter field existed get just that field. Nothing else on the row is touched.
+const BACKFILL_FIELDS = ['scale', 'mechanisms', 'tensions', 'shift', 'ctype'];
+async function backfillLens() {
+  const cur = await db.books.bulkGet(SEED.map(s => s.id));
+  const patches = [];
+  SEED.forEach((s, i) => {
+    const c = cur[i];
+    const missing = c ? BACKFILL_FIELDS.filter(f => c[f] === undefined) : [];
+    if (missing.length) patches.push({ ...c, ...Object.fromEntries(missing.map(f => [f, s[f]])) });
+  });
+  if (patches.length) await db.books.bulkPut(patches);
+}
+
+const normMech = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 30);
+
+// First visit only: fill an empty list so the page isn't blank. Reset won't bring it back.
+async function seedFirstRun() {
+  let seeded = false;
+  try { seeded = localStorage.getItem(SEEDED_KEY) === '1'; } catch (e) {}
+  if (seeded || !SEED.length) return;
+  if (!(await db.books.count())) await db.books.bulkPut(SEED);
+  try { localStorage.setItem(SEEDED_KEY, '1'); } catch (e) {}
+}
+
+// ── Filter + sort ───────────────────────────────────────────────────────────
+const textOf = (a, b) => String(a || '').localeCompare(String(b || ''), undefined, { sensitivity: 'base' });
+const numOf = (a, b) => (a ?? Infinity) - (b ?? Infinity);  // missing values last
+const COMPARE = {
+  title: (a, b) => textOf(a.title, b.title),
+  domain: (a, b) => textOf(a.domain, b.domain) || textOf(a.title, b.title),
+  year: (a, b) => numOf(Number.isFinite(a.year) ? a.year : null, Number.isFinite(b.year) ? b.year : null),
+  kind: (a, b) => textOf(a.kind, b.kind),
+  scale: (a, b) => (SCALE_KEYS.indexOf(a.scale) + 1 || 99) - (SCALE_KEYS.indexOf(b.scale) + 1 || 99),
+  action: (a, b) => a.action - b.action,
+  shift: (a, b) => a.shift - b.shift,
+  ctype: (a, b) => (CTYPE_KEYS.indexOf(a.ctype) + 1 || 99) - (CTYPE_KEYS.indexOf(b.ctype) + 1 || 99),
+  extracted: (a, b) => Number(a.extracted) - Number(b.extracted)
+};
+
+function visibleBooks() {
+  const q = ui.q.trim().toLowerCase();
+  const list = books.filter(b =>
+    (!focusId || b.id === focusId || links.get(focusId).has(b.id)) &&
+    (ui.domain === 'all' || b.domain === ui.domain) &&
+    (ui.scale === 'all' || b.scale === ui.scale) &&
+    (ui.mech === 'all' || b.mechanisms.includes(ui.mech)) &&
+    (ui.kind === 'all' || b.kind === ui.kind) &&
+    (ui.ex === 'all' || (ui.ex === 'yes') === b.extracted) &&
+    (!q || [b.title, b.author, b.claim, b.domain].some(t => String(t || '').toLowerCase().includes(q))));
+  const sign = ui.dir === 'desc' ? -1 : 1;
+  const cmp = COMPARE[ui.sort] || COMPARE.year;
+  // Ties fall back to title so rows don't jump around between sorts.
+  return list.sort((a, b) => sign * cmp(a, b) || textOf(a.title, b.title));
+}
+
+// ── Render ──────────────────────────────────────────────────────────────────
+function renderToolbar() {
+  const domains = [...new Set(books.map(b => b.domain).filter(Boolean))].sort(textOf);
+  if (ui.domain !== 'all' && !domains.includes(ui.domain)) ui.domain = 'all';
+  els.domainFilter.innerHTML = `<option value="all">All domains</option>` +
+    domains.map(d => `<option value="${esc(d)}"${ui.domain === d ? ' selected' : ''}>${esc(d)} (${books.filter(b => b.domain === d).length})</option>`).join('');
+  $('domain-list').innerHTML = domains.map(d => `<option value="${esc(d)}">`).join('');
+
+  els.scaleFilter.innerHTML = `<option value="all">All scales</option>` +
+    SCALES.map(s => `<option value="${s.key}"${ui.scale === s.key ? ' selected' : ''}>${s.label} (${books.filter(b => b.scale === s.key).length})</option>`).join('');
+  const mechCount = new Map();
+  for (const b of books) for (const m of b.mechanisms) mechCount.set(m, (mechCount.get(m) || 0) + 1);
+  const mechs = [...mechCount.keys()].sort((a, b) => mechCount.get(b) - mechCount.get(a) || textOf(a, b));
+  if (ui.mech !== 'all' && !mechCount.has(ui.mech)) ui.mech = 'all';
+  els.mechFilter.innerHTML = `<option value="all">All mechanisms</option>` +
+    mechs.map(m => `<option value="${esc(m)}"${ui.mech === m ? ' selected' : ''}>${esc(m)} (${mechCount.get(m)})</option>`).join('');
+  $('mech-list').innerHTML = mechs.map(m => `<option value="${esc(m)}">`).join('');
+
+  els.tbl.className = ui.hidden.map(k => 'h-' + k).join(' ');
+  $('cols-btn').textContent = ui.hidden.length ? `Columns · ${ui.hidden.length} hidden` : 'Columns';
+  const focus = focusId && books.find(b => b.id === focusId);
+  els.banner.hidden = !focus;
+  if (focus) {
+    const n = links.get(focusId).size;
+    $('banner-text').textContent = n ? `Tension around "${focus.title}": ${n === 1 ? '1 book pulls' : n + ' books pull'} against it` : `"${focus.title}" has no tensions yet`;
+  }
+
+  const chip = (group, key, label, n) =>
+    `<button type="button" class="filter-chip${ui[group] === key ? ' active' : ''}" data-group="${group}" data-key="${key}">${label}<span class="n">${n}</span></button>`;
+  els.filters.innerHTML =
+    chip('kind', 'all', 'All', books.length) +
+    KINDS.map(k => chip('kind', k.key, k.label, books.filter(b => b.kind === k.key).length)).join('') +
+    '<span class="sep"></span>' +
+    chip('ex', 'all', 'Any status', books.length) +
+    EXTRACTED.map(s => chip('ex', s.key, s.label, books.filter(b => b.extracted === (s.key === 'yes')).length)).join('');
+
+  els.sortKey.innerHTML = SORTS.map(s => `<option value="${s.key}"${ui.sort === s.key ? ' selected' : ''}>${s.label}</option>`).join('');
+  els.sortDir.textContent = ui.dir === 'asc' ? '↑' : '↓';
+  document.querySelectorAll('th[data-sort]').forEach(th => {
+    const on = th.dataset.sort === ui.sort;
+    th.classList.toggle('sort-active', on);
+    th.dataset.dir = on ? (ui.dir === 'asc' ? '▲' : '▼') : '';
+    th.setAttribute('aria-sort', on ? (ui.dir === 'asc' ? 'ascending' : 'descending') : 'none');
+  });
+  if (els.q.value !== ui.q) els.q.value = ui.q;
+}
+
+function dotsHtml(n, label = 'Actionability', cls = '') {
+  return `<span class="dots ${cls}" role="img" aria-label="${label} ${n} of 5">${[1, 2, 3, 4, 5].map(i => `<i${i <= n ? ' class="on"' : ''}></i>`).join('')}</span>`;
+}
+
+// Tension chips name the book on the other side; tapping one shows just that pair.
+function tensionHtml(b) {
+  const partners = [...links.get(b.id)].map(id => books.find(x => x.id === id)).filter(Boolean).sort((x, y) => textOf(x.title, y.title));
+  return partners.map(p => `<button type="button" class="tn" data-focus="${b.id}" title="${esc(p.title)}: ${esc(p.claim)}">⇄ <span>${esc(p.title)}</span></button>`).join('');
+}
+
+function rowHtml(b) {
+  const kind = KINDS.find(k => k.key === b.kind) || KINDS[0];
+  const scale = SCALES.find(s => s.key === b.scale);
+  const ct = CTYPES.find(c => c.key === b.ctype);
+  return `<tr class="b-row${b.extracted ? ' is-done' : ''}" data-row="${b.id}" title="Show this book's ideas">
+    <td class="c-title"><div class="b-head"><div class="b-name"><div class="b-title">${esc(b.title)}</div>${b.author ? `<div class="b-author">${esc(b.author)}</div>` : ''}</div><button type="button" class="icon-btn row-edit" data-edit="${b.id}" aria-label="Edit ${esc(b.title)}" title="Edit book">✎</button></div></td>
+    <td class="c-domain col-domain">${b.domain ? `<span class="pill domain">${esc(b.domain)}</span>` : ''}</td>
+    <td class="c-era col-era">${esc(b.era)}</td>
+    <td class="c-kind col-kind"><span class="pill ${kind.key}">${kind.label}</span></td>
+    <td class="col-scale">${scale ? `<span class="pill scale sc-${scale.key}">${scale.label}</span>` : ''}</td>
+    <td class="col-mech">${b.mechanisms.length ? `<div class="tags">${b.mechanisms.map(m => `<button type="button" class="pill mech ${mechClass(m)}${ui.mech === m ? ' on' : ''}" data-mech="${esc(m)}" title="Filter by ${esc(m)}">${esc(m)}</button>`).join('')}</div>` : ''}</td>
+    <td class="col-tension">${links.get(b.id).size ? `<div class="tags">${tensionHtml(b)}</div>` : ''}</td>
+    <td class="c-claim col-claim">${esc(b.claim)}</td>
+    <td class="col-ctype">${ct ? `<span class="pill ct-${ct.key}">${ct.label}</span>` : ''}</td>
+    <td class="c-action c-center col-action">${dotsHtml(b.action)}</td>
+    <td class="c-center col-shift">${b.shift ? dotsHtml(b.shift, 'Perspective shift', 'shift') : ''}</td>
+    <td class="c-ex c-center col-ex"><button type="button" class="pill ex${b.extracted ? ' yes' : ''}" data-ex="${b.id}" aria-pressed="${b.extracted}" title="Tap to mark ${b.extracted ? 'not extracted' : 'extracted'}">${b.extracted ? '✓ Extracted' : 'To extract'}</button></td>
+  </tr>`;
+}
+
+function renderTable(list) {
+  if (!list.length) {
+    els.tbody.innerHTML = books.length
+      ? `<tr><td colspan="12"><div class="empty">No books match<br><button type="button" class="btn" data-clear>Clear filters</button></div></td></tr>`
+      : `<tr><td colspan="12"><div class="empty">No books yet<br><button type="button" class="btn btn-primary" data-new>Add book</button> <button type="button" class="btn" data-seed>Load 20 starter books</button></div></td></tr>`;
+    return;
+  }
+  els.tbody.innerHTML = list.map(rowHtml).join('');
+}
+
+// The table and the scatter are two views of the same filtered list.
+function renderView() {
+  const list = visibleBooks();
+  const scatter = ui.view === 'scatter', ideas = ui.view === 'ideas';
+  els.count.textContent = books.length ? `${list.length} of ${books.length} books` : '';
+  $('table-view').hidden = ui.view !== 'table';
+  $('scatter-view').hidden = !scatter;
+  $('ideas-view').hidden = !ideas;
+  document.querySelector('.toolbar').hidden = ideas;   // search and filters belong to the book catalog
+  if (ideas) els.banner.hidden = true;
+  $('cols-btn').hidden = ui.view !== 'table';
+  document.querySelector('.sortbar').hidden = ui.view !== 'table';
+  document.querySelectorAll('[data-view]').forEach(t => t.setAttribute('aria-selected', String(t.dataset.view === ui.view)));
+  hideTip();
+  if (scatter) renderScatter(list); else if (ideas) renderIdeas(); else renderTable(list);
+}
+
+function renderAll() { renderToolbar(); renderView(); }
+
+// ── Scatter view ────────────────────────────────────────────────────────────
+// x = actionability, y = perspective shift, color = claim type. Hover (or tap, or focus) a dot for the idea and its book.
+function renderScatter(list) {
+  const plotted = list.filter(b => b.action && b.shift && b.ctype);
+  const skipped = list.filter(b => !(b.action && b.shift && b.ctype));
+  $('scatter-legend').innerHTML = CTYPES.map(c =>
+    `<span class="lg"><i class="sw ct-${c.key}"></i>${c.label}<span class="n">${plotted.filter(b => b.ctype === c.key).length}</span></span>`).join('') +
+    `<span class="lg">★ Jackpot<span class="n">${plotted.filter(isJackpot).length}</span></span>`;
+  $('scatter-note').textContent = skipped.length
+    ? `Not plotted, missing a perspective shift or claim type: ${skipped.map(b => b.title).join(', ')}`
+    : '';
+  const wrap = $('scatter-chart');
+  if (!plotted.length) {
+    wrap.innerHTML = `<div class="empty">${books.length ? 'Nothing to plot here. Rate a book\'s perspective shift and claim type to place it.' : 'No books yet'}</div>`;
+    return;
+  }
+
+  const W = Math.max(300, wrap.clientWidth || 600);
+  const H = Math.round(Math.min(520, Math.max(300, W * 0.75)));
+  const m = { l: 46, r: 12, t: 12, b: 48 };
+  const pw = W - m.l - m.r, ph = H - m.t - m.b;
+  const cw = pw / 5, ch = ph / 5;
+  const px = v => m.l + (v - 0.5) * cw;           // each 1-5 score owns a cell, so dots at 1 and 5 stay off the edge
+  const py = v => m.t + ph - (v - 0.5) * ch;
+
+  // Books sharing a score sit in a ring around the cell center so none hides another.
+  const groups = new Map();
+  for (const b of plotted) {
+    const k = `${b.action},${b.shift}`;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(b);
+  }
+  const r0 = Math.max(5, Math.min(8, cw / 8, ch / 6));
+  let dots = '';
+  for (const g of groups.values()) {
+    g.sort((a, b) => textOf(a.title, b.title));
+    const n = g.length;
+    const ring = n === 1 ? 0 : Math.min(r0 * 1.35 / Math.sin(Math.PI / n), Math.min(cw, ch) * 0.42);
+    const start = n === 2 ? 0 : -Math.PI / 2;
+    g.forEach((b, i) => {
+      const a = start + 2 * Math.PI * i / n;
+      const label = `${b.title}. ${b.claim} Actionability ${b.action}, perspective shift ${b.shift}, ${b.ctype}.`;
+      dots += `<circle class="dot ct-${b.ctype}" cx="${(px(b.action) + ring * Math.cos(a)).toFixed(1)}" cy="${(py(b.shift) + ring * Math.sin(a)).toFixed(1)}" r="${r0}" data-dot="${b.id}" tabindex="0" role="img" aria-label="${esc(label)}"/>`;
+    });
+  }
+
+  let grid = '';
+  for (let v = 0; v <= 5; v++) {
+    grid += `<line class="grid" x1="${m.l + v * cw}" y1="${m.t}" x2="${m.l + v * cw}" y2="${m.t + ph}"/>` +
+            `<line class="grid" x1="${m.l}" y1="${m.t + v * ch}" x2="${m.l + pw}" y2="${m.t + v * ch}"/>`;
+  }
+  let ticks = '';
+  for (let v = 1; v <= 5; v++) {
+    ticks += `<text x="${px(v)}" y="${m.t + ph + 16}" text-anchor="middle">${v}</text>` +
+             `<text x="${m.l - 10}" y="${py(v) + 4}" text-anchor="end">${v}</text>`;
+  }
+  wrap.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="group" aria-label="Books plotted by actionability and perspective shift">
+    <rect class="jackpot" x="${m.l + 3 * cw}" y="${m.t}" width="${2 * cw}" height="${2 * ch}"/>
+    <text class="jackpot-label" x="${m.l + pw - 8}" y="${m.t + 16}" text-anchor="end">★ JACKPOT</text>
+    ${grid}${ticks}
+    <text class="axis-title" x="${m.l + pw / 2}" y="${H - 10}" text-anchor="middle">Actionability →</text>
+    <text class="axis-title" transform="rotate(-90)" x="${-(m.t + ph / 2)}" y="13" text-anchor="middle">Perspective shift →</text>
+    ${dots}
+  </svg>`;
+}
+
+// ── Ideas view ──────────────────────────────────────────────────────────────
+// One book's key ideas, one per row: the idea and what kind of claim it is. Data comes from ideas-data.js,
+// which is keyed by a book's catalog `key`; here that is resolved to the book's ID.
+const IDEA_TYPES = [
+  { key: 'fact', label: 'Fact' }, { key: 'theory', label: 'Theory' }, { key: 'model', label: 'Mental model' }
+];
+function ideasByBookId() {
+  const idOf = new Map(((window.BOOKS_DATA && window.BOOKS_DATA.books) || []).map(b => [b.key, b.id]));
+  const out = new Map();
+  for (const [key, rows] of Object.entries(window.IDEAS_DATA || {})) {
+    if (idOf.has(key) && Array.isArray(rows)) out.set(idOf.get(key), rows);
+  }
+  return out;
+}
+
+function renderIdeas() {
+  const byBook = ideasByBookId();
+  const sorted = [...books].sort((a, b) => textOf(a.title, b.title));
+  if (!sorted.some(b => b.id === ui.ideaBook)) {
+    const first = sorted.find(b => byBook.has(b.id)) || sorted[0];
+    ui.ideaBook = first ? first.id : '';
+  }
+  $('idea-book').innerHTML = sorted.map(b => {
+    const n = (byBook.get(b.id) || []).length;
+    return `<option value="${b.id}"${b.id === ui.ideaBook ? ' selected' : ''}>${esc(b.title)}${n ? ` (${n} ideas)` : ''}</option>`;
+  }).join('');
+  const rows = byBook.get(ui.ideaBook) || [];
+  const n = key => rows.filter(r => r.type === key).length;
+  const checked = rows.filter(r => r.validated === true).length;
+  $('idea-count').textContent = rows.length
+    ? `${rows.length} ideas · ${n('fact')} fact${n('fact') === 1 ? '' : 's'} · ${n('theory')} theor${n('theory') === 1 ? 'y' : 'ies'} · ${n('model')} mental model${n('model') === 1 ? '' : 's'} · ${checked} validated`
+    : '';
+  $('idea-body').innerHTML = rows.length
+    ? rows.map(r => {
+        const t = IDEA_TYPES.find(x => x.key === r.type) || IDEA_TYPES[1];
+        const ok = r.validated === true;
+        return `<tr><td>${esc(r.idea)}</td><td><span class="pill ic-${t.key}">${t.label}</span></td><td><span class="pill ${ok ? 'val-yes' : 'val-no'}">${ok ? '✓ Validated' : 'Not validated'}</span></td></tr>`;
+      }).join('')
+    : `<tr><td colspan="3"><div class="empty">${books.length ? 'No ideas for this book yet' : 'No books yet'}</div></td></tr>`;
+}
+$('idea-book').addEventListener('change', () => { ui.ideaBook = $('idea-book').value; saveUi(); renderIdeas(); });
+
+const tip = $('tip');
+function showTip(dot) {
+  const b = books.find(x => x.id === dot.dataset.dot);
+  const ct = b && CTYPES.find(c => c.key === b.ctype);
+  if (!ct) return;
+  tip.innerHTML = `<div class="tip-claim">${esc(b.claim)}</div>
+    <div class="tip-src">${esc(b.title)}${b.author ? ` · ${esc(b.author)}` : ''}</div>
+    <div class="tip-meta"><span class="pill ct-${ct.key}">${ct.label}</span><span>Actionability ${b.action}</span><span>Shift ${b.shift}</span></div>`;
+  tip.hidden = false;
+  const r = dot.getBoundingClientRect(), t = tip.getBoundingClientRect();
+  const x = Math.max(8, Math.min(r.left + r.width / 2 - t.width / 2, innerWidth - t.width - 8));
+  const above = r.top - t.height - 10;
+  tip.style.left = x + 'px';
+  tip.style.top = (above >= 8 ? above : r.bottom + 10) + 'px';
+}
+function hideTip() { tip.hidden = true; }
+
+const chart = $('scatter-chart');
+chart.addEventListener('pointerover', e => { const d = e.target.closest('[data-dot]'); if (d && e.pointerType !== 'touch') showTip(d); });
+chart.addEventListener('pointerout', e => { if (e.target.closest('[data-dot]') && e.pointerType !== 'touch') hideTip(); });
+chart.addEventListener('focusin', e => { const d = e.target.closest('[data-dot]'); if (d) showTip(d); });
+chart.addEventListener('focusout', hideTip);
+// Touch has no hover: a tap on a dot shows the same card, a tap anywhere else hides it.
+document.addEventListener('pointerdown', e => {
+  if (e.pointerType !== 'touch') return;
+  const d = e.target.closest('#scatter-chart [data-dot]');
+  if (d) showTip(d); else hideTip();
+});
+addEventListener('scroll', hideTip, { passive: true });
+let resizeTimer;
+addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (ui.view === 'scatter') renderView(); }, 120); });
+
+document.querySelector('.tabs').addEventListener('click', e => {
+  const t = e.target.closest('[data-view]');
+  if (!t) return;
+  ui.view = t.dataset.view;
+  saveUi(); renderAll();
+});
+
+// ── Interactions ────────────────────────────────────────────────────────────
+els.q.addEventListener('input', () => { ui.q = els.q.value; saveUi(); renderView(); });
+els.domainFilter.addEventListener('change', () => { ui.domain = els.domainFilter.value; saveUi(); renderView(); });
+els.scaleFilter.addEventListener('change', () => { ui.scale = els.scaleFilter.value; saveUi(); renderView(); });
+els.mechFilter.addEventListener('change', () => { ui.mech = els.mechFilter.value; saveUi(); renderAll(); });
+$('banner-clear').addEventListener('click', () => { focusId = null; renderAll(); });
+
+els.filters.addEventListener('click', e => {
+  const b = e.target.closest('[data-key]');
+  if (!b) return;
+  ui[b.dataset.group] = b.dataset.key;
+  saveUi(); renderAll();
+});
+
+function setSort(key) {
+  if (ui.sort === key) ui.dir = ui.dir === 'asc' ? 'desc' : 'asc';
+  else { ui.sort = key; ui.dir = SORTS.find(s => s.key === key).dir; }
+  saveUi(); renderAll();
+}
+document.querySelector('thead').addEventListener('click', e => {
+  const th = e.target.closest('[data-sort]');
+  if (th) setSort(th.dataset.sort);
+});
+els.sortKey.addEventListener('change', () => {
+  ui.sort = els.sortKey.value;
+  ui.dir = SORTS.find(s => s.key === ui.sort).dir;
+  saveUi(); renderAll();
+});
+els.sortDir.addEventListener('click', () => { ui.dir = ui.dir === 'asc' ? 'desc' : 'asc'; saveUi(); renderAll(); });
+
+els.tbody.addEventListener('click', async e => {
+  const ex = e.target.closest('[data-ex]');
+  if (ex) {
+    const b = books.find(x => x.id === ex.dataset.ex);
+    await db.books.update(b.id, { extracted: !b.extracted, updatedAt: Date.now() });
+    await reload();
+    toast(b.extracted ? 'Marked not extracted' : 'Marked extracted');
+    return;
+  }
+  const mech = e.target.closest('[data-mech]');
+  if (mech) {
+    ui.mech = ui.mech === mech.dataset.mech ? 'all' : mech.dataset.mech;
+    saveUi(); renderAll();
+    return;
+  }
+  const tn = e.target.closest('[data-focus]');
+  if (tn) { focusId = tn.dataset.focus; renderAll(); scrollTo({ top: 0 }); return; }
+  if (e.target.closest('[data-new]')) { openBook(null); return; }
+  if (e.target.closest('[data-seed]')) { await loadStarter(); return; }
+  if (e.target.closest('[data-clear]')) {
+    Object.assign(ui, { q: '', domain: 'all', scale: 'all', mech: 'all', kind: 'all', ex: 'all' });
+    focusId = null;
+    saveUi(); renderAll();
+    return;
+  }
+  const edit = e.target.closest('[data-edit]');
+  if (edit) { openBook(edit.dataset.edit); return; }
+  // Clicking a book opens its ideas; the pencil on the row is how you edit the book itself.
+  const row = e.target.closest('[data-row]');
+  if (row) {
+    ui.view = 'ideas';
+    ui.ideaBook = row.dataset.row;
+    saveUi(); renderAll();
+    scrollTo({ top: 0 });
+  }
+});
+
+// ── Columns dialog ──────────────────────────────────────────────────────────
+function renderColsList() {
+  $('cols-list').innerHTML =
+    `<label class="check col-opt"><input type="checkbox" checked disabled> Book <span class="hint">always shown</span></label>` +
+    COLUMNS.map(c => `<label class="check col-opt"><input type="checkbox" data-col="${c.key}"${ui.hidden.includes(c.key) ? '' : ' checked'}> ${c.label}</label>`).join('');
+}
+$('cols-btn').addEventListener('click', () => { renderColsList(); els.colsDlg.showModal(); });
+$('cols-list').addEventListener('change', e => {
+  const box = e.target.closest('[data-col]');
+  if (!box) return;
+  ui.hidden = COLUMNS.map(c => c.key).filter(k => k === box.dataset.col ? !box.checked : ui.hidden.includes(k));
+  saveUi(); renderToolbar();
+});
+$('cols-all').addEventListener('click', () => { ui.hidden = []; saveUi(); renderToolbar(); renderColsList(); });
+$('cols-done').addEventListener('click', () => els.colsDlg.close());
+
+// ── Book dialog ─────────────────────────────────────────────────────────────
+function renderChipEditors() {
+  $('b-mech-chips').innerHTML = pendingMech.map(m =>
+    `<span class="chip-x ${mechClass(m)}">${esc(m)}<button type="button" data-rm-mech="${esc(m)}" aria-label="Remove ${esc(m)}">×</button></span>`).join('');
+  $('b-tn-chips').innerHTML = pendingTn.map(id => {
+    const t = books.find(x => x.id === id);
+    return t ? `<span class="chip-x">⇄ ${esc(t.title)}<button type="button" data-rm-tn="${id}" aria-label="Remove ${esc(t.title)}">×</button></span>` : '';
+  }).join('');
+  const others = books.filter(x => x.id !== editingId && !pendingTn.includes(x.id)).sort((a, b) => textOf(a.title, b.title));
+  $('b-tn-add').innerHTML = '<option value="">Add a book it pulls against…</option>' +
+    others.map(x => `<option value="${x.id}">${esc(x.title)}</option>`).join('');
+}
+
+function addMech(raw) {
+  const m = normMech(raw);
+  if (m && !pendingMech.includes(m) && pendingMech.length < MECH_MAX) pendingMech.push(m);
+  else if (m && pendingMech.length >= MECH_MAX) toast(`Up to ${MECH_MAX} mechanisms`);
+}
+$('b-mech-in').addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ',') return;
+  e.preventDefault();
+  addMech($('b-mech-in').value);
+  $('b-mech-in').value = '';
+  renderChipEditors();
+});
+// Picking a suggestion from the list adds it straight away.
+$('b-mech-in').addEventListener('input', e => {
+  if (e.inputType !== 'insertReplacementText' && e.inputType) return;
+  addMech($('b-mech-in').value);
+  $('b-mech-in').value = '';
+  renderChipEditors();
+});
+$('b-tn-add').addEventListener('change', () => {
+  const id = $('b-tn-add').value;
+  if (id && !pendingTn.includes(id)) pendingTn.push(id);
+  renderChipEditors();
+});
+$('b-dlg').addEventListener('click', e => {
+  const m = e.target.closest('[data-rm-mech]');
+  if (m) { pendingMech = pendingMech.filter(x => x !== m.dataset.rmMech); renderChipEditors(); return; }
+  const t = e.target.closest('[data-rm-tn]');
+  if (t) { pendingTn = pendingTn.filter(x => x !== t.dataset.rmTn); renderChipEditors(); }
+});
+
+function openBook(id) {
+  editingId = id;
+  const b = id ? books.find(x => x.id === id) : null;
+  pendingMech = b ? [...b.mechanisms] : [];
+  pendingTn = b ? [...links.get(id)] : [];
+  $('b-scale').innerHTML = '<option value="">None</option>' + SCALES.map(s => `<option value="${s.key}">${s.label}</option>`).join('');
+  $('b-scale').value = b ? b.scale : '';
+  $('b-mech-in').value = '';
+  renderChipEditors();
+  $('b-dlg-title').textContent = b ? 'Edit book' : 'Add book';
+  $('b-title').value = b ? b.title : '';
+  $('b-author').value = b ? b.author : '';
+  $('b-domain').value = b ? b.domain : (ui.domain !== 'all' ? ui.domain : '');
+  $('b-kind').value = b ? b.kind : 'current';
+  $('b-era').value = b ? b.era : '';
+  $('b-year').value = b && Number.isFinite(b.year) ? b.year : '';
+  $('b-action').value = b ? b.action : 3;
+  $('b-shift').value = b && b.shift ? b.shift : '';
+  $('b-ctype').innerHTML = '<option value="">Not set</option>' + CTYPES.map(c => `<option value="${c.key}">${c.label} · ${c.hint}</option>`).join('');
+  $('b-ctype').value = b ? b.ctype : '';
+  $('b-claim').value = b ? b.claim : '';
+  $('b-ex').checked = b ? b.extracted : false;
+  $('b-delete').hidden = !b;
+  els.bDlg.showModal();
+  if (!b) $('b-title').focus();
+}
+$('add-b').addEventListener('click', () => openBook(null));
+$('fab').addEventListener('click', () => openBook(null));
+$('b-cancel').addEventListener('click', () => els.bDlg.close());
+
+$('b-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const title = clean($('b-title').value);
+  if (!title) { toast('Give the book a title'); return; }
+  const year = $('b-year').value === '' ? null : Math.round(Number($('b-year').value));
+  addMech($('b-mech-in').value);  // text typed but not yet entered still counts
+  const fields = {
+    title, author: clean($('b-author').value), domain: clean($('b-domain').value),
+    era: clean($('b-era').value), year: Number.isFinite(year) ? year : null,
+    kind: $('b-kind').value, action: Number($('b-action').value), claim: clean($('b-claim').value),
+    shift: Number($('b-shift').value) || 0, ctype: $('b-ctype').value,
+    scale: $('b-scale').value, mechanisms: [...pendingMech], tensions: [...pendingTn],
+    extracted: $('b-ex').checked, updatedAt: Date.now()
+  };
+  const id = editingId || uuid();
+  await db.transaction('rw', db.books, async () => {
+    if (editingId) await db.books.update(id, fields);
+    else await db.books.add({ id, createdAt: Date.now(), ...fields });
+    // A tension removed here must also go from the other book if it was stored there.
+    for (const y of books) {
+      if (y.id !== id && y.tensions.includes(id) && !pendingTn.includes(y.id)) {
+        await db.books.update(y.id, { tensions: y.tensions.filter(t => t !== id), updatedAt: Date.now() });
+      }
+    }
+  });
+  els.bDlg.close();
+  await reload();
+  toast('Saved');
+});
+
+$('b-delete').addEventListener('click', async () => {
+  const b = books.find(x => x.id === editingId);
+  if (!confirm(`Delete "${b.title}"?`)) return;
+  await db.transaction('rw', db.books, async () => {
+    await db.books.delete(editingId);
+    for (const y of books) {
+      if (y.tensions.includes(editingId)) await db.books.update(y.id, { tensions: y.tensions.filter(t => t !== editingId), updatedAt: Date.now() });
+    }
+  });
+  els.bDlg.close();
+  await reload();
+  toast('Deleted');
+});
+
+// ── Data menu: seed / export / import / reset ───────────────────────────────
+$('menu-btn').addEventListener('click', () => els.menu.showModal());
+$('m-close').addEventListener('click', () => els.menu.close());
+
+async function loadStarter() {
+  if (!SEED.length) { els.menu.close(); toast('Starter books file did not load'); return; }
+  const r = await mergeTable(db.books, SEED);
+  await backfillLens();
+  try { localStorage.setItem(SEEDED_KEY, '1'); } catch (e) {}
+  els.menu.close();
+  await reload();
+  toast(r.added ? `Added ${r.added} starter books` : 'Starter books already here');
+}
+$('m-seed').addEventListener('click', loadStarter);
+
+$('m-export').addEventListener('click', async () => {
+  const rows = await db.books.orderBy('createdAt').toArray();
+  if (!rows.length) { toast('Nothing to export'); return; }
+  const payload = { type: BACKUP_TYPE, version: 1, exportedAt: new Date().toISOString(), books: rows };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `books-backup-${dateValue(new Date())}.json`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 100);
+  els.menu.close();
+  toast(`Exported ${rows.length} books`);
+});
+
+function pickFile(mode) {
+  importMode = mode;
+  els.menu.close();
+  els.file.value = '';
+  els.file.click();
+}
+$('m-import').addEventListener('click', () => pickFile('merge'));
+$('m-replace').addEventListener('click', () => pickFile('replace'));
+
+$('m-reset').addEventListener('click', async () => {
+  const n = await db.books.count();
+  if (!n) { toast('Already empty'); return; }
+  if (!confirm(`Delete all ${n} books? Export first if you want a copy.`)) return;
+  await db.books.clear();
+  els.menu.close();
+  await reload();
+  toast('All books deleted');
+});
+
+function cleanBook(raw) {
+  if (!raw || typeof raw.id !== 'string' || !UUID_RE.test(raw.id)) return null;
+  const title = clean(raw.title);
+  if (!title) return null;
+  const createdAt = Number(raw.createdAt) || Date.now();
+  const year = raw.year === null || raw.year === '' || raw.year === undefined ? null : Number(raw.year);
+  const action = Math.round(Number(raw.action));
+  return {
+    id: raw.id.toLowerCase(), title,
+    author: clean(raw.author), domain: clean(raw.domain), era: clean(raw.era),
+    year: Number.isFinite(year) ? year : null,
+    kind: KIND_KEYS.includes(raw.kind) ? raw.kind : 'current',
+    action: action >= 1 && action <= 5 ? action : 3,
+    claim: clean(raw.claim),
+    scale: SCALE_KEYS.includes(raw.scale) ? raw.scale : '',
+    shift: Math.round(Number(raw.shift)) >= 1 && Math.round(Number(raw.shift)) <= 5 ? Math.round(Number(raw.shift)) : 0,
+    ctype: CTYPE_KEYS.includes(raw.ctype) ? raw.ctype : '',
+    mechanisms: [...new Set((Array.isArray(raw.mechanisms) ? raw.mechanisms : []).map(normMech).filter(Boolean))].slice(0, MECH_MAX),
+    tensions: [...new Set((Array.isArray(raw.tensions) ? raw.tensions : []).filter(t => typeof t === 'string' && UUID_RE.test(t)).map(t => t.toLowerCase()))],
+    extracted: raw.extracted === true,
+    createdAt, updatedAt: Number(raw.updatedAt) || createdAt
+  };
+}
+
+// Newer updatedAt wins, so re-importing the same file changes nothing.
+async function mergeTable(table, rows) {
+  const existing = await table.bulkGet(rows.map(r => r.id));
+  const toWrite = [];
+  let added = 0, updated = 0;
+  rows.forEach((r, i) => {
+    const cur = existing[i];
+    if (!cur) { toWrite.push(r); added++; }
+    else if (r.updatedAt > cur.updatedAt) { toWrite.push(r); updated++; }
+  });
+  if (toWrite.length) await table.bulkPut(toWrite);
+  return { added, updated, unchanged: rows.length - added - updated };
+}
+
+els.file.addEventListener('change', async () => {
+  const file = els.file.files[0];
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (data?.type !== BACKUP_TYPE || !Array.isArray(data.books)) { toast('Not a Books backup file'); return; }
+    const map = new Map();
+    for (const raw of data.books) { const b = cleanBook(raw); if (b) map.set(b.id, b); }
+    const rows = [...map.values()];
+    const skipped = data.books.length - rows.length;
+    const skippedNote = skipped ? `, ${skipped} invalid skipped` : '';
+
+    if (importMode === 'replace') {
+      if (!confirm(`Delete everything and load ${rows.length} books from this file?`)) return;
+      await db.transaction('rw', db.books, async () => { await db.books.clear(); await db.books.bulkPut(rows); });
+      await reload();
+      toast(`Loaded ${rows.length} books${skippedNote}`);
+      return;
+    }
+
+    const r = await mergeTable(db.books, rows);
+    await reload();
+    toast(r.added || r.updated ? `${r.added} new, ${r.updated} updated${skippedNote}` : `Nothing new${skippedNote}`);
+  } catch (err) {
+    console.error(err);
+    toast('Import failed');
+  }
+});
+
+// ── Init ────────────────────────────────────────────────────────────────────
+// The sticky table header sits right under the page bar, so measure it.
+const setHeaderHeight = () => document.documentElement.style.setProperty('--hdr-h', document.querySelector('.sticky-top').offsetHeight + 'px');
+setHeaderHeight();
+addEventListener('resize', setHeaderHeight);
+
+seedFirstRun().then(backfillLens).then(reload).catch(err => { console.error(err); toast(err?.message || 'Startup failed'); });
+</script>
+  <script src="pwa-register.js"></script>
+</body>
+</html>
