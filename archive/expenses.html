@@ -4,10 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Expenses</title>
-<script src="scripts/feature-flags.js"></script>
-<script src="scripts/dexie.min.js"></script>
-<script src="scripts/explore-mode.js"></script>
-<script src="scripts/privacy-mask.js?v=2"></script>
+<script src="../scripts/feature-flags.js"></script>
+<script src="../scripts/dexie.min.js"></script>
+<script src="../scripts/explore-mode.js"></script>
+<script src="../scripts/privacy-mask.js?v=2"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -171,21 +171,21 @@ select.tag.type{
 .demo-banner button{flex-shrink:0}
 </style>
 <meta name="theme-color" content="#f7f6f2">
-<link rel="icon" href="icons/imago-icon.svg" type="image/svg+xml">
-<script src="scripts/savings-demo.js"></script>
-<script src="scripts/expenses-demo.js"></script>
-<script src="scripts/benchmarks-data.js?v=3"></script>
+<link rel="icon" href="../icons/imago-icon.svg" type="image/svg+xml">
+<script src="../scripts/savings-demo.js"></script>
+<script src="../scripts/expenses-demo.js"></script>
+<script src="../scripts/benchmarks-data.js?v=3"></script>
 <script>
   const script = document.createElement('script');
-  script.src = 'scripts/finance-charts.js?v=' + Date.now();
+  script.src = '../scripts/finance-charts.js?v=' + Date.now();
   document.head.appendChild(script);
 </script>
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="imago">
-<link rel="manifest" href="./manifest.webmanifest">
-<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
 </head>
 <body>
 
@@ -2065,6 +2065,6 @@ document.getElementById('expenseChart').addEventListener('bar-click', e => {
 refreshMode();
 seedBenchmarksIfNeeded();
 </script>
-  <script src="pwa-register.js"></script>
+  <script src="../pwa-register.js"></script>
 </body>
 </html>

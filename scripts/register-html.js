@@ -80,7 +80,7 @@ function getBodyScriptForFile(file) {
 
 // Satellite pages reachable only from their parent page's own nav, not
 // listed on the home page. invest.html itself still gets a launcher link.
-const HIDDEN_FROM_LAUNCHER = [/^invest-.*\.html$/];
+const HIDDEN_FROM_LAUNCHER = [/^(archive\/)?invest-.*\.html$/];
 function isHiddenFromLauncher(file) {
   return HIDDEN_FROM_LAUNCHER.some(re => re.test(file));
 }
@@ -210,7 +210,7 @@ function updateLaunchers(rootFiles, archiveFiles, seldomFiles) {
   }
 
   const rootItems = generateListItems(rootFiles.filter(file => !isHiddenFromLauncher(file)));
-  const archiveItems = generateListItems(archiveFiles);
+  const archiveItems = generateListItems(archiveFiles.filter(file => !isHiddenFromLauncher(file)));
   const seldomItems = generateListItems(seldomFiles);
 
   // 1. Update index.html

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'imago-shell-v11';
+const CACHE_NAME = 'imago-shell-v12';
 // Only the launcher shell is precached. Every other page is cached the
 // first time it's opened online (see the fetch handler's runtime cache),
 // so an install stays small no matter how many prototypes pile up here.

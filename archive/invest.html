@@ -4,11 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Invest</title>
-<script src="scripts/dexie.min.js"></script>
-<script src="scripts/benchmarks-data.js?v=3"></script>
-<script src="scripts/etf-catalog.js"></script>
-<script src="scripts/invest-demo.js"></script>
-<script src="scripts/finance-charts.js"></script>
+<script src="../scripts/dexie.min.js"></script>
+<script src="../scripts/benchmarks-data.js?v=3"></script>
+<script src="../scripts/etf-catalog.js"></script>
+<script src="../scripts/invest-demo.js"></script>
+<script src="../scripts/finance-charts.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -140,15 +140,15 @@ td.actions{text-align:right;white-space:nowrap}
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="imago">
-<link rel="manifest" href="./manifest.webmanifest">
-<link rel="icon" href="./icons/imago-icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/imago-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
 </head>
 <body>
 
 <header>
   <div class="brand">
-    <h1><a href="index.html">Invest</a></h1>
+    <h1><a href="../index.html">Invest</a></h1>
     <button class="icon-btn neutral" onclick="openModal('infoModal')" title="Fees &amp; taxes info" aria-label="Fees and taxes info">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="7.2" x2="8" y2="11.3"/><circle cx="8" cy="4.9" r="0.75" fill="currentColor" stroke="none"/></svg>
     </button>
@@ -1085,6 +1085,6 @@ document.querySelectorAll('#periodFilters .filter-chip').forEach(c => {
   await refreshMode();
 })();
 </script>
-  <script src="pwa-register.js"></script>
+  <script src="../pwa-register.js"></script>
 </body>
 </html>
