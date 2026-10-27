@@ -65,8 +65,8 @@ main{max-width:1400px;margin:0 auto;padding:16px 16px 80px}
 .table-container{width:100%;border:1px solid var(--border);border-radius:var(--rl);background:var(--surface);overflow-x:auto;-webkit-overflow-scrolling:touch}
 table{width:100%;border-collapse:collapse;text-align:left}
 th{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);font-weight:500;padding:9px 12px;border-bottom:1px solid var(--border);background:var(--bg);white-space:nowrap;user-select:none}
-th[data-sort]{cursor:pointer}
-th[data-sort]:hover{background:var(--surface)}
+th[data-sort],th[data-isort]{cursor:pointer}
+th[data-sort]:hover,th[data-isort]:hover{background:var(--surface)}
 th.sort-active{color:var(--text);background:var(--surface)}
 th.sort-active::after{content:attr(data-dir);margin-left:4px;font-size:9px}
 th.c-center,td.c-center{text-align:center}
@@ -145,7 +145,7 @@ button.tn:hover{border-color:#854f0b}
 .scatter svg .grid{stroke:var(--border);stroke-width:1}
 .scatter svg .jackpot{fill:var(--accent-soft);opacity:.7}
 .scatter svg .jackpot-label{fill:var(--accent);font-weight:700;font-size:10px;letter-spacing:.08em}
-circle.dot{stroke:#fff;stroke-width:1.5;transition:transform .1s;transform-box:fill-box;transform-origin:center;outline:none}
+circle.dot{cursor:pointer;stroke:#fff;stroke-width:1.5;transition:transform .1s;transform-box:fill-box;transform-origin:center;outline:none}
 circle.dot:hover,circle.dot:focus{transform:scale(1.35);stroke:var(--text)}
 .scatter-note{font-size:12px;color:var(--text-muted);margin-top:8px}
 /* Ideas tab: two columns, idea and classification (same colors as claim type: fact blue, theory orange, mental model violet) */
@@ -154,6 +154,7 @@ circle.dot:hover,circle.dot:focus{transform:scale(1.35);stroke:var(--text)}
 .pill.ic-fact{background:var(--fact-bg);color:var(--fact)}
 .pill.ic-theory{background:var(--theory-bg);color:var(--theory)}
 .pill.ic-model{background:var(--lens-bg);color:var(--lens)}
+#idea-sortbar{margin-bottom:10px}
 #ideas-view td:first-child{font-size:14px;line-height:1.45}
 #ideas-view th:nth-child(2),#ideas-view td:nth-child(2){width:150px;white-space:nowrap}
 #ideas-view th:nth-child(3),#ideas-view td:nth-child(3){width:140px;white-space:nowrap}
@@ -162,6 +163,7 @@ circle.dot:hover,circle.dot:focus{transform:scale(1.35);stroke:var(--text)}
 .tip{position:fixed;z-index:60;max-width:280px;background:var(--text);color:#fff;border-radius:var(--r);padding:10px 12px;font-size:13px;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,.25)}
 .tip-claim{font-weight:600;line-height:1.35}
 .tip-src{color:#d8d6cf;font-size:12px;margin-top:3px}
+.tip-hint{margin-top:7px;font-size:11px;color:#a9a79f}
 .tip-meta{display:flex;gap:10px;align-items:center;margin-top:7px;font-size:11px;color:#d8d6cf}
 .banner button{background:none;border:0;font-weight:600;color:inherit;text-decoration:underline;white-space:nowrap}
 
@@ -333,9 +335,13 @@ dialog h2{font-size:16px;font-weight:600;margin-bottom:4px}
       <select id="idea-book" aria-label="Book"></select>
       <span class="count" id="idea-count"></span>
     </div>
+    <div class="sortbar" id="idea-sortbar">
+      <select id="idea-sort" aria-label="Sort ideas by"></select>
+      <button class="icon-btn" id="idea-sort-dir" type="button" aria-label="Reverse sort order"></button>
+    </div>
     <div class="table-container">
       <table>
-        <thead><tr><th>Idea</th><th>Classification</th><th title="Checked against an EPUB of the book">Validated</th></tr></thead>
+        <thead><tr><th data-isort="idea">Idea</th><th data-isort="type">Classification</th><th data-isort="validated" title="Checked against an EPUB of the book">Validated</th></tr></thead>
         <tbody id="idea-body"></tbody>
       </table>
     </div>
@@ -504,11 +510,13 @@ let importMode = 'merge';
 
 // ── Remembered UI state ─────────────────────────────────────────────────────
 // Search, filters, sort and hidden columns survive refresh.
-const ui = Object.assign({ q: '', domain: 'all', scale: 'all', mech: 'all', kind: 'all', ex: 'all', sort: 'year', dir: 'asc', hidden: [], view: 'table', hv: 0, ideaBook: '' }, loadUi());
+const ui = Object.assign({ q: '', domain: 'all', scale: 'all', mech: 'all', kind: 'all', ex: 'all', sort: 'year', dir: 'asc', hidden: [], view: 'table', hv: 0, ideaBook: '', ideaSort: '', ideaDir: 'asc' }, loadUi());
 ui.hidden = Array.isArray(ui.hidden) ? ui.hidden.filter(k => COLUMNS.some(c => c.key === k)) : [];
 // Claim type and shift columns arrived with the scatter tab; they start hidden so the table keeps its width.
 if (ui.hv < 2) { ui.hidden = [...new Set([...ui.hidden, 'ctype', 'shift'])]; ui.hv = 2; }
 if (!['scatter', 'ideas'].includes(ui.view)) ui.view = 'table';
+if (!['', 'idea', 'type', 'validated'].includes(ui.ideaSort)) ui.ideaSort = '';
+if (ui.ideaDir !== 'desc') ui.ideaDir = 'asc';
 
 function loadUi() {
   try { return JSON.parse(localStorage.getItem(UI_KEY)) || {}; } catch (e) { return {}; }
@@ -754,7 +762,7 @@ function renderScatter(list) {
     g.forEach((b, i) => {
       const a = start + 2 * Math.PI * i / n;
       const label = `${b.title}. ${b.claim} Actionability ${b.action}, perspective shift ${b.shift}, ${b.ctype}.`;
-      dots += `<circle class="dot ct-${b.ctype}" cx="${(px(b.action) + ring * Math.cos(a)).toFixed(1)}" cy="${(py(b.shift) + ring * Math.sin(a)).toFixed(1)}" r="${r0}" data-dot="${b.id}" tabindex="0" role="img" aria-label="${esc(label)}"/>`;
+      dots += `<circle class="dot ct-${b.ctype}" cx="${(px(b.action) + ring * Math.cos(a)).toFixed(1)}" cy="${(py(b.shift) + ring * Math.sin(a)).toFixed(1)}" r="${r0}" data-dot="${b.id}" tabindex="0" role="button" aria-label="${esc(label)} Opens its ideas."/>`;
     });
   }
 
@@ -793,6 +801,43 @@ function ideasByBookId() {
   return out;
 }
 
+// Same behavior as the book columns: click a header to sort, click again to reverse. A third click goes back to the
+// order the book presents its ideas in, since that order carries meaning.
+const IDEA_SORTS = [
+  { key: '', label: 'Book order', dir: 'asc' },
+  { key: 'idea', label: 'Idea (A to Z)', dir: 'asc' },
+  { key: 'type', label: 'Classification', dir: 'asc' },
+  { key: 'validated', label: 'Validated first', dir: 'desc' }
+];
+const IDEA_COMPARE = {
+  idea: (a, b) => textOf(a.idea, b.idea),
+  type: (a, b) => IDEA_TYPES.findIndex(t => t.key === a.type) - IDEA_TYPES.findIndex(t => t.key === b.type),
+  validated: (a, b) => Number(a.validated === true) - Number(b.validated === true)
+};
+function sortedIdeas(rows) {
+  const cmp = IDEA_COMPARE[ui.ideaSort];
+  if (!cmp) return rows;
+  const sign = ui.ideaDir === 'desc' ? -1 : 1;
+  return rows.map((r, i) => ({ r, i })).sort((a, b) => sign * cmp(a.r, b.r) || a.i - b.i).map(x => x.r);
+}
+function setIdeaSort(key) {
+  const first = IDEA_SORTS.find(s => s.key === key).dir;
+  if (ui.ideaSort !== key) { ui.ideaSort = key; ui.ideaDir = first; }
+  else if (ui.ideaDir === first) ui.ideaDir = first === 'asc' ? 'desc' : 'asc';
+  else { ui.ideaSort = ''; ui.ideaDir = 'asc'; }
+  saveUi(); renderIdeas();
+}
+$('ideas-view').querySelector('thead').addEventListener('click', e => {
+  const th = e.target.closest('[data-isort]');
+  if (th) setIdeaSort(th.dataset.isort);
+});
+$('idea-sort').addEventListener('change', () => {
+  ui.ideaSort = $('idea-sort').value;
+  ui.ideaDir = IDEA_SORTS.find(s => s.key === ui.ideaSort).dir;
+  saveUi(); renderIdeas();
+});
+$('idea-sort-dir').addEventListener('click', () => { ui.ideaDir = ui.ideaDir === 'asc' ? 'desc' : 'asc'; saveUi(); renderIdeas(); });
+
 function renderIdeas() {
   const byBook = ideasByBookId();
   const sorted = [...books].sort((a, b) => textOf(a.title, b.title));
@@ -804,12 +849,21 @@ function renderIdeas() {
     const n = (byBook.get(b.id) || []).length;
     return `<option value="${b.id}"${b.id === ui.ideaBook ? ' selected' : ''}>${esc(b.title)}${n ? ` (${n} ideas)` : ''}</option>`;
   }).join('');
-  const rows = byBook.get(ui.ideaBook) || [];
+  const rows = sortedIdeas(byBook.get(ui.ideaBook) || []);
   const n = key => rows.filter(r => r.type === key).length;
   const checked = rows.filter(r => r.validated === true).length;
   $('idea-count').textContent = rows.length
     ? `${rows.length} ideas · ${n('fact')} fact${n('fact') === 1 ? '' : 's'} · ${n('theory')} theor${n('theory') === 1 ? 'y' : 'ies'} · ${n('model')} mental model${n('model') === 1 ? '' : 's'} · ${checked} validated`
     : '';
+  $('idea-sort').innerHTML = IDEA_SORTS.map(s => `<option value="${s.key}"${ui.ideaSort === s.key ? ' selected' : ''}>${s.label}</option>`).join('');
+  $('idea-sort-dir').textContent = ui.ideaDir === 'asc' ? '↑' : '↓';
+  $('idea-sort-dir').hidden = !ui.ideaSort;
+  document.querySelectorAll('#ideas-view th[data-isort]').forEach(th => {
+    const on = th.dataset.isort === ui.ideaSort;
+    th.classList.toggle('sort-active', on);
+    th.dataset.dir = on ? (ui.ideaDir === 'asc' ? '▲' : '▼') : '';
+    th.setAttribute('aria-sort', on ? (ui.ideaDir === 'asc' ? 'ascending' : 'descending') : 'none');
+  });
   $('idea-body').innerHTML = rows.length
     ? rows.map(r => {
         const t = IDEA_TYPES.find(x => x.key === r.type) || IDEA_TYPES[1];
@@ -818,16 +872,24 @@ function renderIdeas() {
       }).join('')
     : `<tr><td colspan="3"><div class="empty">${books.length ? 'No ideas for this book yet' : 'No books yet'}</div></td></tr>`;
 }
+function openIdeas(bookId) {
+  ui.view = 'ideas';
+  ui.ideaBook = bookId;
+  saveUi(); renderAll();
+  scrollTo({ top: 0 });
+}
 $('idea-book').addEventListener('change', () => { ui.ideaBook = $('idea-book').value; saveUi(); renderIdeas(); });
 
 const tip = $('tip');
-function showTip(dot) {
+function showTip(dot, touch = false) {
   const b = books.find(x => x.id === dot.dataset.dot);
   const ct = b && CTYPES.find(c => c.key === b.ctype);
   if (!ct) return;
   tip.innerHTML = `<div class="tip-claim">${esc(b.claim)}</div>
     <div class="tip-src">${esc(b.title)}${b.author ? ` · ${esc(b.author)}` : ''}</div>
-    <div class="tip-meta"><span class="pill ct-${ct.key}">${ct.label}</span><span>Actionability ${b.action}</span><span>Shift ${b.shift}</span></div>`;
+    <div class="tip-meta"><span class="pill ct-${ct.key}">${ct.label}</span><span>Actionability ${b.action}</span><span>Shift ${b.shift}</span></div>
+    <div class="tip-hint">${touch ? 'Tap again to see its ideas' : 'Click to see its ideas'}</div>`;
+  tip.dataset.book = b.id;
   tip.hidden = false;
   const r = dot.getBoundingClientRect(), t = tip.getBoundingClientRect();
   const x = Math.max(8, Math.min(r.left + r.width / 2 - t.width / 2, innerWidth - t.width - 8));
@@ -840,13 +902,26 @@ function hideTip() { tip.hidden = true; }
 const chart = $('scatter-chart');
 chart.addEventListener('pointerover', e => { const d = e.target.closest('[data-dot]'); if (d && e.pointerType !== 'touch') showTip(d); });
 chart.addEventListener('pointerout', e => { if (e.target.closest('[data-dot]') && e.pointerType !== 'touch') hideTip(); });
-chart.addEventListener('focusin', e => { const d = e.target.closest('[data-dot]'); if (d) showTip(d); });
+chart.addEventListener('focusin', e => { const d = e.target.closest('[data-dot]'); if (d) showTip(d, lastTouch); });
 chart.addEventListener('focusout', hideTip);
 // Touch has no hover: a tap on a dot shows the same card, a tap anywhere else hides it.
+// A second tap on the same dot opens that book's ideas.
+let lastTouch = false;   // a tap also focuses the dot, so remember if the last pointer was a finger to keep the right hint
 document.addEventListener('pointerdown', e => {
-  if (e.pointerType !== 'touch') return;
+  lastTouch = e.pointerType === 'touch';
+  if (!lastTouch) return;
   const d = e.target.closest('#scatter-chart [data-dot]');
-  if (d) showTip(d); else hideTip();
+  if (!d) { hideTip(); return; }
+  if (!tip.hidden && tip.dataset.book === d.dataset.dot) openIdeas(d.dataset.dot);
+  else showTip(d, true);
+});
+chart.addEventListener('click', e => {
+  const d = e.target.closest('[data-dot]');
+  if (d && e.pointerType !== 'touch') openIdeas(d.dataset.dot);
+});
+chart.addEventListener('keydown', e => {
+  const d = e.target.closest('[data-dot]');
+  if (d && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openIdeas(d.dataset.dot); }
 });
 addEventListener('scroll', hideTip, { passive: true });
 let resizeTimer;
@@ -918,12 +993,7 @@ els.tbody.addEventListener('click', async e => {
   if (edit) { openBook(edit.dataset.edit); return; }
   // Clicking a book opens its ideas; the pencil on the row is how you edit the book itself.
   const row = e.target.closest('[data-row]');
-  if (row) {
-    ui.view = 'ideas';
-    ui.ideaBook = row.dataset.row;
-    saveUi(); renderAll();
-    scrollTo({ top: 0 });
-  }
+  if (row) openIdeas(row.dataset.row);
 });
 
 // ── Columns dialog ──────────────────────────────────────────────────────────
