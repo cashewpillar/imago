@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Books v2</title>
+<script src="scripts/dexie.min.js"></script>
+<script src="books-v2-data.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+:root{
+  color-scheme:light;
+  --bg:#f8f7f4;--surface:#fff;--border:#e2e0d8;--border-strong:#c8c5bb;
+  --text:#1a1917;--text-muted:#6b6860;--text-faint:#9c9a94;
+  --accent:#3d5a99;--accent-soft:#e8edf7;
+  --r:8px;--rl:12px;
+}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh;min-height:100dvh}
+button{font-family:inherit;font-size:inherit;color:inherit;cursor:pointer;touch-action:manipulation}
+
+header{position:sticky;top:0;z-index:10;background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+header h1{font-size:17px;font-weight:600;letter-spacing:-.3px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border:1px solid var(--border-strong);border-radius:var(--r);background:var(--surface);font-size:13px;white-space:nowrap}
+.btn:active{background:var(--bg)}
+
+main{max-width:760px;margin:0 auto;padding:16px 16px 80px}
+
+/* ── Table ── */
+.table-container{border:1px solid var(--border);border-radius:var(--rl);background:var(--surface);overflow:hidden}
+table{width:100%;border-collapse:collapse;text-align:left}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);font-weight:500;padding:9px 12px;border-bottom:1px solid var(--border);background:var(--bg);white-space:nowrap}
+td{padding:12px;border-bottom:1px solid var(--border);vertical-align:top;font-size:13px}
+tr:last-child td{border-bottom:none}
+.b-row{cursor:pointer}
+.b-row:hover td{background:#fafaf8}
+.b-row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.b-title{font-weight:600;font-size:14px;line-height:1.35}
+.b-author{font-size:12px;color:var(--text-muted);margin-top:2px}
+.c-title{width:34%;min-width:150px}
+
+/* ── Outline ── */
+.book-head{margin-bottom:14px}
+.book-head h2{font-size:22px;font-weight:700;letter-spacing:-.4px;line-height:1.25}
+.book-head .meta{color:var(--text-muted);margin-top:2px}
+.outline{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:18px 18px 18px 14px}
+.outline ul{list-style:none}
+.outline ul ul{margin-left:14px;padding-left:12px;border-left:2px solid var(--border)}
+.outline li{margin-top:12px}
+.outline > ul > li{margin-top:0}
+.outline > ul > li > .t{font-size:17px;line-height:1.4;padding:10px 12px;background:var(--accent-soft);border-radius:var(--r);display:block}
+.outline > ul > li > ul{margin-top:14px}
+.outline .t{display:block}
+.outline strong{font-weight:600}
+.outline li li > .t strong{font-size:13px;text-transform:none;color:var(--text)}
+.outline li li li > .t{color:var(--text);margin-top:2px}
+.outline li li li{margin-top:2px}
+/* Your points: sit under a chapter's claim, lighter than the book's own lines */
+.outline ul.pts{margin-top:8px}
+.outline ul.pts li{margin-top:6px;display:flex;align-items:flex-start;gap:6px}
+.outline ul.pts li::before{content:"";flex:none;width:5px;height:5px;border-radius:50%;background:var(--accent);margin-top:8px}
+.outline ul.pts .t{flex:1;min-width:0;cursor:text;overflow-wrap:anywhere}
+.pt-x{flex:none;border:0;background:none;color:var(--text-faint);font-size:18px;line-height:1;padding:0 6px}
+.pt-x:hover{color:#b3372f}
+.add-pt{margin-top:6px;border:0;background:none;color:var(--accent);font-size:12px;font-weight:600;padding:4px 0}
+.outline input{font-family:inherit;font-size:16px;color:var(--text);background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r);padding:6px 9px;width:100%}
+.outline input:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+.actions{display:flex;gap:8px;margin-top:12px}
+
+.empty{text-align:center;padding:36px 16px;color:var(--text-faint)}
+.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:var(--text);color:#fff;padding:10px 16px;border-radius:var(--r);font-size:13px;opacity:0;pointer-events:none;transition:opacity .15s,transform .15s;max-width:90vw;text-align:center;z-index:200}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media(max-width:640px){
+  main{padding:12px 12px 80px}
+  .outline{padding:14px 12px 14px 10px}
+  .outline ul ul{margin-left:8px;padding-left:10px}
+  .book-head h2{font-size:20px}
+}
+</style>
+<meta name="theme-color" content="#f7f6f2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="imago">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/imago-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+</head>
+<body>
+<header>
+  <h1 id="title">Books</h1>
+  <button class="btn" id="back" type="button" hidden>← Books</button>
+</header>
+
+<main>
+  <section id="list-view">
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr><th class="c-title">Book</th><th>Key claim</th></tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="book-view" hidden>
+    <div class="book-head">
+      <h2 id="b-title"></h2>
+      <div class="meta" id="b-meta"></div>
+    </div>
+    <div class="outline" id="outline"></div>
+    <div class="actions"><button class="btn" id="copy-md" type="button">Copy markdown</button></div>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const books = window.BOOKS_V2 || [];
+const $ = id => document.getElementById(id);
+
+function esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => t.classList.remove('show'), 1600);
+}
+
+// Inline markdown: **bold** and *italic*, after escaping.
+function inline(s) {
+  return esc(s)
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>');
+}
+
+const db = new Dexie('BooksV2DB');
+db.version(1).stores({ points: 'id, bookKey, createdAt' });
+
+let current = null;   // the open book
+let points = [];      // your points for the open book, oldest first
+let adding = null;    // chapter title whose "add point" input is open
+let rendering = false;
+
+function uuid() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 3 | 8)).toString(16);
+  });
+}
+
+// "- item" lines, two spaces per level.
+function parseOutline(md) {
+  const items = [];
+  for (const line of md.split('\n')) {
+    const m = line.match(/^(\s*)- (.*)$/);
+    if (m) items.push({ depth: Math.floor(m[1].length / 2), text: m[2].trim() });
+  }
+  return items;
+}
+
+// A chapter is a depth-1 item. Your points hang off the depth-2 claim under it, keyed by the chapter's title.
+function chapterName(text) { return text.replace(/\*\*/g, ''); }
+
+function pointsHtml(chapter) {
+  const mine = points.filter(p => p.chapter === chapter);
+  const c = esc(chapter);
+  const rows = mine.map(p => `<li data-id="${p.id}"><span class="t" tabindex="0">${inline(p.text)}</span><button class="pt-x" type="button" aria-label="Delete point">×</button></li>`).join('');
+  const input = adding === chapter ? '<li><input class="new-pt" type="text" placeholder="Your point" autocomplete="off" aria-label="New point"></li>' : '';
+  return (rows || input ? `<ul class="pts" data-ch="${c}">${rows}${input}</ul>` : '')
+    + (adding === chapter ? '' : `<button class="add-pt" type="button" data-ch="${c}">+ Add point</button>`);
+}
+
+function renderOutline(md) {
+  let html = '';
+  let depth = -1;
+  let chapter = '';
+  for (const it of parseOutline(md)) {
+    if (it.depth > depth) {
+      while (depth < it.depth) { html += '<ul>'; depth++; if (depth < it.depth) html += '<li>'; }
+    } else {
+      html += '</li>';
+      while (depth > it.depth) { html += '</ul></li>'; depth--; }
+    }
+    if (it.depth === 1) chapter = chapterName(it.text);
+    html += `<li><span class="t">${inline(it.text)}</span>`;
+    if (it.depth === 2) html += pointsHtml(chapter);
+  }
+  while (depth >= 0) { html += '</li></ul>'; depth--; }
+  return html;
+}
+
+function outlineMarkdown(b) {
+  let chapter = '';
+  const lines = [];
+  for (const it of parseOutline(b.outline)) {
+    lines.push('  '.repeat(it.depth) + '- ' + it.text);
+    if (it.depth === 1) chapter = chapterName(it.text);
+    if (it.depth === 2) {
+      for (const p of points) if (p.chapter === chapter) lines.push('  '.repeat(3) + '- ' + p.text);
+    }
+  }
+  return lines.join('\n');
+}
+
+// Re-draw the outline. `rendering` stops the removed input's blur from saving twice.
+function redraw(focusSel) {
+  rendering = true;
+  $('outline').innerHTML = renderOutline(current.outline);
+  rendering = false;
+  if (focusSel) $('outline').querySelector(focusSel)?.focus();
+}
+
+async function addPoint(chapter, text) {
+  const now = Date.now();
+  const p = { id: uuid(), bookKey: current.key, chapter, text, createdAt: now, updatedAt: now };
+  await db.points.add(p);
+  points.push(p);
+}
+
+async function savePoint(id, text) {
+  const p = points.find(x => x.id === id);
+  if (!p) return;
+  if (!text) {
+    await db.points.delete(id);
+    points = points.filter(x => x.id !== id);
+    return;
+  }
+  p.text = text;
+  p.updatedAt = Date.now();
+  await db.points.put(p);
+}
+
+function renderList() {
+  $('tbody').innerHTML = books.length
+    ? books.map(b => `
+        <tr class="b-row" data-key="${esc(b.key)}" tabindex="0">
+          <td class="c-title"><div class="b-title">${esc(b.title)}</div><div class="b-author">${esc(b.author)}${b.year ? ' · ' + esc(b.year) : ''}</div></td>
+          <td>${esc(b.claim)}</td>
+        </tr>`).join('')
+    : '<tr><td colspan="2" class="empty">No books yet.</td></tr>';
+}
+
+async function openBook(b) {
+  current = b;
+  adding = null;
+  points = [];
+  $('b-title').textContent = b.title;
+  $('b-meta').textContent = b.author + (b.year ? ' · ' + b.year : '');
+  redraw();
+  try {
+    const rows = await db.points.where('bookKey').equals(b.key).sortBy('createdAt');
+    if (current !== b) return;
+    points = rows;
+    redraw();
+  } catch (err) {
+    toast('Could not load your points');
+  }
+}
+
+function route() {
+  const key = decodeURIComponent(location.hash.slice(1));
+  const b = books.find(x => x.key === key);
+  $('list-view').hidden = !!b;
+  $('book-view').hidden = !b;
+  $('back').hidden = !b;
+  $('title').textContent = b ? b.title : 'Books';
+  if (b) openBook(b); else current = null;
+  window.scrollTo(0, 0);
+}
+
+function go(key) { location.hash = encodeURIComponent(key); }
+
+$('tbody').addEventListener('click', e => {
+  const row = e.target.closest('.b-row');
+  if (row) go(row.dataset.key);
+});
+$('tbody').addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const row = e.target.closest('.b-row');
+  if (row) { e.preventDefault(); go(row.dataset.key); }
+});
+$('back').addEventListener('click', () => { location.hash = ''; });
+$('copy-md').addEventListener('click', async () => {
+  const b = books.find(x => x.key === decodeURIComponent(location.hash.slice(1)));
+  if (!b) return;
+  try {
+    await navigator.clipboard.writeText(`# ${b.title}\n${b.author}\n${outlineMarkdown(b)}\n`);
+    toast('Markdown copied');
+  } catch (err) {
+    toast('Copy failed');
+  }
+});
+// Your points: add under a chapter's claim, tap a point to edit it, × to delete.
+$('outline').addEventListener('click', async e => {
+  const add = e.target.closest('.add-pt');
+  if (add) {
+    adding = add.dataset.ch;
+    redraw('.new-pt');
+    return;
+  }
+  const del = e.target.closest('.pt-x');
+  if (del) {
+    await savePoint(del.closest('li').dataset.id, '');
+    redraw();
+    return;
+  }
+  const t = e.target.closest('.pts .t');
+  if (t) startEdit(t);
+});
+$('outline').addEventListener('keydown', e => {
+  const t = e.target.closest('.pts .t');
+  if (t && e.key === 'Enter') { e.preventDefault(); startEdit(t); }
+});
+
+function startEdit(span) {
+  const li = span.closest('li');
+  const p = points.find(x => x.id === li.dataset.id);
+  if (!p) return;
+  rendering = true;
+  li.innerHTML = '<input class="edit-pt" type="text" autocomplete="off" aria-label="Edit point">';
+  rendering = false;
+  const input = li.querySelector('input');
+  input.value = p.text;
+  input.focus();
+}
+
+// mode: 'enter' saves (the new-point box stays open for the next one), 'blur' saves and closes, 'cancel' discards.
+async function finishInput(input, mode) {
+  if (rendering) return;
+  const text = input.value.trim();
+  const save = mode !== 'cancel';
+  if (input.classList.contains('new-pt')) {
+    if (save && text) await addPoint(adding, text);
+    if (mode !== 'enter') adding = null;
+    redraw(mode === 'enter' ? '.new-pt' : '');
+    return;
+  }
+  if (save) await savePoint(input.closest('li').dataset.id, text);
+  redraw();
+}
+
+$('outline').addEventListener('keydown', e => {
+  if (!e.target.matches('input')) return;
+  if (e.key === 'Enter') { e.preventDefault(); finishInput(e.target, 'enter'); }
+  if (e.key === 'Escape') finishInput(e.target, 'cancel');
+});
+$('outline').addEventListener('focusout', e => {
+  if (e.target.matches('input')) finishInput(e.target, 'blur');
+});
+window.addEventListener('hashchange', route);
+
+renderList();
+route();
+</script>
+  <script src="pwa-register.js"></script>
+</body>
+</html>
