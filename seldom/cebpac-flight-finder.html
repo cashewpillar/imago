@@ -115,6 +115,9 @@
   #whenMode .bar i{display:block; height:100%; background:var(--wbest);}
   #whenMode .legend{margin:10px 2px; font-size:13px; color:var(--muted); display:flex; flex-wrap:wrap; gap:14px; align-items:center;}
   #whenMode .legend .strip{display:inline-grid; grid-template-columns:44px; min-width:0;}
+  #whenMode td.chkcell{width:48px;}
+  #whenMode td.chkcell input{width:18px; height:18px; cursor:pointer;}
+  #whenMode .summary button.linkbtn{background:none; border:none; color:var(--accent); padding:0; font-size:13px; font-weight:600; cursor:pointer; text-decoration:underline;}
   #whenMode .empty{padding:28px; text-align:center; color:var(--muted);}
 </style>
 <meta name="theme-color" content="#f7f6f2">
@@ -140,6 +143,7 @@
       <button type="button" onclick="importAvailabilityData()" title="Paste the JSON object copied from the Availability bookmarklet">Import availability data</button>
       <button type="button" onclick="exportAvailabilityData()" title="Download the captured availability data as a JSON file">Export availability data</button>
       <button type="button" onclick="clearEstimateAvailability()" title="Remove old day-level estimate data, keeping real captured flights">Clear estimates</button>
+      <button type="button" onclick="clearSelectedDestinationAvailability()" title="Delete all saved availability for the destination currently selected (both directions)">Clear selected destination</button>
     </div>
   </div>
   </div>
@@ -243,7 +247,7 @@
 
   <div class="summary" id="whenSummary"></div>
   <div class="wrap"><table>
-    <thead><tr><th></th><th>Destination</th><th>Year at a glance (underline = your window)</th><th>Fit</th></tr></thead>
+    <thead><tr><th title="Mark done to hide for today">Done</th><th></th><th>Destination</th><th>Year at a glance (underline = your window)</th><th>Fit</th></tr></thead>
     <tbody id="whenRows"></tbody>
   </table></div>
   <div class="legend">
@@ -270,6 +274,10 @@ function cebpacAvailabilityScraperPayload(){
   function dateOnly(s){ return String(s || '').slice(0, 10); }
 
   var seq = 0;
+  // Request-time stamp: strictly increasing within a page session (so a slow
+  // older response can't overwrite a newer one) and a real wall-clock ms
+  // value across sessions (so a fresh run beats data saved earlier).
+  function nextSeq(){ seq = Math.max(seq + 1, Date.now()); return seq; }
 
   // Each route in an availability/ response carries two different things:
   // `lowFares` is a ~7-day calendar strip around the searched date, one
@@ -302,7 +310,7 @@ function cebpacAvailabilityScraperPayload(){
         preciseDates[d] = true;
         var journeyKey = routeKey + '|' + j.journeyKey;
         var existing = routeEntry.journeys[journeyKey];
-        if(existing && existing.seq != null && s != null && s < existing.seq) return;
+        if(existing && existing.capturedAt != null && s != null && s < existing.capturedAt) return;
         var segments = Array.isArray(j.segments) ? j.segments : [];
         var flightNumbers = segments.map(function(seg){
           var id = seg.identifier || {};
@@ -319,8 +327,7 @@ function cebpacAvailabilityScraperPayload(){
           stops: segments.length ? segments.length - 1 : null,
           flightNumbers: flightNumbers || null,
           currency: currency,
-          capturedAt: Date.now(),
-          seq: s
+          capturedAt: s != null ? s : Date.now()
         };
       });
       // A date that just got precise entries above may still be holding an
@@ -338,7 +345,7 @@ function cebpacAvailabilityScraperPayload(){
         if(preciseDates[d]) return;
         var journeyKey = routeKey + '|' + d;
         var existing = routeEntry.journeys[journeyKey];
-        if(existing && existing.seq != null && s != null && s < existing.seq) return;
+        if(existing && existing.capturedAt != null && s != null && s < existing.capturedAt) return;
         routeEntry.journeys[journeyKey] = {
           journeyKey: journeyKey,
           origin: origin,
@@ -347,8 +354,7 @@ function cebpacAvailabilityScraperPayload(){
           fareTotal: lf.fareTotal,
           availableCount: lf.availableCount,
           currency: currency,
-          capturedAt: Date.now(),
-          seq: s
+          capturedAt: s != null ? s : Date.now()
         };
       });
       store.routes[routeKey] = routeEntry;
@@ -367,7 +373,7 @@ function cebpacAvailabilityScraperPayload(){
         var args = arguments;
         var urlArg = args[0];
         var url = (urlArg && urlArg.url) ? urlArg.url : urlArg;
-        var s = ++seq;
+        var s = nextSeq();
         return origFetch.apply(this, args).then(function(res){
           try{
             if(typeof url === 'string' && url.indexOf('availability') !== -1){
@@ -383,7 +389,7 @@ function cebpacAvailabilityScraperPayload(){
     var origSend = XMLHttpRequest.prototype.send;
     XMLHttpRequest.prototype.open = function(method, url){
       this.__cebpacAvsUrl = url;
-      this.__cebpacAvsSeq = ++seq;
+      this.__cebpacAvsSeq = nextSeq();
       return origOpen.apply(this, arguments);
     };
     XMLHttpRequest.prototype.send = function(){
@@ -544,6 +550,10 @@ function cebpacScraperPayload(){
   }
 
   var seq = 0;
+  // Request-time stamp: strictly increasing within a page session (so a slow
+  // older response can't overwrite a newer one) and a real wall-clock ms
+  // value across sessions (so a fresh run beats data saved earlier).
+  function nextSeq(){ seq = Math.max(seq + 1, Date.now()); return seq; }
 
   function ingest(data, s){
     var routeKey = routeKeyOf(data);
@@ -554,8 +564,8 @@ function cebpacScraperPayload(){
     var store = loadData();
     store.routes = store.routes || {};
     var existing = store.routes[routeKey];
-    if(existing && existing.seq != null && s != null && s < existing.seq) return;
-    store.routes[routeKey] = { raw: filtered, capturedAt: Date.now(), seq: s };
+    if(existing && existing.capturedAt != null && s != null && s < existing.capturedAt) return;
+    store.routes[routeKey] = { raw: filtered, capturedAt: s != null ? s : Date.now() };
     saveData(store);
     renderPanel();
   }
@@ -570,7 +580,7 @@ function cebpacScraperPayload(){
         var args = arguments;
         var urlArg = args[0];
         var url = (urlArg && urlArg.url) ? urlArg.url : urlArg;
-        var s = ++seq;
+        var s = nextSeq();
         return origFetch.apply(this, args).then(function(res){
           try{
             if(typeof url === 'string' && url.indexOf('farecache') !== -1){
@@ -586,7 +596,7 @@ function cebpacScraperPayload(){
     var origSend = XMLHttpRequest.prototype.send;
     XMLHttpRequest.prototype.open = function(method, url){
       this.__cebpacScrUrl = url;
-      this.__cebpacScrSeq = ++seq;
+      this.__cebpacScrSeq = nextSeq();
       return origOpen.apply(this, arguments);
     };
     XMLHttpRequest.prototype.send = function(){
@@ -1377,7 +1387,7 @@ function importAvailabilityData(){
     Object.keys(incoming.journeys).forEach(journeyKey => {
       const incomingJourney = incoming.journeys[journeyKey];
       const existing = routeEntry.journeys[journeyKey];
-      if(existing && existing.seq != null && incomingJourney.seq != null && incomingJourney.seq < existing.seq) return;
+      if(existing && existing.capturedAt != null && incomingJourney.capturedAt != null && incomingJourney.capturedAt < existing.capturedAt) return;
       routeEntry.journeys[journeyKey] = incomingJourney;
     });
 
@@ -1469,6 +1479,41 @@ function clearEstimateAvailability(){
   computeAvailabilityCombos();
 
   statusEl.textContent = `Cleared ${removed} estimate-only date(s). ${keptReal} real captured flight(s) kept.`;
+}
+
+// Removes ALL saved availability (real flights and estimates) for the
+// currently selected source/destination pair, both directions, leaving every
+// other route untouched.
+function clearSelectedDestinationAvailability(){
+  const errorEl = document.getElementById('availError');
+  const statusEl = document.getElementById('availImportStatus');
+  errorEl.textContent = '';
+  statusEl.textContent = '';
+
+  const source = document.getElementById('availSource').value.trim().toUpperCase();
+  const dest = document.getElementById('availDestSelect').value;
+  if(!dest){
+    errorEl.textContent = 'Choose a destination first -- nothing to clear.';
+    return;
+  }
+
+  const store = loadAvailabilityStore();
+  const routes = store.routes || {};
+  const keys = [source + dest, dest + source].filter(k => routes[k]);
+  const journeyCount = keys.reduce((sum, k) => sum + Object.keys(routes[k].journeys || {}).length, 0);
+  if(keys.length === 0){
+    errorEl.textContent = `No saved availability for ${source} \u2194 ${dest}.`;
+    return;
+  }
+  if(!confirm(`Remove all saved availability for ${cityName(dest)} (${source} \u2194 ${dest})? ${journeyCount} journey(s) across ${keys.length} route(s) will be deleted. Other destinations are untouched. This can't be undone (re-scrape to bring them back).`)) return;
+
+  keys.forEach(k => { delete routes[k]; });
+  saveAvailabilityStore(store);
+  refreshAvailabilityDestinationOptions();
+  computeAvailabilityCombos();
+  saveAvailFilters();
+
+  statusEl.textContent = `Cleared ${journeyCount} journey(s) for ${cityName(dest)} (${source} \u2194 ${dest}).`;
 }
 
 function initManualPage(){
@@ -1565,6 +1610,23 @@ initManualPage();
     for(let i = 0; i < 12; i++){ o.push(m); if(m === t) break; m = m % 12 + 1; }
     return o;
   }
+  // Done-today checklist: remembered across refreshes, expires at local midnight.
+  const DONE_KEY = 'cebpac_when_done_v1';
+  function todayStr(){
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function loadDone(){
+    try {
+      const o = JSON.parse(localStorage.getItem(DONE_KEY) || 'null');
+      if(o && o.date === todayStr() && Array.isArray(o.names)) return new Set(o.names);
+    } catch(e){}
+    return new Set();
+  }
+  function saveDone(set){
+    try { localStorage.setItem(DONE_KEY, JSON.stringify({date: todayStr(), names: Array.from(set)})); } catch(e){}
+  }
+
   function loadState(){
     try { const s = JSON.parse(localStorage.getItem(STATE_KEY) || 'null'); if(s) state = {...state, ...s}; } catch(e){}
   }
@@ -1574,14 +1636,18 @@ initManualPage();
 
   function render(){
     const sel = range(state.from, state.to), set = new Set(sel);
-    const res = DEST.map(d => ({
+    const done = loadDone();
+    const all = DEST.map(d => ({
       d,
       b: d.best.filter(m => set.has(m)).length,
       g: state.incGood ? d.good.filter(m => set.has(m)).length : 0
-    })).filter(r => r.b || r.g)
+    })).filter(r => r.b || r.g);
+    const hidden = all.filter(r => done.has(r.d.name)).length;
+    const res = all.filter(r => !done.has(r.d.name))
        .sort((x, y) => y.b - x.b || y.g - x.g || x.d.name.localeCompare(y.d.name));
     const label = sel.length === 12 ? "All year" : M[state.from - 1] + " to " + M[state.to - 1];
-    $("whenSummary").innerHTML = "<b>" + esc(label) + "</b> (" + sel.length + " month" + (sel.length > 1 ? "s" : "") + "): " + res.length + " of " + DEST.length + " destinations match.";
+    $("whenSummary").innerHTML = "<b>" + esc(label) + "</b> (" + sel.length + " month" + (sel.length > 1 ? "s" : "") + "): " + res.length + " of " + DEST.length + " destinations match."
+      + (hidden ? " " + hidden + " done today. <button type='button' class='linkbtn' id='whenResetDone'>Reset</button>" : "");
     $("whenRows").innerHTML = res.length ? res.map((r, i) => {
       const cells = M.map((n, k) => {
         const m = k + 1, inW = set.has(m);
@@ -1589,8 +1655,8 @@ initManualPage();
         return "<span class='" + [t, t && !inW ? "out" : "", inW ? "w" : ""].join(" ").trim() + "'>" + n[0] + "</span>";
       }).join("");
       const pct = Math.round(r.b / sel.length * 100);
-      return "<tr><td class='n'>" + (i + 1) + "</td><td><div class='dest'>" + esc(r.d.name) + "</div><div class='ctry'>" + esc(r.d.country) + "</div></td><td><div class='strip' title='J F M A M J J A S O N D'>" + cells + "</div></td><td>" + r.b + " of " + sel.length + " best" + (r.g ? "<div class='ctry'>+ " + r.g + " okay</div>" : "") + "<div class='bar'><i style='width:" + pct + "%'></i></div></td></tr>";
-    }).join("") : "<tr><td colspan='4' class='empty'>No destinations match this window. Try widening it or turning on “okay” months.</td></tr>";
+      return "<tr><td class='chkcell'><input type='checkbox' data-name='" + esc(r.d.name) + "' aria-label='Mark " + esc(r.d.name) + " done'></td><td class='n'>" + (i + 1) + "</td><td><div class='dest'>" + esc(r.d.name) + "</div><div class='ctry'>" + esc(r.d.country) + "</div></td><td><div class='strip' title='J F M A M J J A S O N D'>" + cells + "</div></td><td>" + r.b + " of " + sel.length + " best" + (r.g ? "<div class='ctry'>+ " + r.g + " okay</div>" : "") + "<div class='bar'><i style='width:" + pct + "%'></i></div></td></tr>";
+    }).join("") : "<tr><td colspan='5' class='empty'>" + (hidden ? "Everything matching this window is marked done today." : "No destinations match this window. Try widening it or turning on “okay” months.") + "</td></tr>";
   }
 
   loadState();
@@ -1601,6 +1667,14 @@ initManualPage();
     state = {from:+$("whenFrom").value, to:+$("whenTo").value, incGood:$("whenIncGood").checked};
     saveState(); render();
   }));
+  $("whenRows").addEventListener("change", e => {
+    const cb = e.target.closest("input[data-name]");
+    if(!cb || !cb.checked) return;
+    const done = loadDone(); done.add(cb.dataset.name); saveDone(done); render();
+  });
+  $("whenSummary").addEventListener("click", e => {
+    if(e.target.id === "whenResetDone"){ saveDone(new Set()); render(); }
+  });
   render();
 })();
 </script>
