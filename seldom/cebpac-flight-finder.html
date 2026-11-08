@@ -64,7 +64,7 @@
 
   @media print{
     body{padding:0; background:#fff;}
-    .topbar, .bookmarklet-row, .mode-tabs, .mode-toolbar, p.sub, .layout, .config,
+    .topbar, .bookmarklet-row, .mode-tabs, .tab-actions, .mode-toolbar, p.sub, .layout, .config,
     #error, #importStatus, #availError, #availImportStatus{display:none;}
     #results, #availResults{margin:0; max-width:none;}
     table{border:1px solid #ccc;}
@@ -78,6 +78,44 @@
     cursor:grab; user-select:none;
   }
   .bookmarklet-btn:active{cursor:grabbing;}
+
+  /* Availability burger menu (top right of tab bar) */
+  .tab-actions{margin-left:auto; align-self:center; margin-bottom:4px; display:flex; align-items:center; gap:10px;}
+  .tab-actions[hidden]{display:none;}
+  .burger{position:relative;}
+  .burger[hidden], .burger-menu[hidden]{display:none;}
+  .burger-btn{background:none; color:var(--text); border:1px solid var(--border); border-radius:8px; padding:4px 10px; font-size:18px; line-height:1;}
+  .burger-btn:hover{filter:none; background:var(--panel2);}
+  .burger-menu{position:absolute; right:0; top:calc(100% + 4px); z-index:10; min-width:200px; background:var(--panel); border:1px solid var(--border); border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,.12); padding:4px; display:flex; flex-direction:column;}
+  .burger-menu button{background:none; color:var(--text); text-align:left; font-weight:500; padding:8px 12px; border-radius:6px; white-space:nowrap;}
+  .burger-menu button:hover{filter:none; background:var(--panel2);}
+
+  /* When to go tab — everything scoped under #whenMode */
+  #whenMode{--wbest:#0f6b5c; --wokay:#8a6a12; --wokaybg:#f7ecc8; max-width:1100px; margin:0 auto;}
+  #whenMode .panel{background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:14px 16px; display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end;}
+  #whenMode label{display:flex; flex-direction:column; gap:4px; font-size:13px; color:var(--muted); text-transform:none; letter-spacing:0; margin:0;}
+  #whenMode select{width:auto;}
+  #whenMode label.chk{flex-direction:row; align-items:center; gap:8px; color:var(--text); padding-bottom:9px;}
+  #whenMode .summary{margin:16px 2px 8px; color:var(--muted); font-size:13px;}
+  #whenMode .summary b{color:var(--text);}
+  #whenMode .wrap{overflow-x:auto; background:var(--panel); border:1px solid var(--border); border-radius:10px;}
+  #whenMode table{min-width:600px; border:none; border-radius:0;}
+  #whenMode th{text-transform:none; font-size:13px; letter-spacing:0;}
+  #whenMode td{vertical-align:middle;}
+  #whenMode td.n{color:var(--muted); width:36px;}
+  #whenMode .dest{font-weight:600;}
+  #whenMode .ctry{color:var(--muted); font-size:13px;}
+  #whenMode .strip{display:grid; grid-template-columns:repeat(12,1fr); gap:2px; min-width:330px;}
+  #whenMode .strip span{font-size:11px; text-align:center; padding:4px 0 2px; border-radius:4px; background:#eef2f1; color:#a3b0b3; border-bottom:3px solid transparent;}
+  #whenMode .strip .b{background:var(--wbest); color:#fff; font-weight:600;}
+  #whenMode .strip .g{background:var(--wokaybg); color:var(--wokay); font-weight:600;}
+  #whenMode .strip .out{opacity:.3;}
+  #whenMode .strip .w{border-bottom-color:var(--text);}
+  #whenMode .bar{height:6px; background:#e6ecea; border-radius:4px; margin-top:6px; width:110px; overflow:hidden;}
+  #whenMode .bar i{display:block; height:100%; background:var(--wbest);}
+  #whenMode .legend{margin:10px 2px; font-size:13px; color:var(--muted); display:flex; flex-wrap:wrap; gap:14px; align-items:center;}
+  #whenMode .legend .strip{display:inline-grid; grid-template-columns:44px; min-width:0;}
+  #whenMode .empty{padding:28px; text-align:center; color:var(--muted);}
 </style>
 <meta name="theme-color" content="#f7f6f2">
 <meta name="mobile-web-app-capable" content="yes">
@@ -90,25 +128,35 @@
 </head>
 <body>
 
-<div class="topbar">
-  <h1>Cheapest Flight Finder - CebPac</h1>
-</div>
-<div class="bookmarklet-row">
-  <a id="cebpac-bookmarklet" class="bookmarklet-btn" href="javascript:void(0)" draggable="true" title="Drag this to your bookmarks bar. Click it to start capturing availability/ responses (fares under ₱6,000 only) as you browse, then use its Copy button.">Availability</a>
-  <a id="cebpac-bookmarklet-scraper" class="bookmarklet-btn" href="javascript:void(0)" draggable="true" title="Drag this to your bookmarks bar. Click it to start capturing farecache/ responses (dates under ₱600 only) as you browse, then use its Copy button and paste into Import scraped data below.">Overview</a>
-</div>
-
 <div class="mode-tabs">
-  <button type="button" class="mode-tab" data-mode="fare" onclick="switchMode('fare')">Fare Search</button>
-  <button type="button" class="mode-tab" data-mode="availability" onclick="switchMode('availability')">Availability Details</button>
+  <button type="button" class="mode-tab" data-mode="when" onclick="switchMode('when')">1. When to go</button>
+  <button type="button" class="mode-tab" data-mode="availability" onclick="switchMode('availability')">2. Availability Details</button>
+  <button type="button" class="mode-tab" data-mode="fare" onclick="switchMode('fare')">3. Fare Search</button>
+  <div class="tab-actions" id="availActions" hidden>
+  <a id="cebpac-bookmarklet" class="bookmarklet-btn" href="javascript:void(0)" draggable="true" title="Drag this to your bookmarks bar. Click it to start capturing availability/ responses (fares under ₱6,000 only) as you browse, then use its Copy button.">Availability</a>
+  <div class="burger">
+    <button type="button" class="burger-btn" aria-label="Availability actions" aria-haspopup="true" aria-expanded="false">&#9776;</button>
+    <div class="burger-menu" hidden>
+      <button type="button" onclick="importAvailabilityData()" title="Paste the JSON object copied from the Availability bookmarklet">Import availability data</button>
+      <button type="button" onclick="exportAvailabilityData()" title="Download the captured availability data as a JSON file">Export availability data</button>
+      <button type="button" onclick="clearEstimateAvailability()" title="Remove old day-level estimate data, keeping real captured flights">Clear estimates</button>
+    </div>
+  </div>
+  </div>
+  <div class="tab-actions" id="fareActions" hidden>
+  <a id="cebpac-bookmarklet-scraper" class="bookmarklet-btn" href="javascript:void(0)" draggable="true" title="Drag this to your bookmarks bar. Click it to start capturing farecache/ responses (dates under ₱600 only) as you browse, then use its Copy button and paste into Import scraped data below.">Overview</a>
+  <div class="burger">
+    <button type="button" class="burger-btn" aria-label="Fare search actions" aria-haspopup="true" aria-expanded="false">&#9776;</button>
+    <div class="burger-menu" hidden>
+      <button type="button" onclick="importScrapedData()" title="Paste the JSON array copied from the Overview bookmarklet">Import scraped data</button>
+    </div>
+  </div>
+  </div>
 </div>
 
 <div id="fareSearchMode">
   <p class="sub">Paste the two fare JSON blobs (route keys like "DGTMNL|PHP"), set your trip preferences, and find the cheapest valid combinations.</p>
 
-  <div class="mode-toolbar">
-    <button onclick="importScrapedData()" title="Paste the JSON array copied from the Scraper bookmarklet">Import scraped data</button>
-  </div>
 
   <div class="layout">
     <div class="card">
@@ -123,7 +171,7 @@
 
   <div class="config">
     <div class="field">
-      <label>Source (3-letter code)</label>
+      <label>Source</label>
       <input type="text" id="source" maxlength="3" placeholder="e.g. MNL" value="MNL">
     </div>
     <div class="field">
@@ -151,15 +199,10 @@
 <div id="availabilityMode" hidden>
   <p class="sub">Import captured availability/ responses (actual flights with live seat counts, fares under ₱6,000) and find round-trip combinations that fit your group.</p>
 
-  <div class="mode-toolbar">
-    <button onclick="importAvailabilityData()" title="Paste the JSON object copied from the Availability bookmarklet">Import availability data</button>
-    <button onclick="exportAvailabilityData()" title="Download the captured availability data as a JSON file">Export availability data</button>
-    <button onclick="clearEstimateAvailability()" title="Remove old day-level estimate data, keeping real captured flights">Clear estimates</button>
-  </div>
 
   <div class="config">
     <div class="field">
-      <label>Source (3-letter code)</label>
+      <label>Source</label>
       <input type="text" id="availSource" maxlength="3" placeholder="e.g. MNL" value="MNL">
     </div>
     <div class="field">
@@ -187,6 +230,27 @@
   <div id="availError"></div>
   <div id="availImportStatus"></div>
   <div id="availResults"></div>
+</div>
+
+<div id="whenMode" hidden>
+  <p class="sub">Pick a travel window to see which destinations are in their best or okay season.</p>
+
+  <div class="panel">
+    <label>From month <select id="whenFrom"></select></label>
+    <label>To month (inclusive) <select id="whenTo"></select></label>
+    <label class="chk"><input type="checkbox" id="whenIncGood"> Include “okay” months</label>
+  </div>
+
+  <div class="summary" id="whenSummary"></div>
+  <div class="wrap"><table>
+    <thead><tr><th></th><th>Destination</th><th>Year at a glance (underline = your window)</th><th>Fit</th></tr></thead>
+    <tbody id="whenRows"></tbody>
+  </table></div>
+  <div class="legend">
+    <span class="strip"><span class="b">Best</span></span>
+    <span class="strip"><span class="g">Okay</span></span>
+    <span class="strip"><span class="b out">Best</span></span> outside your window
+  </div>
 </div>
 
 <script>
@@ -987,11 +1051,34 @@ function run(){
   resultsEl.innerHTML = html;
 }
 
+function closeBurgers(){
+  document.querySelectorAll('.burger-menu').forEach(m => { m.hidden = true; });
+  document.querySelectorAll('.burger-btn').forEach(b => b.setAttribute('aria-expanded', 'false'));
+}
+document.querySelectorAll('.burger').forEach(burger => {
+  const btn = burger.querySelector('.burger-btn');
+  const menu = burger.querySelector('.burger-menu');
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    const open = menu.hidden;
+    closeBurgers();
+    menu.hidden = !open;
+    btn.setAttribute('aria-expanded', String(open));
+  });
+  menu.addEventListener('click', closeBurgers);
+});
+document.addEventListener('click', closeBurgers);
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeBurgers(); });
+
 const MODE_KEY = 'cebpac_active_mode_v1';
 
 function switchMode(mode){
   document.getElementById('fareSearchMode').hidden = mode !== 'fare';
   document.getElementById('availabilityMode').hidden = mode !== 'availability';
+  document.getElementById('whenMode').hidden = mode !== 'when';
+  document.getElementById('availActions').hidden = mode !== 'availability';
+  document.getElementById('fareActions').hidden = mode !== 'fare';
+  closeBurgers();
   document.querySelectorAll('.mode-tab').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.mode === mode);
   });
@@ -1440,12 +1527,82 @@ function initManualPage(){
     saveAvailFilters();
   });
 
-  let savedMode = 'fare';
-  try { savedMode = localStorage.getItem(MODE_KEY) || 'fare'; } catch(e){}
-  switchMode(savedMode === 'availability' ? 'availability' : 'fare');
+  let savedMode = 'when';
+  try { savedMode = localStorage.getItem(MODE_KEY) || 'when'; } catch(e){}
+  switchMode(['fare', 'availability', 'when'].includes(savedMode) ? savedMode : 'when');
 }
 
 initManualPage();
+</script>
+
+<script>
+// "When to go" tab — best/okay travel months per destination
+(function(){
+  const M = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const DEST = [
+    ["Hong Kong","China (SAR)",[10,11,12],[3,4]],
+    ["Bali","Indonesia",[5,6,7,8,9],[4,10]],
+    ["Jakarta","Indonesia",[6,7,8,9],[5,10]],
+    ["Macau","China (SAR)",[10,11,12],[3,4]],
+    ["Singapore","Singapore",[2,3,4,7],[1,5,6,8]],
+    ["Kaohsiung","Taiwan",[11,12,1,2,3],[4,10]],
+    ["Taipei","Taiwan",[3,4,10,11],[5,12]],
+    ["Bangkok","Thailand",[11,12,1,2],[3,10]],
+    ["Chiang Mai","Thailand",[11,12,1],[2,10]],
+    ["Da Nang","Vietnam",[2,3,4,5],[1,6,7,8]],
+    ["Hanoi","Vietnam",[10,11,3,4],[9,12]],
+    ["Ho Chi Minh (Saigon)","Vietnam",[12,1,2,3],[11,4]],
+    ["Coron","Philippines",[1,2,3,4],[11,12,5]]
+  ].map(r => ({name:r[0], country:r[1], best:r[2], good:r[3]}));
+
+  const STATE_KEY = 'cebpac_when_inputs_v1';
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  let state = {from:1, to:12, incGood:true};
+
+  function range(f, t){
+    const o = []; let m = f;
+    for(let i = 0; i < 12; i++){ o.push(m); if(m === t) break; m = m % 12 + 1; }
+    return o;
+  }
+  function loadState(){
+    try { const s = JSON.parse(localStorage.getItem(STATE_KEY) || 'null'); if(s) state = {...state, ...s}; } catch(e){}
+  }
+  function saveState(){
+    try { localStorage.setItem(STATE_KEY, JSON.stringify(state)); } catch(e){}
+  }
+
+  function render(){
+    const sel = range(state.from, state.to), set = new Set(sel);
+    const res = DEST.map(d => ({
+      d,
+      b: d.best.filter(m => set.has(m)).length,
+      g: state.incGood ? d.good.filter(m => set.has(m)).length : 0
+    })).filter(r => r.b || r.g)
+       .sort((x, y) => y.b - x.b || y.g - x.g || x.d.name.localeCompare(y.d.name));
+    const label = sel.length === 12 ? "All year" : M[state.from - 1] + " to " + M[state.to - 1];
+    $("whenSummary").innerHTML = "<b>" + esc(label) + "</b> (" + sel.length + " month" + (sel.length > 1 ? "s" : "") + "): " + res.length + " of " + DEST.length + " destinations match.";
+    $("whenRows").innerHTML = res.length ? res.map((r, i) => {
+      const cells = M.map((n, k) => {
+        const m = k + 1, inW = set.has(m);
+        const t = r.d.best.includes(m) ? "b" : (state.incGood && r.d.good.includes(m) ? "g" : "");
+        return "<span class='" + [t, t && !inW ? "out" : "", inW ? "w" : ""].join(" ").trim() + "'>" + n[0] + "</span>";
+      }).join("");
+      const pct = Math.round(r.b / sel.length * 100);
+      return "<tr><td class='n'>" + (i + 1) + "</td><td><div class='dest'>" + esc(r.d.name) + "</div><div class='ctry'>" + esc(r.d.country) + "</div></td><td><div class='strip' title='J F M A M J J A S O N D'>" + cells + "</div></td><td>" + r.b + " of " + sel.length + " best" + (r.g ? "<div class='ctry'>+ " + r.g + " okay</div>" : "") + "<div class='bar'><i style='width:" + pct + "%'></i></div></td></tr>";
+    }).join("") : "<tr><td colspan='4' class='empty'>No destinations match this window. Try widening it or turning on “okay” months.</td></tr>";
+  }
+
+  loadState();
+  const opts = M.map((m, i) => "<option value='" + (i + 1) + "'>" + m + "</option>").join("");
+  $("whenFrom").innerHTML = opts; $("whenTo").innerHTML = opts;
+  $("whenFrom").value = state.from; $("whenTo").value = state.to; $("whenIncGood").checked = state.incGood;
+  ["whenFrom", "whenTo", "whenIncGood"].forEach(id => $(id).addEventListener("change", () => {
+    state = {from:+$("whenFrom").value, to:+$("whenTo").value, incGood:$("whenIncGood").checked};
+    saveState(); render();
+  }));
+  render();
+})();
 </script>
 
   <script src="pwa-register.js"></script>
