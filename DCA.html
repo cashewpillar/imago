@@ -1,0 +1,426 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><meta name="theme-color" content="#f7f6f2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="imago">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/imago-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+</head><body>
+<title>VWRA Entry Planner</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+/* Layout: one narrow column. Two stages (Buy fund, Buy dollars) behind a tab bar. Each stage: verdict, inputs, how good the price is, settings tucked away. */
+:root {
+  --bg: #F4F6F3;
+  --surface: #FFFFFF;
+  --ink: #16211B;
+  --muted: #5B6960;
+  --line: #DCE2DB;
+  --accent: #1E5C49;
+  --accent-ink: #FFFFFF;
+  --good: #1B7348;
+  --good-bg: #E1F1E8;
+  --warn: #8F5509;
+  --warn-bg: #FAEACB;
+  --idle: #4F5C54;
+  --idle-bg: #E9EDE8;
+  --font-display: 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.45;
+  padding-block: 20px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  font-variant-numeric: tabular-nums;
+}
+.wrap { max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+.panel { display: flex; flex-direction: column; gap: 14px; }
+h1 { font: 600 22px/1.2 var(--font-display); margin: 0; text-wrap: balance; }
+h2 { font: 600 13px/1.2 var(--font-display); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; background: var(--idle-bg); padding: 4px; border-radius: 12px; }
+.tab { position: relative; font: 600 15px var(--font-body); padding: 10px 8px; border-radius: 9px; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+.tab[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(22,33,27,.12); }
+.tab .dot { display: none; width: 8px; height: 8px; border-radius: 50%; background: var(--good); position: absolute; top: 8px; right: 10px; }
+.tab .dot.on { display: block; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.verdict { border-width: 2px; }
+.verdict.go { border-color: var(--good); background: var(--good-bg); }
+.verdict .big { font: 600 28px/1.15 var(--font-display); margin: 0; text-wrap: balance; }
+.verdict .detail { margin: 0; }
+.reasons { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; }
+.reasons:empty { display: none; }
+.pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--idle-bg); color: var(--idle); white-space: nowrap; }
+.pill.hit { background: var(--good-bg); color: var(--good); }
+.pill.near { background: var(--warn-bg); color: var(--warn); }
+.row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.row .k { color: var(--muted); }
+.row .v { font-weight: 600; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+label { font-size: 12px; color: var(--muted); font-weight: 500; }
+input[type=text], input[type=date] {
+  width: 100%; font: 500 16px var(--font-body); color: var(--ink); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; min-width: 0;
+}
+input:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.levels { display: flex; flex-direction: column; gap: 8px; }
+.level { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; align-items: center; font-size: 14px; }
+.level span:last-child { color: var(--muted); }
+button.act {
+  font: 600 15px var(--font-body); border-radius: 10px; padding: 12px 16px; border: 1px solid var(--accent);
+  background: var(--accent); color: var(--accent-ink); cursor: pointer;
+}
+button.ghost { background: var(--surface); color: var(--accent); }
+button[disabled] { opacity: .45; cursor: not-allowed; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.actions:has(button[disabled]:only-child) { display: none; }
+details { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 4px 16px; }
+details[open] { padding-bottom: 16px; }
+summary { cursor: pointer; padding: 12px 0; font: 600 13px var(--font-display); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+details .body { display: flex; flex-direction: column; gap: 14px; }
+.note { font-size: 12.5px; color: var(--muted); margin: 0; }
+.foot { font-size: 12px; color: var(--muted); margin: 0; }
+.hist { display: flex; flex-direction: column; gap: 8px; }
+.hline { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 14px; }
+.hline span { min-width: 0; }
+button.x { font: 500 12px var(--font-body); color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; cursor: pointer; flex-shrink: 0; }
+</style>
+
+<div class="wrap">
+  <h1>VWRA Entry Planner</h1>
+  <div class="tabs" role="tablist" aria-label="Stage">
+    <button class="tab" role="tab" id="tab_fund" aria-selected="true" type="button">Buy fund<span class="dot" id="dot_fund"></span></button>
+    <button class="tab" role="tab" id="tab_fx" aria-selected="false" type="button">Buy dollars<span class="dot" id="dot_fx"></span></button>
+  </div>
+  <div class="panel" id="panel_fund" role="tabpanel"></div>
+  <div class="panel" id="panel_fx" role="tabpanel" hidden></div>
+  <details>
+    <summary>Backup</summary>
+    <div class="body">
+      <div class="actions">
+        <button class="act ghost" type="button" id="bk_export">Export</button>
+        <button class="act ghost" type="button" id="bk_import">Import</button>
+      </div>
+      <p class="note" id="bk_msg" aria-live="polite">Export downloads both stages as a JSON file. Import replaces what is saved on this device.</p>
+      <input type="file" id="bk_file" accept=".json,application/json" hidden>
+    </div>
+  </details>
+  <p class="foot">Saved on this device. A planning aid, not financial advice. The dollar amount and the USD/PHP rate are samples, so replace them with yours.</p>
+</div>
+
+<script>
+(function () {
+  var KEY = 'vwra-entry-planner-v3';
+  var LABELS = ['Good buy', 'Great buy', 'Excellent buy'];
+  var $ = function (id) { return document.getElementById(id); };
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function isoToday() { var d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function parseISO(s) { var p = (s || '').split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function addMonths(d, n) {
+    var whole = Math.floor(n), frac = n - whole;
+    var out = new Date(d.getFullYear(), d.getMonth() + whole, 1);
+    var dim = new Date(out.getFullYear(), out.getMonth() + 1, 0).getDate();
+    out.setDate(Math.min(d.getDate(), dim));
+    if (frac > 0) out.setDate(out.getDate() + Math.round(frac * 30));
+    return out;
+  }
+  function dayDiff(a, b) { return Math.round((a - b) / 864e5); }
+  function num(v) { var x = parseFloat(String(v).replace(/,/g, '')); return isFinite(x) ? x : 0; }
+  var peso = function (n) { return '₱' + Math.round(n).toLocaleString('en-PH'); };
+  var usd = function (n) { return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+  var rate = function (n) { return n.toFixed(2); };
+  var dateFmt = function (d) { return d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }); };
+  function agoText(iso) {
+    var t = parseISO(isoToday()), l = parseISO(iso), days = dayDiff(t, l);
+    if (days < 0) return 'In the future';
+    if (days === 0) return 'Today';
+    var m = (t.getFullYear() - l.getFullYear()) * 12 + t.getMonth() - l.getMonth();
+    if (t.getDate() < l.getDate()) m--;
+    if (m < 0) m = 0;
+    var rem = dayDiff(t, addMonths(l, m)), parts = [];
+    if (m > 0) parts.push(m + (m === 1 ? ' month' : ' months'));
+    if (rem > 0 || m === 0) parts.push(rem + (rem === 1 ? ' day' : ' days'));
+    return parts.join(' ') + ' ago';
+  }
+
+  var CFG = {
+    fund: { name: 'VWRA', cashLab: 'Dollars waiting (USD)', priceLab: 'VWRA price now (USD)', highLab: 'VWRA reference high (USD)',
+            minLab: 'Minimum buy (USD)', rec: 'Record this buy', fc: usd, fp: usd, verb: 'Invest', past: 'Past buys', lastLab: 'Last bought', cur: 'USD' },
+    fx:   { name: 'USD/PHP', cashLab: 'Pesos waiting (₱)', priceLab: 'USD/PHP now (₱ per $)', highLab: 'USD/PHP reference high (₱ per $)',
+            minLab: 'Minimum conversion (₱)', rec: 'Record conversion', fc: peso, fp: rate, verb: 'Convert', past: 'Past conversions', lastLab: 'Last converted', cur: '₱' }
+  };
+
+  var defaults = {
+    tab: 'fund',
+    fund: { cash: 1700, history: [], last: isoToday(), maxMonths: 4, minTicket: 50, price: 184, high: 196.38, drops: [5, 10, 20] },
+    fx:   { cash: 0, history: [], last: isoToday(), maxMonths: 4, minTicket: 5000, price: 59, high: 63, drops: [3, 5, 8] }
+  };
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function normalize(s) {
+    var out = clone(defaults);
+    out.tab = s.tab === 'fx' ? 'fx' : 'fund';
+    ['fund', 'fx'].forEach(function (k) {
+      if (!s[k] || typeof s[k] !== 'object') return;
+      Object.keys(out[k]).forEach(function (f) { if (s[k][f] !== undefined) out[k][f] = s[k][f]; });
+      if (!Array.isArray(out[k].drops) || out[k].drops.length !== 3) out[k].drops = defaults[k].drops;
+      out[k].drops = out[k].drops.map(num);
+      ['cash', 'price', 'high', 'maxMonths', 'minTicket'].forEach(function (f) { out[k][f] = num(out[k][f]); });
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(out[k].last)) out[k].last = defaults[k].last;
+      out[k].history = Array.isArray(out[k].history) ? out[k].history.filter(function (h) {
+        return h && /^\d{4}-\d{2}-\d{2}$/.test(h.date) && num(h.amount) > 0;
+      }).map(function (h) { return { date: h.date, amount: num(h.amount) }; }) : [];
+    });
+    return out;
+  }
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (raw) return normalize(JSON.parse(raw));
+    } catch (e) {}
+    return clone(defaults);
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+  var state = load();
+
+  function panelHTML(k) {
+    var c = CFG[k], p = k + '_', dropFields = '';
+    for (var i = 0; i < 3; i++) {
+      dropFields += '<div class="field"><label for="' + p + 'd' + i + '">' + LABELS[i] + ' at (% below high)</label><input id="' + p + 'd' + i + '" type="text" inputmode="decimal" autocomplete="off"></div>';
+    }
+    return '' +
+      '<section class="card verdict" id="' + p + 'verdict" aria-live="polite">' +
+        '<h2>Today</h2><p class="big" id="' + p + 'big">Wait</p><p class="detail" id="' + p + 'detail"></p>' +
+        '<ul class="reasons" id="' + p + 'reasons"></ul>' +
+        '<div class="actions"><button class="act" type="button" id="' + p + 'rec" disabled>' + c.rec + '</button></div>' +
+      '</section>' +
+      '<section class="card">' +
+        '<div class="fields">' +
+          '<div class="field"><label for="' + p + 'cash">' + c.cashLab + '</label><input id="' + p + 'cash" type="text" inputmode="decimal" autocomplete="off"></div>' +
+          '<div class="field"><label for="' + p + 'price">' + c.priceLab + '</label><input id="' + p + 'price" type="text" inputmode="decimal" autocomplete="off"></div>' +
+        '</div>' +
+        '<div class="field"><label for="' + p + 'last">' + c.lastLab + '</label><input id="' + p + 'last" type="date"></div>' +
+        '<div class="row"><span class="k">Since then</span><span class="v" id="' + p + 'ago"></span></div>' +
+        '<div class="row"><span class="k">Time limit</span><span class="v" id="' + p + 'time"></span></div>' +
+        '<div class="row"><span class="k">' + c.name + ' vs its high</span><span class="v" id="' + p + 'dd"></span></div>' +
+        '<div class="levels" id="' + p + 'levels"></div>' +
+      '</section>' +
+      '<details><summary>Settings</summary><div class="body">' +
+        '<div class="fields">' + dropFields +
+          '<div class="field"><label for="' + p + 'high">' + c.highLab + '</label><input id="' + p + 'high" type="text" inputmode="decimal" autocomplete="off"></div>' +
+          '<div class="field"><label for="' + p + 'maxMonths">Max wait (months)</label><input id="' + p + 'maxMonths" type="text" inputmode="decimal" autocomplete="off"></div>' +
+          '<div class="field"><label for="' + p + 'minTicket">' + c.minLab + '</label><input id="' + p + 'minTicket" type="text" inputmode="decimal" autocomplete="off"></div>' +
+        '</div>' +
+        '<p class="note">The levels only rate how good the price is. Reaching the first level, or the max wait, triggers a buy of everything waiting.</p>' +
+      '</div></details>' +
+      '<details><summary>' + c.past + '</summary><div class="body">' +
+        '<div class="hist" id="' + p + 'hist"></div>' +
+        '<div class="fields">' +
+          '<div class="field"><label for="' + p + 'hd">Date</label><input id="' + p + 'hd" type="date"></div>' +
+          '<div class="field"><label for="' + p + 'ha">Amount (' + c.cur + ')</label><input id="' + p + 'ha" type="text" inputmode="decimal" autocomplete="off"></div>' +
+        '</div>' +
+        '<div class="actions"><button class="act ghost" type="button" id="' + p + 'hadd">Add past entry</button></div>' +
+        '<p class="note">The newest date here becomes your last ' + (k === 'fund' ? 'buy' : 'conversion') + '. Recording above adds an entry for you.</p>' +
+      '</div></details>';
+  }
+  $('panel_fund').innerHTML = panelHTML('fund');
+  $('panel_fx').innerHTML = panelHTML('fx');
+
+  function fillInputs(k) {
+    var s = state[k], p = k + '_';
+    $(p + 'cash').value = s.cash; $(p + 'price').value = s.price; $(p + 'high').value = s.high;
+    $(p + 'last').value = s.last; $(p + 'maxMonths').value = s.maxMonths; $(p + 'minTicket').value = s.minTicket;
+    $(p + 'hd').value = isoToday();
+    s.drops.forEach(function (d, i) { $(p + 'd' + i).value = d; });
+  }
+
+  var computed = { fund: null, fx: null };
+
+  function compute(k) {
+    var s = state[k];
+    var today = parseISO(isoToday()), last = parseISO(s.last);
+    var deadline = addMonths(last, Math.max(0, s.maxMonths));
+    var daysLeft = dayDiff(deadline, today);
+    var timeHit = daysLeft <= 0;
+    var dd = s.high > 0 ? (s.high - s.price) / s.high * 100 : 0;
+    var level = -1;
+    s.drops.forEach(function (d, i) { if (dd >= d && d > 0) level = Math.max(level, i); });
+    var firstHit = s.drops.some(function (d) { return d > 0 && dd >= d; });
+    var trigger = timeHit || firstHit;
+    return { deadline: deadline, daysLeft: daysLeft, timeHit: timeHit, dd: dd, level: level, trigger: trigger, total: trigger ? Math.max(0, s.cash) : 0 };
+  }
+
+  function render(k) {
+    var s = state[k], c = CFG[k], p = k + '_', r = computed[k] = compute(k);
+
+    $(p + 'dd').textContent = r.dd < 0 ? 'Above the high by ' + Math.abs(r.dd).toFixed(1) + '%' : r.dd.toFixed(1) + '% below';
+    $(p + 'time').textContent = r.timeHit ? 'Reached' : dateFmt(r.deadline) + ' (' + r.daysLeft + ' days)';
+    $(p + 'ago').textContent = agoText(s.last);
+
+    var box = $(p + 'levels'); box.innerHTML = '';
+    s.drops.forEach(function (d, i) {
+      var price = s.high * (1 - d / 100), reached = r.dd >= d && d > 0;
+      var near = !reached && r.dd >= d - 1 && d > 0;
+      var row = document.createElement('div'); row.className = 'level';
+      var a = document.createElement('span'); a.className = 'pill' + (reached ? ' hit' : near ? ' near' : ''); a.textContent = reached ? 'Reached' : near ? 'Close' : 'Not yet';
+      var b = document.createElement('span'); b.textContent = LABELS[i] + ': ' + c.fp(price) + ' or lower (' + d + '% off)';
+      row.appendChild(a); row.appendChild(b); box.appendChild(row);
+    });
+
+    var hist = $(p + 'hist'); hist.innerHTML = '';
+    if (!s.history.length) {
+      var empty = document.createElement('p'); empty.className = 'note'; empty.textContent = 'Nothing logged yet. Add your last one below.';
+      hist.appendChild(empty);
+    } else {
+      s.history.map(function (h, i) { return { h: h, i: i }; }).reverse().slice(0, 12).forEach(function (o) {
+        var row = document.createElement('div'); row.className = 'hline';
+        var a = document.createElement('span'); a.textContent = dateFmt(parseISO(o.h.date)) + ' · ' + c.fc(o.h.amount) + ' · ' + agoText(o.h.date);
+        var b = document.createElement('button'); b.type = 'button'; b.className = 'x'; b.textContent = 'Remove'; b.dataset.i = o.i;
+        row.appendChild(a); row.appendChild(b); hist.appendChild(row);
+      });
+    }
+
+    var v = $(p + 'verdict'), big = $(p + 'big'), det = $(p + 'detail'), rs = $(p + 'reasons'), btn = $(p + 'rec');
+    rs.innerHTML = '';
+    function reason(t) { var li = document.createElement('li'); li.textContent = t; rs.appendChild(li); }
+    var go = s.cash > 0 && r.trigger && r.total >= s.minTicket;
+
+    if (s.cash <= 0) {
+      v.className = 'card verdict'; big.textContent = 'Nothing waiting';
+      det.textContent = k === 'fund' ? 'Add the dollars you want to invest above.' : 'No pesos waiting to convert. Add savings above when they arrive.';
+    } else if (go) {
+      v.className = 'card verdict go';
+      big.textContent = c.verb + ' ' + c.fc(r.total) + ' now';
+      if (k === 'fund') det.textContent = 'About ' + (s.price > 0 ? (r.total / s.price).toFixed(2) : '0') + ' units of VWRA at ' + usd(s.price) + '. Fees not included.';
+      else det.textContent = 'About ' + (s.price > 0 ? usd(r.total / s.price) : '$0.00') + ' at ' + rate(s.price) + ' ₱ per $. It joins your waiting dollars.';
+      if (r.level >= 0) reason(c.name + ' is ' + r.dd.toFixed(1) + '% below its high. That is a ' + LABELS[r.level].toLowerCase() + '.');
+      if (r.timeHit) reason('Your max wait is over, so waiting cash goes in either way.');
+    } else if (r.trigger) {
+      v.className = 'card verdict';
+      big.textContent = 'Wait, below minimum';
+      det.textContent = c.fc(r.total) + ' is under your minimum of ' + c.fc(s.minTicket) + '. Add cash or lower the minimum in Settings.';
+    } else {
+      v.className = 'card verdict';
+      big.textContent = 'Wait';
+      var first = s.drops.filter(function (d) { return d > 0; }).sort(function (a, b) { return a - b; })[0];
+      var bits = [];
+      if (first !== undefined) bits.push(c.name + ' at ' + c.fp(s.high * (1 - first / 100)) + ' or lower');
+      bits.push('the time limit on ' + dateFmt(r.deadline));
+      det.textContent = 'Next trigger: ' + bits.join(', or ') + '.';
+    }
+    btn.disabled = !go;
+    if (!go) { btn.dataset.armed = ''; btn.textContent = c.rec; }
+    else if (btn.dataset.armed !== '1') btn.textContent = c.rec;
+    $('dot_' + k).className = 'dot' + (go ? ' on' : '');
+  }
+
+  function renderAll() {
+    render('fund'); render('fx');
+    var t = state.tab;
+    $('panel_fund').hidden = t !== 'fund'; $('panel_fx').hidden = t !== 'fx';
+    $('tab_fund').setAttribute('aria-selected', t === 'fund'); $('tab_fx').setAttribute('aria-selected', t === 'fx');
+  }
+
+  ['fund', 'fx'].forEach(function (k) {
+    var s = state[k], p = k + '_';
+    fillInputs(k);
+    ['cash', 'price', 'high', 'maxMonths', 'minTicket'].forEach(function (f) {
+      $(p + f).addEventListener('input', function () { s[f] = num($(p + f).value); save(); renderAll(); });
+    });
+    s.drops.forEach(function (d, i) {
+      $(p + 'd' + i).addEventListener('input', function () { s.drops[i] = num($(p + 'd' + i).value); save(); renderAll(); });
+    });
+    $(p + 'last').addEventListener('input', function () { if ($(p + 'last').value) { s.last = $(p + 'last').value; save(); renderAll(); } });
+
+    var armTimer = null, btn = $(p + 'rec');
+    btn.addEventListener('click', function () {
+      if (btn.disabled) return;
+      var r = computed[k];
+      if (btn.dataset.armed !== '1') {
+        btn.dataset.armed = '1';
+        btn.textContent = 'Tap again to confirm ' + CFG[k].fc(r.total);
+        clearTimeout(armTimer);
+        armTimer = setTimeout(function () { btn.dataset.armed = ''; renderAll(); }, 4000);
+        return;
+      }
+      clearTimeout(armTimer); btn.dataset.armed = '';
+      var amount = r.total;
+      s.cash = Math.max(0, Math.round((s.cash - amount) * 100) / 100);
+      if (k === 'fx' && s.price > 0) {
+        state.fund.cash = Math.round((state.fund.cash + amount / s.price) * 100) / 100;
+        fillInputs('fund');
+      }
+      s.history.push({ date: isoToday(), amount: amount });
+      s.last = isoToday();
+      save(); fillInputs(k); renderAll();
+    });
+
+    $(p + 'hadd').addEventListener('click', function () {
+      var d = $(p + 'hd').value, a = num($(p + 'ha').value);
+      if (!d || a <= 0) return;
+      s.history.push({ date: d, amount: a });
+      s.history.sort(function (x, y) { return x.date < y.date ? -1 : x.date > y.date ? 1 : 0; });
+      s.last = s.history[s.history.length - 1].date;
+      $(p + 'ha').value = '';
+      save(); fillInputs(k); renderAll();
+    });
+    $(p + 'hist').addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('button.x') : null;
+      if (!b) return;
+      s.history.splice(+b.dataset.i, 1);
+      if (s.history.length) s.last = s.history[s.history.length - 1].date;
+      save(); fillInputs(k); renderAll();
+    });
+  });
+
+  $('tab_fund').addEventListener('click', function () { state.tab = 'fund'; save(); renderAll(); });
+  $('tab_fx').addEventListener('click', function () { state.tab = 'fx'; save(); renderAll(); });
+
+  var BACKUP_TYPE = 'vwra-entry-planner';
+  function bkMsg(t) { $('bk_msg').textContent = t; }
+
+  $('bk_export').addEventListener('click', function () {
+    var payload = { type: BACKUP_TYPE, version: 1, exportedAt: new Date().toISOString(), state: state };
+    var url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
+    var a = document.createElement('a');
+    a.href = url; a.download = 'vwra-entry-planner-' + isoToday() + '.json';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { a.remove(); URL.revokeObjectURL(url); }, 100);
+    bkMsg('Exported ' + (state.fund.history.length + state.fx.history.length) + ' past entries and your settings.');
+  });
+
+  $('bk_import').addEventListener('click', function () { $('bk_file').value = ''; $('bk_file').click(); });
+  $('bk_file').addEventListener('change', function () {
+    var file = $('bk_file').files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onerror = function () { bkMsg('Could not read that file.'); };
+    reader.onload = function () {
+      var data;
+      try { data = JSON.parse(reader.result); } catch (e) { bkMsg('Import failed: not valid JSON.'); return; }
+      if (!data || data.type !== BACKUP_TYPE || !data.state || typeof data.state !== 'object') { bkMsg('Not a VWRA Entry Planner backup file.'); return; }
+      var next = normalize(data.state);
+      var n = next.fund.history.length + next.fx.history.length;
+      if (!confirm('Replace everything saved here with this backup (' + n + ' past entries)?')) return;
+      try { localStorage.setItem(KEY, JSON.stringify(next)); } catch (e) { bkMsg('Import failed: could not save.'); return; }
+      location.reload();
+    };
+    reader.readAsText(file);
+  });
+
+  renderAll();
+})();
+</script>
+
+  <script src="pwa-register.js"></script>
+</body></html>
