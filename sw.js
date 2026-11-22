@@ -68,22 +68,38 @@ self.addEventListener('fetch', event => {
   // server (the only way back to fresh was bumping CACHE_NAME, easy to
   // forget). Falling back to cache only when the network is unavailable
   // keeps offline support while making freshness-when-online the default.
-  event.respondWith(
-    fetch(request)
-      .then(response => {
-        if (response && response.status === 200 && response.type === 'basic') {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
-        }
-        return response;
-      })
-      .catch(async () => {
+  const network = fetch(request).then(response => {
+    if (response && response.status === 200 && response.type === 'basic') {
+      const copy = response.clone();
+      caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+    }
+    return response;
+  });
+  network.catch(() => {}); // a late failure after the cached copy was served is not an error
+
+  // Page opens only: if the network hasn't answered in 2.5s and a cached copy
+  // exists, serve that now (the fetch keeps running and refreshes the cache for
+  // next time). A weak phone connection no longer stalls the app opening.
+  const slowOpen = request.mode === 'navigate'
+    ? new Promise(resolve => setTimeout(() => resolve(null), 2500))
+    : null;
+
+  event.respondWith((async () => {
+    try {
+      if (slowOpen) {
+        const first = await Promise.race([network, slowOpen]);
+        if (first) return first;
         const cached = await caches.match(request);
         if (cached) return cached;
-        if (request.mode === 'navigate') {
-          return (await caches.match('./offline.html')) || caches.match('./index.html');
-        }
-        return Response.error();
-      })
-  );
+      }
+      return await network;
+    } catch (error) {
+      const cached = await caches.match(request);
+      if (cached) return cached;
+      if (request.mode === 'navigate') {
+        return (await caches.match('./offline.html')) || caches.match('./index.html');
+      }
+      return Response.error();
+    }
+  })());
 });
