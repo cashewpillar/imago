@@ -12,24 +12,6 @@
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="icons/imago-icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-    <script>
-        // Installed app reopened after the OS closed it: jump back to the last
-        // page visited (saved by pwa-register.js). Runs once per launch, before
-        // first paint, so the launcher never flashes. Browser tabs are untouched.
-        (function () {
-            try {
-                var standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-                if (!standalone || sessionStorage.getItem('imago:launched')) return;
-                sessionStorage.setItem('imago:launched', '1');
-                var last = localStorage.getItem('imago:lastPage');
-                if (!last) return;
-                var u = new URL(last, location.origin);
-                var base = location.pathname.replace(/[^/]*$/, '');
-                if (u.origin !== location.origin || u.pathname === location.pathname || u.pathname.indexOf(base) !== 0) return;
-                location.replace(u.pathname + u.search);
-            } catch (e) {}
-        })();
-    </script>
     <style>
         :root {
             --bg: #f7f6f2;

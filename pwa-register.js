@@ -1,22 +1,6 @@
 const scriptSrc = document.currentScript ? document.currentScript.src : window.location.href;
 const swUrl = new URL('sw.js', scriptSrc).pathname;
 
-// ── Last page (installed app only) ────────────────────────────────────────────
-// Remember the page the user is on so index.html can reopen it after the OS
-// closes the app. The session flag tells index.html this launch is already
-// underway, so tapping "home" later never bounces back out.
-(function rememberLastPage() {
-  try {
-    sessionStorage.setItem('imago:launched', '1');
-    const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-    if (!standalone) return;
-    const scopeRoot = new URL('./', scriptSrc).pathname;
-    const { pathname, search } = window.location;
-    if (pathname.indexOf(scopeRoot) !== 0 || pathname.endsWith('/') || pathname.endsWith('/index.html')) return;
-    localStorage.setItem('imago:lastPage', pathname + search);
-  } catch (e) {}
-})();
-
 // ── Install prompt ────────────────────────────────────────────────────────────
 // Saving the event (without preventDefault()) lets the settings dropdown's
 // "Install app" item also trigger this same prompt later -- a discoverable,
